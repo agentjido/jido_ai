@@ -97,10 +97,14 @@ defmodule Jido.AI.Skill.Error.Validation.InvalidField do
     class: :validation
 
   @impl true
+  def message(%{field: :frontmatter, reason: :unsupported_top_level_fields, value: fields}),
+    do: "Unsupported top-level frontmatter fields: #{Enum.map_join(fields, ", ", &inspect/1)}"
+
   def message(%{field: field, reason: reason}),
     do: "Invalid #{field}: #{format_reason(reason)}"
 
   defp format_reason(:directory_name_mismatch), do: "must match the parent directory name"
+  defp format_reason(:invalid_skill_filename), do: "file must be named exactly SKILL.md"
   defp format_reason(:too_long), do: "exceeds the maximum length"
   defp format_reason(:empty), do: "must not be empty"
   defp format_reason(:invalid_type), do: "has an invalid type"

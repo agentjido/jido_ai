@@ -79,13 +79,19 @@ defmodule Jido.AI.Skill.LoaderTest do
     Body.
     """
 
-    File.write!(Path.join(@fixtures_path, "valid.md"), valid_skill)
-    File.write!(Path.join(@fixtures_path, "minimal.md"), minimal_skill)
-    File.write!(Path.join(@fixtures_path, "no_frontmatter.md"), no_frontmatter)
-    File.write!(Path.join(@fixtures_path, "invalid_yaml.md"), invalid_yaml)
-    File.write!(Path.join(@fixtures_path, "invalid_name.md"), invalid_name)
-    File.write!(Path.join(@fixtures_path, "missing_name.md"), missing_name)
-    File.write!(Path.join(@fixtures_path, "allowed_tools_list.md"), allowed_tools_list)
+    for {directory, content} <- [
+          {"test-skill", valid_skill},
+          {"minimal", minimal_skill},
+          {"no-frontmatter", no_frontmatter},
+          {"invalid-yaml", invalid_yaml},
+          {"invalid-name", invalid_name},
+          {"missing-name", missing_name},
+          {"tools-list", allowed_tools_list}
+        ] do
+      skill_dir = Path.join(@fixtures_path, directory)
+      File.mkdir_p!(skill_dir)
+      File.write!(Path.join(skill_dir, "SKILL.md"), content)
+    end
 
     on_exit(fn ->
       File.rm_rf!(@fixtures_path)
@@ -96,7 +102,7 @@ defmodule Jido.AI.Skill.LoaderTest do
 
   describe "load/1" do
     test "loads a valid SKILL.md file" do
-      path = Path.join(@fixtures_path, "valid.md")
+      path = fixture("test-skill")
       assert {:ok, %Spec{} = spec} = Loader.load(path)
 
       assert spec.name == "test-skill"
@@ -110,7 +116,7 @@ defmodule Jido.AI.Skill.LoaderTest do
     end
 
     test "loads minimal skill with only required fields" do
-      path = Path.join(@fixtures_path, "minimal.md")
+      path = fixture("minimal")
       assert {:ok, %Spec{} = spec} = Loader.load(path)
 
       assert spec.name == "minimal"
@@ -124,27 +130,27 @@ defmodule Jido.AI.Skill.LoaderTest do
     end
 
     test "returns error for no frontmatter" do
-      path = Path.join(@fixtures_path, "no_frontmatter.md")
+      path = fixture("no-frontmatter")
       assert {:error, %Error.Parse.NoFrontmatter{}} = Loader.load(path)
     end
 
     test "returns error for invalid YAML" do
-      path = Path.join(@fixtures_path, "invalid_yaml.md")
+      path = fixture("invalid-yaml")
       assert {:error, %Error.Parse.InvalidYaml{}} = Loader.load(path)
     end
 
     test "returns error for invalid name format" do
-      path = Path.join(@fixtures_path, "invalid_name.md")
+      path = fixture("invalid-name")
       assert {:error, %Error.Validation.InvalidName{name: "Invalid_Name!"}} = Loader.load(path)
     end
 
     test "returns error for missing name" do
-      path = Path.join(@fixtures_path, "missing_name.md")
+      path = fixture("missing-name")
       assert {:error, %Error.Validation.MissingField{field: :name}} = Loader.load(path)
     end
 
     test "normalizes allowed-tools lists only in lenient mode" do
-      path = Path.join(@fixtures_path, "allowed_tools_list.md")
+      path = fixture("tools-list")
 
       assert {:error, %Error.Validation.InvalidField{field: :allowed_tools, reason: :invalid_type}} =
                Loader.load(path)
@@ -157,12 +163,12 @@ defmodule Jido.AI.Skill.LoaderTest do
 
   describe "load!/1" do
     test "returns spec for valid file" do
-      path = Path.join(@fixtures_path, "valid.md")
+      path = fixture("test-skill")
       assert %Spec{name: "test-skill"} = Loader.load!(path)
     end
 
     test "raises for invalid file" do
-      path = Path.join(@fixtures_path, "no_frontmatter.md")
+      path = fixture("no-frontmatter")
       assert_raise Error.Parse.NoFrontmatter, fn -> Loader.load!(path) end
     end
   end
@@ -436,4 +442,6 @@ defmodule Jido.AI.Skill.LoaderTest do
       assert Enum.any?(diagnostics.warnings, &(&1.type == :invalid_name_format))
     end
   end
+
+  defp fixture(directory), do: Path.join([@fixtures_path, directory, "SKILL.md"])
 end

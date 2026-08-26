@@ -165,15 +165,34 @@ for model-facing catalogs.
 
 Strict loading (`lenient: false`, the default) enforces the Agent Skills format:
 
+- the file is named exactly `SKILL.md`
 - the declared name exactly matches the parent directory
 - descriptions are non-empty and at most 1,024 characters
 - license is a string when present
 - compatibility is non-empty and at most 500 characters when present
 - metadata contains only string keys and string values
 - `allowed-tools` is a space-separated string when present
+- only specification fields are present at the top level
+
+Put Jido-specific file metadata under namespaced metadata keys:
+
+```yaml
+metadata:
+  jido_ai.tags: "support review"
+  jido_ai.version: "1.0.0"
+```
+
+Module-based Jido skills can continue to use native `tags`, `vsn`, `actions`,
+and `plugins` options.
 
 Lenient loading keeps interoperability behavior: it records diagnostics and can
 normalize or truncate recoverable values.
+
+The experimental Agent Skills `allowed-tools` field is advisory in Jido.AI.
+Automatic activation does not approve, enable, or restrict tools from this
+field. A host can apply an explicit policy with
+`Jido.AI.Skill.Prompt.filter_tools/2`, but that restrictive use is a host choice
+and is not the Agent Skills pre-approval meaning.
 
 ## Bounded Discovery And Trust
 
@@ -207,7 +226,8 @@ CLI failure behaviors:
 - `mix jido_ai.skill list` with no paths prints usage help
 - `mix jido_ai.skill validate` with no paths prints usage help
 - unknown commands print `mix jido_ai.skill` help guidance
-- `--strict` raises when any skill fails validation (non-zero exit)
+- validation prints collected warnings and errors
+- `--strict` raises when any skill has a warning or error (non-zero exit)
 
 ## Failure Modes
 

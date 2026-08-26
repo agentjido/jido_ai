@@ -114,6 +114,7 @@ defmodule Mix.Tasks.JidoAi.SkillTest do
       assert {:ok, decoded} = Jason.decode(json)
       assert decoded["valid"] == 1
       assert decoded["errors"] == 1
+      assert decoded["warnings"] >= 0
       assert Enum.any?(decoded["results"], &(&1["path"] == valid and &1["valid"] == true))
       assert Enum.any?(decoded["results"], &(&1["path"] == invalid and &1["valid"] == false))
     end
@@ -121,8 +122,29 @@ defmodule Mix.Tasks.JidoAi.SkillTest do
     test "raises in strict mode when validation errors are present", %{invalid_skill_path: invalid} do
       flush_shell_messages()
 
-      assert_raise Mix.Error, "Validation failed with 1 error(s)", fn ->
+      assert_raise Mix.Error, "Validation failed for 1 skill(s)", fn ->
         invoke_task(["validate", invalid, "--strict"])
+      end
+    end
+
+    test "prints warnings and fails strict validation when warnings are present", %{valid_skill_path: path} do
+      File.write!(path, """
+      ---
+      name: demo-skill
+      description: Demo skill with a migration warning.
+      tags: [legacy]
+      ---
+      """)
+
+      messages = run_task_with_output(["validate", path])
+      output = format_messages(messages)
+      assert output =~ "unsupported_top_level_fields"
+      assert output =~ "Warnings: 1"
+
+      flush_shell_messages()
+
+      assert_raise Mix.Error, "Validation failed for 1 skill(s)", fn ->
+        invoke_task(["validate", path, "--strict"])
       end
     end
 

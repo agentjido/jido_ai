@@ -92,6 +92,10 @@ defmodule Jido.AI.Skill do
 
   @doc """
   Returns the allowed tools for a skill.
+
+  For filesystem Agent Skills, `allowed-tools` is advisory metadata. Jido.AI
+  does not automatically approve, enable, or restrict tools from this field.
+  A host must apply its own explicit approval policy.
   """
   @spec allowed_tools(module() | Spec.t() | String.t()) :: [String.t()]
   def allowed_tools(mod) when is_atom(mod), do: mod.allowed_tools()
