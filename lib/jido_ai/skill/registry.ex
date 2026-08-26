@@ -20,7 +20,7 @@ defmodule Jido.AI.Skill.Registry do
 
   require Logger
 
-  alias Jido.AI.Skill.{Discovery, Error, Spec}
+  alias Jido.AI.Skill.{Discovery, Error, Loader, Spec}
 
   @table_name :jido_skill_registry
   @activation_table :jido_skill_activations
@@ -372,24 +372,34 @@ defmodule Jido.AI.Skill.Registry do
   # Private functions
 
   defp do_load_paths(paths) do
-    with {:ok, skills, diagnostics} <-
-           Discovery.discover_from_with_diagnostics(paths, trust: true) do
-      Enum.each(diagnostics.warnings, &Logger.warning(&1.message))
-
-      Enum.reduce_while(skills, {:ok, 0}, fn metadata, {:ok, count} ->
-        case load_and_register(metadata) do
-          :ok -> {:cont, {:ok, count + 1}}
+    with {:ok, files} <- Discovery.discover_files(paths, trust: true) do
+      files
+      |> Enum.reduce_while({:ok, 0, %{}}, fn path, {:ok, count, winners} ->
+        case load_and_register(path, winners) do
+          {:ok, winners} -> {:cont, {:ok, count + 1, winners}}
+          {:shadowed, winners} -> {:cont, {:ok, count, winners}}
           {:error, _} = error -> {:halt, error}
         end
       end)
+      |> case do
+        {:ok, count, _winners} -> {:ok, count}
+        {:error, _reason} = error -> error
+      end
     end
   end
 
-  defp load_and_register(metadata) do
-    case Discovery.to_spec(metadata, lenient: false) do
+  defp load_and_register(path, winners) do
+    case Loader.load(path, lenient: false) do
       {:ok, spec} ->
-        :ets.insert(@table_name, {spec.name, spec})
-        :ok
+        case Map.fetch(winners, spec.name) do
+          :error ->
+            :ets.insert(@table_name, {spec.name, spec})
+            {:ok, Map.put(winners, spec.name, path)}
+
+          {:ok, winner_path} ->
+            Logger.warning("Skill '#{spec.name}' at '#{path}' is shadowed by '#{winner_path}'")
+            {:shadowed, winners}
+        end
 
       {:error, _reason} = error ->
         error

@@ -214,6 +214,18 @@ defmodule Jido.AI.Skill.RegistryTest do
     end
 
     @tag :tmp_dir
+    test "returns strict load errors for malformed discovered files", %{tmp_dir: tmp_dir} do
+      skill_dir = Path.join(tmp_dir, "malformed")
+      File.mkdir_p!(skill_dir)
+      File.write!(Path.join(skill_dir, "SKILL.md"), "---\nname: [broken\n---\n")
+
+      assert {:error, %Jido.AI.Skill.Error.Parse.InvalidYaml{}} =
+               Registry.load_from_paths([tmp_dir])
+
+      assert Registry.list() == []
+    end
+
+    @tag :tmp_dir
     test "keeps the first root when names collide and logs both locations", %{tmp_dir: tmp_dir} do
       first_root = Path.join(tmp_dir, "z-first")
       second_root = Path.join(tmp_dir, "a-second")

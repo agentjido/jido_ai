@@ -76,8 +76,9 @@ defmodule Jido.AI.Skill.Activation do
       build_context_from_registry(name, opts)
     else
       # Try to resolve the skill
-      with {:ok, spec} <- resolve_skill(name, opts) do
-        do_activate(spec, opts)
+      with {:ok, spec} <- resolve_skill(name, opts),
+           {:ok, resolved_spec} <- resolve_activation_spec(spec) do
+        do_activate(resolved_spec, opts)
       end
     end
   end
