@@ -158,7 +158,7 @@ defmodule Jido.AI.Actions.Skill.LoadResource do
     {:error,
      %{
        type: :binary_resource,
-       message: "Resource '#{path}' is not UTF-8 text",
+       message: "Resource '#{path}' is not safe UTF-8 text",
        skill: name,
        path: path
      }}

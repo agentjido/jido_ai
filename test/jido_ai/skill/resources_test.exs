@@ -107,6 +107,14 @@ defmodule Jido.AI.Skill.ResourcesTest do
       assert {:ok, %{resources: []}} = Resources.list_all(skill_root)
     end
 
+    test "does not list a hard-link alias of the skill document", %{tmp_dir: tmp_dir} do
+      skill_path = Path.join(tmp_dir, "SKILL.md")
+      File.write!(skill_path, "instructions")
+      File.ln!(skill_path, Path.join(tmp_dir, "instructions.txt"))
+
+      assert {:ok, %{resources: []}} = Resources.list_all(tmp_dir)
+    end
+
     test "validates resource policies", %{tmp_dir: tmp_dir} do
       assert {:error, {:invalid_resource_policy, :max_resources}} =
                Resources.list_all(tmp_dir, max_resources: 0)
@@ -149,8 +157,22 @@ defmodule Jido.AI.Skill.ResourcesTest do
       File.write!(Path.join(tmp_dir, "SKILL.md"), "instructions")
 
       assert {:error, :invalid_resource_path} = Resources.load_text(tmp_dir, "SKILL.md")
+      assert {:error, :invalid_resource_path} = Resources.load_text(tmp_dir, "./SKILL.md")
+
+      assert {:error, :invalid_resource_path} =
+               Resources.load_text(tmp_dir, "references/../SKILL.md")
+
       assert {:error, :path_traversal} = Resources.load_text(tmp_dir, "../outside.txt")
       assert {:error, :path_traversal} = Resources.load_text(tmp_dir, "/etc/passwd")
+    end
+
+    test "rejects a hard-link alias of the skill document", %{tmp_dir: tmp_dir} do
+      skill_path = Path.join(tmp_dir, "SKILL.md")
+      alias_path = Path.join(tmp_dir, "instructions.txt")
+      File.write!(skill_path, "instructions")
+      File.ln!(skill_path, alias_path)
+
+      assert {:error, :invalid_resource_path} = Resources.load_text(tmp_dir, "instructions.txt")
     end
 
     test "returns not found for a missing file", %{tmp_dir: tmp_dir} do
@@ -170,6 +192,9 @@ defmodule Jido.AI.Skill.ResourcesTest do
     test "rejects binary content", %{tmp_dir: tmp_dir} do
       File.write!(Path.join(tmp_dir, "image.bin"), <<0xFF, 0xFE, 0x00>>)
       assert {:error, :binary_resource} = Resources.load_text(tmp_dir, "image.bin")
+
+      File.write!(Path.join(tmp_dir, "nul.bin"), <<0, 0, 0, 0>>)
+      assert {:error, :binary_resource} = Resources.load_text(tmp_dir, "nul.bin")
     end
 
     test "rejects symlinks even when the target stays inside the skill", %{tmp_dir: tmp_dir} do

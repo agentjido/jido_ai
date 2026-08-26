@@ -62,6 +62,9 @@ defmodule Jido.AI.Actions.Skill.LoadResourceTest do
       assert {:error, %{type: :invalid_resource_path}} =
                LoadResource.run(%{name: "safe-skill", path: "SKILL.md"}, context)
 
+      assert {:error, %{type: :invalid_resource_path}} =
+               LoadResource.run(%{name: "safe-skill", path: "./SKILL.md"}, context)
+
       assert {:error, %{type: :resource_not_found}} =
                LoadResource.run(%{name: "safe-skill", path: "missing.txt"}, context)
     end
@@ -70,6 +73,7 @@ defmodule Jido.AI.Actions.Skill.LoadResourceTest do
       activate_skill(tmp_dir, "bounded-skill", "bounded-agent", max_text_bytes: 4)
       File.write!(Path.join(tmp_dir, "large.txt"), "12345")
       File.write!(Path.join(tmp_dir, "binary.bin"), <<0xFF, 0xFE>>)
+      File.write!(Path.join(tmp_dir, "nul.bin"), <<0, 0, 0>>)
       context = %{agent_id: "bounded-agent"}
 
       assert {:error, oversized} =
@@ -82,6 +86,9 @@ defmodule Jido.AI.Actions.Skill.LoadResourceTest do
 
       assert {:error, %{type: :binary_resource}} =
                LoadResource.run(%{name: "bounded-skill", path: "binary.bin"}, context)
+
+      assert {:error, %{type: :binary_resource}} =
+               LoadResource.run(%{name: "bounded-skill", path: "nul.bin"}, context)
     end
 
     test "uses the agent integration policy after load_skill activation", %{tmp_dir: tmp_dir} do

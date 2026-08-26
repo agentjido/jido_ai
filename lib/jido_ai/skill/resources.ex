@@ -66,7 +66,8 @@ defmodule Jido.AI.Skill.Resources do
   Lists all bundled resources with explicit bounds.
 
   Results are sorted by relative path. If a limit prevents a complete result,
-  `complete` is false and `truncation_reasons` identifies each reached limit.
+  `complete` is false and `truncation_reasons` identifies each reached limit
+  or unreadable entry.
   """
   @spec list_all(String.t(), ResourcePolicy.t() | keyword() | map()) ::
           {:ok, resource_listing()} | {:error, term()}
@@ -166,7 +167,7 @@ defmodule Jido.AI.Skill.Resources do
          :ok <- within_size(stat.size, policy.max_file_bytes, :file),
          :ok <- within_size(stat.size, policy.max_text_bytes, :text),
          {:ok, content} <- read_bounded(absolute_path, policy.max_text_bytes, :text, stat),
-         true <- String.valid?(content) do
+         true <- text_content?(content) do
       {:ok, %{content: content, relative_path: normalized_path, size: byte_size(content)}}
     else
       false -> {:error, :binary_resource}
@@ -259,7 +260,7 @@ defmodule Jido.AI.Skill.Resources do
       {:ok, %File.Stat{type: :regular} = stat} ->
         relative_path = Path.relative_to(path, root)
 
-        if relative_path == "SKILL.md" do
+        if relative_path == "SKILL.md" or skill_document_alias?(root, stat) do
           state
         else
           add_resource(resource_info_for(relative_path, stat), policy, state)
@@ -271,7 +272,10 @@ defmodule Jido.AI.Skill.Resources do
       {:ok, %File.Stat{type: :directory}} ->
         truncate(state, :max_depth, false)
 
-      _other ->
+      {:error, _reason} ->
+        truncate(state, :unreadable_entry, false)
+
+      {:ok, _other} ->
         state
     end
   end
@@ -322,12 +326,15 @@ defmodule Jido.AI.Skill.Resources do
   end
 
   defp resolve_loadable_file(skill_root, relative_path) do
-    with false <- relative_path == "SKILL.md",
-         {:ok, absolute_path} <- resolve_path(skill_root, relative_path),
+    expanded_root = Path.expand(skill_root)
+
+    with {:ok, absolute_path} <- resolve_path(expanded_root, relative_path),
+         normalized_path = Path.relative_to(absolute_path, expanded_root),
+         false <- normalized_path == "SKILL.md",
          {:ok, stat} <- File.lstat(absolute_path),
-         :ok <- reject_symlink_path(skill_root, absolute_path),
+         :ok <- reject_skill_document_alias(expanded_root, stat),
+         :ok <- reject_symlink_path(expanded_root, absolute_path),
          :ok <- require_regular_file(stat) do
-      normalized_path = Path.relative_to(absolute_path, Path.expand(skill_root))
       {:ok, absolute_path, normalized_path, stat}
     else
       true -> {:error, :invalid_resource_path}
@@ -343,6 +350,19 @@ defmodule Jido.AI.Skill.Resources do
   defp require_regular_file(%File.Stat{type: :regular}), do: :ok
   defp require_regular_file(%File.Stat{type: :symlink}), do: {:error, :path_traversal}
   defp require_regular_file(%File.Stat{}), do: {:error, :not_found}
+
+  defp reject_skill_document_alias(skill_root, candidate_stat) do
+    if skill_document_alias?(skill_root, candidate_stat),
+      do: {:error, :invalid_resource_path},
+      else: :ok
+  end
+
+  defp skill_document_alias?(skill_root, candidate_stat) do
+    case File.lstat(Path.join(skill_root, "SKILL.md")) do
+      {:ok, skill_stat} -> matching_file_identity?(candidate_stat, skill_stat)
+      {:error, _reason} -> false
+    end
+  end
 
   defp within_size(size, limit, _kind) when size <= limit, do: :ok
   defp within_size(size, limit, kind), do: {:error, {:resource_too_large, kind, size, limit}}
@@ -380,14 +400,23 @@ defmodule Jido.AI.Skill.Resources do
   end
 
   defp same_file(expected, opened) do
-    identity = {expected.major_device, expected.minor_device, expected.inode}
-    opened_identity = {opened.major_device, opened.minor_device, opened.inode}
-
-    if identity == opened_identity and opened.type == :regular do
+    if file_identity(expected) == file_identity(opened) and opened.type == :regular do
       :ok
     else
       {:error, :resource_path_changed}
     end
+  end
+
+  defp file_identity(stat), do: {stat.major_device, stat.minor_device, stat.inode}
+
+  defp matching_file_identity?(left, right) do
+    identity = file_identity(left)
+    {_major, _minor, inode} = identity
+    inode != 0 and identity == file_identity(right)
+  end
+
+  defp text_content?(content) do
+    String.valid?(content) and not String.contains?(content, <<0>>)
   end
 
   defp do_resolve_path(skill_root, relative_path) do
