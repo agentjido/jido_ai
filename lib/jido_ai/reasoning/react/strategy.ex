@@ -63,6 +63,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           reqllm_tools: [ReqLLM.Tool.t()],
           actions_by_name: %{String.t() => module()},
           request_transformer: module() | nil,
+          agent_module: module(),
           system_prompt: String.t(),
           model: String.t(),
           max_iterations: pos_integer(),
@@ -697,11 +698,14 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           state: runtime_state,
           task_supervisor: config[:runtime_task_supervisor],
           context:
-            Map.merge(effective_tool_context, %{
+            effective_tool_context
+            |> Map.merge(%{
               state: state_snapshot,
               request_id: request_id,
               run_id: run_id,
+              agent_module: config[:agent_module],
               agent_id: state[:agent_id] || Map.get(agent, :id),
+              tool_context: effective_tool_context,
               observability: config[:observability] || %{},
               effect_policy: config[:effect_policy] || Effects.default_policy()
             })
@@ -2370,6 +2374,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       reqllm_tools: reqllm_tools,
       actions_by_name: actions_by_name,
       request_transformer: validate_request_transformer_opt!(Keyword.get(opts, :request_transformer)),
+      agent_module: ctx[:agent_module],
       system_prompt: append_system_prompt(normalize_system_prompt_opt(opts), skill_integration.index),
       model: resolved_model,
       max_iterations: Keyword.get(opts, :max_iterations, @default_max_iterations),

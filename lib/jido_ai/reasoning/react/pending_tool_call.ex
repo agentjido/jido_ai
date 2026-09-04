@@ -3,11 +3,14 @@ defmodule Jido.AI.Reasoning.ReAct.PendingToolCall do
   Tracks a tool call in the ReAct runtime.
   """
 
+  alias Jido.AI.Effects.Applier
+
   @schema Zoi.struct(
             __MODULE__,
             %{
               id: Zoi.string(description: "LLM tool call ID"),
               name: Zoi.string(description: "Tool/action name"),
+              action_module: Zoi.atom(description: "Resolved action module") |> Zoi.optional(),
               arguments: Zoi.map(description: "Tool call arguments") |> Zoi.default(%{}),
               status: Zoi.atom(description: "Execution status") |> Zoi.default(:pending),
               result: Zoi.any(description: "Raw tool execution result") |> Zoi.optional(),
@@ -33,11 +36,13 @@ defmodule Jido.AI.Reasoning.ReAct.PendingToolCall do
   """
   @spec from_tool_call(map()) :: t()
   def from_tool_call(%{} = tool_call) do
-    attrs = %{
-      id: to_string(Map.get(tool_call, :id, Map.get(tool_call, "id", ""))),
-      name: to_string(Map.get(tool_call, :name, Map.get(tool_call, "name", ""))),
-      arguments: Map.get(tool_call, :arguments, Map.get(tool_call, "arguments", %{})) || %{}
-    }
+    attrs =
+      %{
+        id: to_string(Map.get(tool_call, :id, Map.get(tool_call, "id", ""))),
+        name: to_string(Map.get(tool_call, :name, Map.get(tool_call, "name", ""))),
+        arguments: Map.get(tool_call, :arguments, Map.get(tool_call, "arguments", %{})) || %{}
+      }
+      |> maybe_put_action_module(Map.get(tool_call, :action_module, Map.get(tool_call, "action_module")))
 
     case Zoi.parse(@schema, attrs) do
       {:ok, call} -> call
@@ -45,17 +50,25 @@ defmodule Jido.AI.Reasoning.ReAct.PendingToolCall do
     end
   end
 
+  defp maybe_put_action_module(attrs, module) when is_atom(module) and not is_nil(module),
+    do: Map.put(attrs, :action_module, module)
+
+  defp maybe_put_action_module(attrs, _module), do: attrs
+
   @doc """
   Marks a pending call as completed with result, attempts, and duration metadata.
   """
-  @spec complete(t(), {:ok, term()} | {:error, term()}, non_neg_integer(), non_neg_integer()) :: t()
+  @spec complete(t(), Applier.result_tuple(), non_neg_integer(), non_neg_integer()) :: t()
   def complete(%__MODULE__{} = call, result, attempts, duration_ms) do
     %__MODULE__{
       call
       | result: result,
-        status: if(match?({:ok, _}, result), do: :ok, else: :error),
+        status: result_status(result),
         attempts: max(attempts, 1),
         duration_ms: duration_ms
     }
   end
+
+  defp result_status({:ok, _payload, _effects}), do: :ok
+  defp result_status({:error, _reason, _effects}), do: :error
 end
