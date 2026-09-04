@@ -33,7 +33,7 @@ defmodule Jido.AI.Skill.ResourceProvider do
 
   Jido validates and normalizes every result, reapplies `ResourcePolicy`, rejects
   entries that cannot be encoded for listing, rejects malformed identifiers and
-  binary content, and invokes the provider on every resource load so content
+  binary content unless explicitly allowed, and invokes the provider on every resource load so content
   remains fresh. Listing truncation is ordered: the first entry that violates
   count, declared-size, or encoded-listing limits is excluded, as is everything
   after it. Resource IDs are opaque and are never parsed, normalized, joined,
@@ -127,18 +127,20 @@ defmodule Jido.AI.Skill.ResourceProvider do
   end
 
   @doc """
-  Loads one provider-backed UTF-8 text resource by opaque ID.
+  Loads one provider-backed resource by opaque ID.
+
+  Binary responses require `binary: :allow`, `filename`, and `mime_type`.
   """
   @spec load(provider(), Spec.t(), String.t(), ResourcePolicy.t(), map()) ::
-          {:ok, %{content: String.t(), resource_id: String.t(), size: non_neg_integer(), mime_type: String.t() | nil}}
+          {:ok, Resources.loaded_resource()}
           | {:error, term()}
   def load(provider, %Spec{} = spec, resource_id, %ResourcePolicy{} = policy, context) when is_binary(resource_id) do
     with :ok <- validate_resource_id(resource_id),
          request = %{operation: :load, skill: spec, resource_id: resource_id, policy: policy},
          {:ok, result} <- invoke(provider, request, public_context(context)),
          {:ok, resource} <- validate_load_result(result, resource_id),
-         :ok <- Resources.validate_loaded_text(loaded_resource(resource), policy) do
-      {:ok, resource}
+         {:ok, normalized} <- Resources.validate_loaded_resource(loaded_resource(resource), policy) do
+      {:ok, Map.merge(resource, normalized)}
     end
   end
 
@@ -356,13 +358,14 @@ defmodule Jido.AI.Skill.ResourceProvider do
     resource_id = fetch_entry_value(result, :resource_id)
     size = fetch_entry_value(result, :size)
     mime_type = fetch_entry_value(result, :mime_type)
+    filename = fetch_entry_value(result, :filename)
 
     with :ok <- validate_load_shape(content, size),
          :ok <- validate_resource_id(resource_id),
          :ok <- matching_id(resource_id, requested_id),
          :ok <- valid_optional_string(:mime_type, mime_type),
          :ok <- matching_size(content, size) do
-      {:ok, %{content: content, resource_id: resource_id, size: size, mime_type: mime_type}}
+      {:ok, %{content: content, resource_id: resource_id, size: size, mime_type: mime_type, filename: filename}}
     else
       {:error, reason} -> {:error, reason}
     end
@@ -375,6 +378,7 @@ defmodule Jido.AI.Skill.ResourceProvider do
       content: resource.content,
       size: resource.size,
       mime_type: resource.mime_type,
+      filename: resource.filename,
       selector: {:resource_id, resource.resource_id}
     }
   end

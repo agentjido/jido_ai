@@ -126,8 +126,8 @@ defmodule Jido.AI.Skill.ResourcesTest do
       assert {:ok, %ResourcePolicy{max_text_bytes: 12}} =
                ResourcePolicy.new(max_text_bytes: 12)
 
-      assert {:error, {:invalid_resource_policy, :binary}} =
-               ResourcePolicy.new(binary: :allow)
+      assert {:ok, %ResourcePolicy{binary: :allow}} = ResourcePolicy.new(binary: :allow)
+      assert {:error, {:invalid_resource_policy, :binary}} = ResourcePolicy.new(binary: :unknown)
     end
   end
 

@@ -4,7 +4,8 @@ defmodule Jido.AI.Skill.ResourcePolicy do
 
   A policy bounds file count, directory traversal, the encoded general-resource
   list, file size, and text returned to model context. Binary content is
-  rejected by the text API.
+  rejected by default. Set `binary: :allow` to permit image and file attachments
+  through the generic resource loader. Text-only APIs always reject binary data.
   """
 
   @default_max_resources 256
@@ -38,7 +39,7 @@ defmodule Jido.AI.Skill.ResourcePolicy do
           max_listing_bytes: pos_integer(),
           max_file_bytes: pos_integer(),
           max_text_bytes: pos_integer(),
-          binary: :reject
+          binary: :reject | :allow
         }
 
   @doc """
@@ -97,7 +98,7 @@ defmodule Jido.AI.Skill.ResourcePolicy do
       max_listing_bytes: positive?(policy.max_listing_bytes),
       max_file_bytes: positive?(policy.max_file_bytes),
       max_text_bytes: positive?(policy.max_text_bytes),
-      binary: policy.binary == :reject
+      binary: policy.binary in [:reject, :allow]
     ]
 
     case Enum.find(checks, fn {_key, valid?} -> not valid? end) do
