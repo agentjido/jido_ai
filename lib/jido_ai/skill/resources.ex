@@ -40,6 +40,14 @@ defmodule Jido.AI.Skill.Resources do
           limits: map()
         }
 
+  @type loaded_resource :: %{
+          required(:content) => binary(),
+          required(:size) => non_neg_integer(),
+          optional(:mime_type) => String.t() | nil,
+          optional(:filename) => String.t() | nil,
+          optional(:selector) => {:path, String.t()} | {:resource_id, String.t()}
+        }
+
   @type resource_type :: :scripts | :references | :assets
 
   @doc false
@@ -105,8 +113,17 @@ defmodule Jido.AI.Skill.Resources do
   end
 
   @doc false
-  @spec enforce_text_bounds(String.t(), non_neg_integer(), ResourcePolicy.t()) :: :ok | {:error, term()}
+  @spec enforce_text_bounds(binary(), non_neg_integer(), ResourcePolicy.t()) :: :ok | {:error, term()}
   def enforce_text_bounds(content, size, %ResourcePolicy{} = policy) do
+    validate_loaded_text(%{content: content, size: size}, policy)
+  end
+
+  @doc """
+  Validates a loaded resource against the current text-only resource policy.
+  """
+  @spec validate_loaded_text(loaded_resource(), ResourcePolicy.t()) :: :ok | {:error, term()}
+  def validate_loaded_text(%{content: content, size: size}, %ResourcePolicy{} = policy)
+      when is_binary(content) and is_integer(size) and size >= 0 do
     with :ok <- within_size(size, policy.max_file_bytes, :file),
          :ok <- within_size(size, policy.max_text_bytes, :text),
          true <- text_content?(content) do
@@ -116,6 +133,8 @@ defmodule Jido.AI.Skill.Resources do
       {:error, reason} -> {:error, reason}
     end
   end
+
+  def validate_loaded_text(_resource, %ResourcePolicy{}), do: {:error, :malformed_resource}
 
   @doc """
   Lists all resources and keeps conventional groups for compatibility.
@@ -187,10 +206,15 @@ defmodule Jido.AI.Skill.Resources do
          :ok <- within_size(stat.size, policy.max_file_bytes, :file),
          :ok <- within_size(stat.size, policy.max_text_bytes, :text),
          {:ok, content} <- read_bounded(absolute_path, policy.max_text_bytes, :text, stat),
-         true <- text_content?(content) do
+         resource = %{
+           content: content,
+           size: byte_size(content),
+           filename: Path.basename(normalized_path),
+           selector: {:path, normalized_path}
+         },
+         :ok <- validate_loaded_text(resource, policy) do
       {:ok, %{content: content, relative_path: normalized_path, size: byte_size(content)}}
     else
-      false -> {:error, :binary_resource}
       {:error, reason} -> {:error, reason}
     end
   end

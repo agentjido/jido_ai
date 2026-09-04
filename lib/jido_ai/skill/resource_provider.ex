@@ -137,7 +137,7 @@ defmodule Jido.AI.Skill.ResourceProvider do
          request = %{operation: :load, skill: spec, resource_id: resource_id, policy: policy},
          {:ok, result} <- invoke(provider, request, public_context(context)),
          {:ok, resource} <- validate_load_result(result, resource_id),
-         :ok <- Resources.enforce_text_bounds(resource.content, resource.size, policy) do
+         :ok <- Resources.validate_loaded_text(loaded_resource(resource), policy) do
       {:ok, resource}
     end
   end
@@ -369,6 +369,15 @@ defmodule Jido.AI.Skill.ResourceProvider do
   end
 
   defp validate_load_result(_result, _requested_id), do: {:error, :malformed_resource}
+
+  defp loaded_resource(resource) do
+    %{
+      content: resource.content,
+      size: resource.size,
+      mime_type: resource.mime_type,
+      selector: {:resource_id, resource.resource_id}
+    }
+  end
 
   defp validate_load_shape(content, size) when is_binary(content) and is_integer(size) and size >= 0, do: :ok
   defp validate_load_shape(_content, _size), do: {:error, :malformed_resource}

@@ -159,14 +159,7 @@ defmodule Jido.AI.Actions.Skill.LoadResource do
 
     with :ok <- authorize_provider_resource(resource_id, activation),
          {:ok, resource} <- ResourceProvider.load(provider, activation.skill, resource_id, policy, context) do
-      {:ok,
-       %{
-         skill: name,
-         resource_id: resource.resource_id,
-         content: resource.content,
-         size: resource.size,
-         mime_type: resource.mime_type
-       }}
+      {:ok, format_loaded_resource(name, resource)}
     else
       {:error, reason} ->
         provider_resource_error(name, resource_id, reason)
@@ -178,13 +171,7 @@ defmodule Jido.AI.Actions.Skill.LoadResource do
 
     case Resources.load_text(root_dir, path, policy) do
       {:ok, resource} ->
-        {:ok,
-         %{
-           skill: name,
-           path: resource.relative_path,
-           content: resource.content,
-           size: resource.size
-         }}
+        {:ok, format_loaded_resource(name, resource)}
 
       {:error, reason} ->
         resource_error(name, path, reason)
@@ -192,6 +179,25 @@ defmodule Jido.AI.Actions.Skill.LoadResource do
   end
 
   defp load_resource(name, path, _activation, _context), do: resource_error(name, path, :not_found)
+
+  defp format_loaded_resource(name, %{resource_id: resource_id} = resource) do
+    %{
+      skill: name,
+      resource_id: resource_id,
+      content: resource.content,
+      size: resource.size,
+      mime_type: resource.mime_type
+    }
+  end
+
+  defp format_loaded_resource(name, %{relative_path: path} = resource) do
+    %{
+      skill: name,
+      path: path,
+      content: resource.content,
+      size: resource.size
+    }
+  end
 
   defp invalid_name(reason) do
     {:error, %{type: :invalid_skill_name, message: "Invalid skill name", reason: reason}}
