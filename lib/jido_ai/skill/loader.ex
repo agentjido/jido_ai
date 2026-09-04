@@ -26,6 +26,8 @@ defmodule Jido.AI.Skill.Loader do
   @max_name_length 64
   @max_description_length 1024
   @max_compatibility_length 500
+  @allowed_frontmatter_fields ~w(name description license compatibility metadata allowed-tools)
+  @frontmatter_regex ~r/\A---\r?\n(.*?)\r?\n---(?:\r?\n(.*))?\z/s
 
   @doc """
   Loads a skill from a SKILL.md file path.
@@ -39,12 +41,11 @@ defmodule Jido.AI.Skill.Loader do
   """
   @spec load(String.t(), keyword()) :: {:ok, Spec.t()} | {:error, term()}
   def load(path, opts \\ []) do
-    lenient = Keyword.get(opts, :lenient, false)
     diagnostics = Keyword.get(opts, :diagnostics, Diagnostics.new())
 
-    with {:ok, content} <- File.read(path),
-         {:ok, {frontmatter, body}, diagnostics} <- parse_frontmatter(content, path, diagnostics, lenient) do
-      build_spec(frontmatter, body, path, diagnostics, lenient)
+    case do_load(path, opts, diagnostics) do
+      {:ok, spec, _diagnostics} -> {:ok, spec}
+      {:error, reason, _diagnostics} -> {:error, reason}
     end
   end
 
@@ -62,15 +63,9 @@ defmodule Jido.AI.Skill.Loader do
   @spec load_with_diagnostics(String.t(), keyword()) ::
           {:ok, Spec.t(), Diagnostics.t()} | {:error, term(), Diagnostics.t()}
   def load_with_diagnostics(path, opts \\ []) do
-    lenient = Keyword.get(opts, :lenient, true)
-    diagnostics = Diagnostics.new()
-
-    case load(path, lenient: lenient, diagnostics: diagnostics) do
-      # load/2 accumulates diagnostics inside the spec; pull them back out
-      # so the documented {:ok, spec, diagnostics} contract is honored.
-      {:ok, spec} -> {:ok, spec, spec.diagnostics || diagnostics}
-      {:error, reason} -> {:error, reason, diagnostics}
-    end
+    diagnostics = Keyword.get(opts, :diagnostics, Diagnostics.new())
+    opts = Keyword.put_new(opts, :lenient, true)
+    do_load(path, opts, diagnostics)
   end
 
   @doc """
@@ -94,47 +89,103 @@ defmodule Jido.AI.Skill.Loader do
   """
   @spec parse(String.t(), String.t(), keyword()) :: {:ok, Spec.t()} | {:error, term()}
   def parse(content, source_path \\ "inline", opts \\ []) do
-    lenient = Keyword.get(opts, :lenient, false)
     diagnostics = Keyword.get(opts, :diagnostics, Diagnostics.new())
 
-    with {:ok, {frontmatter, body}, diagnostics} <- parse_frontmatter(content, source_path, diagnostics, lenient) do
-      build_spec(frontmatter, body, source_path, diagnostics, lenient)
+    case do_parse(content, source_path, opts, diagnostics) do
+      {:ok, spec, _diagnostics} -> {:ok, spec}
+      {:error, reason, _diagnostics} -> {:error, reason}
+    end
+  end
+
+  defp do_load(path, opts, diagnostics) do
+    lenient = Keyword.get(opts, :lenient, false)
+
+    case File.read(path) do
+      {:ok, content} ->
+        with {:ok, diagnostics} <- validate_skill_filename(path, diagnostics, lenient),
+             {:ok, {frontmatter, body}, diagnostics} <-
+               parse_frontmatter(content, path, diagnostics, lenient),
+             {:ok, spec, diagnostics} <- build_spec(frontmatter, body, path, diagnostics, lenient),
+             {:ok, diagnostics} <- check_directory_name_match(spec.name, path, diagnostics, lenient) do
+          spec = %{spec | diagnostics: diagnostics}
+          {:ok, spec, diagnostics}
+        end
+
+      {:error, reason} ->
+        {:error, reason, diagnostics}
+    end
+  end
+
+  defp do_parse(content, source_path, opts, diagnostics) do
+    lenient = Keyword.get(opts, :lenient, false)
+
+    with {:ok, {frontmatter, body}, diagnostics} <-
+           parse_frontmatter(content, source_path, diagnostics, lenient),
+         {:ok, spec, diagnostics} <- build_spec(frontmatter, body, source_path, diagnostics, lenient) do
+      {:ok, %{spec | diagnostics: diagnostics}, diagnostics}
     end
   end
 
   defp parse_frontmatter(content, path, diagnostics, lenient) do
-    case Regex.run(~r/\A---\r?\n(.*?)\r?\n---\r?\n(.*)\z/s, content) do
+    content = strip_utf8_bom(content)
+
+    case Regex.run(@frontmatter_regex, content) do
       [_, yaml, body] ->
-        case YamlElixir.read_from_string(yaml) do
-          {:ok, frontmatter} ->
-            {:ok, {frontmatter, String.trim(body)}, diagnostics}
+        decode_frontmatter(yaml, body, path, diagnostics, lenient)
 
-          {:error, reason} ->
-            if lenient do
-              diagnostics =
-                Diagnostics.add_error(diagnostics, %Error.Parse.InvalidYaml{file_path: path, reason: reason})
-
-              # Return empty frontmatter to continue in lenient mode
-              {:ok, {%{}, String.trim(body)}, diagnostics}
-            else
-              {:error, %Error.Parse.InvalidYaml{file_path: path, reason: reason}}
-            end
-        end
+      [_, yaml] ->
+        decode_frontmatter(yaml, "", path, diagnostics, lenient)
 
       nil ->
+        error = %Error.Parse.NoFrontmatter{file_path: path}
+
         if lenient do
-          diagnostics = Diagnostics.add_error(diagnostics, %Error.Parse.NoFrontmatter{file_path: path})
+          diagnostics = Diagnostics.add_error(diagnostics, error)
           {:ok, {%{}, String.trim(content)}, diagnostics}
         else
-          {:error, %Error.Parse.NoFrontmatter{file_path: path}}
+          fail(error, diagnostics)
         end
     end
   end
 
+  defp decode_frontmatter(yaml, body, path, diagnostics, lenient) do
+    result =
+      try do
+        YamlElixir.read_from_string(yaml)
+      rescue
+        exception -> {:error, {:exception, exception.__struct__, Exception.message(exception)}}
+      catch
+        kind, value -> {:error, {kind, value}}
+      end
+
+    case result do
+      {:ok, frontmatter} when is_map(frontmatter) ->
+        {:ok, {frontmatter, String.trim(body)}, diagnostics}
+
+      {:ok, _frontmatter} ->
+        invalid_frontmatter(:frontmatter_must_be_mapping, body, path, diagnostics, lenient)
+
+      {:error, reason} ->
+        invalid_frontmatter(reason, body, path, diagnostics, lenient)
+    end
+  end
+
+  defp invalid_frontmatter(reason, body, path, diagnostics, lenient) do
+    error = %Error.Parse.InvalidYaml{file_path: path, reason: reason}
+
+    if lenient do
+      {:ok, {%{}, String.trim(body)}, Diagnostics.add_error(diagnostics, error)}
+    else
+      fail(error, diagnostics)
+    end
+  end
+
+  defp strip_utf8_bom(<<0xEF, 0xBB, 0xBF, rest::binary>>), do: rest
+  defp strip_utf8_bom(content), do: content
+
   defp build_spec(frontmatter, body, path, diagnostics, lenient) do
-    # Validate fields, allowing lenient mode to proceed with defaults
-    with {:ok, name, diagnostics} <- validate_name(frontmatter["name"], diagnostics, lenient),
-         {:ok, diagnostics} <- check_directory_name_match(name, path, diagnostics, lenient),
+    with {:ok, diagnostics} <- validate_frontmatter_fields(frontmatter, diagnostics, lenient),
+         {:ok, name, diagnostics} <- validate_name(frontmatter["name"], diagnostics, lenient),
          {:ok, description, diagnostics} <- validate_description(frontmatter["description"], diagnostics, lenient),
          {:ok, license, diagnostics} <- validate_license(frontmatter["license"], diagnostics, lenient),
          {:ok, compatibility, diagnostics} <-
@@ -153,30 +204,41 @@ defmodule Jido.AI.Skill.Loader do
         body_ref: {:inline, body},
         actions: [],
         plugins: [],
-        vsn: optional_string(frontmatter["vsn"] || frontmatter["version"]),
-        tags: parse_tags(frontmatter["tags"]),
+        vsn: file_version(metadata, frontmatter, lenient),
+        tags: file_tags(metadata, frontmatter, lenient),
         diagnostics: diagnostics
       }
 
-      {:ok, spec}
+      {:ok, spec, diagnostics}
     end
   end
 
-  # Check if the directory name exactly matches the validated skill name.
-  # Inline parse sources do not have a filesystem directory to compare.
-  defp check_directory_name_match(_name, path, diagnostics, _lenient)
-       when not is_binary(path),
-       do: {:ok, diagnostics}
-
-  defp check_directory_name_match(name, path, diagnostics, lenient) when is_binary(name) do
-    if Path.basename(path) != "SKILL.md" do
+  defp validate_skill_filename(path, diagnostics, lenient) do
+    if Path.basename(path) == "SKILL.md" do
       {:ok, diagnostics}
     else
-      do_check_directory_name_match(name, path, diagnostics, lenient)
+      warning =
+        Diagnostics.Warning.new(
+          :invalid_skill_filename,
+          "Skill file '#{Path.basename(path)}' must be named exactly 'SKILL.md'"
+        )
+
+      if lenient do
+        {:ok, Diagnostics.add_warning(diagnostics, warning)}
+      else
+        fail(
+          %Error.Validation.InvalidField{
+            field: :file_name,
+            reason: :invalid_skill_filename,
+            value: Path.basename(path)
+          },
+          diagnostics
+        )
+      end
     end
   end
 
-  defp do_check_directory_name_match(name, path, diagnostics, lenient) do
+  defp check_directory_name_match(name, path, diagnostics, lenient) do
     parent_dir = path |> Path.expand() |> Path.dirname() |> Path.basename()
 
     if parent_dir != name do
@@ -189,15 +251,49 @@ defmodule Jido.AI.Skill.Loader do
       if lenient do
         {:ok, Diagnostics.add_warning(diagnostics, warning)}
       else
-        {:error,
-         %Error.Validation.InvalidField{
-           field: :name,
-           reason: :directory_name_mismatch,
-           value: name
-         }}
+        fail(
+          %Error.Validation.InvalidField{
+            field: :name,
+            reason: :directory_name_mismatch,
+            value: name
+          },
+          diagnostics
+        )
       end
     else
       {:ok, diagnostics}
+    end
+  end
+
+  defp validate_frontmatter_fields(frontmatter, diagnostics, lenient) do
+    unsupported =
+      frontmatter
+      |> Map.keys()
+      |> Enum.reject(&(&1 in @allowed_frontmatter_fields))
+      |> Enum.sort_by(&inspect/1)
+
+    case unsupported do
+      [] ->
+        {:ok, diagnostics}
+
+      fields when lenient ->
+        warning =
+          Diagnostics.Warning.new(
+            :unsupported_top_level_fields,
+            "Unsupported top-level fields were accepted in lenient mode: #{Enum.map_join(fields, ", ", &inspect/1)}"
+          )
+
+        {:ok, Diagnostics.add_warning(diagnostics, warning)}
+
+      fields ->
+        fail(
+          %Error.Validation.InvalidField{
+            field: :frontmatter,
+            reason: :unsupported_top_level_fields,
+            value: fields
+          },
+          diagnostics
+        )
     end
   end
 
@@ -216,7 +312,7 @@ defmodule Jido.AI.Skill.Loader do
 
       {:ok, fallback, diagnostics}
     else
-      {:error, error}
+      fail(error, diagnostics)
     end
   end
 
@@ -240,7 +336,7 @@ defmodule Jido.AI.Skill.Loader do
             "Skill name exceeds #{@max_name_length} chars, truncated to: "
           )
         else
-          {:error, error}
+          fail(error, diagnostics)
         end
 
       not Regex.match?(@name_regex, name) ->
@@ -255,7 +351,7 @@ defmodule Jido.AI.Skill.Loader do
             "Invalid skill name '#{name}', normalized to: "
           )
         else
-          {:error, error}
+          fail(error, diagnostics)
         end
 
       true ->
@@ -277,7 +373,7 @@ defmodule Jido.AI.Skill.Loader do
 
       {:ok, fallback, diagnostics}
     else
-      {:error, error}
+      fail(error, diagnostics)
     end
   end
 
@@ -288,7 +384,7 @@ defmodule Jido.AI.Skill.Loader do
       diagnostics = Diagnostics.add_warning(diagnostics, warning)
       {:ok, fallback, diagnostics}
     else
-      {:error, %Error.Validation.MissingField{field: :description}}
+      fail(%Error.Validation.MissingField{field: :description}, diagnostics)
     end
   end
 
@@ -301,7 +397,7 @@ defmodule Jido.AI.Skill.Loader do
           diagnostics = Diagnostics.add_warning(diagnostics, warning)
           {:ok, fallback, diagnostics}
         else
-          {:error, %Error.Validation.MissingField{field: :description}}
+          fail(%Error.Validation.MissingField{field: :description}, diagnostics)
         end
 
       String.length(desc) > @max_description_length ->
@@ -317,12 +413,14 @@ defmodule Jido.AI.Skill.Loader do
           diagnostics = Diagnostics.add_warning(diagnostics, warning)
           {:ok, truncated, diagnostics}
         else
-          {:error,
-           %Error.Validation.InvalidField{
-             field: :description,
-             reason: :too_long,
-             value: desc
-           }}
+          fail(
+            %Error.Validation.InvalidField{
+              field: :description,
+              reason: :too_long,
+              value: desc
+            },
+            diagnostics
+          )
         end
 
       true ->
@@ -337,7 +435,7 @@ defmodule Jido.AI.Skill.Loader do
       diagnostics = Diagnostics.add_warning(diagnostics, warning)
       {:ok, fallback, diagnostics}
     else
-      {:error, %Error.Validation.MissingField{field: :description}}
+      fail(%Error.Validation.MissingField{field: :description}, diagnostics)
     end
   end
 
@@ -365,12 +463,14 @@ defmodule Jido.AI.Skill.Loader do
 
           {:ok, String.slice(compat, 0, @max_compatibility_length), Diagnostics.add_warning(diagnostics, warning)}
         else
-          {:error,
-           %Error.Validation.InvalidField{
-             field: :compatibility,
-             reason: :too_long,
-             value: compat
-           }}
+          fail(
+            %Error.Validation.InvalidField{
+              field: :compatibility,
+              reason: :too_long,
+              value: compat
+            },
+            diagnostics
+          )
         end
 
       true ->
@@ -403,13 +503,15 @@ defmodule Jido.AI.Skill.Loader do
     {:ok, [], Diagnostics.add_warning(diagnostics, warning)}
   end
 
-  defp validate_allowed_tools(tools, _diagnostics, false) do
-    {:error,
-     %Error.Validation.InvalidField{
-       field: :allowed_tools,
-       reason: :invalid_type,
-       value: tools
-     }}
+  defp validate_allowed_tools(tools, diagnostics, false) do
+    fail(
+      %Error.Validation.InvalidField{
+        field: :allowed_tools,
+        reason: :invalid_type,
+        value: tools
+      },
+      diagnostics
+    )
   end
 
   defp parse_metadata(nil, diagnostics, _lenient), do: {:ok, %{}, diagnostics}
@@ -431,12 +533,14 @@ defmodule Jido.AI.Skill.Loader do
 
         {:ok, normalize_metadata(metadata), Diagnostics.add_warning(diagnostics, warning)}
       else
-        {:error,
-         %Error.Validation.InvalidField{
-           field: :metadata,
-           reason: :invalid_metadata,
-           value: metadata
-         }}
+        fail(
+          %Error.Validation.InvalidField{
+            field: :metadata,
+            reason: :invalid_metadata,
+            value: metadata
+          },
+          diagnostics
+        )
       end
     end
   end
@@ -451,13 +555,15 @@ defmodule Jido.AI.Skill.Loader do
     {:ok, %{}, diagnostics}
   end
 
-  defp parse_metadata(metadata, _diagnostics, false) do
-    {:error,
-     %Error.Validation.InvalidField{
-       field: :metadata,
-       reason: :invalid_type,
-       value: metadata
-     }}
+  defp parse_metadata(metadata, diagnostics, false) do
+    fail(
+      %Error.Validation.InvalidField{
+        field: :metadata,
+        reason: :invalid_type,
+        value: metadata
+      },
+      diagnostics
+    )
   end
 
   defp invalid_optional_string(field, _value, _reason, diagnostics, true) do
@@ -465,8 +571,8 @@ defmodule Jido.AI.Skill.Loader do
     {:ok, nil, Diagnostics.add_warning(diagnostics, warning)}
   end
 
-  defp invalid_optional_string(field, value, reason, _diagnostics, false) do
-    {:error, %Error.Validation.InvalidField{field: field, reason: reason, value: value}}
+  defp invalid_optional_string(field, value, reason, diagnostics, false) do
+    fail(%Error.Validation.InvalidField{field: field, reason: reason, value: value}, diagnostics)
   end
 
   defp normalize_metadata(metadata) do
@@ -480,10 +586,23 @@ defmodule Jido.AI.Skill.Loader do
   defp invalid_field_warning(:compatibility), do: :invalid_compatibility
   defp invalid_field_warning(:license), do: :invalid_license
 
-  defp parse_tags(nil), do: []
-  defp parse_tags(tags) when is_list(tags), do: Enum.map(tags, &to_string/1)
-  defp parse_tags(tag) when is_binary(tag), do: [tag]
-  defp parse_tags(tag), do: [to_string(tag)]
+  defp file_tags(%{"jido_ai.tags" => tags}, _frontmatter, _lenient),
+    do: String.split(tags, ~r/\s+/, trim: true)
+
+  defp file_tags(_metadata, frontmatter, true), do: parse_legacy_tags(frontmatter["tags"])
+  defp file_tags(_metadata, _frontmatter, false), do: []
+
+  defp file_version(%{"jido_ai.version" => version}, _frontmatter, _lenient), do: version
+
+  defp file_version(_metadata, frontmatter, true),
+    do: optional_string(frontmatter["vsn"] || frontmatter["version"])
+
+  defp file_version(_metadata, _frontmatter, false), do: nil
+
+  defp parse_legacy_tags(nil), do: []
+  defp parse_legacy_tags(tags) when is_list(tags), do: Enum.map(tags, &to_string/1)
+  defp parse_legacy_tags(tags) when is_binary(tags), do: [tags]
+  defp parse_legacy_tags(tag), do: [to_string(tag)]
 
   defp optional_string(value) when is_binary(value), do: value
   defp optional_string(_value), do: nil
@@ -515,5 +634,9 @@ defmodule Jido.AI.Skill.Loader do
 
   defp fallback_name do
     "unnamed-skill-#{:erlang.unique_integer([:positive])}"
+  end
+
+  defp fail(error, diagnostics) do
+    {:error, error, Diagnostics.add_error(diagnostics, error)}
   end
 end

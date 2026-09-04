@@ -6,7 +6,7 @@ compatibility: Jido.AI >= 2.0
 allowed-tools: read_file grep git_diff
 metadata:
   author: jido-team
-  version: "1.0.0"
+  jido_ai.version: "1.0.0"
 ---
 
 # Code Review

@@ -119,6 +119,7 @@ defmodule Jido.AI.Skill.Prompt do
   Collects all allowed tools from a list of skills.
 
   Returns the union of all `allowed_tools` from the given skills.
+  This helper only reads advisory metadata. It does not grant tool approval.
   """
   @spec collect_allowed_tools([module() | Spec.t() | String.t()]) :: [String.t()]
   def collect_allowed_tools(skills) do
@@ -134,6 +135,10 @@ defmodule Jido.AI.Skill.Prompt do
 
   Returns only the tools whose names match the union of `allowed_tools`
   from the given skills. If no skills specify allowed_tools, returns all tools.
+
+  Calling this helper is an explicit host policy. Automatic Agent Skills
+  activation does not apply this restrictive interpretation and does not treat
+  `allowed-tools` as permission to run a tool.
   """
   @spec filter_tools([module()], [module() | Spec.t() | String.t()]) :: [module()]
   def filter_tools(tools, skills) do

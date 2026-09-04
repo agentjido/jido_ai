@@ -38,7 +38,7 @@ defmodule Mix.Tasks.JidoAi.Skill do
 
   use Mix.Task
 
-  alias Jido.AI.Skill.{Loader, Spec}
+  alias Jido.AI.Skill.{Diagnostics, Loader, Spec}
 
   @impl Mix.Task
   def run(args) do
@@ -172,19 +172,35 @@ defmodule Mix.Tasks.JidoAi.Skill do
 
   defp validate_skills(paths, opts) do
     files = Enum.flat_map(paths, &find_skill_files/1)
-    results = Enum.map(files, fn path -> {path, Loader.load(path)} end)
+    results = Enum.map(files, fn path -> {path, validate_skill(path)} end)
 
-    valid = Enum.filter(results, fn {_, result} -> match?({:ok, _}, result) end)
-    errors = Enum.filter(results, fn {_, result} -> match?({:error, _}, result) end)
+    valid = Enum.filter(results, fn {_, result} -> match?({:ok, _, _}, result) end)
+    errors = Enum.filter(results, fn {_, result} -> match?({:error, _, _}, result) end)
+    warning_count = Enum.sum(for {_, result} <- results, do: result_warning_count(result))
 
     if opts[:json] do
       data = %{
         valid: length(valid),
         errors: length(errors),
+        warnings: warning_count,
         results:
           Enum.map(results, fn
-            {path, {:ok, spec}} -> %{path: path, valid: true, name: spec.name}
-            {path, {:error, reason}} -> %{path: path, valid: false, error: format_error(reason)}
+            {path, {:ok, spec, diagnostics}} ->
+              %{
+                path: path,
+                valid: true,
+                name: spec.name,
+                warnings: warning_messages(diagnostics)
+              }
+
+            {path, {:error, reason, diagnostics}} ->
+              %{
+                path: path,
+                valid: false,
+                error: format_error(reason),
+                warnings: warning_messages(diagnostics),
+                diagnostic_errors: diagnostic_error_messages(diagnostics)
+              }
           end)
       }
 
@@ -196,31 +212,68 @@ defmodule Mix.Tasks.JidoAi.Skill do
       Mix.shell().info("")
 
       Enum.each(results, fn
-        {path, {:ok, spec}} ->
+        {path, {:ok, spec, diagnostics}} ->
           Mix.shell().info("  #{IO.ANSI.green()}✓#{IO.ANSI.reset()} #{path} (#{spec.name})")
+          print_warnings(diagnostics)
 
-        {path, {:error, reason}} ->
+        {path, {:error, reason, diagnostics}} ->
           Mix.shell().info("  #{IO.ANSI.red()}✗#{IO.ANSI.reset()} #{path}")
           Mix.shell().info("    #{IO.ANSI.red()}#{format_error(reason)}#{IO.ANSI.reset()}")
+          print_warnings(diagnostics)
       end)
 
       Mix.shell().info("")
 
       Mix.shell().info(
-        "#{IO.ANSI.green()}Valid: #{length(valid)}#{IO.ANSI.reset()}, #{IO.ANSI.red()}Errors: #{length(errors)}#{IO.ANSI.reset()}"
+        "#{IO.ANSI.green()}Valid: #{length(valid)}#{IO.ANSI.reset()}, #{IO.ANSI.yellow()}Warnings: #{warning_count}#{IO.ANSI.reset()}, #{IO.ANSI.red()}Errors: #{length(errors)}#{IO.ANSI.reset()}"
       )
 
       Mix.shell().info("")
     end
 
-    if opts[:strict] && errors != [] do
-      Mix.raise("Validation failed with #{length(errors)} error(s)")
+    strict_failures =
+      Enum.count(results, fn {_path, result} ->
+        match?({:error, _, _}, result) or result_warning_count(result) > 0
+      end)
+
+    if opts[:strict] && strict_failures > 0 do
+      Mix.raise("Validation failed for #{strict_failures} skill(s)")
     end
+  end
+
+  defp validate_skill(path) do
+    case Loader.load_with_diagnostics(path, lenient: true) do
+      {:ok, spec, diagnostics} ->
+        case diagnostics.errors do
+          [reason | _] -> {:error, reason, diagnostics}
+          [] -> {:ok, spec, diagnostics}
+        end
+
+      {:error, reason, diagnostics} ->
+        {:error, reason, diagnostics}
+    end
+  end
+
+  defp result_warning_count({:ok, _spec, diagnostics}), do: Diagnostics.warning_count(diagnostics)
+  defp result_warning_count({:error, _reason, diagnostics}), do: Diagnostics.warning_count(diagnostics)
+
+  defp warning_messages(diagnostics) do
+    Enum.map(diagnostics.warnings, &Diagnostics.Warning.format/1)
+  end
+
+  defp diagnostic_error_messages(diagnostics) do
+    Enum.map(diagnostics.errors, &format_error/1)
+  end
+
+  defp print_warnings(diagnostics) do
+    Enum.each(warning_messages(diagnostics), fn warning ->
+      Mix.shell().info("    #{IO.ANSI.yellow()}#{warning}#{IO.ANSI.reset()}")
+    end)
   end
 
   defp find_skill_files(path) do
     cond do
-      File.regular?(path) && String.ends_with?(path, "SKILL.md") -> [path]
+      File.regular?(path) -> [path]
       File.dir?(path) -> Path.wildcard(Path.join([path, "**", "SKILL.md"]))
       true -> []
     end

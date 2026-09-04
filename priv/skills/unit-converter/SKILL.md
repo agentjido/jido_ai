@@ -5,11 +5,8 @@ license: Apache-2.0
 allowed-tools: convert_temperature convert_distance convert_weight
 metadata:
   author: jido-examples
-  version: "1.0"
-tags:
-  - conversion
-  - units
-  - utility
+  jido_ai.version: "1.0"
+  jido_ai.tags: "conversion units utility"
 ---
 
 # Unit Converter Skill
