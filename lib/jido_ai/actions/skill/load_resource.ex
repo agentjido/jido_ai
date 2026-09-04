@@ -1,6 +1,6 @@
 defmodule Jido.AI.Actions.Skill.LoadResource do
   @moduledoc """
-  Loads one text resource from an activated skill.
+  Loads one resource from an activated skill.
 
   The action uses the same runtime session as `load_skill`. It cannot access a
   skill that is not active in that session. It applies the resource policy that
@@ -9,13 +9,14 @@ defmodule Jido.AI.Actions.Skill.LoadResource do
   Filesystem skills load by `relative_path` and retain the legacy `path` alias.
   Runtime specs configured with `:resource_provider` load by opaque
   `resource_id`; the provider is invoked on every authorized load and its output
-  is validated before returning text to the model.
+  is validated before returning content to the model. Binary resources require
+  an explicit resource policy and use content parts for attachment transport.
   """
 
   use Jido.Action,
     name: "load_skill_resource",
     description: """
-    Loads one UTF-8 text resource from an activated skill. Use resource_id for
+    Loads one text, image, or file resource from an activated skill. Use resource_id for
     provider-backed runtime skills. Use relative_path for filesystem skills;
     path remains accepted as a compatibility alias.
     """,
@@ -169,7 +170,7 @@ defmodule Jido.AI.Actions.Skill.LoadResource do
   defp load_resource(name, path, %{root_dir: root_dir} = activation, _context) when is_binary(root_dir) do
     policy = Map.get(activation, :resource_policy, ResourcePolicy.default())
 
-    case Resources.load_text(root_dir, path, policy) do
+    case Resources.load(root_dir, path, policy) do
       {:ok, resource} ->
         {:ok, format_loaded_resource(name, resource)}
 
@@ -179,6 +180,28 @@ defmodule Jido.AI.Actions.Skill.LoadResource do
   end
 
   defp load_resource(name, path, _activation, _context), do: resource_error(name, path, :not_found)
+
+  defp format_loaded_resource(name, %{kind: kind} = resource) when kind in [:image, :file] do
+    part =
+      case kind do
+        :image -> ReqLLM.Message.ContentPart.image(resource.content, resource.mime_type)
+        :file -> ReqLLM.Message.ContentPart.file(resource.content, resource.filename, resource.mime_type)
+      end
+
+    metadata = %{
+      skill: name,
+      kind: kind,
+      filename: resource.filename,
+      size: resource.size,
+      mime_type: resource.mime_type,
+      __content_parts__: [part]
+    }
+
+    case resource.selector do
+      {:resource_id, id} -> Map.put(metadata, :resource_id, id)
+      {:path, path} -> Map.put(metadata, :path, path)
+    end
+  end
 
   defp format_loaded_resource(name, %{resource_id: resource_id} = resource) do
     %{
@@ -309,7 +332,7 @@ defmodule Jido.AI.Actions.Skill.LoadResource do
     error_with_selector(
       %{
         type: :binary_resource,
-        message: "#{subject} is not safe UTF-8 text",
+        message: "#{subject} requires a resource policy that allows binary content",
         skill: name
       },
       selector_key,

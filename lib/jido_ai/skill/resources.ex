@@ -43,9 +43,12 @@ defmodule Jido.AI.Skill.Resources do
   @type loaded_resource :: %{
           required(:content) => binary(),
           required(:size) => non_neg_integer(),
+          optional(:kind) => :text | :image | :file,
           optional(:mime_type) => String.t() | nil,
           optional(:filename) => String.t() | nil,
-          optional(:selector) => {:path, String.t()} | {:resource_id, String.t()}
+          optional(:selector) => {:path, String.t()} | {:resource_id, String.t()},
+          optional(:relative_path) => String.t(),
+          optional(:resource_id) => String.t()
         }
 
   @type resource_type :: :scripts | :references | :assets
@@ -119,22 +122,130 @@ defmodule Jido.AI.Skill.Resources do
   end
 
   @doc """
-  Validates a loaded resource against the current text-only resource policy.
+  Validates loaded bytes and returns a normalized text, image, or file resource.
+
+  Every resource is subject to `max_file_bytes`. Only text is subject to
+  `max_text_bytes`. Binary resources require `binary: :allow`, a filename, and
+  a MIME type. Known image and PDF signatures must match their metadata.
   """
-  @spec validate_loaded_text(loaded_resource(), ResourcePolicy.t()) :: :ok | {:error, term()}
-  def validate_loaded_text(%{content: content, size: size}, %ResourcePolicy{} = policy)
+  @spec validate_loaded_resource(loaded_resource(), ResourcePolicy.t()) ::
+          {:ok, loaded_resource()} | {:error, term()}
+  def validate_loaded_resource(%{content: content, size: size} = resource, %ResourcePolicy{} = policy)
       when is_binary(content) and is_integer(size) and size >= 0 do
-    with :ok <- within_size(size, policy.max_file_bytes, :file),
-         :ok <- within_size(size, policy.max_text_bytes, :text),
-         true <- text_content?(content) do
-      :ok
+    with true <- byte_size(content) == size,
+         :ok <- within_size(size, policy.max_file_bytes, :file),
+         {:ok, kind, mime_type} <- classify_resource(resource),
+         :ok <- validate_resource_kind(kind, resource, policy) do
+      {:ok, resource |> Map.put(:kind, kind) |> Map.put(:mime_type, mime_type)}
     else
-      false -> {:error, :binary_resource}
+      false -> {:error, :resource_size_mismatch}
       {:error, reason} -> {:error, reason}
     end
   end
 
-  def validate_loaded_text(_resource, %ResourcePolicy{}), do: {:error, :malformed_resource}
+  def validate_loaded_resource(_resource, %ResourcePolicy{}), do: {:error, :malformed_resource}
+
+  @doc """
+  Validates text only, retaining the existing `:ok` return contract.
+  """
+  @spec validate_loaded_text(loaded_resource(), ResourcePolicy.t()) :: :ok | {:error, term()}
+  def validate_loaded_text(resource, %ResourcePolicy{} = policy) do
+    case validate_loaded_resource(resource, %{policy | binary: :reject}) do
+      {:ok, %{kind: :text}} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp classify_resource(%{content: content} = resource) do
+    signature = signature_mime(content)
+    mime_type = normalize_mime(Map.get(resource, :mime_type))
+    extension_mime = filename_mime(Map.get(resource, :filename))
+
+    cond do
+      not valid_mime?(mime_type) ->
+        {:error, :invalid_resource_mime_type}
+
+      known_binary_mime?(mime_type) and mime_type != signature ->
+        {:error, :resource_mime_mismatch}
+
+      known_binary_mime?(extension_mime) and extension_mime != signature ->
+        {:error, :resource_mime_mismatch}
+
+      signature && mime_type not in [nil, signature] ->
+        {:error, :resource_mime_mismatch}
+
+      signature ->
+        kind = if String.starts_with?(signature, "image/"), do: :image, else: :file
+        {:ok, kind, signature}
+
+      text_content?(content) ->
+        {:ok, :text, mime_type}
+
+      is_binary(mime_type) and String.starts_with?(mime_type, "text/") ->
+        {:error, :resource_mime_mismatch}
+
+      true ->
+        {:ok, :file, mime_type}
+    end
+  end
+
+  defp validate_resource_kind(:text, resource, policy) do
+    within_size(resource.size, policy.max_text_bytes, :text)
+  end
+
+  defp validate_resource_kind(_kind, _resource, %ResourcePolicy{binary: :reject}),
+    do: {:error, :binary_resource}
+
+  defp validate_resource_kind(_kind, resource, %ResourcePolicy{binary: :allow}) do
+    cond do
+      not valid_filename?(Map.get(resource, :filename)) -> {:error, :invalid_resource_filename}
+      is_nil(Map.get(resource, :mime_type)) -> {:error, :invalid_resource_mime_type}
+      true -> :ok
+    end
+  end
+
+  defp valid_filename?(name) when is_binary(name) do
+    name != "" and byte_size(name) <= 1_024 and String.valid?(name) and
+      not String.contains?(name, ["/", "\\", "\0"]) and name not in [".", ".."]
+  end
+
+  defp valid_filename?(_name), do: false
+
+  defp normalize_mime(mime) when is_binary(mime), do: String.downcase(mime)
+  defp normalize_mime(mime), do: mime
+
+  defp valid_mime?(nil), do: true
+
+  defp valid_mime?(mime) when is_binary(mime) do
+    byte_size(mime) <= 255 and String.valid?(mime) and
+      Regex.match?(~r/\A[a-zA-Z0-9!#$&^_.+-]+\/[a-zA-Z0-9!#$&^_.+-]+\z/, mime)
+  end
+
+  defp valid_mime?(_mime), do: false
+
+  defp known_binary_mime?(mime),
+    do: mime in ["image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf"]
+
+  defp signature_mime(<<137, "PNG", 13, 10, 26, 10, _rest::binary>>), do: "image/png"
+  defp signature_mime(<<255, 216, 255, _rest::binary>>), do: "image/jpeg"
+  defp signature_mime(<<"GIF87a", _rest::binary>>), do: "image/gif"
+  defp signature_mime(<<"GIF89a", _rest::binary>>), do: "image/gif"
+  defp signature_mime(<<"RIFF", _size::binary-size(4), "WEBP", _rest::binary>>), do: "image/webp"
+  defp signature_mime(<<"%PDF-", _rest::binary>>), do: "application/pdf"
+  defp signature_mime(_content), do: nil
+
+  defp filename_mime(name) when is_binary(name) do
+    case String.downcase(Path.extname(name)) do
+      ".png" -> "image/png"
+      ext when ext in [".jpg", ".jpeg"] -> "image/jpeg"
+      ".gif" -> "image/gif"
+      ".webp" -> "image/webp"
+      ".pdf" -> "application/pdf"
+      _ -> nil
+    end
+  end
+
+  defp filename_mime(_name), do: nil
 
   @doc """
   Lists all resources and keeps conventional groups for compatibility.
@@ -186,6 +297,39 @@ defmodule Jido.AI.Skill.Resources do
     case load_text(skill_root, relative_path, ResourcePolicy.default()) do
       {:ok, %{content: content}} -> {:ok, content}
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
+  Loads one resource as text or, with explicit permission, as an image or file.
+
+  The result contains raw bytes and metadata. Callers must keep binary bytes
+  out of JSON and use a supported attachment transport.
+  """
+  @spec load(String.t(), String.t(), ResourcePolicy.t() | keyword() | map()) ::
+          {:ok, loaded_resource()} | {:error, term()}
+  def load(skill_root, relative_path, policy_or_opts \\ [])
+      when is_binary(skill_root) and is_binary(relative_path) do
+    with {:ok, policy} <- ResourcePolicy.new(policy_or_opts),
+         {:ok, absolute_path, normalized_path, stat} <-
+           resolve_loadable_file(skill_root, relative_path),
+         :ok <- within_size(stat.size, policy.max_file_bytes, :file),
+         {:ok, content} <- read_bounded(absolute_path, policy.max_file_bytes, :file, stat) do
+      mime_type =
+        signature_mime(content) || filename_mime(normalized_path) ||
+          if(text_content?(content), do: nil, else: "application/octet-stream")
+
+      validate_loaded_resource(
+        %{
+          content: content,
+          size: byte_size(content),
+          filename: Path.basename(normalized_path),
+          relative_path: normalized_path,
+          mime_type: mime_type,
+          selector: {:path, normalized_path}
+        },
+        policy
+      )
     end
   end
 

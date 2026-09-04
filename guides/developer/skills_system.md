@@ -164,6 +164,39 @@ the skill to refresh the authorized listing.
 Agent Skills integration is disabled by default so an application never starts
 trusting repository instructions merely by upgrading a dependency.
 
+### Binary resource attachments
+
+Binary resources are disabled by default. Set `resource_policy: [binary: :allow]`
+to permit images and files from an activated skill. `max_file_bytes` applies to
+all resources. `max_text_bytes` applies only to text, including UTF-8 scripts.
+
+`Resources.load/3` returns the raw bytes with a derived `kind` (`:text`, `:image`,
+or `:file`), MIME type, filename, byte size, and selector. `load_text/3` remains
+a text-only compatibility API. The filesystem and runtime provider paths use
+one shared validator.
+
+PNG, JPEG, GIF, WebP, and PDF signatures must agree with their MIME type and
+known filename extension. The signature check identifies the format; it does
+not decode or fully validate the file. Other binary files use file attachments
+when binary loading is allowed. The filesystem loader uses
+`application/octet-stream` for unknown formats.
+
+A provider must return the filename and MIME type with binary content:
+
+```elixir
+{:ok, %{resource_id: id, content: bytes, size: byte_size(bytes),
+        filename: "report.pdf", mime_type: "application/pdf"}}
+```
+
+`load_skill_resource` keeps text results in the existing `content` field. For
+images and files, it returns metadata and `__content_parts__`. Raw bytes stay in
+these content parts and are excluded from the JSON tool payload. `Turn` and
+`Context` preserve the attachment for ReqLLM. The selected model and provider
+must support the attachment type; ReqLLM reports unsupported attachments.
+
+Activation, provider ID authorization, path traversal checks, symlink rejection,
+and file size limits apply to both text and binary resource loads.
+
 ## Manual Lifecycle: Load, Register, Resolve, Retire
 
 ```elixir
@@ -317,9 +350,9 @@ content is never cached by Jido.
 
 Filesystem resources reject absolute paths, traversal, the root `SKILL.md`,
 symlinks, hard-link aliases of `SKILL.md`, oversized files, oversized text, and
-binary or non-UTF-8 content. Provider-backed resources validate only the opaque
+binary content unless the policy allows it. Provider-backed resources validate only the opaque
 ID type, emptiness, length, listing authorization, response identity, declared
-size, loaded text size, and binary/non-UTF-8 content. Missing, invalid,
+size, loaded text size, and the binary permission policy. Missing, invalid,
 oversized, binary, provider-failed, and malformed resources return structured
 action errors.
 
