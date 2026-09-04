@@ -76,6 +76,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
   alias Jido.AI.Error
   alias Jido.AI.Reasoning.TreeOfThoughts.Machine
   alias Jido.AI.ToolAdapter
+  alias Jido.AI.ToolInterceptor
   alias Jido.AI.Turn
   alias ReqLLM.Context
 
@@ -407,31 +408,71 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
       :error ->
         {agent, []}
 
-      {:ok, _pending} ->
+      {:ok, pending} ->
         result = normalize_tool_result(params[:result])
+        context = tool_interceptor_context(agent, state, config)
 
-        pending_results =
-          Map.put(
-            state[:pending_tool_results] || %{},
-            tool_call_id,
-            %{result: result, tool_name: params[:tool_name]}
-          )
+        tool_call = %{
+          id: tool_call_id,
+          name: pending[:tool_name] || params[:tool_name],
+          arguments: pending[:arguments] || %{},
+          action_module: pending[:action_module]
+        }
 
-        state = Map.put(state, :pending_tool_results, pending_results)
-        agent = StratState.put(agent, state)
+        case maybe_after_tool_call(config[:agent_module], tool_call, result, context) do
+          {:ok, result} ->
+            store_tool_result(agent, state, config, policy, tool_call_id, params[:tool_name], result)
 
-        if pending_tool_round_complete?(state) do
-          {agent, effect_directives} = apply_pending_tool_effects(agent, state, policy)
-          state = StratState.get(agent, %{})
-          {agent, resume_directives} = resume_after_tool_round(agent, state, config)
-          {agent, effect_directives ++ resume_directives}
-        else
-          {agent, []}
+          {:error, reason} ->
+            fail_tool_interceptor(agent, state, reason)
         end
     end
   end
 
   defp process_tool_result(agent, _params, _config), do: {agent, []}
+
+  defp store_tool_result(agent, state, config, policy, tool_call_id, tool_name, result) do
+    pending_results =
+      Map.put(
+        state[:pending_tool_results] || %{},
+        tool_call_id,
+        %{result: result, tool_name: tool_name}
+      )
+
+    state = Map.put(state, :pending_tool_results, pending_results)
+    agent = StratState.put(agent, state)
+
+    if pending_tool_round_complete?(state) do
+      {agent, effect_directives} = apply_pending_tool_effects(agent, state, policy)
+      state = StratState.get(agent, %{})
+      {agent, resume_directives} = resume_after_tool_round(agent, state, config)
+      {agent, effect_directives ++ resume_directives}
+    else
+      {agent, []}
+    end
+  end
+
+  defp fail_tool_interceptor(agent, state, reason) do
+    request_id = state[:last_request_id] || ""
+
+    state =
+      state
+      |> Map.put(:pending_tool_calls, %{})
+      |> Map.put(:pending_tool_call_order, [])
+      |> Map.put(:pending_tool_results, %{})
+      |> Map.put(:pending_tool_phase, nil)
+      |> Map.put(:pending_tool_call_id, nil)
+      |> Map.put(:pending_tool_turn, nil)
+
+    directive =
+      Directive.EmitRequestError.new!(%{
+        request_id: request_id,
+        reason: :tool_interceptor,
+        message: inspect(reason)
+      })
+
+    {StratState.put(agent, state), [directive]}
+  end
 
   defp apply_machine_update(agent, nil, _config), do: {agent, []}
 
@@ -518,73 +559,154 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
         iteration = state[:iteration] || 0
         state_snapshot = normalize_map_opt(Map.get(agent, :state, %{}))
 
-        directives =
-          Enum.map(normalized_calls, fn call ->
-            case Map.get(config[:actions_by_name] || %{}, call.tool_name) do
-              nil ->
-                Directive.EmitToolError.new!(%{
-                  id: call.call_id,
-                  tool_name: call.tool_name,
-                  error: %{type: :not_found, message: "Tool not found: #{call.tool_name}"},
-                  metadata: %{
-                    request_id: request_id,
-                    run_id: request_id,
-                    iteration: iteration,
-                    origin: :worker_runtime,
-                    operation: :tool_execute,
-                    strategy: :tot
-                  }
-                })
+        context = tool_interceptor_context(agent, state, config)
 
-              module ->
-                Directive.ToolExec.new!(%{
-                  id: call.call_id,
-                  tool_name: call.tool_name,
-                  action_module: module,
-                  arguments: call.arguments,
-                  context:
-                    Map.merge(config[:tool_context] || %{}, %{
-                      state: state_snapshot,
-                      agent_id: agent.id,
+        case prepare_tool_calls(normalized_calls, config[:agent_module], context, config[:actions_by_name] || %{}) do
+          {:ok, prepared_calls} ->
+            directives =
+              Enum.map(prepared_calls, fn call ->
+                case call[:action_module] do
+                  nil ->
+                    Directive.EmitToolError.new!(%{
+                      id: call.call_id,
+                      tool_name: call.tool_name,
+                      error: %{type: :not_found, message: "Tool not found: #{call.tool_name}"},
+                      metadata: %{
+                        request_id: request_id,
+                        run_id: request_id,
+                        iteration: iteration,
+                        origin: :worker_runtime,
+                        operation: :tool_execute,
+                        strategy: :tot
+                      }
+                    })
+
+                  module ->
+                    Directive.ToolExec.new!(%{
+                      id: call.call_id,
+                      tool_name: call.tool_name,
+                      action_module: module,
+                      arguments: call.arguments,
+                      context:
+                        Map.merge(config[:tool_context] || %{}, %{
+                          state: state_snapshot,
+                          agent_module: config[:agent_module],
+                          agent_id: agent.id,
+                          request_id: request_id,
+                          run_id: request_id,
+                          iteration: iteration,
+                          strategy: :tot,
+                          tool_context: config[:tool_context] || %{},
+                          effect_policy: config[:effect_policy] || Effects.default_policy()
+                        }),
+                      timeout_ms: config[:tool_timeout_ms],
+                      max_retries: config[:tool_max_retries],
+                      retry_backoff_ms: config[:tool_retry_backoff_ms],
                       request_id: request_id,
                       iteration: iteration,
-                      effect_policy: config[:effect_policy] || Effects.default_policy()
-                    }),
-                  timeout_ms: config[:tool_timeout_ms],
-                  max_retries: config[:tool_max_retries],
-                  retry_backoff_ms: config[:tool_retry_backoff_ms],
-                  request_id: request_id,
-                  iteration: iteration,
-                  metadata: %{
-                    request_id: request_id,
-                    run_id: request_id,
-                    iteration: iteration,
-                    strategy: :tot
-                  }
-                })
-            end
-          end)
+                      metadata: %{
+                        request_id: request_id,
+                        run_id: request_id,
+                        iteration: iteration,
+                        strategy: :tot
+                      }
+                    })
+                end
+              end)
 
-        pending_tool_calls = Map.new(normalized_calls, fn call -> {call.call_id, call} end)
-        pending_tool_call_order = Enum.map(normalized_calls, & &1.call_id)
+            pending_tool_calls = Map.new(prepared_calls, fn call -> {call.call_id, call} end)
+            pending_tool_call_order = Enum.map(prepared_calls, & &1.call_id)
 
-        new_state =
-          state
-          |> Map.put(:pending_tool_calls, pending_tool_calls)
-          |> Map.put(:pending_tool_call_order, pending_tool_call_order)
-          |> Map.put(:pending_tool_results, %{})
-          |> Map.put(:pending_tool_call_id, llm_call_id)
-          |> Map.put(:pending_tool_turn, turn)
-          |> Map.put(:pending_tool_phase, state[:status])
-          |> Map.update(:tool_rounds, %{llm_call_id => round + 1}, fn rounds ->
-            Map.put(rounds || %{}, llm_call_id, round + 1)
-          end)
+            new_state =
+              state
+              |> Map.put(:pending_tool_calls, pending_tool_calls)
+              |> Map.put(:pending_tool_call_order, pending_tool_call_order)
+              |> Map.put(:pending_tool_results, %{})
+              |> Map.put(:pending_tool_call_id, llm_call_id)
+              |> Map.put(:pending_tool_turn, turn)
+              |> Map.put(:pending_tool_phase, state[:status])
+              |> Map.update(:tool_rounds, %{llm_call_id => round + 1}, fn rounds ->
+                Map.put(rounds || %{}, llm_call_id, round + 1)
+              end)
 
-        {StratState.put(agent, new_state), directives}
+            {StratState.put(agent, new_state), directives}
+
+          {:interrupt, interrupt} ->
+            tool_interceptor_request_error(agent, request_id, {:interrupt, interrupt})
+
+          {:error, reason} ->
+            tool_interceptor_request_error(agent, request_id, reason)
+        end
     end
   rescue
     _ ->
       apply_machine_update(agent, {:llm_result, llm_call_id, result}, config)
+  end
+
+  defp prepare_tool_calls(tool_calls, agent_module, context, actions_by_name) do
+    Enum.reduce_while(tool_calls, {:ok, []}, fn call, {:ok, acc} ->
+      action_module = Map.get(actions_by_name, call.tool_name)
+
+      case is_atom(action_module) and not is_nil(action_module) do
+        true ->
+          tool_call = %{id: call.call_id, name: call.tool_name, arguments: call.arguments, action_module: action_module}
+
+          case ToolInterceptor.before_tool_call(agent_module, tool_call, context) do
+            {:ok, transformed} ->
+              prepared = call |> Map.put(:arguments, transformed.arguments) |> Map.put(:action_module, action_module)
+              {:cont, {:ok, [prepared | acc]}}
+
+            {:interrupt, interrupt} ->
+              {:halt, {:interrupt, interrupt}}
+
+            {:error, reason} ->
+              {:halt, {:error, reason}}
+          end
+
+        false ->
+          {:cont, {:ok, [call | acc]}}
+      end
+    end)
+    |> case do
+      {:ok, calls} -> {:ok, Enum.reverse(calls)}
+      other -> other
+    end
+  end
+
+  defp maybe_after_tool_call(agent_module, %{action_module: action_module} = tool_call, result, context)
+       when is_atom(action_module) and not is_nil(action_module) do
+    ToolInterceptor.after_tool_call(agent_module, tool_call, result, context)
+  end
+
+  defp maybe_after_tool_call(_agent_module, _tool_call, result, _context), do: {:ok, Effects.normalize_result(result)}
+
+  defp tool_interceptor_context(agent, state, config) do
+    tool_context = config[:tool_context] || %{}
+    request_id = state[:last_request_id]
+
+    Map.merge(tool_context, %{
+      state: normalize_map_opt(Map.get(agent, :state, %{})),
+      agent_module: config[:agent_module],
+      agent_id: agent.id,
+      request_id: request_id,
+      run_id: request_id,
+      iteration: state[:iteration] || 0,
+      strategy: :tot,
+      tool_context: tool_context,
+      strategy_opts: config[:strategy_opts] || [],
+      effect_policy: config[:effect_policy] || Effects.default_policy()
+    })
+  end
+
+  defp tool_interceptor_request_error(agent, request_id, reason) do
+    directive =
+      Directive.EmitRequestError.new!(%{
+        request_id: request_id || "",
+        reason: :tool_interceptor,
+        message: inspect(reason)
+      })
+
+    {agent, [directive]}
   end
 
   defp has_pending_tool_round?(state, llm_call_id) do
@@ -845,6 +967,8 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Strategy do
     effect_policy = Effects.intersect_policies(agent_effect_policy, strategy_effect_policy)
 
     %{
+      agent_module: ctx[:agent_module],
+      strategy_opts: opts,
       model: resolved_model,
       branching_factor: Map.get(agent.state, :branching_factor, Keyword.get(opts, :branching_factor, 3)),
       max_depth: Map.get(agent.state, :max_depth, Keyword.get(opts, :max_depth, 3)),
