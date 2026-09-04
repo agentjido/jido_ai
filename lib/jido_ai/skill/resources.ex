@@ -1,166 +1,422 @@
 defmodule Jido.AI.Skill.Resources do
   @moduledoc """
-  Progressive disclosure of skill resources without eager loading.
+  Provides bounded, lazy access to files bundled with a skill.
 
-  Provides APIs to enumerate and lazily load resources bundled with skills:
-  - `scripts/` - Executable scripts and automation
-  - `references/` - Documentation and reference materials
-  - `assets/` - Binary assets (images, binaries, etc.)
+  General listing includes each regular file below the skill root except the
+  root `SKILL.md`. Root files and custom directories are valid resources.
+  Conventional `scripts`, `references`, and `assets` groups remain available in
+  the listing. Paths in returned listings are relative to the skill root.
 
-  All paths are resolved relative to the skill root directory,
-  preventing path traversal attacks.
-
-  ## Usage
-
-      # List all resources in a skill
-      resources = Jido.AI.Skill.Resources.list_resources(skill_root)
-      # => %{scripts: [...], references: [...], assets: [...]}
-
-      # Load a specific resource
-      {:ok, content} = Jido.AI.Skill.Resources.load_resource(skill_root, "references/guide.md")
-
-      # Check resource exists without loading
-      true = Jido.AI.Skill.Resources.exists?(skill_root, "scripts/setup.sh")
+  Listing does not follow symlinks. Loading rejects traversal, absolute paths,
+  and symlinks. `Jido.AI.Skill.ResourcePolicy` supplies all limits.
   """
 
-  @type resource_listing :: %{
-          scripts: [resource_info()],
-          references: [resource_info()],
-          assets: [resource_info()]
-        }
+  alias Jido.AI.Skill.ResourcePolicy
+
+  @context_policy_key :__jido_ai_skill_resource_policy__
 
   @type resource_info :: %{
           name: String.t(),
           relative_path: String.t(),
-          absolute_path: String.t(),
-          size: non_neg_integer() | nil,
-          modified: DateTime.t() | nil
+          size: non_neg_integer(),
+          modified: DateTime.t()
+        }
+
+  @type resource_listing :: %{
+          resources: [resource_info()],
+          scripts: [resource_info()],
+          references: [resource_info()],
+          assets: [resource_info()],
+          complete: boolean(),
+          truncated: boolean(),
+          truncation_reasons: [atom()],
+          limits: map()
         }
 
   @type resource_type :: :scripts | :references | :assets
 
+  @doc false
+  @spec context_policy_key() :: atom()
+  def context_policy_key, do: @context_policy_key
+
   @doc """
-  Lists all resources in a skill directory.
+  Returns the default resource policy.
+  """
+  @spec default_policy() :: ResourcePolicy.t()
+  def default_policy, do: ResourcePolicy.default()
 
-  Returns a map with resources grouped by type, without loading content.
+  @doc """
+  Gets a validated resource policy from action context.
 
-  ## Examples
+  The default policy is returned when the reserved context key is absent.
+  """
+  @spec policy_from_context(map()) :: {:ok, ResourcePolicy.t()} | {:error, term()}
+  def policy_from_context(context) when is_map(context) do
+    value =
+      Map.get(
+        context,
+        @context_policy_key,
+        Map.get(context, Atom.to_string(@context_policy_key), ResourcePolicy.default())
+      )
 
-      resources = Jido.AI.Skill.Resources.list_resources("/path/to/skill")
-      IO.inspect(resources.scripts)     # [%{name: "deploy.sh", ...}]
-      IO.inspect(resources.references)    # [%{name: "api.md", ...}]
-      IO.inspect(resources.assets)        # [%{name: "logo.png", ...}]
+    ResourcePolicy.new(value)
+  end
+
+  @doc """
+  Lists all bundled resources with explicit bounds.
+
+  Results are sorted by relative path. If a limit prevents a complete result,
+  `complete` is false and `truncation_reasons` identifies each reached limit
+  or unreadable entry.
+  """
+  @spec list_all(String.t(), ResourcePolicy.t() | keyword() | map()) ::
+          {:ok, resource_listing()} | {:error, term()}
+  def list_all(skill_root, policy_or_opts \\ []) when is_binary(skill_root) do
+    with {:ok, policy} <- ResourcePolicy.new(policy_or_opts) do
+      expanded_root = Path.expand(skill_root)
+
+      state =
+        if directory?(expanded_root) do
+          walk_directory(expanded_root, expanded_root, 0, policy, initial_state())
+        else
+          initial_state()
+        end
+
+      {:ok, build_listing(Enum.reverse(state.resources), state.reasons, policy)}
+    end
+  end
+
+  @doc """
+  Returns an empty, complete listing for a selected policy.
+  """
+  @spec empty_listing(ResourcePolicy.t() | keyword() | map()) ::
+          {:ok, resource_listing()} | {:error, term()}
+  def empty_listing(policy_or_opts \\ []) do
+    with {:ok, policy} <- ResourcePolicy.new(policy_or_opts) do
+      {:ok, build_listing([], MapSet.new(), policy)}
+    end
+  end
+
+  @doc """
+  Lists all resources and keeps conventional groups for compatibility.
+
+  This function uses the default policy. Use `list_all/2` for custom limits.
   """
   @spec list_resources(String.t()) :: resource_listing()
   def list_resources(skill_root) when is_binary(skill_root) do
-    if File.dir?(skill_root) do
-      %{
-        scripts: list_resource_type(skill_root, :scripts),
-        references: list_resource_type(skill_root, :references),
-        assets: list_resource_type(skill_root, :assets)
-      }
-    else
-      %{scripts: [], references: [], assets: []}
-    end
+    {:ok, listing} = list_all(skill_root, ResourcePolicy.default())
+    listing
   end
 
   @doc """
-  Lists resources of a specific type.
-
-  ## Examples
-
-      scripts = Jido.AI.Skill.Resources.list_by_type(skill_root, :scripts)
+  Lists one conventional resource group with the default policy.
   """
   @spec list_by_type(String.t(), resource_type()) :: [resource_info()]
   def list_by_type(skill_root, type) when type in [:scripts, :references, :assets] do
-    list_resource_type(skill_root, type)
+    list_resources(skill_root)[type]
   end
 
   @doc """
-  Loads a resource file lazily.
-
-  Returns the file content only when requested. Validates the path
-  is within the skill root to prevent directory traversal.
-
-  ## Returns
-
-  - `{:ok, binary}` - Resource loaded successfully
-  - `{:error, :not_found}` - Resource doesn't exist
-  - `{:error, :path_traversal}` - Attempted path traversal attack
-
-  ## Examples
-
-      {:ok, content} = Jido.AI.Skill.Resources.load_resource(skill_root, "references/api.md")
-      {:error, :not_found} = Jido.AI.Skill.Resources.load_resource(skill_root, "missing.txt")
-
-      # Path traversal is blocked:
-      {:error, :path_traversal} = Jido.AI.Skill.Resources.load_resource(skill_root, "../../../etc/passwd")
+  Loads resource bytes with the default file-size limit.
   """
-  @spec load_resource(String.t(), String.t()) :: {:ok, binary()} | {:error, atom()}
-  def load_resource(skill_root, relative_path) when is_binary(skill_root) and is_binary(relative_path) do
-    case resolve_path(skill_root, relative_path) do
-      {:ok, absolute_path} ->
-        if File.regular?(absolute_path) do
-          File.read(absolute_path)
-        else
-          {:error, :not_found}
-        end
+  @spec load_resource(String.t(), String.t()) :: {:ok, binary()} | {:error, term()}
+  def load_resource(skill_root, relative_path) do
+    load_resource(skill_root, relative_path, ResourcePolicy.default())
+  end
 
-      {:error, reason} ->
-        {:error, reason}
+  @doc """
+  Loads resource bytes with a selected resource policy.
+  """
+  @spec load_resource(String.t(), String.t(), ResourcePolicy.t() | keyword() | map()) ::
+          {:ok, binary()} | {:error, term()}
+  def load_resource(skill_root, relative_path, policy_or_opts)
+      when is_binary(skill_root) and is_binary(relative_path) do
+    with {:ok, policy} <- ResourcePolicy.new(policy_or_opts),
+         {:ok, absolute_path, _normalized_path, stat} <-
+           resolve_loadable_file(skill_root, relative_path),
+         :ok <- within_size(stat.size, policy.max_file_bytes, :file) do
+      read_bounded(absolute_path, policy.max_file_bytes, :file, stat)
     end
   end
 
   @doc """
-  Loads a resource as UTF-8 text.
-
-  Same as `load_resource/2` but validates the content is valid UTF-8.
-
-  ## Returns
-
-  - `{:ok, String.t()}` - Resource loaded and valid UTF-8
-  - `{:error, :invalid_utf8}` - Content is not valid UTF-8
-  - `{:error, reason}` - Other errors from `load_resource/2`
+  Loads a resource as bounded UTF-8 text with the default policy.
   """
-  @spec load_resource_text(String.t(), String.t()) :: {:ok, String.t()} | {:error, atom()}
-  def load_resource_text(skill_root, relative_path) when is_binary(skill_root) and is_binary(relative_path) do
-    case load_resource(skill_root, relative_path) do
-      {:ok, binary} ->
-        case String.valid?(binary) do
-          true -> {:ok, binary}
-          false -> {:error, :invalid_utf8}
-        end
-
-      {:error, reason} ->
-        {:error, reason}
+  @spec load_resource_text(String.t(), String.t()) :: {:ok, String.t()} | {:error, term()}
+  def load_resource_text(skill_root, relative_path) do
+    case load_text(skill_root, relative_path, ResourcePolicy.default()) do
+      {:ok, %{content: content}} -> {:ok, content}
+      {:error, reason} -> {:error, reason}
     end
   end
 
   @doc """
-  Resolves a relative path to an absolute path within the skill root.
+  Loads one resource as bounded UTF-8 text.
 
-  Validates the resolved path is within the skill root directory
-  to prevent path traversal attacks.
+  The result includes the normalized relative path and byte size. Binary
+  content returns `:binary_resource`.
+  """
+  @spec load_text(String.t(), String.t(), ResourcePolicy.t() | keyword() | map()) ::
+          {:ok, %{content: String.t(), relative_path: String.t(), size: non_neg_integer()}}
+          | {:error, term()}
+  def load_text(skill_root, relative_path, policy_or_opts \\ [])
+      when is_binary(skill_root) and is_binary(relative_path) do
+    with {:ok, policy} <- ResourcePolicy.new(policy_or_opts),
+         {:ok, absolute_path, normalized_path, stat} <-
+           resolve_loadable_file(skill_root, relative_path),
+         :ok <- within_size(stat.size, policy.max_file_bytes, :file),
+         :ok <- within_size(stat.size, policy.max_text_bytes, :text),
+         {:ok, content} <- read_bounded(absolute_path, policy.max_text_bytes, :text, stat),
+         true <- text_content?(content) do
+      {:ok, %{content: content, relative_path: normalized_path, size: byte_size(content)}}
+    else
+      false -> {:error, :binary_resource}
+      {:error, reason} -> {:error, reason}
+    end
+  end
 
-  ## Returns
+  @doc """
+  Resolves a relative path inside the skill root.
 
-  - `{:ok, absolute_path}` - Path resolved successfully
-  - `{:error, :path_traversal}` - Path escapes skill root
-
-  ## Examples
-
-      {:ok, "/skill/references/guide.md"} = Jido.AI.Skill.Resources.resolve_path("/skill", "references/guide.md")
-      {:error, :path_traversal} = Jido.AI.Skill.Resources.resolve_path("/skill", "../../../etc/passwd")
+  Absolute paths, traversal, and paths that resolve through an escaping symlink
+  return `:path_traversal`.
   """
   @spec resolve_path(String.t(), String.t()) :: {:ok, String.t()} | {:error, :path_traversal}
   def resolve_path(skill_root, relative_path) when is_binary(skill_root) and is_binary(relative_path) do
-    # Reject absolute inputs outright — `Path.join/2` would silently re-root
-    # them under the skill root, masking an attempted absolute-path injection.
     if Path.type(relative_path) == :absolute do
       {:error, :path_traversal}
     else
       do_resolve_path(skill_root, relative_path)
     end
+  end
+
+  @doc """
+  Checks if a safe regular resource exists.
+  """
+  @spec exists?(String.t(), String.t()) :: boolean()
+  def exists?(skill_root, relative_path) when is_binary(skill_root) and is_binary(relative_path) do
+    match?(
+      {:ok, _absolute_path, _normalized_path, _stat},
+      resolve_loadable_file(skill_root, relative_path)
+    )
+  end
+
+  @doc """
+  Gets information about a safe regular resource.
+  """
+  @spec resource_info(String.t(), String.t()) :: {:ok, resource_info()} | {:error, :not_found}
+  def resource_info(skill_root, relative_path) when is_binary(skill_root) and is_binary(relative_path) do
+    case resolve_loadable_file(skill_root, relative_path) do
+      {:ok, _absolute_path, normalized_path, stat} ->
+        {:ok, resource_info_for(normalized_path, stat)}
+
+      {:error, _reason} ->
+        {:error, :not_found}
+    end
+  end
+
+  @doc """
+  Searches the bounded general listing with a glob pattern.
+  """
+  @spec search(String.t(), String.t()) :: [resource_info()]
+  def search(skill_root, pattern) when is_binary(skill_root) and is_binary(pattern) do
+    with {:ok, regex} <- glob_regex(pattern),
+         {:ok, listing} <- list_all(skill_root) do
+      Enum.filter(listing.resources, &Regex.match?(regex, &1.relative_path))
+    else
+      _error -> []
+    end
+  end
+
+  defp initial_state do
+    %{resources: [], count: 0, directories: 0, reasons: MapSet.new(), halt: false}
+  end
+
+  defp walk_directory(_root, _directory, _depth, _policy, %{halt: true} = state), do: state
+
+  defp walk_directory(root, directory, depth, policy, state) do
+    if state.directories >= policy.max_directories do
+      truncate(state, :max_directories, true)
+    else
+      state = %{state | directories: state.directories + 1}
+
+      case File.ls(directory) do
+        {:ok, entries} ->
+          entries
+          |> Enum.sort()
+          |> Enum.reduce_while(state, fn entry, acc ->
+            next = walk_entry(root, Path.join(directory, entry), depth, policy, acc)
+            if next.halt, do: {:halt, next}, else: {:cont, next}
+          end)
+
+        {:error, _reason} ->
+          truncate(state, :unreadable_directory, false)
+      end
+    end
+  end
+
+  defp walk_entry(root, path, depth, policy, state) do
+    case File.lstat(path) do
+      {:ok, %File.Stat{type: :regular} = stat} ->
+        relative_path = Path.relative_to(path, root)
+
+        if relative_path == "SKILL.md" or skill_document_alias?(root, stat) do
+          state
+        else
+          add_resource(resource_info_for(relative_path, stat), policy, state)
+        end
+
+      {:ok, %File.Stat{type: :directory}} when depth < policy.max_depth ->
+        walk_directory(root, path, depth + 1, policy, state)
+
+      {:ok, %File.Stat{type: :directory}} ->
+        truncate(state, :max_depth, false)
+
+      {:error, _reason} ->
+        truncate(state, :unreadable_entry, false)
+
+      {:ok, _other} ->
+        state
+    end
+  end
+
+  defp add_resource(_resource, policy, %{count: count} = state) when count >= policy.max_resources do
+    truncate(state, :max_resources, true)
+  end
+
+  defp add_resource(resource, policy, state) do
+    resources = [resource | state.resources]
+
+    if listing_payload_size(resources) > policy.max_listing_bytes do
+      truncate(state, :max_listing_bytes, true)
+    else
+      %{state | resources: resources, count: state.count + 1}
+    end
+  end
+
+  defp truncate(state, reason, halt?) do
+    %{state | reasons: MapSet.put(state.reasons, reason), halt: state.halt or halt?}
+  end
+
+  defp listing_payload_size(resources) do
+    resources
+    |> Enum.reverse()
+    |> Jason.encode!()
+    |> byte_size()
+  end
+
+  defp build_listing(resources, reasons, policy) do
+    reasons = reasons |> MapSet.to_list() |> Enum.sort()
+
+    %{
+      resources: resources,
+      scripts: resources_in_group(resources, "scripts"),
+      references: resources_in_group(resources, "references"),
+      assets: resources_in_group(resources, "assets"),
+      complete: reasons == [],
+      truncated: reasons != [],
+      truncation_reasons: reasons,
+      limits: ResourcePolicy.to_map(policy)
+    }
+  end
+
+  defp resources_in_group(resources, group) do
+    prefix = group <> "/"
+    Enum.filter(resources, &String.starts_with?(&1.relative_path, prefix))
+  end
+
+  defp resolve_loadable_file(skill_root, relative_path) do
+    expanded_root = Path.expand(skill_root)
+
+    with {:ok, absolute_path} <- resolve_path(expanded_root, relative_path),
+         normalized_path = Path.relative_to(absolute_path, expanded_root),
+         false <- normalized_path == "SKILL.md",
+         {:ok, stat} <- File.lstat(absolute_path),
+         :ok <- reject_skill_document_alias(expanded_root, stat),
+         :ok <- reject_symlink_path(expanded_root, absolute_path),
+         :ok <- require_regular_file(stat) do
+      {:ok, absolute_path, normalized_path, stat}
+    else
+      true -> {:error, :invalid_resource_path}
+      {:error, :enoent} -> {:error, :not_found}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp reject_symlink_path(skill_root, absolute_path) do
+    if symlink_free?(skill_root, absolute_path), do: :ok, else: {:error, :path_traversal}
+  end
+
+  defp require_regular_file(%File.Stat{type: :regular}), do: :ok
+  defp require_regular_file(%File.Stat{type: :symlink}), do: {:error, :path_traversal}
+  defp require_regular_file(%File.Stat{}), do: {:error, :not_found}
+
+  defp reject_skill_document_alias(skill_root, candidate_stat) do
+    if skill_document_alias?(skill_root, candidate_stat),
+      do: {:error, :invalid_resource_path},
+      else: :ok
+  end
+
+  defp skill_document_alias?(skill_root, candidate_stat) do
+    case File.lstat(Path.join(skill_root, "SKILL.md")) do
+      {:ok, skill_stat} -> matching_file_identity?(candidate_stat, skill_stat)
+      {:error, _reason} -> false
+    end
+  end
+
+  defp within_size(size, limit, _kind) when size <= limit, do: :ok
+  defp within_size(size, limit, kind), do: {:error, {:resource_too_large, kind, size, limit}}
+
+  defp read_bounded(path, limit, kind, expected_stat) do
+    with {:ok, io} <- File.open(path, [:read, :binary]) do
+      try do
+        with {:ok, opened_stat} <- opened_file_stat(io),
+             :ok <- same_file(expected_stat, opened_stat) do
+          case IO.binread(io, limit + 1) do
+            content when is_binary(content) and byte_size(content) <= limit ->
+              {:ok, content}
+
+            content when is_binary(content) ->
+              {:error, {:resource_too_large, kind, byte_size(content), limit}}
+
+            :eof ->
+              {:ok, ""}
+
+            {:error, reason} ->
+              {:error, reason}
+          end
+        end
+      after
+        File.close(io)
+      end
+    end
+  end
+
+  defp opened_file_stat(io) do
+    case :file.read_file_info(io, time: :universal) do
+      {:ok, record} -> {:ok, File.Stat.from_record(record)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp same_file(expected, opened) do
+    if file_identity(expected) == file_identity(opened) and opened.type == :regular do
+      :ok
+    else
+      {:error, :resource_path_changed}
+    end
+  end
+
+  defp file_identity(stat), do: {stat.major_device, stat.minor_device, stat.inode}
+
+  defp matching_file_identity?(left, right) do
+    identity = file_identity(left)
+    {_major, _minor, inode} = identity
+    inode != 0 and identity == file_identity(right)
+  end
+
+  defp text_content?(content) do
+    String.valid?(content) and not String.contains?(content, <<0>>)
   end
 
   defp do_resolve_path(skill_root, relative_path) do
@@ -174,112 +430,30 @@ defmodule Jido.AI.Skill.Resources do
     end
   end
 
-  @doc """
-  Checks if a resource exists without loading it.
+  defp symlink_free?(skill_root, absolute_path) do
+    root = Path.expand(skill_root)
 
-  ## Examples
+    absolute_path
+    |> Path.relative_to(root)
+    |> Path.split()
+    |> Enum.reduce_while(root, fn part, current ->
+      next = Path.join(current, part)
 
-      true = Jido.AI.Skill.Resources.exists?(skill_root, "scripts/setup.sh")
-      false = Jido.AI.Skill.Resources.exists?(skill_root, "missing.txt")
-  """
-  @spec exists?(String.t(), String.t()) :: boolean()
-  def exists?(skill_root, relative_path) when is_binary(skill_root) and is_binary(relative_path) do
-    case resolve_path(skill_root, relative_path) do
-      {:ok, absolute_path} -> File.regular?(absolute_path)
-      {:error, _} -> false
-    end
+      case File.lstat(next) do
+        {:ok, %File.Stat{type: :symlink}} -> {:halt, false}
+        {:ok, _stat} -> {:cont, next}
+        {:error, _reason} -> {:halt, false}
+      end
+    end)
+    |> is_binary()
   end
 
-  @doc """
-  Gets information about a specific resource without loading it.
-
-  ## Returns
-
-  - `{:ok, resource_info}` - Resource exists, info returned
-  - `{:error, :not_found}` - Resource doesn't exist
-
-  ## Examples
-
-      {:ok, info} = Jido.AI.Skill.Resources.resource_info(skill_root, "references/api.md")
-      IO.puts("Size: \#{info.size}")
-  """
-  @spec resource_info(String.t(), String.t()) :: {:ok, resource_info()} | {:error, :not_found}
-  def resource_info(skill_root, relative_path) when is_binary(skill_root) and is_binary(relative_path) do
-    case resolve_path(skill_root, relative_path) do
-      {:ok, absolute_path} ->
-        if File.regular?(absolute_path) do
-          {:ok, resource_info_for(absolute_path, relative_path)}
-        else
-          {:error, :not_found}
-        end
-
-      {:error, _} ->
-        {:error, :not_found}
-    end
-  end
-
-  @doc """
-  Searches for resources matching a pattern.
-
-  ## Examples
-
-      # Find all markdown files in references
-      matches = Jido.AI.Skill.Resources.search(skill_root, "references/**/*.md")
-  """
-  @spec search(String.t(), String.t()) :: [resource_info()]
-  def search(skill_root, pattern) when is_binary(skill_root) and is_binary(pattern) do
-    if File.dir?(skill_root) do
-      expanded_root = Path.expand(skill_root)
-      real_root = real_path(expanded_root)
-      full_pattern = Path.join(expanded_root, pattern)
-
-      full_pattern
-      |> Path.wildcard()
-      |> Enum.filter(&(File.regular?(&1) and within_root?(&1, expanded_root, real_root)))
-      |> Enum.map(fn absolute_path ->
-        relative_path = Path.relative_to(absolute_path, expanded_root)
-        resource_info_for(absolute_path, relative_path)
-      end)
-      |> Enum.sort_by(& &1.relative_path)
-    else
-      []
-    end
-  end
-
-  # Guards `search/2` results against patterns that traverse outside the
-  # skill root (e.g. "../**/*.md"), matching the protection in `resolve_path/2`.
-  defp within_root?(absolute_path, expanded_root, real_root) do
-    expanded = Path.expand(absolute_path)
-    within_path?(expanded, expanded_root) and resolved_within_root?(expanded, real_root)
-  end
-
-  # Private functions
-
-  defp list_resource_type(skill_root, type) when type in [:scripts, :references, :assets] do
-    expanded_root = Path.expand(skill_root)
-    real_root = real_path(expanded_root)
-    dir_path = Path.join(expanded_root, to_string(type))
-
-    if File.dir?(dir_path) do
-      dir_path
-      |> Path.join("**/*")
-      |> Path.wildcard()
-      |> Enum.filter(&(File.regular?(&1) and within_root?(&1, expanded_root, real_root)))
-      |> Enum.map(fn absolute_path ->
-        relative_path = Path.relative_to(absolute_path, expanded_root)
-        resource_info_for(absolute_path, relative_path)
-      end)
-      |> Enum.sort_by(& &1.relative_path)
-    else
-      []
-    end
+  defp directory?(path) do
+    match?({:ok, %File.Stat{type: :directory}}, File.lstat(path))
   end
 
   defp within_path?(path, "/"), do: Path.type(path) == :absolute
-
-  defp within_path?(path, root) do
-    path == root or String.starts_with?(path, root <> "/")
-  end
+  defp within_path?(path, root), do: path == root or String.starts_with?(path, root <> "/")
 
   defp resolved_within_root?(path, root) do
     real_root = real_path(root)
@@ -319,17 +493,10 @@ defmodule Jido.AI.Skill.Resources do
     candidate = Path.join(current, part)
 
     case File.lstat(candidate) do
-      {:ok, %File.Stat{type: :symlink}} ->
-        resolve_link(candidate, current, rest, seen)
-
-      {:ok, _stat} ->
-        do_resolve_symlinks(candidate, rest, seen)
-
-      {:error, :enoent} ->
-        {:missing, append_path(candidate, rest)}
-
-      {:error, reason} ->
-        {:error, reason}
+      {:ok, %File.Stat{type: :symlink}} -> resolve_link(candidate, current, rest, seen)
+      {:ok, _stat} -> do_resolve_symlinks(candidate, rest, seen)
+      {:error, :enoent} -> {:missing, append_path(candidate, rest)}
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -354,15 +521,24 @@ defmodule Jido.AI.Skill.Resources do
   defp append_path(base, []), do: base
   defp append_path(base, parts), do: Path.join(base, Path.join(parts))
 
-  defp resource_info_for(absolute_path, relative_path) do
-    stat = File.stat!(absolute_path)
-
+  defp resource_info_for(relative_path, stat) do
     %{
       name: Path.basename(relative_path),
       relative_path: relative_path,
-      absolute_path: absolute_path,
       size: stat.size,
       modified: stat.mtime |> NaiveDateTime.from_erl!() |> DateTime.from_naive!("Etc/UTC")
     }
+  end
+
+  defp glob_regex(pattern) do
+    source =
+      pattern
+      |> Regex.escape()
+      |> String.replace("\\*\\*/", "(?:.*/)?")
+      |> String.replace("\\*\\*", ".*")
+      |> String.replace("\\*", "[^/]*")
+      |> String.replace("\\?", "[^/]")
+
+    Regex.compile("^" <> source <> "$")
   end
 end

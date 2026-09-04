@@ -12,10 +12,14 @@ defmodule Jido.AI.Skill.AgentIntegration do
   The catalog contains metadata-only specs. Full files are read and strictly
   validated only after the model selects a skill. Duplicate names use the first
   trusted root and are available in the returned diagnostics.
+
+  Enabled agents receive both `load_skill` and `load_skill_resource`. The
+  optional `:resource_policy` sets listing and text-loading limits for both
+  actions.
   """
 
-  alias Jido.AI.Actions.Skill.LoadSkill
-  alias Jido.AI.Skill.{Diagnostics, Discovery, Prompt, Spec}
+  alias Jido.AI.Actions.Skill.{LoadResource, LoadSkill}
+  alias Jido.AI.Skill.{Diagnostics, Discovery, Prompt, ResourcePolicy, Resources, Spec}
 
   @type t :: %{
           specs: [Spec.t()],
@@ -34,7 +38,7 @@ defmodule Jido.AI.Skill.AgentIntegration do
   - `true` - trust and discover the standard project and user roots
   - a list of paths - trust and discover only those roots
   - keyword options - accepts `:paths`, `:trust`, `:max_depth`,
-    `:max_directories`, and `:exclude_directories`
+    `:max_directories`, `:exclude_directories`, and `:resource_policy`
   """
   @spec prepare(false | nil | true | [String.t()] | keyword()) :: {:ok, t()} | {:error, term()}
   def prepare(value \\ false)
@@ -71,13 +75,15 @@ defmodule Jido.AI.Skill.AgentIntegration do
 
   defp prepare_options(opts) do
     paths = Keyword.get(opts, :paths, :default)
+    policy_or_opts = Keyword.get(opts, :resource_policy, ResourcePolicy.default())
 
     discovery_opts =
       opts
       |> Keyword.take([:trust, :max_depth, :max_directories, :exclude_directories])
       |> Keyword.put_new(:trust, false)
 
-    with {:ok, metadata, diagnostics} <- discover(paths, discovery_opts),
+    with {:ok, resource_policy} <- ResourcePolicy.new(policy_or_opts),
+         {:ok, metadata, diagnostics} <- discover(paths, discovery_opts),
          {:ok, specs} <- catalog_specs(metadata) do
       specs = Enum.sort_by(specs, & &1.name)
 
@@ -85,8 +91,11 @@ defmodule Jido.AI.Skill.AgentIntegration do
        %{
          specs: specs,
          index: Prompt.render_index(specs),
-         tools: if(specs == [], do: [], else: [LoadSkill]),
-         tool_context: %{LoadSkill.context_skills_key() => Map.new(specs, &{&1.name, &1})},
+         tools: if(specs == [], do: [], else: [LoadSkill, LoadResource]),
+         tool_context: %{
+           LoadSkill.context_skills_key() => Map.new(specs, &{&1.name, &1}),
+           Resources.context_policy_key() => resource_policy
+         },
          diagnostics: diagnostics
        }}
     end

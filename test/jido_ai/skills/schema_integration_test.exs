@@ -21,7 +21,7 @@ defmodule Jido.AI.Plugins.SchemaIntegrationTest do
   }
 
   alias Jido.AI.Actions.Reasoning.RunStrategy
-  alias Jido.AI.Actions.Skill.LoadSkill
+  alias Jido.AI.Actions.Skill.{LoadResource, LoadSkill}
   alias Jido.AI.Actions.ToolCalling.{CallWithTools, ExecuteTool, ListTools}
 
   describe "LLM and Tool-Calling Action Schemas" do
@@ -76,6 +76,10 @@ defmodule Jido.AI.Plugins.SchemaIntegrationTest do
     test "LoadSkill action has schema function" do
       assert function_exported?(LoadSkill, :schema, 0)
     end
+
+    test "LoadResource action has schema function" do
+      assert function_exported?(LoadResource, :schema, 0)
+    end
   end
 
   describe "Schema Structure" do
@@ -92,6 +96,7 @@ defmodule Jido.AI.Plugins.SchemaIntegrationTest do
         ExecuteTool,
         ListTools,
         LoadSkill,
+        LoadResource,
         RunStrategy
       ]
 

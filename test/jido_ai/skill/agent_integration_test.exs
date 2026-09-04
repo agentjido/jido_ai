@@ -1,8 +1,8 @@
 defmodule Jido.AI.Skill.AgentIntegrationTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Actions.Skill.LoadSkill
-  alias Jido.AI.Skill.AgentIntegration
+  alias Jido.AI.Actions.Skill.{LoadResource, LoadSkill}
+  alias Jido.AI.Skill.{AgentIntegration, Resources}
 
   @moduletag :tmp_dir
 
@@ -34,13 +34,36 @@ defmodule Jido.AI.Skill.AgentIntegrationTest do
     File.write!(Path.join([skill_dir, "references", "checks.md"]), "Checks")
 
     assert {:ok, integration} = AgentIntegration.prepare([tmp_dir])
-    assert [LoadSkill] == integration.tools
+    assert [LoadSkill, LoadResource] == integration.tools
     assert integration.index =~ "**review**"
     refute integration.index =~ "# Review instructions"
 
     specs = integration.tool_context[LoadSkill.context_skills_key()]
     assert specs["review"].body_ref == {:file, Path.join(skill_dir, "SKILL.md")}
     refute inspect(specs["review"]) =~ "# Review instructions"
+  end
+
+  test "validates and provides a custom resource policy", %{tmp_dir: tmp_dir} do
+    skill_dir = Path.join(tmp_dir, "bounded")
+    File.mkdir_p!(skill_dir)
+    File.write!(Path.join(skill_dir, "SKILL.md"), "---\nname: bounded\ndescription: Bounded.\n---\n")
+
+    assert {:ok, integration} =
+             AgentIntegration.prepare(
+               paths: [tmp_dir],
+               trust: true,
+               resource_policy: [max_text_bytes: 128]
+             )
+
+    policy = integration.tool_context[Resources.context_policy_key()]
+    assert policy.max_text_bytes == 128
+
+    assert {:error, {:invalid_resource_policy, :max_file_bytes}} =
+             AgentIntegration.prepare(
+               paths: [tmp_dir],
+               trust: true,
+               resource_policy: [max_file_bytes: 0]
+             )
   end
 
   test "supports an explicit trust gate", %{tmp_dir: tmp_dir} do

@@ -8,7 +8,9 @@ defmodule Jido.AI.Actions.Skill.LoadSkill do
   until they are needed.
 
   The action routes through `Jido.AI.Skill.Activation`, returning the skill root
-  and resource listing with the instructions. It scopes activation
+  and a bounded resource listing with the instructions. The listing contains
+  relative paths for later use with `Jido.AI.Actions.Skill.LoadResource`.
+  It scopes activation
   from `session_id`, `agent_id`, or `request_id` in the runtime context and tags
   the resulting tool message as durable for ReAct compaction.
 
@@ -45,7 +47,8 @@ defmodule Jido.AI.Actions.Skill.LoadSkill do
           |> Zoi.optional()
       })
 
-  alias Jido.AI.Skill.{Activation, Registry, Spec}
+  alias Jido.AI.Actions.Skill.RuntimeContext
+  alias Jido.AI.Skill.{Activation, Registry, Resources, Spec}
   alias Jido.AI.Validation
 
   @name_regex ~r/^[a-z0-9]+(-[a-z0-9]+)*$/
@@ -105,10 +108,25 @@ defmodule Jido.AI.Actions.Skill.LoadSkill do
   end
 
   defp activate_skill(name, context) do
-    opts = [session_id: activation_session_id(context)]
-
-    with {:ok, skill} <- activation_target(name, context) do
+    with {:ok, resource_policy} <- resource_policy(context),
+         {:ok, skill} <- activation_target(name, context) do
+      opts = [session_id: RuntimeContext.session_id(context), resource_policy: resource_policy]
       activate(name, skill, opts, context)
+    end
+  end
+
+  defp resource_policy(context) do
+    case Resources.policy_from_context(context) do
+      {:ok, policy} ->
+        {:ok, policy}
+
+      {:error, reason} ->
+        {:error,
+         %{
+           type: :invalid_resource_policy,
+           message: "The skill resource policy is not valid",
+           reason: reason
+         }}
     end
   end
 
@@ -154,12 +172,6 @@ defmodule Jido.AI.Actions.Skill.LoadSkill do
       {:ok, specs} -> {:ok, specs}
       :error -> Map.fetch(context, Atom.to_string(@context_skills_key))
     end
-  end
-
-  defp activation_session_id(context) do
-    context[:session_id] || context["session_id"] ||
-      context[:agent_id] || context["agent_id"] ||
-      context[:request_id] || context["request_id"] || self()
   end
 
   defp skill_not_found(name, available_skills) do
