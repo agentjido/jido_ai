@@ -2,7 +2,7 @@ defmodule Jido.AI.Skill.AgentIntegrationTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Actions.Skill.{LoadResource, LoadSkill}
-  alias Jido.AI.Skill.{AgentIntegration, Resources}
+  alias Jido.AI.Skill.{AgentIntegration, ResourceProvider, Resources, Spec}
 
   @moduletag :tmp_dir
 
@@ -64,6 +64,82 @@ defmodule Jido.AI.Skill.AgentIntegrationTest do
                trust: true,
                resource_policy: [max_file_bytes: 0]
              )
+  end
+
+  test "prepares runtime-only specs without filesystem discovery" do
+    provider = fn _request, _context -> {:ok, %{resources: [], complete: true}} end
+
+    spec = %Spec{
+      name: "runtime-only",
+      description: "Runtime supplied skill.",
+      body_ref: {:inline, "Runtime body."},
+      metadata: %{"source" => "host"},
+      tags: ["runtime"]
+    }
+
+    assert {:ok, integration} = AgentIntegration.prepare(specs: [spec], resource_provider: provider)
+    assert integration.specs == [spec]
+    assert integration.index =~ "**runtime-only**"
+    assert integration.tools == [LoadSkill, LoadResource]
+
+    catalog = integration.tool_context[LoadSkill.context_skills_key()]
+    assert catalog["runtime-only"] == spec
+    assert integration.tool_context[ResourceProvider.context_provider_key()] == provider
+  end
+
+  test "runtime specs take precedence over discovered paths and report shadowed duplicates", %{tmp_dir: tmp_dir} do
+    discovered_path = write_skill(tmp_dir, "shared", "Discovered skill.")
+
+    runtime_spec = %Spec{
+      name: "shared",
+      description: "Runtime skill.",
+      body_ref: {:inline, "Runtime body."}
+    }
+
+    assert {:ok, integration} = AgentIntegration.prepare(specs: [runtime_spec], paths: [tmp_dir], trust: true)
+    assert integration.specs == [runtime_spec]
+    assert integration.index =~ "Runtime skill."
+    refute integration.index =~ "Discovered skill."
+
+    assert [warning] = Enum.filter(integration.diagnostics.warnings, &(&1.type == :shadowed_skill))
+    assert warning.message =~ discovered_path
+    assert warning.message =~ "runtime spec"
+  end
+
+  test "rejects duplicate and invalid runtime specs" do
+    first = %Spec{name: "dup", description: "First.", body_ref: {:inline, "Body."}}
+    second = %Spec{name: "dup", description: "Second.", body_ref: {:inline, "Body."}}
+
+    assert {:error, {:duplicate_runtime_skill, "dup", 0, 1}} =
+             AgentIntegration.prepare(specs: [first, second])
+
+    invalid = %Spec{name: "bad", description: "Bad.", body_ref: nil}
+
+    assert {:error,
+            {:invalid_runtime_skill_spec, 0,
+             %Jido.AI.Skill.Error.Validation.InvalidField{field: :body_ref, reason: :inline_body_required}}} =
+             AgentIntegration.prepare(specs: [invalid])
+  end
+
+  test "rejects runtime specs with filesystem sources" do
+    spec = %Spec{
+      name: "runtime-source",
+      description: "Runtime source.",
+      source: {:file, "/tmp/runtime-source/SKILL.md"},
+      body_ref: {:inline, "Body."}
+    }
+
+    assert {:error,
+            {:invalid_runtime_skill_spec, 0,
+             %Jido.AI.Skill.Error.Validation.InvalidField{field: :source, reason: :must_be_nil}}} =
+             AgentIntegration.prepare(specs: [spec])
+  end
+
+  test "rejects invalid resource providers" do
+    spec = %Spec{name: "runtime-provider", description: "Runtime provider.", body_ref: {:inline, "Body."}}
+
+    assert {:error, {:invalid_resource_provider, :invalid_form}} =
+             AgentIntegration.prepare(specs: [spec], resource_provider: :bad_provider)
   end
 
   test "supports an explicit trust gate", %{tmp_dir: tmp_dir} do

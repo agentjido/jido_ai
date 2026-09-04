@@ -78,8 +78,9 @@ Skills are reusable instruction/capability units loaded at runtime:
 
 - `Jido.AI.Skill.Loader` parses skill files.
 - `Jido.AI.Skill.Registry` stores specs and session-scoped activations.
-- `Jido.AI.Agent` accepts `agent_skills: true`, trusted paths, or bounded discovery options.
+- `Jido.AI.Agent` accepts `agent_skills: true`, trusted paths, bounded discovery options, or runtime `%Jido.AI.Skill.Spec{}` values.
 - Agents receive a compact catalog and load full instructions only when needed.
+- Runtime specs can use a host `resource_provider` callback for fresh, policy-bounded resources.
 - Activated skill content is retained across ReAct context compaction.
 - Skills are useful for domain behavior reuse without duplicating agent code.
 

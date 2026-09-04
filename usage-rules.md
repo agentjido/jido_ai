@@ -9,6 +9,10 @@ Implement tool-using AI behavior with explicit model policy, bounded execution, 
 - Use **Zoi-first** schemas for structured inputs/outputs and tool contracts.
 - Treat `ask`/`await` request handles as the safe concurrency boundary.
 - Keep provider-specific logic behind ReqLLM integration points.
+- Treat `agent_skills` filesystem discovery as an explicit trust boundary; runtime specs must use `source: nil`, carry inline bodies, and provider-backed resources must pass through `Jido.AI.Skill.ResourceProvider` validation.
+- Preserve structured skill/resource errors and `ResourcePolicy` bounds for filesystem and provider-backed resources.
+- Use `resource_id` for provider-backed resource loads; use `relative_path` for filesystem loads, with `path` retained only as a filesystem compatibility alias.
+- Treat skill listing `resources` as the complete aggregate and `references`, `assets`, and `scripts` as filtered views. Entries intentionally appear in both views.
 
 ## Library Author Patterns
 - Define tools as `Jido.Action` modules with small, deterministic behavior.

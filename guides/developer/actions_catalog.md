@@ -115,12 +115,22 @@ For direct app integration (`Jido.Exec`-driven), this is the primary standalone 
   - Use when a prompt advertises a compact skill index and the selected skill body should be loaded only on demand.
   - Required params: `name`. Optional params: `include_metadata` (default `true`).
   - Output contract: `%{name, description, instructions, resources}` plus metadata fields when requested.
-  - Pair with `Jido.AI.Skill.Prompt.render_registry_index/1` for tag-filtered skill indexes.
+  - Pair with `Jido.AI.Skill.Prompt.render_registry_index/1` for tag-filtered skill indexes, or use `agent_skills:` for scoped filesystem and runtime-spec catalogs.
+  - Runtime specs configured with `resource_provider:` are activated through the same native action and receive provider-normalized resource listings.
 - `Jido.AI.Actions.Skill.LoadResource`
-  - Use after `LoadSkill` when skill instructions refer to one bundled text file.
-  - Required params: `name` and relative `path`.
-  - Output contract: `%{skill, path, content, size}`.
-  - Requires the skill to be active in the same runtime session and enforces the configured resource policy.
+  - Use after `LoadSkill` when skill instructions refer to one bundled or provider-backed text resource.
+  - Required params: `name` plus exactly one selector: `resource_id` for provider-backed runtime skills, or `relative_path` for filesystem skills. `path` remains accepted only as a filesystem compatibility alias.
+  - Provider-backed example:
+
+    ```json
+    {
+      "name": "about-jaicool",
+      "resource_id": "b7754895-90f8-4594-b6be-c80fd0859545"
+    }
+    ```
+  - Output contract: `%{skill, resource_id, content, size, mime_type}` for provider resources or `%{skill, path, content, size}` for filesystem resources.
+  - Requires the skill to be active in the same runtime session and enforces the configured resource policy. Provider-backed resources are fetched fresh on every call, authorized against the activated listing, and validated for identifier identity, size, and UTF-8 text before returning.
+  - Resource listings keep `resources` as the complete aggregate. `references`, `assets`, and `scripts` are filtered views; entries intentionally appear in both the aggregate and typed lists.
 
 ## Reasoning Actions
 

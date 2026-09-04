@@ -55,6 +55,7 @@ defmodule Jido.AI.Skill.ResourcesTest do
 
       refute Enum.any?(listing.resources, &Map.has_key?(&1, :absolute_path))
       assert Enum.map(listing.scripts, & &1.relative_path) == ["scripts/run.sh"]
+      assert Enum.any?(listing.resources, &(&1.relative_path == "scripts/run.sh"))
       assert listing.complete
       refute listing.truncated
     end
@@ -141,6 +142,29 @@ defmodule Jido.AI.Skill.ResourcesTest do
     test "returns error for missing file", %{tmp_dir: tmp_dir} do
       assert Resources.load_resource(tmp_dir, "missing.txt") ==
                {:error, :not_found}
+    end
+  end
+
+  describe "validate_loaded_text/2" do
+    test "applies common text-only policy to normalized loaded resources" do
+      policy = %ResourcePolicy{max_file_bytes: 5, max_text_bytes: 4}
+
+      assert :ok = Resources.validate_loaded_text(%{content: "text", size: 4}, policy)
+
+      assert {:error, {:resource_too_large, :file, 6, 5}} =
+               Resources.validate_loaded_text(%{content: "123456", size: 6}, policy)
+
+      assert {:error, {:resource_too_large, :text, 5, 4}} =
+               Resources.validate_loaded_text(%{content: "12345", size: 5}, %ResourcePolicy{
+                 max_file_bytes: 10,
+                 max_text_bytes: 4
+               })
+
+      assert {:error, :binary_resource} =
+               Resources.validate_loaded_text(%{content: <<0xFF>>, size: 1}, ResourcePolicy.default())
+
+      assert {:error, :binary_resource} =
+               Resources.validate_loaded_text(%{content: <<0>>, size: 1}, ResourcePolicy.default())
     end
   end
 
