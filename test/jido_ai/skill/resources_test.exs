@@ -55,6 +55,7 @@ defmodule Jido.AI.Skill.ResourcesTest do
 
       refute Enum.any?(listing.resources, &Map.has_key?(&1, :absolute_path))
       assert Enum.map(listing.scripts, & &1.relative_path) == ["scripts/run.sh"]
+      assert Enum.any?(listing.resources, &(&1.relative_path == "scripts/run.sh"))
       assert listing.complete
       refute listing.truncated
     end

@@ -209,7 +209,10 @@ defmodule Jido.AI.Skill.Loader do
         diagnostics: diagnostics
       }
 
-      {:ok, spec, diagnostics}
+      case Spec.validate_manifest(spec) do
+        :ok -> {:ok, spec, diagnostics}
+        {:error, error} -> fail(error, diagnostics)
+      end
     end
   end
 

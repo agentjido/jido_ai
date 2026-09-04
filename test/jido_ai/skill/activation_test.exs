@@ -57,6 +57,49 @@ defmodule Jido.AI.Skill.ActivationTest do
       assert context.resources.complete
     end
 
+    test "runtime specs without providers receive an empty resource listing" do
+      spec = %Spec{
+        name: "runtime-empty",
+        description: "Runtime empty.",
+        body_ref: {:inline, "Runtime body."}
+      }
+
+      assert {:ok, context} = Activation.activate(spec, session_id: "runtime-empty-session")
+      assert context.skill_body == "Runtime body."
+      assert context.root_dir == nil
+      assert context.resources.resources == []
+      assert context.resources.complete
+    end
+
+    test "provider-backed activation lists resources once and remains idempotent" do
+      parent = self()
+
+      spec = %Spec{
+        name: "runtime-provider",
+        description: "Runtime provider.",
+        body_ref: {:inline, "Runtime body."}
+      }
+
+      provider = fn %{operation: :list}, context ->
+        send(parent, {:listed, context})
+        {:ok, %{resources: [%{id: "guide-id", name: "guide.md", type: :reference, size: 5}], complete: true}}
+      end
+
+      opts = [
+        session_id: "runtime-provider-session",
+        resource_provider: %{provider: provider, context: %{tenant: "acme"}}
+      ]
+
+      assert {:ok, first} = Activation.activate(spec, opts)
+      assert {:ok, second} = Activation.activate(spec, opts)
+      assert first == second
+      assert first.resource_backend == :provider
+      assert MapSet.member?(first.provider_resource_ids, "guide-id")
+      assert Enum.map(first.resources.resources, & &1.id) == ["guide-id"]
+      assert_receive {:listed, %{tenant: "acme"}}
+      refute_received {:listed, _context}
+    end
+
     @tag :tmp_dir
     test "returns error when body file cannot be loaded", %{tmp_dir: tmp_dir} do
       missing_body_path = Path.join(tmp_dir, "missing-body.md")

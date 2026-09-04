@@ -15,6 +15,12 @@ defmodule Jido.AI.Skill.Activation do
   - `skill_body` - The rendered skill body text
   - `root_dir` - Skill root directory for resource resolution
   - `resources` - Listing of bundled resources
+  - `resource_policy` - Policy captured at activation time
+  - `resource_provider` - Optional provider binding for runtime resources
+
+  Filesystem skills list bundled resources from their skill root. Runtime specs
+  may pass a `:resource_provider` binding in options; that provider is used for
+  listing during activation and stored for fresh `load_skill_resource` calls.
 
   ## Usage
 
@@ -32,7 +38,7 @@ defmodule Jido.AI.Skill.Activation do
       Jido.AI.Skill.Activation.activated?("code-review")
   """
 
-  alias Jido.AI.Skill.{Discovery, Loader, Registry, ResourcePolicy, Resources, Spec}
+  alias Jido.AI.Skill.{Discovery, Loader, Registry, ResourcePolicy, ResourceProvider, Resources, Spec}
 
   @discovery_option_keys [:trust, :max_depth, :max_directories, :exclude_directories]
 
@@ -40,8 +46,11 @@ defmodule Jido.AI.Skill.Activation do
           skill: Spec.t(),
           skill_body: String.t(),
           root_dir: String.t() | nil,
-          resources: Resources.resource_listing(),
-          resource_policy: ResourcePolicy.t()
+          resources: Resources.resource_listing() | ResourceProvider.resource_listing(),
+          resource_policy: ResourcePolicy.t(),
+          resource_provider: ResourceProvider.binding() | nil,
+          resource_backend: :filesystem | :provider | :none,
+          provider_resource_ids: MapSet.t(String.t())
         }
 
   @doc """
@@ -265,16 +274,21 @@ defmodule Jido.AI.Skill.Activation do
   defp activation_context(%Spec{} = spec, skill_body, opts) do
     root_dir = root_dir(spec)
     policy_or_opts = Keyword.get(opts, :resource_policy, ResourcePolicy.default())
+    provider_binding = Keyword.get(opts, :resource_provider)
 
     with {:ok, policy} <- ResourcePolicy.new(policy_or_opts),
-         {:ok, resources} <- list_resources(root_dir, policy) do
+         {:ok, resources, resource_backend, provider_resource_ids} <-
+           list_resources(spec, root_dir, policy, provider_binding) do
       {:ok,
        %{
          skill: spec,
          skill_body: skill_body,
          root_dir: root_dir,
          resources: resources,
-         resource_policy: policy
+         resource_policy: policy,
+         resource_provider: provider_binding,
+         resource_backend: resource_backend,
+         provider_resource_ids: provider_resource_ids
        }}
     end
   end
@@ -291,6 +305,21 @@ defmodule Jido.AI.Skill.Activation do
   defp root_dir(%Spec{source: {:file, path}}), do: Path.dirname(path)
   defp root_dir(%Spec{}), do: nil
 
-  defp list_resources(nil, policy), do: Resources.empty_listing(policy)
-  defp list_resources(root_dir, policy), do: Resources.list_all(root_dir, policy)
+  defp list_resources(%Spec{} = spec, _root_dir, policy, %{provider: provider, context: context}) do
+    with {:ok, resources} <- ResourceProvider.list(provider, spec, policy, context) do
+      {:ok, resources, :provider, MapSet.new(resources.resources, & &1.id)}
+    end
+  end
+
+  defp list_resources(_spec, nil, policy, _provider_binding) do
+    with {:ok, resources} <- Resources.empty_listing(policy) do
+      {:ok, resources, :none, MapSet.new()}
+    end
+  end
+
+  defp list_resources(_spec, root_dir, policy, _provider_binding) do
+    with {:ok, resources} <- Resources.list_all(root_dir, policy) do
+      {:ok, resources, :filesystem, MapSet.new()}
+    end
+  end
 end

@@ -78,6 +78,89 @@ Keyword options must include an explicit `trust` policy. Omitting it rejects
 every discovered root; passing a path list directly is the shorthand for
 trusting exactly those roots.
 
+Hosts can also supply runtime specs directly. Runtime specs must include a valid
+name, description, `source: nil`, and inline body. They are not discovered from
+the filesystem and cannot retain a filesystem root:
+
+```elixir
+runtime_specs = [
+  %Jido.AI.Skill.Spec{
+    name: "billing-playbook",
+    description: "Answer billing questions using current tenant policy.",
+    source: nil,
+    body_ref: {:inline, "# Billing Playbook\n\nCheck tenant policy before answering."},
+    metadata: %{"owner" => "support"},
+    tags: ["support"]
+  }
+]
+
+provider = fn
+  %{operation: :list}, %{tenant_id: tenant_id} ->
+    {:ok,
+     %{
+       resources: [
+         %{
+           id: "tenant-policy:#{tenant_id}",
+           name: "#{tenant_id}-policy.md",
+           type: :reference,
+           size: 512
+         }
+       ],
+       complete: true
+     }}
+
+  %{operation: :load, resource_id: id}, %{tenant_id: tenant_id} ->
+    content = MyApp.PolicyStore.fetch!(tenant_id, id)
+    {:ok, %{resource_id: id, content: content, size: byte_size(content)}}
+end
+
+use Jido.AI.Agent,
+  name: "support_agent",
+  agent_skills: [
+    specs: runtime_specs,
+    resource_provider: provider,
+    resource_policy: [max_text_bytes: 131_072]
+  ]
+```
+
+Runtime specs can be mixed with discovered paths. Runtime specs win over
+discovered skills with the same name, and shadowed discovered entries are
+reported in diagnostics. Duplicate runtime names are rejected. Filesystem-backed
+skills must enter through trusted discovery (`paths` plus `trust`) rather than
+through `specs:`.
+
+The provider is called with one of these requests:
+
+```elixir
+%{operation: :list, skill: spec, policy: policy}
+%{operation: :load, skill: spec, resource_id: opaque_id, policy: policy}
+```
+
+It must return one of these shapes:
+
+```elixir
+{:ok, %{resources: resource_entries, complete: boolean()}}
+{:ok, %{resource_id: opaque_id, content: text, size: non_neg_integer()}}
+{:error, reason}
+```
+
+Provider entries require `id`, `name`, and `size`. Optional fields are `type`,
+`modified`, `mime_type`, and `metadata`. The `id` is opaque: Jido preserves it
+byte-for-byte and never parses, normalizes, joins, sorts, or interprets it. The
+`name` is descriptive only and is not used for loading.
+
+Provider listings are ordered. Policy enforcement truncates at the first entry
+that violates count, declared-size, or encoded-listing limits; that entry and all
+later entries are excluded. Entries that cannot be encoded for listing, including
+malformed metadata, reject the provider listing with a structured error.
+
+Jido validates and normalizes provider output instead of trusting it. Reserved
+Agent Skills context is removed before the callback runs; host context such as
+tenant IDs remains available. Provider-backed resource IDs are authorized only
+when they appeared in the activated skill's post-policy listing. Unlisted IDs are
+forbidden even when the provider reported `complete: false`; clear and reactivate
+the skill to refresh the authorized listing.
+
 Agent Skills integration is disabled by default so an application never starts
 trusting repository instructions merely by upgrading a dependency.
 
@@ -144,12 +227,13 @@ agent instances do not share activation state. Its structured result contains:
   description: "...",
   instructions: "# Code Review ...",
   root_dir: "/absolute/path/to/code-review",
-  resources: %{scripts: [...], references: [...], assets: [...]}
+  resources: %{resources: [...], scripts: [...], references: [...], assets: [...]}
 }
 ```
 
-The `resources` value also has the complete relative-path list, limit details,
-and truncation state:
+The `resources` value also has the complete selector list, limit details, and
+truncation state. Filesystem skills use `relative_path`; provider-backed runtime
+skills use opaque `id` values:
 
 ```elixir
 %{
@@ -164,9 +248,26 @@ and truncation state:
 }
 ```
 
-The conventional groups are compatibility views of the general list. The
-general list also includes root files and custom directories. It excludes the
-root `SKILL.md` and does not contain absolute paths.
+```elixir
+%{
+  resources: [%{id: "tenant-policy:acme", name: "policy.md", size: 1_067, ...}],
+  scripts: [...],
+  references: [...],
+  assets: [...],
+  complete: true,
+  truncated: false,
+  truncation_reasons: [],
+  limits: %{...}
+}
+```
+
+The `resources` field is the complete aggregate listing. The conventional
+`references`, `assets`, and `scripts` groups are filtered views of that same
+manifest. Entries intentionally appear in both the aggregate list and their
+typed list; do not deduplicate across these fields because they serve different
+views. The general filesystem list also includes root files and custom
+directories. It excludes the root `SKILL.md` and does not contain absolute
+paths.
 
 Skill tool results are marked durable in conversation refs. A ReAct context
 replacement with `reason: :compaction` retains the skill output and its matching
@@ -174,23 +275,53 @@ assistant tool call.
 
 ## Bounded Resource Loading
 
-After `load_skill` activates a skill, use `load_skill_resource` with one listed
-relative path:
+After `load_skill` activates a filesystem skill, use `load_skill_resource` with
+one listed relative path:
 
 ```elixir
 {:ok, resource} =
   Jido.AI.Actions.Skill.LoadResource.run(
-    %{name: "code-review", path: "references/checks.md"},
+    %{name: "code-review", relative_path: "references/checks.md"},
     %{agent_id: conversation_id}
   )
 
 resource.content
 ```
 
-The action requires activation in the same runtime session. It rejects absolute
-paths, traversal, symlinks, the root `SKILL.md`, oversized files, oversized text,
-and binary content. Missing, invalid, oversized, and binary resources return
-structured action errors.
+For provider-backed runtime skills, use the listed opaque `resource_id` instead:
+
+```elixir
+{:ok, resource} =
+  Jido.AI.Actions.Skill.LoadResource.run(
+    %{
+      name: "about-jaicool",
+      resource_id: "b7754895-90f8-4594-b6be-c80fd0859545"
+    },
+    %{agent_id: conversation_id, tenant_id: "acme"}
+  )
+```
+
+The same provider-backed tool arguments as JSON are:
+
+```json
+{
+  "name": "about-jaicool",
+  "resource_id": "b7754895-90f8-4594-b6be-c80fd0859545"
+}
+```
+
+The action requires activation in the same runtime session. Filesystem resources
+use the bundled file loader. Runtime specs configured with `resource_provider:`
+use their opaque provider IDs and call the provider for every load, so resource
+content is never cached by Jido.
+
+Filesystem resources reject absolute paths, traversal, the root `SKILL.md`,
+symlinks, hard-link aliases of `SKILL.md`, oversized files, oversized text, and
+binary or non-UTF-8 content. Provider-backed resources validate only the opaque
+ID type, emptiness, length, listing authorization, response identity, declared
+size, loaded text size, and binary/non-UTF-8 content. Missing, invalid,
+oversized, binary, provider-failed, and malformed resources return structured
+action errors.
 
 `Jido.AI.Skill.ResourcePolicy` has these defaults:
 
@@ -202,8 +333,11 @@ structured action errors.
 - 256 KiB of returned text
 - binary text loading rejected
 
-When a listing reaches a count, depth, directory, or payload limit, `complete`
-is false and `truncation_reasons` identifies the reached limits.
+When a filesystem listing reaches a count, depth, directory, or payload limit,
+`complete` is false and `truncation_reasons` identifies the reached limits. When
+a provider listing reaches a count, declared-size, or encoded payload limit,
+`complete` is false and `truncation_reasons` identifies the reached limits.
+Provider listings marked incomplete add `:provider_incomplete`.
 
 ## Lazy Loading Skill Bodies
 
@@ -344,7 +478,7 @@ Fix:
 - skill registry stores specs by skill name
 - activation registry stores by session ID and skill name
 - `body_ref` can be inline or file-backed
-- resource listings use relative paths and report incomplete results
+- filesystem resource listings use relative paths, provider listings use opaque IDs, and both report incomplete results
 - resource text loading rejects binary content
 - allowed tools are normalized to string names
 - `Prompt.render/2` ignores unresolved skills, renders only valid specs, and omits bodies by default

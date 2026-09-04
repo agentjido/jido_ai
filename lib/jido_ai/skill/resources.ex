@@ -2,10 +2,12 @@ defmodule Jido.AI.Skill.Resources do
   @moduledoc """
   Provides bounded, lazy access to files bundled with a skill.
 
-  General listing includes each regular file below the skill root except the
-  root `SKILL.md`. Root files and custom directories are valid resources.
-  Conventional `scripts`, `references`, and `assets` groups remain available in
-  the listing. Paths in returned listings are relative to the skill root.
+  The `resources` field is the complete aggregate listing and includes each
+  regular file below the skill root except the root `SKILL.md`. Root files and
+  custom directories are valid resources. Conventional `scripts`, `references`,
+  and `assets` groups remain available as filtered views of the same entries, so
+  a file can intentionally appear in both `resources` and its typed view. Paths
+  in returned listings are relative to the skill root.
 
   Listing does not follow symlinks. Loading rejects traversal, absolute paths,
   and symlinks. `Jido.AI.Skill.ResourcePolicy` supplies all limits.
@@ -15,18 +17,23 @@ defmodule Jido.AI.Skill.Resources do
 
   @context_policy_key :__jido_ai_skill_resource_policy__
 
-  @type resource_info :: %{
-          name: String.t(),
-          relative_path: String.t(),
-          size: non_neg_integer(),
-          modified: DateTime.t()
+  @type filesystem_resource_info :: %{
+          required(:name) => String.t(),
+          required(:relative_path) => String.t(),
+          required(:size) => non_neg_integer(),
+          required(:modified) => DateTime.t(),
+          optional(:type) => atom() | String.t() | nil,
+          optional(:mime_type) => String.t() | nil,
+          optional(:metadata) => map()
         }
 
+  @type resource_info :: filesystem_resource_info()
+
   @type resource_listing :: %{
-          resources: [resource_info()],
-          scripts: [resource_info()],
-          references: [resource_info()],
-          assets: [resource_info()],
+          resources: [filesystem_resource_info()],
+          scripts: [filesystem_resource_info()],
+          references: [filesystem_resource_info()],
+          assets: [filesystem_resource_info()],
           complete: boolean(),
           truncated: boolean(),
           truncation_reasons: [atom()],
@@ -94,6 +101,19 @@ defmodule Jido.AI.Skill.Resources do
   def empty_listing(policy_or_opts \\ []) do
     with {:ok, policy} <- ResourcePolicy.new(policy_or_opts) do
       {:ok, build_listing([], MapSet.new(), policy)}
+    end
+  end
+
+  @doc false
+  @spec enforce_text_bounds(String.t(), non_neg_integer(), ResourcePolicy.t()) :: :ok | {:error, term()}
+  def enforce_text_bounds(content, size, %ResourcePolicy{} = policy) do
+    with :ok <- within_size(size, policy.max_file_bytes, :file),
+         :ok <- within_size(size, policy.max_text_bytes, :text),
+         true <- text_content?(content) do
+      :ok
+    else
+      false -> {:error, :binary_resource}
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -415,6 +435,7 @@ defmodule Jido.AI.Skill.Resources do
     inode != 0 and identity == file_identity(right)
   end
 
+  @doc false
   defp text_content?(content) do
     String.valid?(content) and not String.contains?(content, <<0>>)
   end

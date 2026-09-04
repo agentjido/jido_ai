@@ -9,9 +9,24 @@ defmodule Jido.AI.Skill.AgentIntegration do
   bounds and a custom trust predicate. Keyword options do not trust any root
   unless `:trust` is explicitly set.
 
-  The catalog contains metadata-only specs. Full files are read and strictly
-  validated only after the model selects a skill. Duplicate names use the first
-  trusted root and are available in the returned diagnostics.
+  Hosts may also pass runtime `%Jido.AI.Skill.Spec{}` values with `source: nil`
+  and inline bodies:
+
+      agent_skills: [
+        specs: runtime_specs,
+        resource_provider: &MyApp.SkillResources.handle/2,
+        resource_policy: [max_text_bytes: 131_072]
+      ]
+
+  Runtime specs are validated, preserved without filesystem discovery or
+  filesystem roots, and added to the same scoped catalog as discovered skills.
+  Runtime specs take precedence over discovered skills with the same name;
+  shadowed discovered entries are reported in diagnostics. Duplicate runtime
+  names are rejected.
+
+  The catalog contains metadata-only discovered specs. Full files are read and
+  strictly validated only after the model selects a filesystem skill. Runtime
+  specs keep their inline body and metadata exactly as supplied.
 
   Enabled agents receive both `load_skill` and `load_skill_resource`. The
   optional `:resource_policy` sets listing and text-loading limits for both
@@ -19,7 +34,7 @@ defmodule Jido.AI.Skill.AgentIntegration do
   """
 
   alias Jido.AI.Actions.Skill.{LoadResource, LoadSkill}
-  alias Jido.AI.Skill.{Diagnostics, Discovery, Prompt, ResourcePolicy, Resources, Spec}
+  alias Jido.AI.Skill.{Diagnostics, Discovery, Prompt, ResourcePolicy, ResourceProvider, Resources, Spec}
 
   @type t :: %{
           specs: [Spec.t()],
@@ -37,8 +52,9 @@ defmodule Jido.AI.Skill.AgentIntegration do
   - `false` or `nil` - disable Agent Skills integration
   - `true` - trust and discover the standard project and user roots
   - a list of paths - trust and discover only those roots
-  - keyword options - accepts `:paths`, `:trust`, `:max_depth`,
-    `:max_directories`, `:exclude_directories`, and `:resource_policy`
+  - keyword options - accepts `:specs`, `:resource_provider`, `:paths`,
+    `:trust`, `:max_depth`, `:max_directories`, `:exclude_directories`, and
+    `:resource_policy`
   """
   @spec prepare(false | nil | true | [String.t()] | keyword()) :: {:ok, t()} | {:error, term()}
   def prepare(value \\ false)
@@ -74,30 +90,41 @@ defmodule Jido.AI.Skill.AgentIntegration do
   end
 
   defp prepare_options(opts) do
-    paths = Keyword.get(opts, :paths, :default)
+    runtime_specs_or_opts = Keyword.get(opts, :specs, [])
+    paths = paths_option(opts, runtime_specs_or_opts)
     policy_or_opts = Keyword.get(opts, :resource_policy, ResourcePolicy.default())
+    provider_or_nil = Keyword.get(opts, :resource_provider)
 
     discovery_opts =
       opts
       |> Keyword.take([:trust, :max_depth, :max_directories, :exclude_directories])
       |> Keyword.put_new(:trust, false)
 
-    with {:ok, resource_policy} <- ResourcePolicy.new(policy_or_opts),
+    with {:ok, runtime_specs} <- runtime_specs(runtime_specs_or_opts),
+         {:ok, provider} <- ResourceProvider.validate(provider_or_nil),
+         {:ok, resource_policy} <- ResourcePolicy.new(policy_or_opts),
          {:ok, metadata, diagnostics} <- discover(paths, discovery_opts),
-         {:ok, specs} <- catalog_specs(metadata) do
+         {:ok, discovered_specs} <- catalog_specs(metadata),
+         {specs, diagnostics} <- merge_specs(runtime_specs, discovered_specs, diagnostics) do
       specs = Enum.sort_by(specs, & &1.name)
+      tool_context = tool_context(specs, provider, resource_policy)
 
       {:ok,
        %{
          specs: specs,
          index: Prompt.render_index(specs),
          tools: if(specs == [], do: [], else: [LoadSkill, LoadResource]),
-         tool_context: %{
-           LoadSkill.context_skills_key() => Map.new(specs, &{&1.name, &1}),
-           Resources.context_policy_key() => resource_policy
-         },
+         tool_context: tool_context,
          diagnostics: diagnostics
        }}
+    end
+  end
+
+  defp paths_option(opts, runtime_specs) do
+    cond do
+      Keyword.has_key?(opts, :paths) -> Keyword.get(opts, :paths)
+      runtime_specs != [] -> []
+      true -> :default
     end
   end
 
@@ -115,6 +142,74 @@ defmodule Jido.AI.Skill.AgentIntegration do
         {:error, reason} -> {:halt, {:error, {:skill_load_failed, item.skill_md_path, reason}}}
       end
     end)
+  end
+
+  defp runtime_specs(specs) when is_list(specs) do
+    specs
+    |> Enum.with_index()
+    |> Enum.reduce_while({:ok, [], %{}}, fn {spec, index}, {:ok, acc, names} ->
+      with {:ok, %Spec{name: name} = spec} <- Spec.validate_runtime(spec, index: index),
+           :ok <- unique_runtime_name(name, index, names) do
+        {:cont, {:ok, [spec | acc], Map.put(names, name, index)}}
+      else
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+    |> case do
+      {:ok, specs, _names} -> {:ok, Enum.reverse(specs)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp runtime_specs(_specs), do: {:error, {:invalid_agent_skills_option, :specs}}
+
+  defp unique_runtime_name(name, index, names) do
+    case Map.fetch(names, name) do
+      :error -> :ok
+      {:ok, first_index} -> {:error, {:duplicate_runtime_skill, name, first_index, index}}
+    end
+  end
+
+  defp merge_specs(runtime_specs, discovered_specs, diagnostics) do
+    Enum.reduce(
+      discovered_specs,
+      {Enum.reverse(runtime_specs), Map.new(runtime_specs, &{&1.name, &1}), diagnostics},
+      fn spec, {selected, winners, diagnostics} ->
+        case Map.fetch(winners, spec.name) do
+          :error ->
+            {[spec | selected], Map.put(winners, spec.name, spec), diagnostics}
+
+          {:ok, winner} ->
+            warning =
+              Diagnostics.Warning.new(
+                :shadowed_skill,
+                "Skill '#{spec.name}' from #{source_label(spec)} is shadowed by #{source_label(winner)}",
+                severity: :medium
+              )
+
+            {selected, winners, Diagnostics.add_warning(diagnostics, warning)}
+        end
+      end
+    )
+    |> then(fn {selected, _winners, diagnostics} -> {Enum.reverse(selected), diagnostics} end)
+  end
+
+  defp source_label(%Spec{source: {:file, path}}), do: "'#{path}'"
+  defp source_label(%Spec{}), do: "a runtime spec"
+
+  defp tool_context([], _provider, _resource_policy), do: %{}
+
+  defp tool_context(specs, provider, resource_policy) do
+    base = %{
+      LoadSkill.context_skills_key() => Map.new(specs, &{&1.name, &1}),
+      Resources.context_policy_key() => resource_policy
+    }
+
+    if provider do
+      Map.put(base, ResourceProvider.context_provider_key(), provider)
+    else
+      base
+    end
   end
 
   defp empty do

@@ -8,11 +8,17 @@ defmodule Jido.AI.Actions.Skill.LoadSkill do
   until they are needed.
 
   The action routes through `Jido.AI.Skill.Activation`, returning the skill root
-  and a bounded resource listing with the instructions. The listing contains
-  relative paths for later use with `Jido.AI.Actions.Skill.LoadResource`.
+  and a bounded resource listing with the instructions. Filesystem listings
+  contain relative paths for later use with `Jido.AI.Actions.Skill.LoadResource`;
+  provider-backed runtime listings contain opaque resource IDs.
   It scopes activation
   from `session_id`, `agent_id`, or `request_id` in the runtime context and tags
   the resulting tool message as durable for ReAct compaction.
+
+  Scoped Agent Skills catalogs may contain discovered filesystem specs or
+  host-supplied runtime specs. Runtime specs keep their inline bodies and, when
+  configured with `:resource_provider`, receive callback-backed resource
+  listings through `Jido.AI.Skill.ResourceProvider`.
 
   ## Parameters
 
@@ -48,7 +54,7 @@ defmodule Jido.AI.Actions.Skill.LoadSkill do
       })
 
   alias Jido.AI.Actions.Skill.RuntimeContext
-  alias Jido.AI.Skill.{Activation, Registry, Resources, Spec}
+  alias Jido.AI.Skill.{Activation, Registry, ResourceProvider, Resources, Spec}
   alias Jido.AI.Validation
 
   @name_regex ~r/^[a-z0-9]+(-[a-z0-9]+)*$/
@@ -110,10 +116,22 @@ defmodule Jido.AI.Actions.Skill.LoadSkill do
   defp activate_skill(name, context) do
     with {:ok, resource_policy} <- resource_policy(context),
          {:ok, skill} <- activation_target(name, context) do
-      opts = [session_id: RuntimeContext.session_id(context), resource_policy: resource_policy]
+      opts =
+        [session_id: RuntimeContext.session_id(context), resource_policy: resource_policy]
+        |> maybe_put_resource_provider(skill, context)
+
       activate(name, skill, opts, context)
     end
   end
+
+  defp maybe_put_resource_provider(opts, %Spec{source: nil}, context) do
+    case fetch_reserved(context, ResourceProvider.context_provider_key()) do
+      {:ok, provider} -> Keyword.put(opts, :resource_provider, %{provider: provider, context: context})
+      :error -> opts
+    end
+  end
+
+  defp maybe_put_resource_provider(opts, _skill, _context), do: opts
 
   defp resource_policy(context) do
     case Resources.policy_from_context(context) do
@@ -168,9 +186,13 @@ defmodule Jido.AI.Actions.Skill.LoadSkill do
   end
 
   defp fetch_agent_skill_specs(context) do
-    case Map.fetch(context, @context_skills_key) do
-      {:ok, specs} -> {:ok, specs}
-      :error -> Map.fetch(context, Atom.to_string(@context_skills_key))
+    fetch_reserved(context, @context_skills_key)
+  end
+
+  defp fetch_reserved(context, key) do
+    case Map.fetch(context, key) do
+      {:ok, value} -> {:ok, value}
+      :error -> Map.fetch(context, Atom.to_string(key))
     end
   end
 

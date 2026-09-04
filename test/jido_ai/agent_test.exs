@@ -27,6 +27,18 @@ defmodule Jido.AI.AgentTest do
     def name, do: "test_actor"
   end
 
+  defmodule RuntimeAgentSkillProvider do
+    def handle(%{operation: :list}, _context, _suffix) do
+      {:ok,
+       %{resources: [%{id: "briefing://runtime/1", name: "briefing.md", type: :reference, size: 9}], complete: true}}
+    end
+
+    def handle(%{operation: :load, resource_id: resource_id}, _context, suffix) do
+      content = "Briefing" <> suffix
+      {:ok, %{content: content, resource_id: resource_id, size: byte_size(content)}}
+    end
+  end
+
   defmodule TestCalculator do
     use Jido.Action,
       name: "calculator",
@@ -93,6 +105,26 @@ defmodule Jido.AI.AgentTest do
       tools: [TestCalculator],
       system_prompt: "Base instructions.",
       agent_skills: [".agents/skills"]
+  end
+
+  defmodule AgentWithRuntimeAgentSkills do
+    use Jido.AI.Agent,
+      name: "agent_with_runtime_agent_skills",
+      tools: [TestCalculator],
+      system_prompt: "Base instructions.",
+      agent_skills: [
+        specs: [
+          %Jido.AI.Skill.Spec{
+            name: "runtime-briefing",
+            description: "Load runtime briefing resources.",
+            body_ref: {:inline, "Runtime briefing instructions."},
+            metadata: %{"owner" => "test"},
+            allowed_tools: ["calculator"],
+            tags: ["runtime"]
+          }
+        ],
+        resource_provider: {RuntimeAgentSkillProvider, :handle, ["!"]}
+      ]
   end
 
   defmodule AgentWithToolContext do
@@ -531,6 +563,41 @@ defmodule Jido.AI.AgentTest do
       specs = config.base_tool_context[Jido.AI.Actions.Skill.LoadSkill.context_skills_key()]
       assert %Jido.AI.Skill.Spec{name: "hex-release"} = specs["hex-release"]
       assert %Jido.AI.Skill.Diagnostics{} = config.skill_diagnostics
+    end
+
+    test "agent_skills accepts runtime specs and an MFA resource provider" do
+      start_supervised!(Jido.AI.Skill.Registry)
+
+      agent = AgentWithRuntimeAgentSkills.new()
+      state = StratState.get(agent, %{})
+      config = state.config
+
+      assert Jido.AI.Actions.Skill.LoadSkill in ReAct.list_tools(agent)
+      assert Jido.AI.Actions.Skill.LoadResource in ReAct.list_tools(agent)
+      assert config.system_prompt =~ "Base instructions."
+      assert config.system_prompt =~ "**runtime-briefing**"
+      refute config.system_prompt =~ "Runtime briefing instructions."
+
+      specs = config.base_tool_context[Jido.AI.Actions.Skill.LoadSkill.context_skills_key()]
+
+      assert %Jido.AI.Skill.Spec{body_ref: {:inline, "Runtime briefing instructions."}, source: nil} =
+               specs["runtime-briefing"]
+
+      assert config.base_tool_context[Jido.AI.Skill.ResourceProvider.context_provider_key()] ==
+               {RuntimeAgentSkillProvider, :handle, ["!"]}
+
+      context = Map.put(config.base_tool_context, :agent_id, "runtime-agent-mfa")
+
+      assert {:ok, loaded} = Jido.AI.Actions.Skill.LoadSkill.run(%{name: "runtime-briefing"}, context)
+      assert Enum.map(loaded.resources.resources, & &1.id) == ["briefing://runtime/1"]
+
+      assert {:ok, resource} =
+               Jido.AI.Actions.Skill.LoadResource.run(
+                 %{name: "runtime-briefing", resource_id: "briefing://runtime/1"},
+                 context
+               )
+
+      assert resource.content == "Briefing!"
     end
 
     @tag :tmp_dir

@@ -55,10 +55,12 @@ defmodule Jido.AI.Agent do
     Runtime reserves `:state` (core Jido-compatible) for tool execution snapshots.
     User-provided values for that key are overwritten per request.
   - `:skills` - Additional skills to attach to the agent (TaskSupervisorSkill is auto-included)
-  - `:agent_skills` - Agent Skills (`SKILL.md`) integration. Pass `true` to trust
-    and discover standard roots, a list of trusted roots, or discovery options
-    with an explicit `:trust` policy. The agent automatically receives the compact
-    catalog and `load_skill` tool after strict validation at initialization.
+  - `:agent_skills` - Agent Skills integration. Pass `true` to trust and discover
+    standard roots, a list of trusted roots, discovery options with an explicit
+    `:trust` policy, or `specs: [%Jido.AI.Skill.Spec{}]` with optional
+    `resource_provider:` for host-backed runtime resources. The agent
+    automatically receives the compact catalog and native skill-loading tools
+    after strict validation at initialization.
   - `:signal_routes` - Additional agent-level signal routes forwarded to `Jido.Agent`.
     ReAct routes are still provided by the default strategy.
 
