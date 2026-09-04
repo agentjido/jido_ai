@@ -1,6 +1,8 @@
 defmodule Jido.AI.Skill.RegistryTest do
   use ExUnit.Case
 
+  import ExUnit.CaptureLog
+
   alias Jido.AI.Skill.{Registry, Spec, Error}
 
   @fixtures_path Path.join([__DIR__, "..", "..", "fixtures", "skills", "registry"])
@@ -210,5 +212,42 @@ defmodule Jido.AI.Skill.RegistryTest do
     test "ignores non-existent paths" do
       assert {:ok, 0} = Registry.load_from_paths(["/nonexistent/path"])
     end
+
+    @tag :tmp_dir
+    test "returns strict load errors for malformed discovered files", %{tmp_dir: tmp_dir} do
+      skill_dir = Path.join(tmp_dir, "malformed")
+      File.mkdir_p!(skill_dir)
+      File.write!(Path.join(skill_dir, "SKILL.md"), "---\nname: [broken\n---\n")
+
+      assert {:error, %Jido.AI.Skill.Error.Parse.InvalidYaml{}} =
+               Registry.load_from_paths([tmp_dir])
+
+      assert Registry.list() == []
+    end
+
+    @tag :tmp_dir
+    test "keeps the first root when names collide and logs both locations", %{tmp_dir: tmp_dir} do
+      first_root = Path.join(tmp_dir, "z-first")
+      second_root = Path.join(tmp_dir, "a-second")
+      first_path = write_skill(first_root, "shared", "First root.")
+      second_path = write_skill(second_root, "shared", "Second root.")
+
+      log =
+        capture_log(fn ->
+          assert {:ok, 1} = Registry.load_from_paths([first_root, second_root])
+        end)
+
+      assert {:ok, %Spec{description: "First root."}} = Registry.lookup("shared")
+      assert log =~ first_path
+      assert log =~ second_path
+    end
+  end
+
+  defp write_skill(root, name, description) do
+    skill_dir = Path.join(root, name)
+    File.mkdir_p!(skill_dir)
+    path = Path.join(skill_dir, "SKILL.md")
+    File.write!(path, "---\nname: #{name}\ndescription: #{description}\n---\nBody.\n")
+    path
   end
 end

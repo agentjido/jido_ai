@@ -2,7 +2,7 @@ defmodule Jido.AI.Actions.Skill.LoadSkillTest do
   use ExUnit.Case, async: false
 
   alias Jido.AI.Actions.Skill.LoadSkill
-  alias Jido.AI.Skill.{Registry, Spec}
+  alias Jido.AI.Skill.{Discovery, Registry, Spec}
 
   setup do
     start_supervised!(Registry)
@@ -91,6 +91,36 @@ defmodule Jido.AI.Actions.Skill.LoadSkillTest do
       assert error.type == :skill_not_found
       assert error.available_skills == []
       refute Registry.activated?("insights", session_id: "scoped-agent")
+    end
+
+    @tag :tmp_dir
+    test "strictly loads the current file from a scoped lazy catalog", %{tmp_dir: tmp_dir} do
+      skill_dir = Path.join(tmp_dir, "lazy-action")
+      skill_path = Path.join(skill_dir, "SKILL.md")
+      File.mkdir_p!(skill_dir)
+
+      File.write!(
+        skill_path,
+        "---\nname: lazy-action\ndescription: Lazy action.\n---\nInitial body.\n"
+      )
+
+      assert {:ok, [metadata]} = Discovery.discover_from([tmp_dir])
+      assert {:ok, catalog_spec} = Discovery.to_catalog_spec(metadata)
+
+      File.write!(
+        skill_path,
+        "---\nname: lazy-action\ndescription: Updated action.\n---\nUpdated body.\n"
+      )
+
+      context = %{
+        LoadSkill.context_skills_key() => %{"lazy-action" => catalog_spec},
+        agent_id: "lazy-agent"
+      }
+
+      assert {:ok, result} = LoadSkill.run(%{name: "lazy-action"}, context)
+      assert result.description == "Updated action."
+      assert result.instructions == "Updated body."
+      assert result.metadata["jido_ai.discovery_scope"] == "custom"
     end
 
     test "returns structured error when a skill body file is unavailable" do
