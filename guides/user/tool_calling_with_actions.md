@@ -155,6 +155,52 @@ First non-`nil` registry wins. This keeps behavior deterministic across direct a
 {:ok, true} = Jido.AI.has_tool?(agent_pid, "multiply")
 ```
 
+## Transform Agent Tool Calls And Results
+
+`Jido.AI.Agent` provides optional callbacks for data that must have a different
+model-facing representation. For example, an agent can replace a long record
+key with a short alias in a tool result, then resolve that alias before the
+model calls another tool.
+
+```elixir
+defmodule MyApp.SupportAgent do
+  use Jido.AI.Agent,
+    name: "support_agent",
+    tools: [MyApp.Actions.GetTicket, MyApp.Actions.UpdateTicket]
+
+  @impl Jido.AI.ToolInterceptor
+  def before_tool_call(%{arguments: arguments} = tool_call, context) do
+    resolved_arguments = MyApp.ToolAliases.resolve(arguments, context)
+    {:ok, %{tool_call | arguments: resolved_arguments}}
+  end
+
+  @impl Jido.AI.ToolInterceptor
+  def after_tool_call(_tool_call, {:ok, result, effects}, context) do
+    projected_result = MyApp.ToolAliases.project(result, context)
+    {:ok, {:ok, projected_result, effects}}
+  end
+
+  def after_tool_call(_tool_call, result, _context), do: {:ok, result}
+end
+```
+
+The callback contract is:
+
+- `before_tool_call/2` runs once before argument validation and retries.
+- It can change `arguments`, but it cannot change the call ID, tool name, or action module.
+- `after_tool_call/3` runs once after the final attempt.
+- It receives and must return a canonical `{:ok | :error, value, effects}` result.
+- The active effect policy filters effects returned by `after_tool_call/3`.
+- Callback errors and invalid returns stop the current tool round.
+
+Callbacks receive the configured tool context plus runtime data such as
+`:state`, `:request_id`, and `:agent_id`. Keep callback work short. The
+callbacks run in the agent strategy path, not in the action process.
+
+These callbacks apply to agent-managed ReAct and Tree-of-Thoughts tool
+execution. Direct `Jido.Exec`, `Jido.AI.Turn`, `CallWithTools`, and
+`ExecuteTool` calls do not invoke them.
+
 ## Failure Mode: Tool Execution Returns `:not_found`
 
 Symptom:
