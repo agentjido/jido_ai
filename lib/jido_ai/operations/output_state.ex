@@ -95,4 +95,21 @@ defmodule Jido.AI.Runtime.OutputState do
   end
 
   def raw(value), do: value
+
+  @doc false
+  def content(value) do
+    case raw(value) do
+      text when is_binary(text) ->
+        text
+
+      nil ->
+        ""
+
+      other ->
+        case Jason.encode(other) do
+          {:ok, text} -> text
+          {:error, _} -> Kernel.inspect(other)
+        end
+    end
+  end
 end

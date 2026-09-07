@@ -181,143 +181,274 @@ defmodule Jido.AI.Agent do
   end
 
   defmacro __using__(opts) do
-    prompt = Keyword.get(opts, :system_prompt)
-    prompt_line = system_prompt_line(prompt, __CALLER__.line)
+    if canonical_use?(opts) do
+      canonical_using(opts)
+    else
+      prompt = Keyword.get(opts, :system_prompt)
+      prompt_line = system_prompt_line(prompt, __CALLER__.line)
 
-    prompt_ast =
-      case prompt do
-        {:@, _, [_]} ->
-          prompt
+      prompt_ast =
+        case prompt do
+          {:@, _, [_]} ->
+            prompt
 
-        other ->
-          expanded = Macro.expand(other, __CALLER__)
+          other ->
+            expanded = Macro.expand(other, __CALLER__)
 
-          unless Macro.quoted_literal?(expanded),
-            do:
-              raise(CompileError,
-                file: __CALLER__.file,
-                line: prompt_line,
-                description: "system_prompt requires text or a bare module attribute"
-              )
+            unless Macro.quoted_literal?(expanded),
+              do:
+                raise(CompileError,
+                  file: __CALLER__.file,
+                  line: prompt_line,
+                  description: "system_prompt requires text or a bare module attribute"
+                )
 
-          expanded
+            expanded
+        end
+
+      routes_ast =
+        case Keyword.get(opts, :signal_routes, []) do
+          {:@, _, [_]} = attribute -> attribute
+          value -> value |> expand_and_eval_literal_option(__CALLER__) |> Macro.escape()
+        end
+
+      values =
+        opts
+        |> Keyword.drop([:system_prompt, :signal_routes])
+        |> Enum.map(fn
+          {:output, value} ->
+            {:output, expand_and_eval_output_option(value, __CALLER__, __CALLER__.file, __CALLER__.line)}
+
+          {key, value} ->
+            {key, expand_and_eval_literal_option(value, __CALLER__)}
+        end)
+
+      defaults = Keyword.get(values, :tool_context, %{})
+      unless is_map(defaults), do: raise(ArgumentError, "tool_context must be a map")
+
+      case Jido.Action.validate_static_data(defaults) do
+        :ok ->
+          :ok
+
+        {:error, reason} ->
+          raise ArgumentError, "tool_context must be static data: #{inspect(reason)}"
       end
 
-    routes_ast =
-      case Keyword.get(opts, :signal_routes, []) do
-        {:@, _, [_]} = attribute -> attribute
-        value -> value |> expand_and_eval_literal_option(__CALLER__) |> Macro.escape()
+      quote location: :keep do
+        @jido_ai_options Keyword.put(
+                           Keyword.put(
+                             unquote(Macro.escape(values)),
+                             :signal_routes,
+                             unquote(routes_ast)
+                           ),
+                           :system_prompt,
+                           case Jido.AI.Agent.normalize_system_prompt_value(
+                                  unquote(prompt_ast),
+                                  __ENV__.file,
+                                  unquote(prompt_line)
+                                ) do
+                             :absent -> nil
+                             {:resolved, prompt} -> prompt
+                           end
+                         )
+        use Jido.Agent, Jido.AI.Agent.Options.lower!(@jido_ai_options)
+
+        @jido_ai_label Jido.AI.Reasoning.label(Keyword.get(@jido_ai_options, :reasoning, :react))
+        @jido_ai_query_type "ai.#{@jido_ai_label}.query"
+        @jido_ai_cancel_type "ai.#{@jido_ai_label}.cancel"
+        @jido_ai_source "/ai/#{@jido_ai_label}/agent"
+
+        import Jido.AI.Agent, only: [tools_from_skills: 1]
+        @behaviour Jido.AI.ToolInterceptor
+        @before_compile Jido.AI.Agent
+
+        @doc "Admits a request and returns its handle."
+        def ask(server, query, opts \\ []) when is_binary(query) or is_list(query) do
+          with {:ok, opts} <- Jido.AI.Agent.request_options(opts, %{}) do
+            Jido.AI.Request.create_and_send(
+              server,
+              query,
+              Keyword.merge(opts, signal_type: @jido_ai_query_type, source: @jido_ai_source)
+            )
+          end
+        end
+
+        @doc "Admits a request and returns its handle and event stream."
+        def ask_stream(server, query, opts \\ []) when is_binary(query) or is_list(query) do
+          with {:ok, request} <- ask(server, query, Keyword.put(opts, :stream_to, {:pid, self()})) do
+            {:ok, %{request: request, events: Jido.AI.Request.Stream.events(request, opts)}}
+          end
+        end
+
+        @doc "Waits for one committed result."
+        def await(request, opts \\ []), do: Jido.AI.Request.await(request, opts)
+
+        @doc "Admits a request and waits for its result."
+        def ask_sync(server, query, opts \\ []) when is_binary(query) or is_list(query) do
+          with {:ok, request} <- ask(server, query, opts), do: await(request, opts)
+        end
+
+        @doc "Sends an advisory cancellation for the active request or a supplied request ID."
+        def cancel(server, opts \\ []) do
+          data = %{
+            request_id: opts[:request_id],
+            reason: Keyword.get(opts, :reason, :user_cancelled)
+          }
+
+          signal = Jido.Signal.new!(@jido_ai_cancel_type, data, source: @jido_ai_source)
+          Jido.AgentServer.cast(server, signal)
+        end
+
+        @doc "Queues input and returns the committed Agent or a tagged rejection."
+        def steer(server, content, opts \\ []) when is_binary(content),
+          do:
+            Jido.AI.Session.control_agent(
+              server,
+              content,
+              :steer,
+              Keyword.put_new(opts, :source, @jido_ai_source)
+            )
+
+        @doc "Queues peer input with the same result contract as steer/3."
+        def inject(server, content, opts \\ []) when is_binary(content),
+          do:
+            Jido.AI.Session.control_agent(
+              server,
+              content,
+              :inject,
+              Keyword.put_new(opts, :source, @jido_ai_source)
+            )
+
+        defoverridable ask: 3, ask_stream: 3, await: 2, ask_sync: 3, cancel: 2, steer: 3, inject: 3
       end
-
-    values =
-      opts
-      |> Keyword.drop([:system_prompt, :signal_routes])
-      |> Enum.map(fn
-        {:output, value} ->
-          {:output, expand_and_eval_output_option(value, __CALLER__, __CALLER__.file, __CALLER__.line)}
-
-        {key, value} ->
-          {key, expand_and_eval_literal_option(value, __CALLER__)}
-      end)
-
-    defaults = Keyword.get(values, :tool_context, %{})
-    unless is_map(defaults), do: raise(ArgumentError, "tool_context must be a map")
-
-    case Jido.Action.validate_static_data(defaults) do
-      :ok ->
-        :ok
-
-      {:error, reason} ->
-        raise ArgumentError, "tool_context must be static data: #{inspect(reason)}"
     end
+  end
+
+  defp canonical_use?(opts) do
+    is_list(opts) and Keyword.keyword?(opts) and
+      Keyword.keys(opts) -- [:name, :description, :metadata, :max_state_size, :extensions] == []
+  end
+
+  defp canonical_using(opts) do
+    extensions = Keyword.get(opts, :extensions, [])
+    opts = Keyword.put(opts, :extensions, Enum.uniq([Jido.AI.DSL | extensions]))
 
     quote location: :keep do
-      @jido_ai_options Keyword.put(
-                         Keyword.put(
-                           unquote(Macro.escape(values)),
-                           :signal_routes,
-                           unquote(routes_ast)
-                         ),
-                         :system_prompt,
-                         case Jido.AI.Agent.normalize_system_prompt_value(
-                                unquote(prompt_ast),
-                                __ENV__.file,
-                                unquote(prompt_line)
-                              ) do
-                           :absent -> nil
-                           {:resolved, prompt} -> prompt
-                         end
-                       )
-      use Jido.Agent, Jido.AI.Agent.Options.lower!(@jido_ai_options)
-
-      @jido_ai_label Jido.AI.Reasoning.label(Keyword.get(@jido_ai_options, :reasoning, :react))
-      @jido_ai_query_type "ai.#{@jido_ai_label}.query"
-      @jido_ai_cancel_type "ai.#{@jido_ai_label}.cancel"
-      @jido_ai_source "/ai/#{@jido_ai_label}/agent"
+      use Jido.Agent, unquote(opts)
 
       import Jido.AI.Agent, only: [tools_from_skills: 1]
-      @behaviour Jido.AI.ToolInterceptor
-      @before_compile Jido.AI.Agent
 
-      @doc "Admits a request and returns its handle."
-      def ask(server, query, opts \\ []) when is_binary(query) or is_list(query) do
-        with {:ok, opts} <- Jido.AI.Agent.request_options(opts, %{}) do
+      @doc "Runs one request with the selected AI profile."
+      def ask(server, query, opts \\ []),
+        do: Jido.AI.Agent.ask_request(__MODULE__, server, query, opts)
+
+      @doc "Runs one request and waits for a completed result when needed."
+      def ask_sync(server, query, opts \\ []),
+        do: Jido.AI.Agent.ask_sync_request(__MODULE__, server, query, opts)
+
+      @doc "Runs one streaming session request."
+      def ask_stream(server, query, opts \\ []),
+        do: Jido.AI.Agent.ask_stream_request(__MODULE__, server, query, opts)
+
+      @doc "Waits for one admitted session request."
+      def await(request, opts \\ []), do: Jido.AI.Request.await(request, opts)
+
+      @doc "Cancels one active session request."
+      def cancel(server, opts \\ []), do: Jido.AI.Agent.cancel_request(server, opts)
+
+      @doc "Queues visible input for an active session request."
+      def steer(server, content, opts \\ []), do: Jido.AI.steer(server, content, opts)
+
+      defoverridable ask: 3, ask_sync: 3, ask_stream: 3, await: 2, cancel: 2, steer: 3
+    end
+  end
+
+  @doc "Returns all declared AI profiles from an Agent module or definition."
+  def profiles(module) when is_atom(module), do: profiles(module.agent())
+
+  def profiles(%Jido.Agent{} = agent) do
+    case Jido.AI.Configuration.options(agent) do
+      {:ok, options} -> Keyword.fetch!(options, :profiles)
+      {:error, _} -> %{}
+    end
+  end
+
+  @doc "Returns one declared AI profile or nil."
+  def profile(source, id), do: Map.get(profiles(source), id)
+
+  @doc false
+  def ask_request(module, server, query, opts) do
+    with {:ok, profile, route} <- request_route(module, opts) do
+      case profile.requests.mode do
+        :session ->
           Jido.AI.Request.create_and_send(
             server,
             query,
-            Keyword.merge(opts, signal_type: @jido_ai_query_type, source: @jido_ai_source)
-          )
-        end
-      end
-
-      @doc "Admits a request and returns its handle and event stream."
-      def ask_stream(server, query, opts \\ []) when is_binary(query) or is_list(query) do
-        with {:ok, request} <- ask(server, query, Keyword.put(opts, :stream_to, {:pid, self()})) do
-          {:ok, %{request: request, events: Jido.AI.Request.Stream.events(request, opts)}}
-        end
-      end
-
-      @doc "Waits for one committed result."
-      def await(request, opts \\ []), do: Jido.AI.Request.await(request, opts)
-
-      @doc "Admits a request and waits for its result."
-      def ask_sync(server, query, opts \\ []) when is_binary(query) or is_list(query) do
-        with {:ok, request} <- ask(server, query, opts), do: await(request, opts)
-      end
-
-      @doc "Sends an advisory cancellation for the active request or a supplied request ID."
-      def cancel(server, opts \\ []) do
-        data = %{
-          request_id: opts[:request_id],
-          reason: Keyword.get(opts, :reason, :user_cancelled)
-        }
-
-        signal = Jido.Signal.new!(@jido_ai_cancel_type, data, source: @jido_ai_source)
-        Jido.AgentServer.cast(server, signal)
-      end
-
-      @doc "Queues input and returns the committed Agent or a tagged rejection."
-      def steer(server, content, opts \\ []) when is_binary(content),
-        do:
-          Jido.AI.Session.control_agent(
-            server,
-            content,
-            :steer,
-            Keyword.put_new(opts, :source, @jido_ai_source)
+            Keyword.merge(opts, signal_type: route.path, source: "/jido/ai/agent")
           )
 
-      @doc "Queues peer input with the same result contract as steer/3."
-      def inject(server, content, opts \\ []) when is_binary(content),
-        do:
-          Jido.AI.Session.control_agent(
-            server,
-            content,
-            :inject,
-            Keyword.put_new(opts, :source, @jido_ai_source)
-          )
+        :turn ->
+          signal = Jido.Signal.new!(route.path, %{query: query}, source: "/jido/ai/agent")
 
-      defoverridable ask: 3, ask_stream: 3, await: 2, ask_sync: 3, cancel: 2, steer: 3, inject: 3
+          with {:ok, agent} <- Jido.AgentServer.call(server, signal, timeout: opts[:timeout] || 30_000),
+               do: {:ok, Map.fetch!(agent.state, profile.result.into)}
+      end
     end
+  end
+
+  @doc false
+  def ask_sync_request(module, server, query, opts) do
+    with {:ok, profile, _route} <- request_route(module, opts),
+         {:ok, result} <- ask_request(module, server, query, opts) do
+      if profile.requests.mode == :session,
+        do: Jido.AI.Request.await(result, opts),
+        else: {:ok, result}
+    end
+  end
+
+  @doc false
+  def ask_stream_request(module, server, query, opts) do
+    with {:ok, profile, _route} <- request_route(module, opts),
+         true <- profile.requests.mode == :session and profile.requests.streaming,
+         {:ok, request} <- ask_request(module, server, query, Keyword.put(opts, :stream_to, {:pid, self()})) do
+      {:ok, %{request: request, events: Jido.AI.Request.Stream.events(request, opts)}}
+    else
+      false -> Jido.AI.Profile.error("requests.streaming", "Select a streaming session profile")
+      error -> error
+    end
+  end
+
+  @doc false
+  def cancel_request(server, opts) do
+    data = %{request_id: opts[:request_id], reason: Keyword.get(opts, :reason, :user_cancelled)}
+    signal = Jido.Signal.new!(Jido.AI.Session.cancel_type(), data, source: "/jido/ai/agent")
+    Jido.AgentServer.cast(server, signal)
+  end
+
+  defp request_route(module, opts) do
+    profiles = profiles(module)
+    id = opts[:profile]
+
+    profile =
+      cond do
+        not is_nil(id) -> Map.get(profiles, id)
+        map_size(profiles) == 1 -> profiles |> Map.values() |> hd()
+        true -> nil
+      end
+
+    route =
+      if profile do
+        Enum.find(module.routes(), fn route ->
+          {target, defaults} = Jido.Agent.Authoring.split_target(route.target)
+
+          target in [Jido.AI.Runtime.Run, Jido.AI.Session.Start] and
+            is_map(defaults) and defaults[:profile_id] == profile.id
+        end)
+      end
+
+    if profile && route,
+      do: {:ok, profile, route},
+      else: Jido.AI.Profile.error("profile", "Select one routed AI profile")
   end
 
   @doc false

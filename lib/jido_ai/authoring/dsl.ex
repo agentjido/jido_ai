@@ -23,11 +23,17 @@ defmodule Jido.AI.DSL.Entities do
   end
 
   defmodule Models do
-    defstruct [:router, :fallback, :__spark_metadata__, entries: []]
+    defstruct [:router, :fallback, :__spark_metadata__, entries: [], routers: []]
+  end
+
+  defmodule Router do
+    defstruct [:module, :fallback, :__spark_metadata__]
   end
 
   defmodule Model do
     defstruct [
+      :first,
+      :second,
       :role,
       :model,
       :temperature,
@@ -111,6 +117,92 @@ defmodule Jido.AI.DSL.Entities do
       :__spark_metadata__,
       forward_context: :public,
       timeout: 5_000
+    ]
+  end
+
+  defmodule AshResource do
+    defstruct [:resource, :description, :approval, :__spark_metadata__, actions: [], metadata: %{}]
+  end
+
+  defmodule MCPTools do
+    defstruct [
+      :endpoint,
+      :prefix,
+      :transport,
+      :client_info,
+      :protocol_version,
+      :timeout,
+      :description,
+      :approval,
+      :__spark_metadata__,
+      tools: [],
+      discover: false,
+      required: false,
+      capabilities: %{},
+      timeouts: %{},
+      metadata: %{}
+    ]
+  end
+
+  defmodule Browser do
+    defstruct [
+      :name,
+      :description,
+      :approval,
+      :__spark_metadata__,
+      mode: :read_only,
+      allow: [],
+      metadata: %{}
+    ]
+  end
+
+  defmodule Catalog do
+    defstruct [
+      :catalog,
+      :description,
+      :approval,
+      :__spark_metadata__,
+      prefix: "catalog_",
+      timeout: 1_500,
+      max_calls: 12,
+      max_parallel_calls: 8,
+      require_read_only: true,
+      metadata: %{}
+    ]
+  end
+
+  defmodule ToolSkill do
+    defstruct [:skill, :__spark_metadata__]
+  end
+
+  defmodule ToolSkillPath do
+    defstruct [:path, :__spark_metadata__]
+  end
+
+  defmodule Subagent do
+    defstruct [
+      :agent,
+      :as,
+      :description,
+      :approval,
+      :__spark_metadata__,
+      timeout: 30_000,
+      forward_context: :public,
+      result: :structured,
+      metadata: %{}
+    ]
+  end
+
+  defmodule Handoff do
+    defstruct [
+      :agent,
+      :as,
+      :description,
+      :approval,
+      :__spark_metadata__,
+      target: :auto,
+      forward_context: :public,
+      metadata: %{}
     ]
   end
 
@@ -278,10 +370,11 @@ defmodule Jido.AI.DSL do
   @model %Spark.Dsl.Entity{
     name: :model,
     target: E.Model,
-    args: [:role, :model],
+    args: [:first, {:optional, :second}],
+    transform: {__MODULE__, :normalize_model_entity, []},
     schema: [
-      role: [type: :atom, required: true],
-      model: [type: :any, required: true],
+      first: [type: :any, required: true],
+      second: [type: :any],
       generation: [type: :keyword_list, default: []],
       temperature: [type: :number],
       max_tokens: [type: :pos_integer],
@@ -291,19 +384,21 @@ defmodule Jido.AI.DSL do
     ]
   }
 
-  @default_model %Spark.Dsl.Entity{
-    name: :model,
-    target: E.Model,
-    args: [:model],
-    auto_set_fields: [role: :default],
-    schema: Keyword.delete(@model.schema, :role)
-  }
-
   @models %Spark.Dsl.Entity{
     name: :models,
     target: E.Models,
     schema: [router: [type: :atom], fallback: [type: :atom]],
-    entities: [entries: [@model]]
+    entities: [
+      entries: [@model],
+      routers: [
+        %Spark.Dsl.Entity{
+          name: :router,
+          target: E.Router,
+          args: [:module],
+          schema: [module: [type: :atom, required: true], fallback: [type: :atom]]
+        }
+      ]
+    ]
   }
   @reasoning %Spark.Dsl.Entity{
     name: :reasoning,
@@ -357,10 +452,125 @@ defmodule Jido.AI.DSL do
       timeout: [type: :pos_integer, default: 5_000]
     ]
   }
+  @ash_resource %Spark.Dsl.Entity{
+    name: :ash_resource,
+    target: E.AshResource,
+    args: [:resource],
+    schema: [
+      resource: [type: :atom, required: true],
+      actions: [type: :any, default: []],
+      description: [type: :string],
+      approval: [type: :any],
+      metadata: [type: :map, default: %{}]
+    ]
+  }
+  @mcp_tools %Spark.Dsl.Entity{
+    name: :mcp_tools,
+    target: E.MCPTools,
+    schema: [
+      endpoint: [type: :any, required: true],
+      prefix: [type: :string, default: ""],
+      tools: [type: :any, default: []],
+      discover: [type: :boolean, default: false],
+      required: [type: :boolean, default: false],
+      transport: [type: :any],
+      client_info: [type: :map],
+      protocol_version: [type: :string],
+      capabilities: [type: :map, default: %{}],
+      timeouts: [type: :map, default: %{}],
+      timeout: [type: :pos_integer],
+      description: [type: :string],
+      approval: [type: :any],
+      metadata: [type: :map, default: %{}]
+    ]
+  }
+  @browser %Spark.Dsl.Entity{
+    name: :browser,
+    target: E.Browser,
+    args: [:name],
+    schema: [
+      name: [type: :any, required: true],
+      mode: [type: :any, default: :read_only],
+      allow: [type: :any, default: []],
+      description: [type: :string],
+      approval: [type: :any],
+      metadata: [type: :map, default: %{}]
+    ]
+  }
+  @catalog %Spark.Dsl.Entity{
+    name: :catalog,
+    target: E.Catalog,
+    args: [:catalog],
+    schema: [
+      catalog: [type: :atom, required: true],
+      prefix: [type: :string, default: "catalog_"],
+      timeout: [type: :pos_integer, default: 1_500],
+      max_calls: [type: :pos_integer, default: 12],
+      max_parallel_calls: [type: :pos_integer, default: 8],
+      require_read_only: [type: :boolean, default: true],
+      description: [type: :string],
+      approval: [type: :any],
+      metadata: [type: :map, default: %{}]
+    ]
+  }
+  @tool_skill %Spark.Dsl.Entity{
+    name: :skill,
+    target: E.ToolSkill,
+    args: [:skill],
+    schema: [skill: [type: :any, required: true]]
+  }
+  @tool_skill_path %Spark.Dsl.Entity{
+    name: :load_path,
+    target: E.ToolSkillPath,
+    args: [:path],
+    schema: [path: [type: :string, required: true]]
+  }
+  @subagent %Spark.Dsl.Entity{
+    name: :subagent,
+    target: E.Subagent,
+    args: [:agent],
+    schema: [
+      agent: [type: :atom, required: true],
+      as: [type: :atom],
+      description: [type: :string],
+      timeout: [type: :pos_integer, default: 30_000],
+      forward_context: [type: :any, default: :public],
+      result: [type: :any, default: :structured],
+      approval: [type: :any],
+      metadata: [type: :map, default: %{}]
+    ]
+  }
+  @handoff %Spark.Dsl.Entity{
+    name: :handoff,
+    target: E.Handoff,
+    args: [:agent],
+    schema: [
+      agent: [type: :atom, required: true],
+      as: [type: :atom],
+      description: [type: :string],
+      target: [type: :any, default: :auto],
+      forward_context: [type: :any, default: :public],
+      approval: [type: :any],
+      metadata: [type: :map, default: %{}]
+    ]
+  }
   @tools %Spark.Dsl.Entity{
     name: :tools,
     target: E.Tools,
-    entities: [entries: [@tool, %{@tool | name: :flow}]]
+    entities: [
+      entries: [
+        @tool,
+        %{@tool | name: :flow},
+        @ash_resource,
+        @mcp_tools,
+        @browser,
+        @catalog,
+        @tool_skill,
+        @tool_skill_path,
+        @subagent,
+        @handoff
+      ]
+    ]
   }
   @skills %Spark.Dsl.Entity{
     name: :skills,
@@ -449,7 +659,7 @@ defmodule Jido.AI.DSL do
       tool_context: [type: :any, default: %{}]
     ],
     entities: [
-      model_entries: [@default_model],
+      model_entries: [@model],
       models: [@models],
       reasoning: [@reasoning],
       controls: [@controls],
@@ -467,6 +677,14 @@ defmodule Jido.AI.DSL do
     imports: [Jido.AI.DSL.Macros]
 
   @behaviour Jido.Agent.Extension
+
+  @doc false
+  def normalize_model_entity(%E.Model{first: model, second: nil} = entity),
+    do: {:ok, %{entity | role: :default, model: model}}
+
+  def normalize_model_entity(%E.Model{first: role, second: model} = entity),
+    do: {:ok, %{entity | role: role, model: model}}
+
   @impl Jido.Agent.Extension
   def lower_agent(config, entities) do
     {profiles, rest} = Enum.split_with(entities, &match?(%E.Profile{}, &1))
@@ -478,6 +696,7 @@ defmodule Jido.AI.DSL do
 
   defp profile(entity) do
     with {:ok, models} <- model_entries(entity.models, entity.model_entries),
+         {:ok, model_router} <- model_router(models),
          {:ok, reasoning} <- optional(entity.reasoning, :reasoning, nil),
          {:ok, result} <- one(entity.result, :result),
          {:ok, controls} <- optional(entity.controls, :controls, %E.Controls{}),
@@ -492,56 +711,71 @@ defmodule Jido.AI.DSL do
 
       controls =
         Enum.reduce([:input, :model, :operation, :output], controls, fn stage, acc ->
-          Map.update!(acc, stage, &Enum.map(&1, fn check -> check.module end))
+          Map.update!(acc, stage, fn checks ->
+            Enum.map(checks, fn check ->
+              if is_nil(check.when),
+                do: check.module,
+                else: %{module: check.module, when: check.when}
+            end)
+          end)
         end)
 
-      {:ok,
-       %{
-         id: entity.id,
-         instructions: entity.instructions,
-         observability: if(observability, do: plain(observability), else: %{}),
-         metadata: entity.metadata,
-         effect_policy: entity.effect_policy || %{},
-         tool_interceptor: entity.tool_interceptor,
-         tool_context: entity.tool_context,
-         skills: skills,
-         model_router:
-           if(models.router,
-             do: %{module: models.router, fallback: models.fallback},
-             else: nil
-           ),
-         models:
-           Map.new(models.entries, fn model ->
-             {model.role,
-              model
-              |> plain()
-              |> Map.delete(:role)
-              |> omit_nil([:temperature, :max_tokens, :timeout])}
-           end),
-         reasoning:
-           if(reasoning,
-             do: reasoning |> plain() |> omit_nil([:request_transformer, :effect_policy, :model]),
-             else: %{}
-           ),
-         controls: controls,
-         result:
-           result
-           |> plain()
-           |> omit_nil([:schema, :repair_fun, :repair_action, :on_validation_error]),
-         requests: requests |> plain() |> omit_nil([:idle_timeout, :tool_heartbeat]),
-         memory: plain(memory),
-         tools:
-           Enum.map(tools.entries, fn tool ->
-             name = tool_name(tool)
+      profile =
+        %{
+          id: entity.id,
+          instructions: entity.instructions,
+          observability: if(observability, do: plain(observability), else: %{}),
+          metadata: entity.metadata,
+          effect_policy: entity.effect_policy || %{},
+          tool_interceptor: entity.tool_interceptor,
+          tool_context: entity.tool_context,
+          skills: skills,
+          model_router: model_router,
+          models:
+            Map.new(models.entries, fn model ->
+              {model.role,
+               model
+               |> plain()
+               |> Map.drop([:first, :second, :role])
+               |> omit_nil([:temperature, :max_tokens, :timeout])}
+            end),
+          reasoning:
+            if(reasoning,
+              do: reasoning |> plain() |> omit_nil([:request_transformer, :effect_policy, :model]),
+              else: %{}
+            ),
+          controls: controls,
+          result:
+            result
+            |> plain()
+            |> omit_nil([:schema, :repair_fun, :repair_action, :on_validation_error]),
+          requests: requests |> plain() |> omit_nil([:idle_timeout, :tool_heartbeat]),
+          memory: plain(memory),
+          tools:
+            tools.entries
+            |> Enum.filter(&match?(%E.Tool{}, &1))
+            |> Enum.map(fn tool ->
+              name = tool_name(tool)
 
-             tool
-             |> plain()
-             |> omit_nil([:max_retries, :retry_backoff, :idempotency, :approval, :metadata])
-             |> Map.delete(:as)
-             |> Map.put(:name, name)
-             |> Map.update!(:description, &(&1 || name))
-           end)
-       }}
+              tool
+              |> plain()
+              |> omit_nil([:max_retries, :retry_backoff, :idempotency, :approval, :metadata])
+              |> Map.delete(:as)
+              |> Map.put(:name, name)
+              |> Map.update!(:description, &(&1 || name))
+            end),
+          tool_sources:
+            tools.entries
+            |> Enum.reject(&match?(%E.Tool{}, &1))
+            |> Enum.map(&tool_source/1)
+        }
+
+      profile =
+        if models.entries == [],
+          do: Map.delete(profile, :models),
+          else: profile
+
+      {:ok, profile}
     else
       false -> Jido.AI.Profile.error("models", "Duplicate model role")
       error -> error
@@ -557,7 +791,19 @@ defmodule Jido.AI.DSL do
   defp model_entries(_, _),
     do: Jido.AI.Profile.error("models", "Use one models block or direct model declarations")
 
-  defp tool_name(%{as: name}) when is_atom(name), do: Atom.to_string(name)
+  defp model_router(%E.Models{router: nil, routers: []}), do: {:ok, nil}
+
+  defp model_router(%E.Models{router: module, fallback: fallback, routers: []}),
+    do: {:ok, %{module: module, fallback: fallback}}
+
+  defp model_router(%E.Models{router: nil, routers: [%E.Router{} = router]}),
+    do: {:ok, router |> plain() |> Map.take([:module, :fallback])}
+
+  defp model_router(_),
+    do: Jido.AI.Profile.error("models.router", "Declare at most one model router")
+
+  defp tool_name(%{as: name}) when is_atom(name) and name not in [nil, true, false],
+    do: Atom.to_string(name)
 
   defp tool_name(%{target: %Jido.Flow{name: name}}) when is_binary(name), do: name
 
@@ -565,6 +811,24 @@ defmodule Jido.AI.DSL do
     if Code.ensure_loaded?(module) and function_exported?(module, :name, 0),
       do: module.name(),
       else: inspect(module)
+  end
+
+  defp tool_source(%E.AshResource{} = source), do: source_map(source, :ash_resource, :resource)
+  defp tool_source(%E.MCPTools{} = source), do: source_map(source, :mcp_tools, :endpoint)
+  defp tool_source(%E.Browser{} = source), do: source_map(source, :browser, :name)
+  defp tool_source(%E.Catalog{} = source), do: source_map(source, :catalog, :catalog)
+  defp tool_source(%E.ToolSkill{} = source), do: source_map(source, :skill, :skill)
+  defp tool_source(%E.ToolSkillPath{} = source), do: source_map(source, :load_path, :path)
+  defp tool_source(%E.Subagent{} = source), do: source_map(source, :subagent, :agent)
+  defp tool_source(%E.Handoff{} = source), do: source_map(source, :handoff, :agent)
+
+  defp source_map(source, kind, field) do
+    source
+    |> plain()
+    |> Map.put(:kind, kind)
+    |> Map.put(:ref, Map.fetch!(source, field))
+    |> Map.delete(field)
+    |> omit_nil([:as, :description, :approval, :transport, :client_info, :protocol_version, :timeout])
   end
 
   defp plain(value), do: value |> Map.from_struct() |> Map.delete(:__spark_metadata__)

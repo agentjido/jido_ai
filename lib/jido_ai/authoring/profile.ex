@@ -12,11 +12,12 @@ defmodule Jido.AI.Profile do
             __MODULE__,
             %{
               id: Zoi.atom(),
-              instructions: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),
+              instructions: Zoi.any() |> Zoi.nullable() |> Zoi.default(nil),
               models: Zoi.map(),
               reasoning: Zoi.map(),
               controls: Zoi.map(),
               tools: Zoi.list(Zoi.map()),
+              tool_sources: Zoi.list(Zoi.map()) |> Zoi.default([]),
               tool_context: Zoi.map() |> Zoi.default(%{}),
               skills: Zoi.any() |> Zoi.default(nil),
               effect_policy: Zoi.map() |> Zoi.default(%{}),
@@ -49,6 +50,7 @@ defmodule Jido.AI.Profile do
     :reasoning,
     :controls,
     :tools,
+    :tool_sources,
     :tool_context,
     :skills,
     :observability,
@@ -74,21 +76,25 @@ defmodule Jido.AI.Profile do
          {:ok, attrs} <- fields(attrs, @fields ++ [:model], "profile"),
          {:ok, attrs} <- resolve_references(attrs, opts[:registries]),
          {:ok, attrs} <- defaults(attrs),
+         {:ok, id} <- role(attrs[:id], "profile.id"),
+         attrs = Map.put(attrs, :id, id),
          :ok <- identifier(attrs[:id], "profile.id"),
          :ok <- instructions(attrs[:instructions]),
          :ok <- tool_interceptor(attrs[:tool_interceptor]),
-         :ok <- model_router(attrs[:model_router]),
          {:ok, effect_policy} <- effect_policy(Map.get(attrs, :effect_policy, %{})),
          {:ok, models} <- models(Map.get(attrs, :models, %{})),
+         {:ok, model_router} <- model_router(attrs[:model_router], models),
          {:ok, reasoning} <- reasoning(Map.get(attrs, :reasoning, %{}), models),
          {:ok, tools} <- Jido.AI.ToolCatalog.new(Map.get(attrs, :tools, [])),
+         {:ok, tool_sources} <-
+           Jido.AI.ToolSource.new(Map.get(attrs, :tool_sources, []), opts[:registries] || %{}),
          :ok <- Jido.AI.ToolContext.validate(Map.get(attrs, :tool_context, %{})),
          {:ok, skills} <- Jido.AI.Skill.Source.new(Map.get(attrs, :skills)),
          {:ok, result} <- result(attrs[:result]),
          {:ok, controls} <- controls(Map.get(attrs, :controls, %{})),
          {:ok, requests} <- requests(Map.get(attrs, :requests, %{})),
          :ok <- skill_mode(skills, requests, reasoning),
-         :ok <- method_features(reasoning.method, tools, requests),
+         :ok <- method_features(reasoning.method, tools ++ tool_sources, requests),
          :ok <- method_output(reasoning.method, result),
          {:ok, memory} <- memory(Map.get(attrs, :memory, %{})),
          {:ok, observability} <- observability(Map.get(attrs, :observability, %{})),
@@ -100,13 +106,15 @@ defmodule Jido.AI.Profile do
                reasoning: reasoning,
                controls: controls,
                tools: tools,
+               tool_sources: tool_sources,
                skills: skills,
                result: result,
                requests: requests,
                memory: memory,
                observability: observability,
                effect_policy: effect_policy,
-               metadata: Map.get(attrs, :metadata, %{})
+               model_router: model_router,
+               metadata: portable_data(Map.get(attrs, :metadata, %{}))
              })
            ) do
         {:ok, profile} -> {:ok, profile}
@@ -174,6 +182,7 @@ defmodule Jido.AI.Profile do
       end)
       |> Map.put_new(:instructions, Map.get(configured, :instructions))
       |> Map.put_new(:tools, [])
+      |> Map.put_new(:tool_sources, [])
       |> Map.put_new(:controls, %{})
       |> Map.put_new(:requests, %{})
       |> Map.put_new(:memory, %{})
@@ -197,18 +206,36 @@ defmodule Jido.AI.Profile do
   end
 
   defp resolve_references(attrs, registries) do
-    with {:ok, instructions} <- resolve_instructions(attrs[:instructions], registries),
-         {:ok, tools} <- resolve_tools(Map.get(attrs, :tools, []), registries),
+    with {:ok, {tool_sources, tools}} <- split_tool_inputs(Map.get(attrs, :tools, [])),
+         {:ok, explicit_sources} <- tool_source_inputs(Map.get(attrs, :tool_sources, [])),
+         tool_sources = explicit_sources ++ tool_sources,
+         {:ok, instructions} <- resolve_instructions(attrs[:instructions], registries),
+         {:ok, tools} <- resolve_tools(tools, registries),
          {:ok, result} <- resolve_result(attrs[:result], registries),
-         {:ok, models} <- resolve_router(Map.get(attrs, :models), registries) do
+         {:ok, models} <- resolve_router(Map.get(attrs, :models), registries),
+         {:ok, controls} <- resolve_control_references(Map.get(attrs, :controls, %{}), registries) do
+      attrs =
+        if Map.has_key?(attrs, :instructions),
+          do: Map.put(attrs, :instructions, instructions),
+          else: attrs
+
       {:ok,
        attrs
-       |> Map.put(:instructions, instructions)
        |> Map.put(:tools, tools)
+       |> Map.put(:tool_sources, tool_sources)
        |> Map.put(:result, result)
-       |> Map.put(:models, models)}
+       |> Map.put(:models, models)
+       |> Map.put(:controls, controls)}
     end
   end
+
+  defp split_tool_inputs(values) when is_list(values),
+    do: {:ok, Enum.split_with(values, &Jido.AI.ToolSource.source_input?/1)}
+
+  defp split_tool_inputs(_), do: error("tools", "Expected a tool list")
+
+  defp tool_source_inputs(values) when is_list(values), do: {:ok, values}
+  defp tool_source_inputs(_), do: error("tool_sources", "Expected a tool-source list")
 
   defp resolve_instructions(%{} = value, registries) do
     action = Map.get(value, :action, Map.get(value, "action"))
@@ -225,7 +252,7 @@ defmodule Jido.AI.Profile do
 
   defp resolve_tools(value, _), do: {:ok, value}
 
-  defp resolve_tool(%{} = value, registries) do
+  defp resolve_tool(%{} = value, registries) when not is_struct(value) do
     ref = Map.get(value, :ref, Map.get(value, "ref"))
     kind = Map.get(value, :kind, Map.get(value, "kind", "action"))
 
@@ -265,6 +292,8 @@ defmodule Jido.AI.Profile do
     end
   end
 
+  defp resolve_tool(%Jido.Flow{} = value, _registries), do: {:ok, %{target: value}}
+  defp resolve_tool(value, _registries) when is_atom(value), do: {:ok, %{target: value}}
   defp resolve_tool(value, _), do: {:ok, value}
 
   defp resolve_result(nil, _), do: {:ok, nil}
@@ -341,6 +370,39 @@ defmodule Jido.AI.Profile do
   end
 
   defp resolve_router(value, _), do: {:ok, value}
+
+  defp resolve_control_references(value, registries) when is_map(value) or is_list(value) do
+    with {:ok, value} <- input_map(value),
+         {:ok, value} <- fields(value, Map.keys(@limits) ++ @stages, "controls") do
+      Enum.reduce_while(@stages, {:ok, value}, fn stage, {:ok, acc} ->
+        with {:ok, controls} <-
+               traverse(Map.get(acc, stage, []), &resolve_control_reference(&1, registries)) do
+          {:cont, {:ok, Map.put(acc, stage, controls)}}
+        else
+          error -> {:halt, error}
+        end
+      end)
+    end
+  end
+
+  defp resolve_control_references(value, _registries), do: {:ok, value}
+
+  defp resolve_control_reference(%{} = value, registries) do
+    ref = Map.get(value, :ref, Map.get(value, "ref"))
+
+    if is_binary(ref) do
+      with {:ok, module} <- registry(registries, :controls, ref) do
+        case Map.get(value, :when, Map.get(value, "when")) do
+          nil -> {:ok, module}
+          match -> {:ok, %{module: module, when: match}}
+        end
+      end
+    else
+      {:ok, value}
+    end
+  end
+
+  defp resolve_control_reference(value, _registries), do: {:ok, value}
 
   defp registry(%Jido.Agent.Codec.Registry{} = registry, kind, id) do
     core_kind = if kind == :actions, do: :action, else: if(kind == :flows, do: :flow, else: nil)
@@ -431,20 +493,23 @@ defmodule Jido.AI.Profile do
 
   defp instructions(_), do: error("instructions", "Expected text, an Action module, or nil")
 
-  defp model_router(nil), do: :ok
+  defp model_router(nil, _models), do: {:ok, nil}
 
-  defp model_router(%{module: module} = router) when is_atom(module) do
-    fallback = Map.get(router, :fallback)
-
-    if match?({:module, _}, Code.ensure_compiled(module)) and
-         (function_exported?(module, :route, 2) or function_exported?(module, :select, 2)) and
-         (is_nil(fallback) or is_atom(fallback)),
-       do: :ok,
-       else: error("models.router", "Expected a router module with route/2 or select/2")
+  defp model_router(%{module: module} = router, models) when is_atom(module) do
+    with true <- match?({:module, _}, Code.ensure_compiled(module)),
+         true <- function_exported?(module, :route, 2) or function_exported?(module, :select, 2),
+         {:ok, fallback} <- optional_role(Map.get(router, :fallback), models) do
+      {:ok, %{module: module, fallback: fallback}}
+    else
+      _ -> error("models.router", "Expected a router module and a declared fallback role")
+    end
   end
 
-  defp model_router(_),
+  defp model_router(_, _models),
     do: error("models.router", "Expected a router module and an optional fallback role")
+
+  defp optional_role(nil, _models), do: {:ok, nil}
+  defp optional_role(value, models), do: reasoning_model(value, models)
 
   defp tool_interceptor(nil), do: :ok
 
@@ -522,13 +587,15 @@ defmodule Jido.AI.Profile do
              "models.entry"
            ),
          true <- Keyword.keyword?(Map.get(entry, :generation, [])),
-         :ok <- model_input(entry.model),
-         {:ok, generation} <- generation(entry) do
+         {:ok, model} <- model_input(entry.model),
+         {:ok, provider_options} <- provider_options(Map.get(entry, :provider_options, %{})),
+         {:ok, generation} <- generation(Map.put(entry, :provider_options, provider_options)) do
       {:ok,
        entry
+       |> Map.put(:model, model)
        |> Map.put(:generation, generation)
-       |> Map.put_new(:provider_options, %{})
-       |> Map.put_new(:metadata, %{})}
+       |> Map.put(:provider_options, Map.new(provider_options))
+       |> Map.update(:metadata, %{}, &portable_data/1)}
     else
       false -> error("models.generation", "Expected a keyword list")
       error -> error
@@ -536,15 +603,26 @@ defmodule Jido.AI.Profile do
   end
 
   defp model(value) do
-    with :ok <- model_input(value),
-         do: {:ok, %{model: value, generation: [], provider_options: %{}, metadata: %{}}}
+    with {:ok, model} <- model_input(value),
+         do: {:ok, %{model: model, generation: [], provider_options: %{}, metadata: %{}}}
   end
 
-  defp model_input(value) when is_atom(value) and value not in [nil, true, false], do: :ok
+  defp model_input(value) when is_atom(value) and value not in [nil, true, false], do: {:ok, value}
 
-  defp model_input(value) do
+  defp model_input(value) when is_binary(value) and not is_struct(value) do
+    aliases = Jido.AI.Models.model_aliases()
+
+    case Enum.find(Map.keys(aliases), &(Atom.to_string(&1) == value)) do
+      nil -> req_llm_model(value)
+      alias_name -> {:ok, alias_name}
+    end
+  end
+
+  defp model_input(value), do: req_llm_model(value)
+
+  defp req_llm_model(value) do
     case ReqLLM.model(value) do
-      {:ok, _} -> :ok
+      {:ok, _} -> {:ok, value}
       {:error, _} -> error("models", "Invalid ReqLLM model input")
     end
   end
@@ -590,8 +668,10 @@ defmodule Jido.AI.Profile do
              :trm,
              :adaptive
            ],
+         {:ok, method_options} <-
+           portable_reasoning_options(value[:method], Map.get(value, :options, %{})),
          {:ok, options} <-
-           Jido.AI.Reasoning.options(value[:method], Map.get(value, :options, %{})),
+           Jido.AI.Reasoning.options(value[:method], method_options),
          true <- Map.has_key?(models, value[:model]),
          n = Map.get(value, :tool_concurrency, 4),
          true <- is_integer(n) and n in 1..64 do
@@ -626,6 +706,133 @@ defmodule Jido.AI.Profile do
 
   defp method_output(_, _), do: :ok
 
+  defp portable_reasoning_options(method, value) when is_list(value) do
+    if Keyword.keyword?(value) and length(value) == length(Keyword.keys(value) |> Enum.uniq()),
+      do: portable_reasoning_options(method, Map.new(value)),
+      else: {:ok, value}
+  end
+
+  defp portable_reasoning_options(:algorithm_of_thoughts, value) do
+    with {:ok, value} <-
+           fields(
+             value,
+             [:profile, :search_style, :examples, :require_explicit_answer],
+             "reasoning.options"
+           ) do
+      {:ok,
+       value
+       |> normalize_known(:profile, [:short, :standard, :long])
+       |> normalize_known(:search_style, [:dfs, :bfs])}
+    end
+  end
+
+  defp portable_reasoning_options(:tree_of_thoughts, value) do
+    with {:ok, value} <-
+           fields(
+             value,
+             [
+               :branching_factor,
+               :max_depth,
+               :traversal_strategy,
+               :top_k,
+               :min_depth,
+               :max_nodes,
+               :max_duration_ms,
+               :beam_width,
+               :early_success_threshold,
+               :convergence_window,
+               :min_score_improvement,
+               :max_parse_retries,
+               :max_tool_round_trips,
+               :generation_prompt,
+               :evaluation_prompt
+             ],
+             "reasoning.options"
+           ) do
+      {:ok, normalize_known(value, :traversal_strategy, [:bfs, :dfs, :best_first])}
+    end
+  end
+
+  defp portable_reasoning_options(:graph_of_thoughts, value) do
+    with {:ok, value} <-
+           fields(
+             value,
+             [
+               :max_nodes,
+               :max_depth,
+               :aggregation_strategy,
+               :min_nodes_for_aggregation,
+               :generation_prompt,
+               :connection_prompt,
+               :aggregation_prompt
+             ],
+             "reasoning.options"
+           ) do
+      {:ok, normalize_known(value, :aggregation_strategy, [:synthesis, :voting, :weighted])}
+    end
+  end
+
+  defp portable_reasoning_options(:trm, value),
+    do: fields(value, [:max_supervision_steps, :act_threshold], "reasoning.options")
+
+  defp portable_reasoning_options(:adaptive, value) do
+    strategies = [:cod, :cot, :react, :aot, :tot, :got, :trm]
+
+    with {:ok, value} <-
+           fields(
+             value,
+             [:available_strategies, :complexity_thresholds, :strategy_override, :method_options],
+             "reasoning.options"
+           ),
+         {:ok, method_options} <-
+           portable_adaptive_method_options(Map.get(value, :method_options, %{})) do
+      available =
+        value
+        |> Map.get(:available_strategies, [])
+        |> Enum.map(&known_value(&1, strategies))
+
+      {:ok,
+       value
+       |> Map.put(:method_options, method_options)
+       |> then(fn options ->
+         if Map.has_key?(options, :available_strategies),
+           do: Map.put(options, :available_strategies, available),
+           else: options
+       end)
+       |> normalize_known(:strategy_override, strategies)}
+    end
+  end
+
+  defp portable_reasoning_options(_method, value), do: {:ok, value}
+
+  defp portable_adaptive_method_options(value) do
+    methods = %{
+      cod: :chain_of_draft,
+      cot: :chain_of_thought,
+      react: :react,
+      aot: :algorithm_of_thoughts,
+      tot: :tree_of_thoughts,
+      got: :graph_of_thoughts,
+      trm: :trm
+    }
+
+    with {:ok, value} <- fields(value, Map.keys(methods), "reasoning.options.method_options") do
+      traverse(Enum.to_list(value), fn {strategy, options} ->
+        with {:ok, options} <- portable_reasoning_options(methods[strategy], options),
+             do: {:ok, {strategy, options}}
+      end)
+      |> case do
+        {:ok, pairs} -> {:ok, Map.new(pairs)}
+        error -> error
+      end
+    end
+  end
+
+  defp known_value(value, allowed) when is_binary(value),
+    do: Enum.find(allowed, value, &(Atom.to_string(&1) == value))
+
+  defp known_value(value, _allowed), do: value
+
   defp method_features(:adaptive, _, %{steering: false}), do: :ok
   defp method_features(:tree_of_thoughts, _, %{steering: false}), do: :ok
   defp method_features(:react, _, _), do: :ok
@@ -649,6 +856,10 @@ defmodule Jido.AI.Profile do
              ],
              "requests"
            ),
+         value =
+           value
+           |> normalize_known(:mode, [:turn, :session])
+           |> normalize_known(:on_busy, [:reject]),
          value =
            Map.merge(
              %{
@@ -695,16 +906,16 @@ defmodule Jido.AI.Profile do
   defp memory(value) do
     with {:ok, value} <- fields(value, [:history], "memory"),
          history = value[:history],
-         true <- is_nil(history) or (is_atom(history) and history not in [true, false]) do
+         {:ok, history} <- optional_field(history, "memory.history") do
       {:ok, %{history: history}}
     else
-      false -> error("memory.history", "Expected a declared domain field")
       error -> error
     end
   end
 
   defp controls(value) do
     with {:ok, value} <- fields(value, Map.keys(@limits) ++ @stages, "controls"),
+         value = normalize_method_defaults(value),
          limits = Map.merge(@limits, Map.take(value, Map.keys(@limits))),
          true <- Enum.all?(limits, &valid_limit?/1),
          {:ok, stages} <-
@@ -723,6 +934,12 @@ defmodule Jido.AI.Profile do
       error ->
         error
     end
+  end
+
+  defp normalize_method_defaults(value) do
+    Enum.reduce([:max_iterations, :max_model_calls, :max_tool_calls], value, fn key, acc ->
+      if Map.get(acc, key) == "method_default", do: Map.put(acc, key, :method_default), else: acc
+    end)
   end
 
   defp valid_limit?({key, :method_default}), do: key != :timeout
@@ -757,12 +974,49 @@ defmodule Jido.AI.Profile do
     %{limits | max_iterations: iterations, max_model_calls: calls, max_tool_calls: tools}
   end
 
-  defp control(module) do
-    if is_atom(module) and match?({:module, _}, Code.ensure_compiled(module)) and
+  defp control(module) when is_atom(module) do
+    if match?({:module, _}, Code.ensure_compiled(module)) and
          function_exported?(module, :check, 2),
        do: {:ok, module},
        else: error("controls", "#{inspect(module)} must export check/2")
   end
+
+  defp control(value) when is_map(value) or is_list(value) do
+    with {:ok, value} <- input_map(value),
+         {:ok, value} <- fields(value, [:module, :when], "controls"),
+         {:ok, module} <- control(value[:module]),
+         {:ok, match} <- control_match(value[:when]) do
+      {:ok, %{module: module, when: match}}
+    end
+  end
+
+  defp control(value), do: error("controls", "#{inspect(value)} must export check/2")
+
+  defp control_match(value) when is_list(value) do
+    if Keyword.keyword?(value),
+      do: control_match(Map.new(value)),
+      else: error("controls.when", "Expected static match data")
+  end
+
+  defp control_match(value) when is_map(value) and not is_struct(value) do
+    if Jido.Action.validate_static_data(value) == :ok,
+      do: {:ok, portable_data(value)},
+      else: error("controls.when", "Expected static match data")
+  end
+
+  defp control_match(_), do: error("controls.when", "Expected static match data")
+
+  @doc false
+  def portable_data(value) when is_map(value) do
+    Map.new(value, fn {key, item} -> {portable_data_key(key), portable_data(item)} end)
+  end
+
+  def portable_data(value) when is_list(value), do: Enum.map(value, &portable_data/1)
+  def portable_data(value) when is_atom(value) and value not in [nil, true, false], do: Atom.to_string(value)
+  def portable_data(value), do: value
+
+  defp portable_data_key(key) when is_atom(key), do: Atom.to_string(key)
+  defp portable_data_key(key), do: key
 
   defp result(nil), do: error("result", "Declare an output field with into")
 
@@ -774,7 +1028,10 @@ defmodule Jido.AI.Profile do
              "result"
            ),
          {:ok, into} <- role(value[:into], "result.into"),
-         value = Map.put(value, :into, into),
+         value =
+           value
+           |> Map.put(:into, into)
+           |> normalize_known(:on_validation_error, [:repair, :error]),
          :ok <- identifier(value[:into], "result.into"),
          :ok <- repair_action(value[:repair_action]),
          n = Map.get(value, :max_repairs, 0),
@@ -835,15 +1092,18 @@ defmodule Jido.AI.Profile do
         |> put_generation(:max_tokens, entry[:max_tokens])
         |> put_generation(:receive_timeout, entry[:timeout])
 
-      {:ok, entry.generation |> Keyword.merge(provider) |> Keyword.merge(direct)}
+      {:ok, Map.get(entry, :generation, []) |> Keyword.merge(provider) |> Keyword.merge(direct)}
     else
       false -> error("models.entry", "Invalid model options")
       error -> error
     end
   end
 
-  defp provider_options(value) when is_map(value) and not is_struct(value),
-    do: {:ok, Enum.to_list(value)}
+  defp provider_options(value) when is_map(value) and not is_struct(value) do
+    value
+    |> Enum.to_list()
+    |> traverse(&provider_option/1)
+  end
 
   defp provider_options(value) when is_list(value) do
     if Keyword.keyword?(value),
@@ -852,6 +1112,16 @@ defmodule Jido.AI.Profile do
   end
 
   defp provider_options(_), do: error("models.provider_options", "Expected a map or keyword list")
+
+  defp provider_option({key, value}) when is_atom(key), do: {:ok, {key, value}}
+
+  defp provider_option({key, value}) when is_binary(key) do
+    try do
+      {:ok, {String.to_existing_atom(key), value}}
+    rescue
+      ArgumentError -> error("models.provider_options", "Expected registered option names")
+    end
+  end
 
   defp put_generation(options, _key, nil), do: options
   defp put_generation(options, key, value), do: Keyword.put(options, key, value)
@@ -928,6 +1198,22 @@ defmodule Jido.AI.Profile do
   end
 
   defp role(_, path), do: error(path, "Expected a host-defined atom")
+
+  defp optional_field(nil, _path), do: {:ok, nil}
+  defp optional_field(value, path), do: role(value, path)
+
+  defp normalize_known(value, key, allowed) do
+    case Map.get(value, key) do
+      text when is_binary(text) ->
+        case Enum.find(allowed, &(Atom.to_string(&1) == text)) do
+          nil -> value
+          atom -> Map.put(value, key, atom)
+        end
+
+      _ ->
+        value
+    end
+  end
 
   defp normalize_observability(value) do
     Enum.reduce(

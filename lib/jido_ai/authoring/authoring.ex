@@ -11,8 +11,8 @@ defmodule Jido.AI.Authoring do
   def ai(id), do: %Ref{id: id}
 
   @doc false
-  def request_binding(agent, %Jido.Signal{data: data} = signal) when is_map(data) do
-    with {:ok, router} <- Jido.Signal.Router.new(agent.routes),
+  def request_binding(%Jido.Agent{routes: routes}, %Jido.Signal{data: data} = signal) when is_map(data) do
+    with {:ok, router} <- Jido.Signal.Router.new(routes),
          {:ok, [{target, %{profile_id: id} = defaults}]} <-
            Jido.Signal.Router.route(router, signal),
          true <- target in [Jido.AI.Runtime.Run, Jido.AI.Session.Start] do
@@ -175,6 +175,15 @@ defmodule Jido.AI.Authoring do
 
   defp route(%{target: %Ref{id: id}} = route, flows) do
     with {:ok, flow} <- fetch(flows, id), do: {:ok, %{route | target: flow}}
+  end
+
+  defp route(%{target: {{:jido_agent_extension, :ai, id}, defaults}} = route, flows)
+       when is_map(defaults) do
+    route(%{route | target: {%Ref{id: id}, defaults}}, flows)
+  end
+
+  defp route(%{target: {:jido_agent_extension, :ai, id}} = route, flows) do
+    route(%{route | target: %Ref{id: id}}, flows)
   end
 
   defp route(route, _), do: {:ok, route}

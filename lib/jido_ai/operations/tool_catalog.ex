@@ -48,7 +48,10 @@ defmodule Jido.AI.ToolCatalog do
              "tools"
            ),
          {:ok, name} <- tool_name(value[:name], value[:target]),
-         value = Map.put(value, :name, name),
+         value =
+           value
+           |> Map.put(:name, name)
+           |> normalize_portable_options(),
          true <- is_binary(value[:name]) and Regex.match?(~r/\A[a-zA-Z0-9_-]{1,64}\z/, value.name),
          :ok <- compiled(value[:target]),
          :ok <- Jido.Executable.validate(value[:target]),
@@ -62,7 +65,7 @@ defmodule Jido.AI.ToolCatalog do
              strict: strict?(value.target),
              callback: &__MODULE__.unreachable/1
            ),
-         fields = Map.get(value, :forward_context, []),
+         fields = Map.get(value, :forward_context, :public),
          timeout = Map.get(value, :timeout, 5_000),
          true <- valid_context_policy?(fields),
          true <- is_integer(timeout) and timeout > 0,
@@ -70,6 +73,11 @@ defmodule Jido.AI.ToolCatalog do
          true <- nonnegative?(Map.get(value, :retry_backoff, 0)),
          true <- Map.get(value, :idempotency, :idempotent) in [:idempotent, :unsafe_once],
          true <- is_map(Map.get(value, :metadata, %{})) do
+      value =
+        value
+        |> Map.update(:metadata, %{}, &Profile.portable_data/1)
+        |> Map.update(:approval, nil, &Profile.portable_data/1)
+
       {:ok,
        Map.merge(
          %{
@@ -95,6 +103,67 @@ defmodule Jido.AI.ToolCatalog do
   defp valid_context_policy?(fields), do: atom_list?(fields)
 
   defp atom_list?(fields), do: is_list(fields) and Enum.all?(fields, &is_atom/1)
+
+  defp normalize_portable_options(value) do
+    value
+    |> normalize_context_policy()
+    |> normalize_known(:forward_context, [:all, :public, :none])
+    |> normalize_known(:idempotency, [:idempotent, :unsafe_once])
+  end
+
+  defp normalize_context_policy(value) do
+    case Map.get(value, :forward_context) do
+      %{} = policy ->
+        Enum.find_value([:only, :except], value, fn kind ->
+          fields = Map.get(policy, kind, Map.get(policy, Atom.to_string(kind)))
+
+          if is_list(fields) do
+            case existing_fields(fields) do
+              {:ok, fields} -> Map.put(value, :forward_context, {kind, fields})
+              :error -> value
+            end
+          end
+        end)
+
+      _ ->
+        value
+    end
+  end
+
+  defp existing_fields(fields) do
+    fields
+    |> Enum.reduce_while({:ok, []}, fn
+      field, {:ok, acc} when is_atom(field) ->
+        {:cont, {:ok, [field | acc]}}
+
+      field, {:ok, acc} when is_binary(field) ->
+        try do
+          {:cont, {:ok, [String.to_existing_atom(field) | acc]}}
+        rescue
+          ArgumentError -> {:halt, :error}
+        end
+
+      _, _ ->
+        {:halt, :error}
+    end)
+    |> case do
+      {:ok, values} -> {:ok, Enum.reverse(values)}
+      :error -> :error
+    end
+  end
+
+  defp normalize_known(value, key, allowed) do
+    case Map.get(value, key) do
+      text when is_binary(text) ->
+        case Enum.find(allowed, &(Atom.to_string(&1) == text)) do
+          nil -> value
+          atom -> Map.put(value, key, atom)
+        end
+
+      _ ->
+        value
+    end
+  end
 
   defp tool_name(name, _) when is_atom(name) and name not in [nil, true, false],
     do: {:ok, Atom.to_string(name)}

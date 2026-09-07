@@ -9,6 +9,8 @@ defmodule Jido.AI.Session.Record do
               query: Jido.AI.Query.schema(),
               status: Zoi.enum([:pending, :completed, :failed]),
               result: Zoi.any() |> Zoi.default(nil),
+              content: Zoi.string() |> Zoi.default(""),
+              value: Zoi.any() |> Zoi.default(nil),
               error: Zoi.any() |> Zoi.default(nil),
               inserted_at: Zoi.integer(),
               completed_at: Zoi.integer() |> Zoi.nullable(),
@@ -119,6 +121,8 @@ defmodule Jido.AI.Session.Start do
             query: query,
             status: :pending,
             result: nil,
+            content: "",
+            value: nil,
             error: nil,
             inserted_at: System.system_time(:millisecond),
             completed_at: nil,
@@ -201,8 +205,17 @@ defmodule Jido.AI.Session.Settle do
 
       {candidate, update, directives} =
         case outcome do
-          {:ok, %{result: result, meta: meta, effect_plan: plan}} ->
-            completed = Map.merge(record, %{status: :completed, result: result})
+          {:ok, %{result: result, meta: meta, effect_plan: plan} = outcome} ->
+            content = Map.get(outcome, :content, Jido.AI.Runtime.OutputState.content(result))
+            value = Map.get(outcome, :value, if(profile.result.schema, do: result, else: nil))
+
+            completed =
+              Map.merge(record, %{
+                status: :completed,
+                result: result,
+                content: content,
+                value: value
+              })
 
             with {:ok, candidate} <-
                    Jido.AI.Effects.Candidate.assemble(
@@ -215,7 +228,14 @@ defmodule Jido.AI.Session.Settle do
                    |> Map.put(profile.result.into, result)
                    |> Jido.AI.Agent.StateProjection.apply(completed, context),
                  {:ok, _} <- domain(candidate, context) do
-              {candidate, %{status: :completed, result: result, meta: meta}, plan.directives}
+              {candidate,
+               %{
+                 status: :completed,
+                 result: result,
+                 content: content,
+                 value: value,
+                 meta: meta
+               }, plan.directives}
             else
               {:error, reason} ->
                 meta = Jido.AI.Session.failed_metadata(meta, reason)

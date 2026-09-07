@@ -262,7 +262,13 @@ defmodule Jido.AI.Session.Runtime do
         {kind, data} =
           case record do
             %{status: :completed} ->
-              {:request_completed, Map.merge(record.meta, %{result: record.result, meta: record.meta})}
+              {:request_completed,
+               Map.merge(record.meta, %{
+                 result: record.result,
+                 content: record.content,
+                 value: record.value,
+                 meta: record.meta
+               })}
 
             %{error: :cancelled} ->
               {:request_cancelled, Map.merge(record.meta, %{reason: :cancelled, meta: record.meta})}

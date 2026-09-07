@@ -79,8 +79,25 @@ defmodule Jido.AI do
 
   """
 
+  import Kernel, except: [inspect: 1]
+
   alias Jido.AI.Models
   alias Jido.AI.Turn
+
+  @doc "Builds one canonical, validated AI profile."
+  def profile(attrs, opts \\ []), do: Jido.AI.Profile.new(attrs, opts)
+
+  @doc "Returns a safe canonical view of an Agent's AI profiles."
+  def inspect(source, opts \\ []), do: Jido.AI.Portable.inspect(source, opts)
+
+  @doc "Resolves an AI request plan without a provider or tool call."
+  def preflight(source, request, opts \\ []), do: Jido.AI.Portable.preflight(source, request, opts)
+
+  @doc "Exports an Agent or Profile as a versioned map, JSON, or YAML document."
+  def export(source, format, opts \\ []), do: Jido.AI.Portable.export(source, format, opts)
+
+  @doc "Imports a versioned map, JSON, or YAML document through explicit registries."
+  def import(input, opts \\ []), do: Jido.AI.Portable.import(input, opts)
 
   @type model_alias ::
           :fast | :capable | :thinking | :reasoning | :planning | :image | :embedding | atom()
@@ -311,7 +328,7 @@ defmodule Jido.AI do
     case Configuration.direct(agent, :prompt, text) do
       {:ok, next} -> next
       {:error, error} when is_exception(error) -> raise error
-      {:error, error} -> raise ArgumentError, inspect(error)
+      {:error, error} -> raise ArgumentError, Kernel.inspect(error)
     end
   end
 
@@ -369,7 +386,7 @@ defmodule Jido.AI do
       case Jido.AI.History.replace(agent, profile, entries) do
         {:ok, next} -> next
         {:error, error} when is_exception(error) -> raise error
-        {:error, error} -> raise ArgumentError, inspect(error)
+        {:error, error} -> raise ArgumentError, Kernel.inspect(error)
       end
     else
       _ -> agent

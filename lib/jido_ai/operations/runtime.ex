@@ -94,27 +94,67 @@ defmodule Jido.AI.Control do
 
   @doc false
   def check(profile, stage, value, context, deadline) do
-    Enum.reduce_while(profile.controls[stage], :ok, fn module, :ok ->
-      remaining = deadline - System.monotonic_time(:millisecond)
+    Enum.reduce_while(profile.controls[stage], :ok, fn control, :ok ->
+      {module, match} = control_spec(control)
 
-      result =
-        if remaining > 0,
-          do:
-            Jido.Exec.run(
-              Jido.AI.Runtime.CheckControl,
-              %{module: module, stage: stage, value: value},
-              context,
-              timeout: remaining
-            ),
-          else: Jido.AI.Profile.error("controls.#{stage}", "AI request deadline reached")
+      if matches?(value, match) do
+        remaining = deadline - System.monotonic_time(:millisecond)
 
-      case result do
-        {:ok, _} -> {:cont, :ok}
-        {:error, _} = error -> {:halt, error}
-        _ -> {:halt, Jido.AI.Profile.error("controls.#{stage}", "Invalid control result")}
+        result =
+          if remaining > 0,
+            do:
+              Jido.Exec.run(
+                Jido.AI.Runtime.CheckControl,
+                %{module: module, stage: stage, value: value},
+                context,
+                timeout: remaining
+              ),
+            else: Jido.AI.Profile.error("controls.#{stage}", "AI request deadline reached")
+
+        case result do
+          {:ok, _} -> {:cont, :ok}
+          {:error, _} = error -> {:halt, error}
+          _ -> {:halt, Jido.AI.Profile.error("controls.#{stage}", "Invalid control result")}
+        end
+      else
+        {:cont, :ok}
       end
     end)
   end
+
+  defp control_spec(%{module: module, when: match}), do: {module, match}
+  defp control_spec(module), do: {module, nil}
+
+  defp matches?(_value, nil), do: true
+
+  defp matches?(value, match) do
+    metadata = stable_metadata(value)
+
+    Enum.all?(match, fn {key, expected} ->
+      actual =
+        Enum.find_value(metadata, fn {actual_key, value} ->
+          if comparable(actual_key) == comparable(key), do: value
+        end)
+
+      comparable(actual) == comparable(expected)
+    end)
+  end
+
+  defp stable_metadata(%{tool: tool} = value) do
+    kind =
+      case Jido.Executable.resolve(tool.target) do
+        {:ok, %{kind: kind}} -> kind
+        _ -> nil
+      end
+
+    Map.merge(Map.get(tool, :metadata, %{}), %{kind: kind, name: value.name})
+  end
+
+  defp stable_metadata(value) when is_map(value), do: value
+  defp stable_metadata(_value), do: %{}
+
+  defp comparable(value) when is_atom(value), do: Atom.to_string(value)
+  defp comparable(value), do: value
 end
 
 defmodule Jido.AI.Runtime.CheckControl do
@@ -214,6 +254,9 @@ defmodule Jido.AI.Runtime.Prepare do
     with %Profile{} = profile <- get_in(context, [:jido_ai_profiles, id]),
          deadline = System.monotonic_time(:millisecond) + profile.controls.timeout,
          :ok <- Control.check(profile, :input, %{query: query}, context, deadline),
+         {:ok, profile} <-
+           Jido.AI.Instructions.resolve(profile, %{query: query}, context, deadline),
+         {:ok, profile} <- Jido.AI.ModelRouter.select(profile, %{query: query}, context),
          {:ok, profile, adaptive} <- Jido.AI.Reasoning.select(profile, query),
          {:ok, output} <- Profile.output_contract(profile.result),
          {:ok, history} <- Jido.AI.History.read(context.agent_state, profile),
@@ -367,6 +410,7 @@ defmodule Jido.AI.Runtime.CallModel do
               |> Map.put(:jido_ai_quota_call_id, state.llm_call_id),
               timeout: remaining
             )},
+         :ok <- Control.check(state.profile, :model, response, context, state.deadline),
          response = Jido.AI.History.bind_response(response, context),
          :ok <- Jido.AI.Session.account(context, response.usage),
          :ok <- terminal_response(response, request, state, context),
@@ -535,11 +579,15 @@ defmodule Jido.AI.Runtime.Decide do
     cond do
       calls == [] or Map.get(state, :object_request, false) ->
         case Jido.AI.Reasoning.advance(state) do
-          {:continue, next} -> {:continue, next, Jido.AI.Runtime.ReasonFlow}
+          {:continue, next} ->
+            {:continue, next, Jido.AI.Runtime.ReasonFlow}
+
           {:done, next} ->
             with :ok <- Jido.AI.Session.inspect_reasoning(context, Jido.AI.Reasoning.inspection(next)),
                  do: finish(next, context)
-          {:error, reason} -> Jido.AI.Runtime.OutputState.fail(state, reason, context)
+
+          {:error, reason} ->
+            Jido.AI.Runtime.OutputState.fail(state, reason, context)
         end
 
       Jido.AI.Reasoning.single_pass?(state.profile.reasoning.method) ->
@@ -579,6 +627,7 @@ defmodule Jido.AI.Runtime.Decide do
             deadline: state.deadline,
             position: index,
             agent_state: state.effect_plan.state,
+            profile: state.profile,
             interceptor: Jido.AI.Runtime.ToolInterception.module(state.profile, context),
             runtime_identity: Jido.AI.Runtime.ToolInterception.identity(state, context),
             effect_policy: Jido.AI.Runtime.ToolInterception.policy(state.profile)
@@ -651,9 +700,13 @@ defmodule Jido.AI.Runtime.Decide do
           meta = if state.output, do: Map.put(meta, :output, state.output_meta), else: meta
 
           with {:ok, meta} <- Jido.AI.Reasoning.ReAct.Checkpoint.terminal(state, meta, context) do
+            content = Jido.AI.Runtime.OutputState.content(value)
+
             {:ok,
              %{
                result: answer,
+               content: content,
+               value: if(state.output, do: answer, else: nil),
                meta: meta,
                effect_plan: state.effect_plan,
                history_delta: state.history_delta
@@ -769,10 +822,7 @@ defmodule Jido.AI.Runtime.ToolAttempt do
         |> Map.put(:agent_state, call.agent_state)
         |> Map.put(:state, call.agent_state)
 
-      tool_context =
-        if call.tool.forward_context == :all,
-          do: context,
-          else: Map.take(context, call.tool.forward_context)
+      tool_context = forward_context(context, call.tool.forward_context)
 
       tool_context = Map.merge(tool_context, Map.take(context, [:jido_ai_quota]))
 
@@ -780,24 +830,45 @@ defmodule Jido.AI.Runtime.ToolAttempt do
         Jido.Exec.run(call.tool.target, call.arguments, tool_context, timeout: min(remaining, call.tool.timeout))
         |> Jido.AI.ToolResult.normalize(call)
 
-      delay = Map.get(call.tool, :retry_backoff, 0)
+      with :ok <-
+             Jido.AI.Control.check(
+               call.profile,
+               :operation,
+               Map.put(call, :result, result),
+               context,
+               call.deadline
+             ) do
+        delay = Map.get(call.tool, :retry_backoff, 0)
 
-      if Jido.AI.Error.retryable?(result) and elem(result, 2) == [] and
-           call.attempt <= Map.get(call.tool, :max_retries, 0) and
-           System.monotonic_time(:millisecond) + delay < call.deadline do
-        Process.sleep(delay)
-        {:continue, %{call | attempt: call.attempt + 1}, __MODULE__}
-      else
-        duration = System.monotonic_time(:millisecond) - call.started_at
+        if Jido.AI.Error.retryable?(result) and elem(result, 2) == [] and
+             call.attempt <= Map.get(call.tool, :max_retries, 0) and
+             System.monotonic_time(:millisecond) + delay < call.deadline do
+          Process.sleep(delay)
+          {:continue, %{call | attempt: call.attempt + 1}, __MODULE__}
+        else
+          duration = System.monotonic_time(:millisecond) - call.started_at
 
-        if call.interceptor,
-          do: {:ok, %{call: call, raw: result, attempts: call.attempt, duration: duration}},
-          else: Jido.AI.Runtime.ToolInterception.finish(call, result, call.attempt, duration, context)
+          if call.interceptor,
+            do: {:ok, %{call: call, raw: result, attempts: call.attempt, duration: duration}},
+            else: Jido.AI.Runtime.ToolInterception.finish(call, result, call.attempt, duration, context)
+        end
       end
     else
       Jido.AI.Profile.error("controls", "AI request deadline reached")
     end
   end
+
+  defp forward_context(context, :all), do: context
+  defp forward_context(_context, :none), do: %{}
+  defp forward_context(context, :public), do: Jido.AI.ToolContext.runtime(context)
+
+  defp forward_context(context, {:only, fields}),
+    do: context |> Jido.AI.ToolContext.runtime() |> Map.take(fields)
+
+  defp forward_context(context, {:except, fields}),
+    do: context |> Jido.AI.ToolContext.runtime() |> Map.drop(fields)
+
+  defp forward_context(context, fields) when is_list(fields), do: Map.take(context, fields)
 end
 
 defmodule Jido.AI.Runtime.Continue do
