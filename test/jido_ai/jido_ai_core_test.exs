@@ -9,7 +9,7 @@ defmodule Jido.AI.CoreTest do
     use Jido.Action,
       name: "valid_tool",
       description: "Valid tool",
-      schema: []
+      schema: Zoi.object(%{})
 
     @impl true
     def run(_params, _context), do: {:ok, :ok}
@@ -235,7 +235,7 @@ defmodule Jido.AI.CoreTest do
     end
 
     test "register_tool_direct validates and updates strategy tool config without AgentServer call" do
-      agent = %Jido.Agent{state: %{}}
+      agent = %Jido.Agent{module: Jido.Agent, name: "fixture", schema: Zoi.object(%{}), state: %{}}
 
       assert {:error, {:not_loaded, Missing.Tool}} =
                AI.register_tool_direct(agent, Missing.Tool)
@@ -252,7 +252,7 @@ defmodule Jido.AI.CoreTest do
     end
 
     test "unregister_tool_direct removes tool config without AgentServer call" do
-      agent = %Jido.Agent{state: %{}}
+      agent = %Jido.Agent{module: Jido.Agent, name: "fixture", schema: Zoi.object(%{}), state: %{}}
       assert {:ok, agent} = AI.register_tool_direct(agent, ValidTool)
       assert {:ok, agent} = AI.unregister_tool_direct(agent, "valid_tool")
 
@@ -284,7 +284,12 @@ defmodule Jido.AI.CoreTest do
     end
 
     test "list_tools and has_tool work for agent struct and server wrappers" do
-      agent = %Jido.Agent{state: %{StratState.key() => %{config: %{tools: [ValidTool]}}}}
+      agent = %Jido.Agent{
+        module: Jido.Agent,
+        name: "fixture",
+        schema: Zoi.object(%{}),
+        state: %{StratState.key() => %{config: %{tools: [ValidTool]}}}
+      }
 
       assert AI.list_tools(agent) == [ValidTool]
       assert AI.has_tool?(agent, "valid_tool")

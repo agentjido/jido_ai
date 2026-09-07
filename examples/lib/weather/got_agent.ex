@@ -13,6 +13,7 @@ defmodule Jido.AI.Examples.Weather.GoTAgent do
   alias Jido.AI.Examples.Weather.LiveContext
 
   use Jido.AI.GoTAgent,
+    request_transformer: LiveContext,
     name: "weather_got_agent",
     description: "Multi-location weather synthesis using Graph-of-Thoughts",
     max_nodes: 18,
@@ -55,15 +56,4 @@ defmodule Jido.AI.Examples.Weather.GoTAgent do
       opts
     )
   end
-
-  @impl true
-  def on_before_cmd(agent, {:got_start, %{prompt: prompt} = params}) do
-    case LiveContext.enrich_prompt(prompt) do
-      {:ok, enriched_prompt} -> super(agent, {:got_start, %{params | prompt: enriched_prompt}})
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  @impl true
-  def on_before_cmd(agent, action), do: super(agent, action)
 end

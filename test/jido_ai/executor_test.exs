@@ -11,11 +11,12 @@ defmodule Jido.AI.TurnExecutionTest do
     use Jido.Action,
       name: "calculator",
       description: "Performs arithmetic calculations",
-      schema: [
-        operation: [type: :string, required: true, doc: "The operation to perform"],
-        a: [type: :integer, required: true, doc: "First operand"],
-        b: [type: :integer, required: true, doc: "Second operand"]
-      ]
+      schema:
+        Zoi.object(%{
+          operation: Zoi.string(description: "The operation to perform"),
+          a: Zoi.integer(description: "First operand"),
+          b: Zoi.integer(description: "Second operand")
+        })
 
     @impl true
     def run(params, _context) do
@@ -34,9 +35,7 @@ defmodule Jido.AI.TurnExecutionTest do
     use Jido.Action,
       name: "slow_action",
       description: "A slow action for testing timeouts",
-      schema: [
-        delay_ms: [type: :integer, required: true, doc: "How long to sleep"]
-      ]
+      schema: Zoi.object(%{delay_ms: Zoi.integer(description: "How long to sleep")})
 
     @impl true
     def run(params, _context) do
@@ -49,9 +48,7 @@ defmodule Jido.AI.TurnExecutionTest do
     use Jido.Action,
       name: "error_action",
       description: "An action that returns an error",
-      schema: [
-        message: [type: :string, required: true, doc: "Error message"]
-      ]
+      schema: Zoi.object(%{message: Zoi.string(description: "Error message")})
 
     @impl true
     def run(params, _context) do
@@ -63,9 +60,7 @@ defmodule Jido.AI.TurnExecutionTest do
     use Jido.Action,
       name: "exception_action",
       description: "An action that raises an exception",
-      schema: [
-        message: [type: :string, required: true, doc: "Exception message"]
-      ]
+      schema: Zoi.object(%{message: Zoi.string(description: "Exception message")})
 
     @impl true
     def run(params, _context) do
@@ -78,9 +73,7 @@ defmodule Jido.AI.TurnExecutionTest do
     use Jido.Action,
       name: "echo",
       description: "Echoes back the input message",
-      schema: [
-        message: [type: :string, required: true, doc: "Message to echo"]
-      ]
+      schema: Zoi.object(%{message: Zoi.string(description: "Message to echo")})
 
     @impl true
     def run(params, _context) do
@@ -92,9 +85,7 @@ defmodule Jido.AI.TurnExecutionTest do
     use Jido.Action,
       name: "large_result",
       description: "Returns a large result for testing truncation",
-      schema: [
-        size: [type: :integer, required: true, doc: "Size of result"]
-      ]
+      schema: Zoi.object(%{size: Zoi.integer(description: "Size of result")})
 
     @impl true
     def run(params, _context) do
@@ -106,9 +97,7 @@ defmodule Jido.AI.TurnExecutionTest do
     use Jido.Action,
       name: "binary_result",
       description: "Returns binary data",
-      schema: [
-        size: [type: :integer, required: true, doc: "Size of binary"]
-      ]
+      schema: Zoi.object(%{size: Zoi.integer(description: "Size of binary")})
 
     @impl true
     def run(params, _context) do
@@ -120,9 +109,7 @@ defmodule Jido.AI.TurnExecutionTest do
     use Jido.Action,
       name: "exception_action2",
       description: "An action that raises an exception for security tests",
-      schema: [
-        message: [type: :string, required: true, doc: "Exception message"]
-      ]
+      schema: Zoi.object(%{message: Zoi.string(description: "Exception message")})
 
     @impl true
     def run(params, _context) do
@@ -306,6 +293,43 @@ defmodule Jido.AI.TurnExecutionTest do
 
       assert result.value == 20.0
       assert is_float(result.value)
+    end
+
+    test "normalizes nested numeric tool fields and list items before Action validation" do
+      schema =
+        Zoi.object(%{
+          count: Zoi.integer() |> Zoi.default(1),
+          groups: Zoi.array(Zoi.object(%{ratio: Zoi.float(), count: Zoi.integer()})),
+          label: Zoi.string()
+        })
+
+      input = %{"count" => "0", "groups" => [%{"ratio" => "1.5", "count" => "-2"}], "label" => "123"}
+      expected = %{count: 0, groups: [%{ratio: 1.5, count: -2}], label: "123"}
+      assert Turn.normalize_params(input, schema) == expected
+      assert {:ok, ^expected} = Zoi.parse(schema, expected)
+      assert Turn.normalize_params(%{"groups" => [], "label" => "ok"}, schema) == %{groups: [], label: "ok"}
+    end
+
+    for value <- ["4x", "1.5", "", nil, 2.5] do
+      test "invalid integer #{inspect(value)} remains invalid" do
+        schema = Zoi.object(%{count: Zoi.integer()})
+        normalized = Turn.normalize_params(%{"count" => unquote(value)}, schema)
+        assert normalized == %{count: unquote(value)}
+        assert {:error, _} = Zoi.parse(schema, normalized)
+      end
+    end
+
+    test "unknown keys and explicit atom keys retain their values" do
+      schema = Zoi.object(%{count: Zoi.integer()})
+      input = %{"count" => "3", :count => 7, "unknown_numeric_key_92841" => "5"}
+      assert Turn.normalize_params(input, schema) == %{"unknown_numeric_key_92841" => "5", count: 7}
+      assert_raise ArgumentError, fn -> String.to_existing_atom("unknown_numeric_key_92841") end
+    end
+
+    test "numeric conversion does not change strict non-tool input validation" do
+      schema = Zoi.object(%{count: Zoi.integer()})
+      assert Jido.AI.SchemaInput.normalize(schema, %{"count" => "3"}) == %{count: "3"}
+      assert {:error, _} = Zoi.parse(schema, %{count: "3"})
     end
   end
 

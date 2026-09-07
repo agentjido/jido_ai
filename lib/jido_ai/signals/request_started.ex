@@ -3,12 +3,26 @@ defmodule Jido.AI.Signal.RequestStarted do
   Signal for request lifecycle start.
   """
 
-  use Jido.AI.Signal.Definition,
+  use Jido.Signal,
     type: "ai.request.started",
     default_source: "/ai/request",
-    schema: [
-      request_id: [type: :string, required: true, doc: "Request correlation ID"],
-      query: [type: :string, required: true, doc: "Original user query"],
-      run_id: [type: :string, doc: "Request-scoped run ID"]
-    ]
+    schema:
+      Zoi.object(
+        %{
+          request_id: Zoi.string(),
+          query: Jido.AI.Query.schema(),
+          run_id: Zoi.string() |> Zoi.optional()
+        },
+        unrecognized_keys: :error
+      )
+
+  defoverridable validate_data: 1
+
+  def validate_data(data) do
+    Jido.AI.Signal.Definition.validate_data(data, schema())
+  end
+
+  def extension_policy, do: %{}
+  def to_json, do: Jido.AI.Signal.Definition.metadata(__MODULE__)
+  def __signal_metadata__, do: to_json()
 end

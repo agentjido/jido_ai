@@ -87,7 +87,7 @@ defmodule Jido.AI.Reasoning.TRM.CLIAdapterTest do
     end
 
     test "await propagates status errors" do
-      expect(Jido.AgentServer, :status, fn _pid -> {:error, :not_found} end)
+      expect(Jido.AI.CLI.Adapter, :status, fn _pid -> {:error, :not_found} end)
       assert {:error, :not_found} = TRMAdapter.await(self(), 100, %{})
     end
 
@@ -99,7 +99,7 @@ defmodule Jido.AI.Reasoning.TRM.CLIAdapterTest do
           raw_state: %{last_result: "TRM answer"}
         )
 
-      expect(Jido.AgentServer, :status, fn _pid -> {:ok, status} end)
+      expect(Jido.AI.CLI.Adapter, :status, fn _pid -> {:ok, status} end)
 
       assert {:ok, %{answer: "TRM answer", meta: meta}} = TRMAdapter.await(self(), 100, %{})
       assert meta.status == :success

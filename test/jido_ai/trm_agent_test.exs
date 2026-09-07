@@ -6,12 +6,12 @@ defmodule Jido.AI.TRMAgentTest do
   defmodule TestTRMAgent do
     use Jido.AI.TRMAgent,
       name: "test_trm_agent",
-      model: "test:model"
+      model: "openai:gpt-4o-mini"
   end
 
   describe "request lifecycle hooks" do
     test "on_before_cmd marks request as failed on trm_request_error" do
-      agent = TestTRMAgent.new()
+      agent = TestTRMAgent.new!()
       agent = Request.start_request(agent, "req_1", "query")
 
       {:ok, agent, _action} =
@@ -26,7 +26,7 @@ defmodule Jido.AI.TRMAgentTest do
 
     test "on_after_cmd finalizes pending request on delegated worker completion" do
       agent =
-        TestTRMAgent.new()
+        TestTRMAgent.new!()
         |> Request.start_request("req_done", "query")
         |> with_completed_strategy("improved answer")
 

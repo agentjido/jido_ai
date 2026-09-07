@@ -382,10 +382,8 @@ defmodule Jido.AI.DirectiveTest do
       use Jido.Action,
         name: "calculator",
         description: "Performs arithmetic calculations",
-        schema: [
-          a: [type: :integer, required: true, doc: "First operand"],
-          b: [type: :integer, required: true, doc: "Second operand"]
-        ]
+        schema:
+          Zoi.object(%{a: Zoi.integer(description: "First operand"), b: Zoi.integer(description: "Second operand")})
 
       @impl true
       def run(params, _context) do
@@ -398,9 +396,7 @@ defmodule Jido.AI.DirectiveTest do
       use Jido.Action,
         name: "echo",
         description: "Echoes back the input message",
-        schema: [
-          message: [type: :string, required: true, doc: "Message to echo"]
-        ]
+        schema: Zoi.object(%{message: Zoi.string(description: "Message to echo")})
 
       @impl true
       def run(params, _context) do

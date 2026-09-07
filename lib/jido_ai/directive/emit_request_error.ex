@@ -32,7 +32,7 @@ defmodule Jido.AI.Directive.EmitRequestError do
   end
 end
 
-defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.EmitRequestError do
+defmodule Jido.AI.Directive.EmitRequestError.Execution do
   @moduledoc """
   Immediately emits a request error signal without spawning a task.
 
@@ -49,7 +49,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.EmitRequestError 
       message: message
     } = directive
 
-    agent_pid = self()
+    agent_pid = Map.fetch!(state, :agent_server)
 
     # Emit the request error synchronously
     signal =

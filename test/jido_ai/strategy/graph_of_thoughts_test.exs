@@ -10,7 +10,9 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.StrategyTest do
     %Jido.Agent{
       id: "test-agent",
       name: "test",
-      state: %{}
+      state: %{},
+      schema: Zoi.object(%{}),
+      module: Jido.Agent
     }
     |> then(fn agent ->
       ctx = %{strategy_opts: opts}
@@ -179,14 +181,14 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.StrategyTest do
       {agent, _first_directives} =
         GraphOfThoughts.cmd(
           agent,
-          [%Jido.Instruction{action: :got_start, params: %{prompt: "first", request_id: "req_got_1"}}],
+          [%Jido.Instruction{target: :got_start, params: %{prompt: "first", request_id: "req_got_1"}}],
           %{}
         )
 
       {_agent, second_directives} =
         GraphOfThoughts.cmd(
           agent,
-          [%Jido.Instruction{action: :got_start, params: %{prompt: "second", request_id: "req_got_2"}}],
+          [%Jido.Instruction{target: :got_start, params: %{prompt: "second", request_id: "req_got_2"}}],
           %{}
         )
 
@@ -205,7 +207,7 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.StrategyTest do
       agent = create_agent()
 
       request_error_instruction = %Jido.Instruction{
-        action: :got_request_error,
+        target: :got_request_error,
         params: %{request_id: "req_got_busy", reason: :busy, message: "Agent is busy"}
       }
 

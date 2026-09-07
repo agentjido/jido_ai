@@ -3,21 +3,34 @@ defmodule Jido.AI.Signal.LLMDelta do
   Signal for streaming LLM token chunks.
   """
 
-  use Jido.AI.Signal.Definition,
+  use Jido.Signal,
     type: "ai.llm.delta",
     default_source: "/ai/llm",
-    schema: [
-      call_id: [type: :string, required: true, doc: "Correlation ID for the LLM call"],
-      delta: [type: :any, required: true, doc: "Text or complete content part from the stream"],
-      chunk_type: [
-        type: :atom,
-        default: :content,
-        doc: "Type: :content, :content_part, or :thinking"
-      ],
-      metadata: [type: :map, default: %{}, doc: "Optional request/run metadata for correlation"],
-      seq: [type: :integer, doc: "Monotonic runtime sequence number for this delta, when available"],
-      run_id: [type: :string, doc: "Runtime run identifier, when available"],
-      request_id: [type: :string, doc: "Request correlation identifier, when available"],
-      iteration: [type: :integer, doc: "ReAct/runtime iteration number, when available"]
-    ]
+    schema:
+      Zoi.object(
+        %{
+          call_id: Zoi.string(),
+          delta: Zoi.any(),
+          chunk_type: Zoi.atom() |> Zoi.default(:content),
+          metadata:
+            Zoi.any()
+            |> Zoi.refine({Jido.AI.Signal.Definition, :map_value, []})
+            |> Zoi.default(%{}),
+          seq: Zoi.integer() |> Zoi.optional(),
+          run_id: Zoi.string() |> Zoi.optional(),
+          request_id: Zoi.string() |> Zoi.optional(),
+          iteration: Zoi.integer() |> Zoi.optional()
+        },
+        unrecognized_keys: :error
+      )
+
+  defoverridable validate_data: 1
+
+  def validate_data(data) do
+    Jido.AI.Signal.Definition.validate_data(data, schema())
+  end
+
+  def extension_policy, do: %{}
+  def to_json, do: Jido.AI.Signal.Definition.metadata(__MODULE__)
+  def __signal_metadata__, do: to_json()
 end

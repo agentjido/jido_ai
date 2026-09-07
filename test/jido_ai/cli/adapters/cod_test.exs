@@ -88,7 +88,7 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.CLIAdapterTest do
     end
 
     test "await propagates status errors" do
-      expect(Jido.AgentServer, :status, fn _pid -> {:error, :not_found} end)
+      expect(Jido.AI.CLI.Adapter, :status, fn _pid -> {:error, :not_found} end)
       assert {:error, :not_found} = CoDAdapter.await(self(), 100, %{})
     end
 
@@ -100,7 +100,7 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.CLIAdapterTest do
           raw_state: %{last_result: "CoD answer"}
         )
 
-      expect(Jido.AgentServer, :status, fn _pid -> {:ok, status} end)
+      expect(Jido.AI.CLI.Adapter, :status, fn _pid -> {:ok, status} end)
 
       assert {:ok, %{answer: "CoD answer", meta: meta}} = CoDAdapter.await(self(), 100, %{})
       assert meta.status == :success
@@ -112,7 +112,7 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.CLIAdapterTest do
     test "await inspects non-binary failure results for CLI-safe output" do
       status = AdapterTestSupport.status(result: {:provider_error, :overloaded}, snapshot_status: :failure)
 
-      expect(Jido.AgentServer, :status, fn _pid -> {:ok, status} end)
+      expect(Jido.AI.CLI.Adapter, :status, fn _pid -> {:ok, status} end)
 
       assert {:ok, %{answer: "{:provider_error, :overloaded}", meta: meta}} =
                CoDAdapter.await(self(), 100, %{})

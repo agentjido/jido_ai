@@ -46,7 +46,7 @@ defmodule Mix.Tasks.JidoAi do
       mix jido_ai --agent MyApp.WeatherAgent "Will it rain in Seattle?"
 
       # One-shot with specific model/tools
-      mix jido_ai --model openai:gpt-4o --tools Jido.Tools.Arithmetic "15 * 23"
+      mix jido_ai --model openai:gpt-4o --tools Jido.AI.Tools.Arithmetic "15 * 23"
 
       # One-shot with tracing
       mix jido_ai --trace "Will it rain in Seattle today?"

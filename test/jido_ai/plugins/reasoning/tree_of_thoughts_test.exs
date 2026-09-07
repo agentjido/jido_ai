@@ -1,119 +1,54 @@
 defmodule Jido.AI.Plugins.Reasoning.TreeOfThoughtsTest do
   use ExUnit.Case, async: true
+  alias Jido.AI.Plugins.Reasoning.TreeOfThoughts, as: Capability
 
-  alias Jido.AI.Plugins.Reasoning.TreeOfThoughts
+  defmodule Overwrite do
+    use Jido.Action, name: "overwrite_tot_defaults"
 
-  describe "plugin_spec/1" do
-    test "returns valid plugin spec" do
-      spec = TreeOfThoughts.plugin_spec(%{})
-
-      assert spec.module == TreeOfThoughts
-      assert spec.name == "reasoning_tree_of_thoughts"
-      assert spec.state_key == :reasoning_tot
-      assert spec.category == "ai"
-      assert is_list(spec.actions)
-      assert spec.actions == [Jido.AI.Actions.Reasoning.RunStrategy]
-    end
-
-    test "includes config in plugin spec" do
-      config = %{default_model: :capable, timeout: 15_000}
-      spec = TreeOfThoughts.plugin_spec(config)
-
-      assert spec.config == config
+    def run(_, context) do
+      next = put_in(context.agent_state.reasoning_tot.timeout, 1)
+      {:ok, next}
     end
   end
 
-  describe "mount/2" do
-    test "initializes state with defaults" do
-      {:ok, state} = TreeOfThoughts.mount(%Jido.Agent{}, %{})
+  test "core creates owned defaults for the fixed method" do
+    definition = definition([])
+    agent = Jido.Agent.instantiate!(definition)
 
-      assert state.strategy == :tot
-      assert state.default_model == :reasoning
-      assert state.timeout == 30_000
-      assert state.options == %{}
-    end
+    assert agent.state.reasoning_tot == %{
+             strategy: :tot,
+             default_model: :reasoning,
+             timeout: 30_000,
+             options: %{}
+           }
 
-    test "merges custom config into initial state, including ToT options" do
-      {:ok, state} =
-        TreeOfThoughts.mount(%Jido.Agent{}, %{
-          default_model: :fast,
-          timeout: 5_000,
-          options: %{branching_factor: 4, max_depth: 5, traversal_strategy: :best_first}
-        })
-
-      assert state.strategy == :tot
-      assert state.default_model == :fast
-      assert state.timeout == 5_000
-      assert state.options == %{branching_factor: 4, max_depth: 5, traversal_strategy: :best_first}
-    end
-
-    test "mounted state validates against plugin schema" do
-      {:ok, state} = TreeOfThoughts.mount(%Jido.Agent{}, %{})
-
-      assert {:ok, _parsed_state} = Zoi.parse(TreeOfThoughts.schema(), state)
-    end
+    assert agent.state.result == nil
   end
 
-  describe "schema/0" do
-    test "applies default values for ToT plugin state" do
-      assert {:ok, state} = Zoi.parse(TreeOfThoughts.schema(), %{})
-
-      assert state.strategy == :tot
-      assert state.default_model == :reasoning
-      assert state.timeout == 30_000
-      assert state.options == %{}
-    end
+  test "configured defaults survive an empty restored state and reject another method" do
+    config = [default_model: :fast, timeout: 800, options: %{system_prompt: "Use facts"}]
+    {:reasoning_tot, schema} = Capability.state_spec(config)
+    assert {:ok, state} = Zoi.parse(schema, %{})
+    assert state.default_model == :fast and state.timeout == 800
+    assert state.options == %{system_prompt: "Use facts"}
+    assert {:error, _} = Zoi.parse(schema, %{state | strategy: :invalid})
+    assert {:error, _} = Zoi.parse(schema, %{state | timeout: 0})
   end
 
-  describe "actions" do
-    test "returns RunStrategy action" do
-      actions = TreeOfThoughts.actions()
-
-      assert actions == [Jido.AI.Actions.Reasoning.RunStrategy]
-    end
+  test "an ordinary Action cannot replace the owned defaults" do
+    agent = definition([]) |> Jido.Agent.instantiate!()
+    signal = Jido.Signal.new!("defaults.replace", %{}, source: "/test")
+    assert {:error, error} = Jido.Agent.cmd(agent, signal)
+    assert inspect(error) =~ "Plugin"
+    assert agent.state.reasoning_tot.timeout == 30_000
   end
 
-  describe "signal routing" do
-    test "routes reasoning.tot.run to RunStrategy" do
-      routes = TreeOfThoughts.signal_routes(%{})
-      route_map = Map.new(routes)
-
-      assert route_map["reasoning.tot.run"] == Jido.AI.Actions.Reasoning.RunStrategy
-    end
-  end
-
-  describe "handle_signal/2" do
-    test "forces strategy :tot and preserves ToT options" do
-      signal =
-        Jido.Signal.new!(
-          "reasoning.tot.run",
-          %{
-            prompt: "explore weather-safe plans",
-            strategy: :cot,
-            timeout: 45_000,
-            options: %{branching_factor: 4, max_depth: 5, traversal_strategy: :dfs}
-          },
-          source: "/test"
-        )
-
-      assert {:ok, {:override, {Jido.AI.Actions.Reasoning.RunStrategy, params}}} =
-               TreeOfThoughts.handle_signal(signal, %{})
-
-      assert params.strategy == :tot
-      assert params.prompt == "explore weather-safe plans"
-      assert params.timeout == 45_000
-      assert params.options == %{branching_factor: 4, max_depth: 5, traversal_strategy: :dfs}
-    end
-
-    test "normalizes non-map payload data and still injects strategy" do
-      signal =
-        Jido.Signal.new!("reasoning.tot.run", %{prompt: "placeholder"}, source: "/test")
-        |> Map.put(:data, :not_a_map)
-
-      assert {:ok, {:override, {Jido.AI.Actions.Reasoning.RunStrategy, params}}} =
-               TreeOfThoughts.handle_signal(signal, %{})
-
-      assert params == %{strategy: :tot}
-    end
+  defp definition(config) do
+    Jido.Agent.new!(%{
+      name: "tot_capability_contract",
+      schema: Zoi.object(%{result: Zoi.any() |> Zoi.default(nil)}),
+      plugins: [{Capability, config}],
+      routes: [{"defaults.replace", Overwrite}]
+    })
   end
 end

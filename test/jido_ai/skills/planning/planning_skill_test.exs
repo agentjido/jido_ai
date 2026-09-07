@@ -1,80 +1,60 @@
 defmodule Jido.AI.Plugins.PlanningTest do
   use ExUnit.Case, async: true
-
-  alias Jido.AI.Actions.Planning.{Decompose, Plan, Prioritize}
   alias Jido.AI.Plugins.Planning
 
-  describe "plugin_spec/1" do
-    test "returns valid skill spec with empty config" do
-      spec = Planning.plugin_spec(%{})
+  test "core state creation and empty restore use the declared Planning defaults" do
+    config = [default_model: "openai:gpt-4o", default_max_tokens: 700, default_temperature: 0.2]
+    {:planning, schema} = Planning.state_spec(config)
+    assert {:ok, state} = Zoi.parse(schema, %{})
+    assert state.default_model == "openai:gpt-4o"
+    assert state.default_max_tokens == 700 and state.default_temperature == 0.2
 
-      assert spec.module == Planning
-      assert spec.name == "planning"
-      assert spec.state_key == :planning
-      assert spec.category == "ai"
-      assert is_list(spec.actions)
-      assert length(spec.actions) == 3
-    end
+    agent =
+      Jido.Agent.new!(%{
+        name: "planning_defaults",
+        schema: Zoi.object(%{}),
+        plugins: [{Planning, config}]
+      })
+      |> Jido.Agent.instantiate!()
 
-    test "includes config in skill spec" do
-      config = %{default_model: :capable, default_max_tokens: 8192}
-      spec = Planning.plugin_spec(config)
+    assert agent.state.planning == state
+  end
 
-      assert spec.config == config
+  test "invalid and duplicate configuration fails core definition validation" do
+    for config <- [
+          [default_max_tokens: 0],
+          [default_temperature: false],
+          [into: nil],
+          [typo: 1],
+          [default_max_tokens: 1, default_max_tokens: 2]
+        ] do
+      assert {:error, _} =
+               Jido.Agent.new(%{
+                 name: "invalid_planning",
+                 schema: Zoi.object(%{}),
+                 plugins: [{Planning, config}]
+               })
     end
   end
 
-  describe "mount/2" do
-    test "initializes state with defaults" do
-      {:ok, state} = Planning.mount(%Jido.Agent{}, %{})
+  test "the callable catalog and explicit route helper retain each Planning operation" do
+    assert Planning.actions() == [
+             Jido.AI.Actions.Planning.Plan,
+             Jido.AI.Actions.Planning.Decompose,
+             Jido.AI.Actions.Planning.Prioritize
+           ]
 
-      assert state.default_model == :planning
-      assert state.default_max_tokens == 4096
-      assert state.default_temperature == 0.7
-    end
+    assert Planning.signal_patterns() == [
+             "planning.plan",
+             "planning.decompose",
+             "planning.prioritize"
+           ]
 
-    test "merges custom config into initial state" do
-      {:ok, state} =
-        Planning.mount(%Jido.Agent{}, %{default_model: :fast, default_max_tokens: 1024})
+    assert Enum.map(Planning.signal_routes([]), &elem(&1, 0)) == Planning.signal_patterns()
 
-      assert state.default_model == :fast
-      assert state.default_max_tokens == 1024
-      assert state.default_temperature == 0.7
-    end
-  end
-
-  describe "actions" do
-    test "returns all three actions" do
-      actions = Planning.actions()
-
-      assert length(actions) == 3
-      assert Plan in actions
-      assert Decompose in actions
-      assert Prioritize in actions
-    end
-  end
-
-  describe "signal_routes/1" do
-    test "routes planning signals to planning actions" do
-      route_map = Planning.signal_routes(%{}) |> Map.new()
-
-      assert route_map["planning.plan"] == Plan
-      assert route_map["planning.decompose"] == Decompose
-      assert route_map["planning.prioritize"] == Prioritize
-      assert map_size(route_map) == 3
-    end
-
-    test "route targets are part of plugin action inventory" do
-      route_targets =
-        Planning.signal_routes(%{})
-        |> Enum.map(fn {_signal, action} -> action end)
-        |> Enum.uniq()
-        |> MapSet.new()
-
-      actions = Planning.actions() |> MapSet.new()
-
-      assert MapSet.subset?(route_targets, actions)
-      assert route_targets == actions
-    end
+    assert Enum.all?(
+             Planning.signal_routes([]),
+             &(elem(&1, 1) == Jido.AI.Actions.Planning.RunCapability)
+           )
   end
 end

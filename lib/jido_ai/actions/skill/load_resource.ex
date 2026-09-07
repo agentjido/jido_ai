@@ -20,9 +20,6 @@ defmodule Jido.AI.Actions.Skill.LoadResource do
     provider-backed runtime skills. Use relative_path for filesystem skills;
     path remains accepted as a compatibility alias.
     """,
-    category: "ai",
-    tags: ["skills", "resources", "lazy-loading"],
-    vsn: "1.0.0",
     schema:
       Zoi.object(%{
         name: Zoi.string(description: "The activated skill name"),
@@ -35,6 +32,13 @@ defmodule Jido.AI.Actions.Skill.LoadResource do
         path: Zoi.string(description: "Compatibility alias for relative_path") |> Zoi.optional()
       })
       |> Zoi.refine({__MODULE__, :validate_resource_selector, []})
+
+  def category, do: "ai"
+  def tags, do: ["skills", "resources", "lazy-loading"]
+  def vsn, do: "1.0.0"
+
+  @impl Jido.Action
+  def on_before_validate_params(params), do: Jido.AI.ActionInput.before_validate(schema(), params)
 
   alias Jido.AI.Actions.Skill.RuntimeContext
   alias Jido.AI.Skill.{Activation, ResourcePolicy, ResourceProvider, Resources}

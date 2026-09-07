@@ -8,7 +8,7 @@ defmodule Jido.AI.AdaptiveAgentTest do
   defmodule TestAdaptiveAgent do
     use Jido.AI.AdaptiveAgent,
       name: "test_adaptive_agent",
-      model: "test:model",
+      model: "openai:gpt-4o-mini",
       default_strategy: :cot,
       available_strategies: [:cot, :react, :tot]
   end
@@ -26,7 +26,7 @@ defmodule Jido.AI.AdaptiveAgentTest do
     test "passes custom strategy options to adaptive strategy" do
       opts = TestAdaptiveAgent.strategy_opts()
 
-      assert opts[:model] == "test:model"
+      assert opts[:model] == "openai:gpt-4o-mini"
       assert opts[:default_strategy] == :cot
       assert opts[:available_strategies] == [:cot, :react, :tot]
       refute Keyword.has_key?(opts, :complexity_thresholds)
@@ -44,7 +44,7 @@ defmodule Jido.AI.AdaptiveAgentTest do
 
   describe "request lifecycle hooks" do
     test "on_before_cmd tracks prompt and request_id on adaptive_start" do
-      agent = TestAdaptiveAgent.new()
+      agent = TestAdaptiveAgent.new!()
 
       {:ok, updated_agent, {:adaptive_start, params}} =
         TestAdaptiveAgent.on_before_cmd(agent, {:adaptive_start, %{prompt: "Compare weather routes"}})
@@ -57,7 +57,7 @@ defmodule Jido.AI.AdaptiveAgentTest do
     end
 
     test "on_before_cmd marks request as failed on adaptive_request_error" do
-      agent = TestAdaptiveAgent.new()
+      agent = TestAdaptiveAgent.new!()
       agent = Request.start_request(agent, "req_1", "query")
 
       {:ok, agent, _action} =
@@ -72,7 +72,7 @@ defmodule Jido.AI.AdaptiveAgentTest do
 
     test "on_after_cmd completes request when strategy snapshot is done" do
       agent =
-        TestAdaptiveAgent.new()
+        TestAdaptiveAgent.new!()
         |> Request.start_request("req_done", "query")
         |> with_completed_strategy("final recommendation")
 
@@ -87,7 +87,7 @@ defmodule Jido.AI.AdaptiveAgentTest do
 
     test "on_after_cmd finalizes pending request for delegated worker events" do
       agent =
-        TestAdaptiveAgent.new()
+        TestAdaptiveAgent.new!()
         |> Request.start_request("req_worker", "query")
         |> with_completed_strategy("worker recommendation")
 
@@ -109,7 +109,7 @@ defmodule Jido.AI.AdaptiveAgentTest do
       raw_error = %{type: :provider_error, status: 503, message: "busy"}
 
       agent =
-        TestAdaptiveAgent.new()
+        TestAdaptiveAgent.new!()
         |> Request.start_request("req_failed", "query")
         |> with_failed_strategy(raw_error)
 
@@ -126,7 +126,7 @@ defmodule Jido.AI.AdaptiveAgentTest do
 
     test "on_after_cmd preserves pending request when strategy is still running" do
       agent =
-        TestAdaptiveAgent.new()
+        TestAdaptiveAgent.new!()
         |> Request.start_request("req_running", "query")
         |> with_running_strategy()
 
@@ -139,7 +139,7 @@ defmodule Jido.AI.AdaptiveAgentTest do
     end
 
     test "on_after_cmd passes through adaptive_request_error action unchanged" do
-      agent = TestAdaptiveAgent.new()
+      agent = TestAdaptiveAgent.new!()
 
       {:ok, updated_agent, directives} =
         TestAdaptiveAgent.on_after_cmd(agent, {:adaptive_request_error, %{request_id: "req_1"}}, [:noop])

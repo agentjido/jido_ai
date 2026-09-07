@@ -128,7 +128,7 @@ defmodule Jido.AI.Skill.Registry do
   def ensure_started do
     case Process.whereis(__MODULE__) do
       nil ->
-        case start_link() do
+        case GenServer.start(__MODULE__, [], name: __MODULE__) do
           {:ok, _pid} -> :ok
           {:error, {:already_started, _pid}} -> :ok
           {:error, reason} -> {:error, reason}
@@ -140,6 +140,11 @@ defmodule Jido.AI.Skill.Registry do
   end
 
   # Session/Activation API
+
+  @doc false
+  def own_session(session, owner) when is_pid(owner) do
+    with_started_registry(fn -> GenServer.call(__MODULE__, {:own_session, session, owner}) end)
+  end
 
   @doc """
   Marks a skill as activated with its activation context.
@@ -301,7 +306,7 @@ defmodule Jido.AI.Skill.Registry do
     activation_table =
       :ets.new(@activation_table, [:named_table, :set, :public, read_concurrency: true])
 
-    {:ok, %{table: table, activation_table: activation_table}}
+    {:ok, %{table: table, activation_table: activation_table, owners: %{}}}
   end
 
   @impl true
@@ -327,8 +332,18 @@ defmodule Jido.AI.Skill.Registry do
   end
 
   def handle_call({:mark_activated, session_id, name, context}, _from, state) do
-    :ets.insert(@activation_table, {{session_id, name}, %{context: context, durable: false}})
+    :ets.insert_new(@activation_table, {{session_id, name}, %{context: context, durable: false}})
     {:reply, :ok, state}
+  end
+
+  def handle_call({:own_session, session, owner}, _from, state) do
+    entry =
+      Map.get_lazy(state.owners, owner, fn ->
+        %{monitor: Process.monitor(owner), sessions: MapSet.new()}
+      end)
+
+    entry = %{entry | sessions: MapSet.put(entry.sessions, session)}
+    {:reply, :ok, %{state | owners: Map.put(state.owners, owner, entry)}}
   end
 
   def handle_call({:mark_durable, session_id, name}, _from, state) do
@@ -370,6 +385,21 @@ defmodule Jido.AI.Skill.Registry do
   end
 
   # Private functions
+
+  @impl true
+  def handle_info({:DOWN, ref, :process, owner, _}, state) do
+    case state.owners[owner] do
+      %{monitor: ^ref, sessions: sessions} ->
+        Enum.each(sessions, fn session ->
+          :ets.select_delete(@activation_table, [{{{session, :_}, :_}, [], [true]}])
+        end)
+
+        {:noreply, %{state | owners: Map.delete(state.owners, owner)}}
+
+      _ ->
+        {:noreply, state}
+    end
+  end
 
   defp do_load_paths(paths) do
     with {:ok, files} <- Discovery.discover_files(paths, trust: true) do

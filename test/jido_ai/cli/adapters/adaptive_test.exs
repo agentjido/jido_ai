@@ -89,7 +89,7 @@ defmodule Jido.AI.Reasoning.Adaptive.CLIAdapterTest do
     end
 
     test "await propagates status errors" do
-      expect(Jido.AgentServer, :status, fn _pid -> {:error, :not_found} end)
+      expect(Jido.AI.CLI.Adapter, :status, fn _pid -> {:error, :not_found} end)
       assert {:error, :not_found} = AdaptiveAdapter.await(self(), 100, %{})
     end
 
@@ -104,7 +104,7 @@ defmodule Jido.AI.Reasoning.Adaptive.CLIAdapterTest do
           }
         )
 
-      expect(Jido.AgentServer, :status, fn _pid -> {:ok, status} end)
+      expect(Jido.AI.CLI.Adapter, :status, fn _pid -> {:ok, status} end)
 
       assert {:ok, %{answer: "Adaptive answer", meta: meta}} = AdaptiveAdapter.await(self(), 100, %{})
       assert meta.status == :success
@@ -117,7 +117,7 @@ defmodule Jido.AI.Reasoning.Adaptive.CLIAdapterTest do
     test "await inspects non-binary failure results for CLI-safe output" do
       status = AdapterTestSupport.status(result: {:provider_error, :overloaded}, snapshot_status: :failure)
 
-      expect(Jido.AgentServer, :status, fn _pid -> {:ok, status} end)
+      expect(Jido.AI.CLI.Adapter, :status, fn _pid -> {:ok, status} end)
 
       assert {:ok, %{answer: "{:provider_error, :overloaded}", meta: meta}} =
                AdaptiveAdapter.await(self(), 100, %{})

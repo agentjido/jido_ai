@@ -54,9 +54,21 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
     end
 
     test "plugins maintain independent state" do
-      {:ok, chat_state} = Chat.mount(%Jido.Agent{}, %{default_model: :capable})
-      {:ok, planning_state} = Planning.mount(%Jido.Agent{}, %{default_model: :planning})
-      {:ok, cot_state} = ChainOfThought.mount(%Jido.Agent{}, %{})
+      {:ok, chat_state} =
+        Chat.mount(%Jido.Agent{id: "fixture", name: "fixture", module: Jido.Agent, schema: Zoi.object(%{})}, %{
+          default_model: :capable
+        })
+
+      {:ok, planning_state} =
+        Planning.mount(%Jido.Agent{id: "fixture", name: "fixture", module: Jido.Agent, schema: Zoi.object(%{})}, %{
+          default_model: :planning
+        })
+
+      {:ok, cot_state} =
+        ChainOfThought.mount(
+          %Jido.Agent{id: "fixture", name: "fixture", module: Jido.Agent, schema: Zoi.object(%{})},
+          %{}
+        )
 
       assert chat_state.default_model == :capable
       assert planning_state.default_model == :planning

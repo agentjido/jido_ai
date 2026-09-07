@@ -33,7 +33,9 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
 
   describe "Plugin Mount/2 Initialization" do
     test "Chat plugin mount/2 returns defaults" do
-      assert {:ok, state} = Chat.mount(%Agent{}, %{})
+      assert {:ok, state} =
+               Chat.mount(%Agent{id: "fixture", name: "fixture", module: Jido.Agent, schema: Zoi.object(%{})}, %{})
+
       assert state.default_model == :capable
       assert state.default_max_tokens == 4096
       assert state.auto_execute == true
@@ -42,7 +44,9 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
     end
 
     test "Planning plugin mount/2 returns defaults" do
-      assert {:ok, state} = Planning.mount(%Agent{}, %{})
+      assert {:ok, state} =
+               Planning.mount(%Agent{id: "fixture", name: "fixture", module: Jido.Agent, schema: Zoi.object(%{})}, %{})
+
       assert state.default_model == :planning
       assert state.default_max_tokens == 4096
       assert state.default_temperature == 0.7
@@ -52,7 +56,12 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
       spec = TaskSupervisor.plugin_spec(%{})
       assert spec.state_key == :__task_supervisor_skill__
 
-      assert {:ok, state} = TaskSupervisor.mount(%Agent{}, %{})
+      assert {:ok, state} =
+               TaskSupervisor.mount(
+                 %Agent{id: "fixture", name: "fixture", module: Jido.Agent, schema: Zoi.object(%{})},
+                 %{}
+               )
+
       assert is_pid(state.supervisor)
       assert Process.alive?(state.supervisor)
 
@@ -64,7 +73,12 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
 
       {owner_pid, owner_ref} =
         spawn_monitor(fn ->
-          assert {:ok, state} = TaskSupervisor.mount(%Agent{}, %{})
+          assert {:ok, state} =
+                   TaskSupervisor.mount(
+                     %Agent{id: "fixture", name: "fixture", module: Jido.Agent, schema: Zoi.object(%{})},
+                     %{}
+                   )
+
           send(parent, {:task_supervisor_pid, state.supervisor})
           Process.sleep(:infinity)
         end)
@@ -80,13 +94,41 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
     end
 
     test "Reasoning strategy plugins mount with fixed strategy ids" do
-      assert {:ok, cod} = ChainOfDraft.mount(%Agent{}, %{})
-      assert {:ok, cot} = ChainOfThought.mount(%Agent{}, %{})
-      assert {:ok, aot} = AlgorithmOfThoughts.mount(%Agent{}, %{})
-      assert {:ok, tot} = TreeOfThoughts.mount(%Agent{}, %{})
-      assert {:ok, got} = GraphOfThoughts.mount(%Agent{}, %{})
-      assert {:ok, trm} = TRM.mount(%Agent{}, %{})
-      assert {:ok, adaptive} = Adaptive.mount(%Agent{}, %{})
+      assert {:ok, cod} =
+               ChainOfDraft.mount(
+                 %Agent{id: "fixture", name: "fixture", module: Jido.Agent, schema: Zoi.object(%{})},
+                 %{}
+               )
+
+      assert {:ok, cot} =
+               ChainOfThought.mount(
+                 %Agent{id: "fixture", name: "fixture", module: Jido.Agent, schema: Zoi.object(%{})},
+                 %{}
+               )
+
+      assert {:ok, aot} =
+               AlgorithmOfThoughts.mount(
+                 %Agent{id: "fixture", name: "fixture", module: Jido.Agent, schema: Zoi.object(%{})},
+                 %{}
+               )
+
+      assert {:ok, tot} =
+               TreeOfThoughts.mount(
+                 %Agent{id: "fixture", name: "fixture", module: Jido.Agent, schema: Zoi.object(%{})},
+                 %{}
+               )
+
+      assert {:ok, got} =
+               GraphOfThoughts.mount(
+                 %Agent{id: "fixture", name: "fixture", module: Jido.Agent, schema: Zoi.object(%{})},
+                 %{}
+               )
+
+      assert {:ok, trm} =
+               TRM.mount(%Agent{id: "fixture", name: "fixture", module: Jido.Agent, schema: Zoi.object(%{})}, %{})
+
+      assert {:ok, adaptive} =
+               Adaptive.mount(%Agent{id: "fixture", name: "fixture", module: Jido.Agent, schema: Zoi.object(%{})}, %{})
 
       assert cod.strategy == :cod
       assert cot.strategy == :cot

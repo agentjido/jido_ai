@@ -5,5 +5,6 @@ Mimic.copy(ReqLLM.Providers.OpenAI)
 Mimic.copy(ReqLLM.Providers.OpenAICodex)
 Mimic.copy(ReqLLM.StreamResponse)
 Mimic.copy(Jido.AgentServer)
+Mimic.copy(Jido.AI.CLI.Adapter)
 
 ExUnit.start(exclude: [:flaky], capture_log: true)

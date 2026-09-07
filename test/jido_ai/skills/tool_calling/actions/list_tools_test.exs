@@ -6,10 +6,11 @@ defmodule Jido.AI.Actions.ToolCalling.ListToolsTest do
   defmodule LegacySchemaTool do
     use Jido.Action,
       name: "legacy_schema_tool",
-      schema: [
-        query: [type: :string, required: true, doc: "Search query"],
-        limit: [type: :integer, default: 10, doc: "Maximum result count"]
-      ]
+      schema:
+        Zoi.object(%{
+          query: Zoi.string(description: "Search query"),
+          limit: Zoi.integer(description: "Maximum result count") |> Zoi.default(10) |> Zoi.optional()
+        })
 
     @impl Jido.Action
     def run(params, _context), do: {:ok, params}
@@ -32,7 +33,7 @@ defmodule Jido.AI.Actions.ToolCalling.ListToolsTest do
   defmodule SafeTool do
     use Jido.Action,
       name: "safe_tool",
-      schema: []
+      schema: Zoi.object(%{})
 
     @impl Jido.Action
     def run(params, _context), do: {:ok, params}
@@ -41,7 +42,7 @@ defmodule Jido.AI.Actions.ToolCalling.ListToolsTest do
   defmodule AdminDeleteTool do
     use Jido.Action,
       name: "admin_delete_tool",
-      schema: []
+      schema: Zoi.object(%{})
 
     @impl Jido.Action
     def run(params, _context), do: {:ok, params}

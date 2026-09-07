@@ -5,25 +5,25 @@ defmodule Jido.AI.Integration.RequestAwaitRejectionTest do
   alias Jido.AI.TestSupport.StreamResponseFactory
 
   defmodule CoTAwaitAgent do
-    use Jido.AI.CoTAgent, name: "cot_await_agent", model: "test:model"
+    use Jido.AI.CoTAgent, name: "cot_await_agent", model: "openai:gpt-4o-mini"
   end
 
   defmodule ToTAwaitAgent do
-    use Jido.AI.ToTAgent, name: "tot_await_agent", model: "test:model"
+    use Jido.AI.ToTAgent, name: "tot_await_agent", model: "openai:gpt-4o-mini"
   end
 
   defmodule GoTAwaitAgent do
-    use Jido.AI.GoTAgent, name: "got_await_agent", model: "test:model"
+    use Jido.AI.GoTAgent, name: "got_await_agent", model: "openai:gpt-4o-mini"
   end
 
   defmodule TRMAwaitAgent do
-    use Jido.AI.TRMAgent, name: "trm_await_agent", model: "test:model"
+    use Jido.AI.TRMAgent, name: "trm_await_agent", model: "openai:gpt-4o-mini"
   end
 
   defmodule AdaptiveAwaitAgent do
     use Jido.AI.AdaptiveAgent,
       name: "adaptive_await_agent",
-      model: "test:model",
+      model: "openai:gpt-4o-mini",
       default_strategy: :cot,
       available_strategies: [:cot]
   end

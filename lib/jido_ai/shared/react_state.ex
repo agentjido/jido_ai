@@ -1,0 +1,378 @@
+defmodule Jido.AI.Reasoning.ReAct.State do
+  @moduledoc """
+  Runtime state for a single ReAct run.
+  """
+
+  alias Jido.AI.Reasoning.ReAct.{Config, PendingToolCall}
+  alias Jido.AI.Context, as: AIContext
+
+  @status_values [:running, :awaiting_tools, :completed, :failed, :cancelled]
+  @version 3
+
+  @schema Zoi.struct(
+            __MODULE__,
+            %{
+              version: Zoi.integer() |> Zoi.default(@version),
+              run_id: Zoi.string() |> Zoi.min(1),
+              request_id: Zoi.string() |> Zoi.min(1),
+              status: Zoi.atom() |> Zoi.default(:running),
+              iteration: Zoi.integer() |> Zoi.default(1),
+              llm_call_id: Zoi.string() |> Zoi.nullish(),
+              llm_response_id: Zoi.string() |> Zoi.nullish(),
+              context: Zoi.any(),
+              active_tools: Zoi.map() |> Zoi.default(%{}),
+              pending_tool_calls: Zoi.list(PendingToolCall.schema()) |> Zoi.default([]),
+              usage: Zoi.map() |> Zoi.default(%{}),
+              output: Zoi.map() |> Zoi.default(%{}),
+              streaming_text: Zoi.string() |> Zoi.default(""),
+              streaming_thinking: Zoi.string() |> Zoi.default(""),
+              result: Zoi.any() |> Zoi.nullish(),
+              termination_reason: Zoi.atom() |> Zoi.nullish(),
+              checkpoint: Zoi.map() |> Zoi.nullish(),
+              error: Zoi.any() |> Zoi.nullish(),
+              started_at_ms: Zoi.integer() |> Zoi.default(0),
+              updated_at_ms: Zoi.integer() |> Zoi.default(0),
+              prev_tool_signature: Zoi.any() |> Zoi.nullish(),
+              seq: Zoi.integer() |> Zoi.default(0)
+            },
+            coerce: true
+          )
+
+  @type t :: unquote(Zoi.type_spec(@schema))
+
+  @enforce_keys Zoi.Struct.enforce_keys(@schema)
+  defstruct Zoi.Struct.struct_fields(@schema)
+
+  @doc """
+  Returns the Zoi schema used to validate ReAct runtime state.
+  """
+  @spec schema() :: term()
+  def schema, do: @schema
+
+  @doc """
+  Creates initial runtime state for a new query.
+  """
+  @spec new(String.t(), String.t() | nil, keyword()) :: t()
+  def new(query, system_prompt, opts \\ []) when is_binary(query) or is_list(query) do
+    now = now_ms()
+
+    request_id = Keyword.get(opts, :request_id, "req_#{Jido.Signal.ID.generate!()}")
+    run_id = Keyword.get(opts, :run_id, "run_#{Jido.Signal.ID.generate!()}")
+
+    context =
+      AIContext.new(system_prompt: system_prompt)
+      |> AIContext.append_user(query)
+
+    attrs = %{
+      run_id: run_id,
+      request_id: request_id,
+      status: :running,
+      iteration: 1,
+      llm_response_id: nil,
+      context: context,
+      active_tools: %{},
+      pending_tool_calls: [],
+      usage: %{},
+      output: %{},
+      streaming_text: "",
+      streaming_thinking: "",
+      prev_tool_signature: nil,
+      started_at_ms: now,
+      updated_at_ms: now,
+      seq: 0
+    }
+
+    parse_or_raise(attrs)
+  end
+
+  @doc """
+  Restores state from a minimal checkpoint map.
+  """
+  @spec from_checkpoint_map(map()) :: {:ok, t()} | {:error, term()}
+  def from_checkpoint_map(%{} = map) when is_map_key(map, :thread) or is_map_key(map, "thread") do
+    {:error, :legacy_thread_checkpoint}
+  end
+
+  def from_checkpoint_map(%{} = map) do
+    with {:ok, run_id} <- fetch_binary(map, :run_id),
+         {:ok, request_id} <- fetch_binary(map, :request_id),
+         {:ok, status} <- fetch_status(map),
+         {:ok, context} <- fetch_context(map) do
+      attrs = %{
+        version: Map.get(map, :version, Map.get(map, "version", @version)),
+        run_id: run_id,
+        request_id: request_id,
+        status: status,
+        iteration: Map.get(map, :iteration, Map.get(map, "iteration", 1)),
+        llm_call_id: Map.get(map, :llm_call_id, Map.get(map, "llm_call_id")),
+        llm_response_id: Map.get(map, :llm_response_id, Map.get(map, "llm_response_id")),
+        context: context,
+        active_tools: Map.get(map, :active_tools, Map.get(map, "active_tools", %{})) || %{},
+        pending_tool_calls:
+          restore_pending(
+            Map.get(map, :pending_tool_calls, Map.get(map, "pending_tool_calls", []))
+          ),
+        usage: Map.get(map, :usage, Map.get(map, "usage", %{})) || %{},
+        output: Map.get(map, :output, Map.get(map, "output", %{})) || %{},
+        streaming_text: Map.get(map, :streaming_text, Map.get(map, "streaming_text", "")) || "",
+        streaming_thinking:
+          Map.get(map, :streaming_thinking, Map.get(map, "streaming_thinking", "")) || "",
+        result: Map.get(map, :result, Map.get(map, "result")),
+        termination_reason: Map.get(map, :termination_reason, Map.get(map, "termination_reason")),
+        checkpoint: Map.get(map, :checkpoint, Map.get(map, "checkpoint")),
+        error: Map.get(map, :error, Map.get(map, "error")),
+        started_at_ms: Map.get(map, :started_at_ms, Map.get(map, "started_at_ms", now_ms())),
+        updated_at_ms: Map.get(map, :updated_at_ms, Map.get(map, "updated_at_ms", now_ms())),
+        prev_tool_signature:
+          Map.get(map, :prev_tool_signature, Map.get(map, "prev_tool_signature")),
+        seq: Map.get(map, :seq, Map.get(map, "seq", 0))
+      }
+
+      case Zoi.parse(@schema, attrs) do
+        {:ok, state} -> {:ok, state}
+        {:error, errors} -> {:error, {:invalid_checkpoint_state, errors}}
+      end
+    end
+  end
+
+  def from_checkpoint_map(_), do: {:error, :invalid_checkpoint_state}
+
+  @doc """
+  Converts released State-v3 data from Jido AI v2 to a native checkpoint.
+
+  Supply `:phase` (`:before_llm`, `:after_llm`, `:after_tools`, or `:terminal`),
+  `:counters` (a map with `:iterations`, `:model_calls`, and `:tool_calls`),
+  `:domain` (the reconciled application state), and `:remaining_ms`.
+  Optional `:termination_reason` identifies an old iteration-limit result.
+
+  Read these values from the saved event log and application state. Old tokens
+  do not contain enough data to infer them. Decode signed tokens with `Token`
+  first. This function checks data; it does not verify an unsigned map's source.
+
+  Conversion does not execute work. Unresolved or partly executed tools must
+  be reconciled before a failed/cancelled run can restart. Native checkpoints
+  cannot be imported again. Use `stream_from_state/3` or `Token.issue/2` with
+  the returned State. The original value remains unchanged for rollback.
+  """
+  @spec migrate(t() | map(), Config.t() | map() | keyword(), keyword()) ::
+          {:ok, t()} | {:error, term()}
+  def migrate(saved, config, evidence) do
+    Jido.AI.Reasoning.ReAct.Migration.convert(saved, config, evidence)
+  end
+
+  @doc """
+  Returns the minimal serializable map required to resume execution.
+  """
+  @spec minimal_checkpoint_map(t()) :: map()
+  def minimal_checkpoint_map(%__MODULE__{} = state) do
+    %{
+      version: state.version,
+      run_id: state.run_id,
+      request_id: state.request_id,
+      status: state.status,
+      iteration: state.iteration,
+      llm_call_id: state.llm_call_id,
+      llm_response_id: state.llm_response_id,
+      context: state.context,
+      active_tools: state.active_tools,
+      pending_tool_calls: state.pending_tool_calls,
+      usage: state.usage,
+      output: state.output,
+      streaming_text: state.streaming_text,
+      streaming_thinking: state.streaming_thinking,
+      result: state.result,
+      termination_reason: state.termination_reason,
+      checkpoint: state.checkpoint,
+      error: state.error,
+      started_at_ms: state.started_at_ms,
+      updated_at_ms: state.updated_at_ms,
+      prev_tool_signature: state.prev_tool_signature,
+      seq: state.seq
+    }
+  end
+
+  @doc """
+  Increments the event sequence counter and returns `{state, next_seq}`.
+  """
+  @spec bump_seq(t()) :: {t(), pos_integer()}
+  def bump_seq(%__MODULE__{} = state) do
+    next = state.seq + 1
+    {%{state | seq: next, updated_at_ms: now_ms()}, next}
+  end
+
+  @doc """
+  Advances the event sequence counter to `seq` when it is ahead of the current
+  value, leaving it untouched otherwise.
+
+  Used to reconcile sequence numbers allocated out-of-band by the tool-execution
+  heartbeat (which runs in a separate process while the runner is blocked inside
+  `Task.async_stream`). Adopting the heartbeat's final seq guarantees the next
+  normal event the runner emits is strictly greater than every keepalive,
+  preserving the monotonic-and-unique seq invariant.
+  """
+  @spec adopt_seq(t(), integer() | nil) :: t()
+  def adopt_seq(%__MODULE__{} = state, seq) when is_integer(seq) and seq > state.seq do
+    %{state | seq: seq, updated_at_ms: now_ms()}
+  end
+
+  def adopt_seq(%__MODULE__{} = state, _seq), do: state
+
+  @doc """
+  Increments the reasoning iteration counter.
+  """
+  @spec inc_iteration(t()) :: t()
+  def inc_iteration(%__MODULE__{} = state) do
+    %{state | iteration: state.iteration + 1, updated_at_ms: now_ms()}
+  end
+
+  @doc """
+  Sets runtime status.
+  """
+  @spec put_status(t(), atom()) :: t()
+  def put_status(%__MODULE__{} = state, status) when status in @status_values do
+    %{state | status: status, updated_at_ms: now_ms()}
+  end
+
+  @doc """
+  Stores the current LLM call id.
+  """
+  @spec put_llm_call_id(t(), String.t() | nil) :: t()
+  def put_llm_call_id(%__MODULE__{} = state, call_id) do
+    %{state | llm_call_id: call_id, updated_at_ms: now_ms()}
+  end
+
+  @doc """
+  Stores the latest provider response id for multi-turn continuation.
+  """
+  @spec put_llm_response_id(t(), String.t() | nil) :: t()
+  def put_llm_response_id(%__MODULE__{} = state, response_id) do
+    %{state | llm_response_id: response_id, updated_at_ms: now_ms()}
+  end
+
+  @doc """
+  Replaces pending tool calls.
+  """
+  @spec put_pending_tools(t(), [PendingToolCall.t()]) :: t()
+  def put_pending_tools(%__MODULE__{} = state, pending) when is_list(pending) do
+    %{state | pending_tool_calls: pending, updated_at_ms: now_ms()}
+  end
+
+  @doc """
+  Clears all pending tool calls.
+  """
+  @spec clear_pending_tools(t()) :: t()
+  def clear_pending_tools(%__MODULE__{} = state) do
+    %{state | pending_tool_calls: [], updated_at_ms: now_ms()}
+  end
+
+  @doc """
+  Stores terminal result value.
+  """
+  @spec put_result(t(), term()) :: t()
+  def put_result(%__MODULE__{} = state, result) do
+    %{state | result: result, updated_at_ms: now_ms()}
+  end
+
+  @doc """
+  Stores structured output metadata.
+  """
+  @spec put_output(t(), map()) :: t()
+  def put_output(%__MODULE__{} = state, output) when is_map(output) do
+    %{state | output: output, updated_at_ms: now_ms()}
+  end
+
+  @doc """
+  Clears streaming accumulators before a new LLM turn starts.
+  """
+  @spec clear_streaming(t()) :: t()
+  def clear_streaming(%__MODULE__{} = state) do
+    %{state | streaming_text: "", streaming_thinking: "", updated_at_ms: now_ms()}
+  end
+
+  @doc """
+  Stores terminal error value.
+  """
+  @spec put_error(t(), term()) :: t()
+  def put_error(%__MODULE__{} = state, error) do
+    %{state | error: error, updated_at_ms: now_ms()}
+  end
+
+  @doc """
+  Merges usage counters into existing state usage map.
+  """
+  @spec merge_usage(t(), map() | nil) :: t()
+  def merge_usage(%__MODULE__{} = state, nil), do: state
+
+  def merge_usage(%__MODULE__{} = state, usage) when is_map(usage) do
+    %{state | usage: Jido.AI.Usage.merge(state.usage, usage), updated_at_ms: now_ms()}
+  end
+
+  def merge_usage(%__MODULE__{} = state, _), do: state
+
+  @doc """
+  Returns elapsed runtime in milliseconds.
+  """
+  @spec duration_ms(t()) :: non_neg_integer()
+  def duration_ms(%__MODULE__{} = state) do
+    max(now_ms() - state.started_at_ms, 0)
+  end
+
+  defp parse_or_raise(attrs) do
+    case Zoi.parse(@schema, attrs) do
+      {:ok, state} -> state
+      {:error, errors} -> raise ArgumentError, "invalid ReAct state: #{inspect(errors)}"
+    end
+  end
+
+  defp restore_pending(items) when is_list(items) do
+    Enum.map(items, fn
+      %PendingToolCall{} = call -> call
+      %{} = map -> struct(PendingToolCall, map)
+      _ -> %PendingToolCall{id: "", name: ""}
+    end)
+  end
+
+  defp restore_pending(_), do: []
+
+  defp fetch_binary(map, key) do
+    value = Map.get(map, key, Map.get(map, Atom.to_string(key)))
+
+    if is_binary(value) and value != "" do
+      {:ok, value}
+    else
+      {:error, {:missing_field, key}}
+    end
+  end
+
+  defp fetch_status(map) do
+    value = Map.get(map, :status, Map.get(map, "status", :running))
+
+    case normalize_status(value) do
+      {:ok, status} -> {:ok, status}
+      :error -> {:error, :invalid_status}
+    end
+  end
+
+  defp fetch_context(map) do
+    map
+    |> Map.get(:context, Map.get(map, "context"))
+    |> AIContext.coerce()
+    |> case do
+      {:ok, context} -> {:ok, context}
+      :error -> {:error, :invalid_context}
+    end
+  end
+
+  defp normalize_status(value) when value in @status_values, do: {:ok, value}
+
+  defp normalize_status(value) when is_binary(value) do
+    case Enum.find(@status_values, fn status -> Atom.to_string(status) == value end) do
+      nil -> :error
+      status -> {:ok, status}
+    end
+  end
+
+  defp normalize_status(_), do: :error
+
+  defp now_ms, do: System.system_time(:millisecond)
+end

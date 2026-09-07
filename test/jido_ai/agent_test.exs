@@ -59,9 +59,10 @@ defmodule Jido.AI.AgentTest do
   defmodule TestSignalAction do
     use Jido.Action,
       name: "signal_action",
-      description: "Handles custom agent signals"
+      description: "Handles custom agent signals",
+      schema: Zoi.object(%{model: Zoi.string()})
 
-    def run(params, _ctx), do: {:ok, params}
+    def run(params, context), do: {:ok, Map.merge(context.agent_state, params)}
   end
 
   defmodule TestRequestTransformer do
@@ -70,21 +71,12 @@ defmodule Jido.AI.AgentTest do
 
   defmodule ReplacementMemoryPlugin do
     @moduledoc false
-    @state_schema Zoi.object(%{namespace: Zoi.string() |> Zoi.default("agent:replacement")})
-    @config_schema Zoi.object(%{namespace: Zoi.string() |> Zoi.default("agent:replacement")})
+    use Jido.Plugin
 
-    use Jido.Plugin,
-      name: "replacement_memory",
-      state_key: :__memory__,
-      actions: [],
-      schema: @state_schema,
-      config_schema: @config_schema,
-      singleton: true,
-      capabilities: [:memory]
-
-    @impl true
-    def mount(_agent, config) do
-      {:ok, %{namespace: Map.get(config, :namespace, "agent:replacement")}}
+    def state_spec(options) do
+      {:__memory__,
+       Zoi.object(%{namespace: Zoi.string() |> Zoi.default(Keyword.get(options, :namespace, "agent:replacement"))})
+       |> Zoi.default(%{})}
     end
   end
 
@@ -256,14 +248,14 @@ defmodule Jido.AI.AgentTest do
     use Jido.AI.Agent,
       name: "agent_without_default_memory",
       tools: [TestCalculator],
-      default_plugins: %{__memory__: false}
+      default_plugins: false
   end
 
   defmodule AgentWithReplacementMemory do
     use Jido.AI.Agent,
       name: "agent_with_replacement_memory",
       tools: [TestCalculator],
-      default_plugins: %{__memory__: {ReplacementMemoryPlugin, %{namespace: "agent:ai-replacement"}}}
+      plugins: [{ReplacementMemoryPlugin, namespace: "agent:ai-replacement"}]
   end
 
   # ============================================================================
@@ -335,31 +327,32 @@ defmodule Jido.AI.AgentTest do
       assert function_exported?(BasicAgent, :ask_stream, 3)
       assert function_exported?(BasicAgent, :steer, 3)
       assert function_exported?(BasicAgent, :inject, 3)
-      assert function_exported?(BasicAgent, :on_before_cmd, 2)
-      assert function_exported?(BasicAgent, :on_after_cmd, 3)
+      assert function_exported?(BasicAgent, :agent, 0)
+      assert function_exported?(BasicAgent, :new, 0)
     end
 
     test "agent has correct name" do
-      agent = BasicAgent.new()
+      agent = BasicAgent.new!()
       assert agent.name == "basic_agent"
     end
 
     test "agent has correct description" do
-      agent = BasicAgent.new()
+      agent = BasicAgent.new!()
       assert agent.description == "A basic test agent"
     end
 
     test "forwards default plugin exclusions to Jido.Agent" do
-      modules = Enum.map(AgentWithoutDefaultMemory.plugin_instances(), & &1.module)
+      modules = Enum.map(AgentWithoutDefaultMemory.agent().plugins, &elem(&1, 0))
 
       refute Jido.Memory.Plugin in modules
-      assert Jido.Thread.Plugin in modules
-      assert Jido.Agent.Identity.Plugin in modules
+      refute Jido.Thread.Plugin in modules
+      refute Jido.Agent.Identity.Plugin in modules
+      assert Jido.AI.Session.Plugin in modules
     end
 
     test "forwards default plugin replacements with config to Jido.Agent" do
-      modules = Enum.map(AgentWithReplacementMemory.plugin_instances(), & &1.module)
-      agent = AgentWithReplacementMemory.new()
+      modules = Enum.map(AgentWithReplacementMemory.agent().plugins, &elem(&1, 0))
+      agent = AgentWithReplacementMemory.new!()
 
       assert ReplacementMemoryPlugin in modules
       refute Jido.Memory.Plugin in modules
@@ -367,11 +360,8 @@ defmodule Jido.AI.AgentTest do
     end
 
     test "tool_context with module aliases resolves correctly" do
-      # When using Agent, the strategy is auto-initialized via new()
-      # The config is stored in agent.state.__strategy__.config
-      agent = AgentWithToolContext.new()
-      state = StratState.get(agent, %{})
-      config = state[:config]
+      agent = AgentWithToolContext.new!()
+      config = Jido.AI.get_strategy_config(agent)
 
       # Modules should be resolved to atoms, not AST tuples
       # Now stored as base_tool_context (persistent)
@@ -381,9 +371,8 @@ defmodule Jido.AI.AgentTest do
     end
 
     test "tool_context with plain map values works" do
-      agent = AgentWithPlainMapContext.new()
-      state = StratState.get(agent, %{})
-      config = state[:config]
+      agent = AgentWithPlainMapContext.new!()
+      config = Jido.AI.get_strategy_config(agent)
 
       # Now stored as base_tool_context (persistent)
       assert config.base_tool_context[:tenant_id] == "tenant_123"
@@ -391,89 +380,77 @@ defmodule Jido.AI.AgentTest do
     end
 
     test "llm_opts and req_http_options are forwarded into strategy config" do
-      agent = AgentWithLlmOpts.new()
-      state = StratState.get(agent, %{})
-      config = state[:config]
+      agent = AgentWithLlmOpts.new!()
+      config = Jido.AI.get_strategy_config(agent)
 
-      assert config.base_llm_opts == [thinking: %{type: :enabled, budget_tokens: 800}, reasoning_effort: :high]
-      assert config.base_req_http_options == [adapter: [recv_timeout: 2_000]]
+      assert config.thinking == %{type: :enabled, budget_tokens: 800}
+      assert config.reasoning_effort == :high
+      assert config.req_http_options == [adapter: [recv_timeout: 2_000]]
     end
 
     test "streaming: false is forwarded into strategy config" do
-      agent = AgentWithStreamingDisabled.new()
-      state = StratState.get(agent, %{})
-      config = state[:config]
+      agent = AgentWithStreamingDisabled.new!()
+      config = Jido.AI.get_strategy_config(agent)
 
       assert config.streaming == false
     end
 
     test "max_tokens is forwarded into strategy config" do
-      agent = AgentWithMaxTokens.new()
-      state = StratState.get(agent, %{})
-      config = state[:config]
+      agent = AgentWithMaxTokens.new!()
+      config = Jido.AI.get_strategy_config(agent)
 
       assert config.max_tokens == 4_096
     end
 
     test "stream_timeout_ms is forwarded into strategy config" do
-      agent = AgentWithStreamTimeout.new()
-      state = StratState.get(agent, %{})
-      config = state[:config]
-
-      assert config.stream_timeout_ms == 123_456
+      agent = AgentWithStreamTimeout.new!()
+      {:ok, profile} = Jido.AI.Configuration.profile(agent)
+      assert profile.requests.idle_timeout == 123_456
     end
 
     test "request_transformer is forwarded into strategy config" do
-      agent = AgentWithRequestTransformer.new()
-      state = StratState.get(agent, %{})
-      config = state[:config]
-
-      assert config.request_transformer == TestRequestTransformer
+      agent = AgentWithRequestTransformer.new!()
+      {:ok, profile} = Jido.AI.Configuration.profile(agent)
+      assert profile.reasoning.request_transformer == TestRequestTransformer
     end
 
     test "inline map model specs are evaluated and forwarded into strategy config" do
-      agent = AgentWithInlineModelMap.new()
-      state = StratState.get(agent, %{})
-      config = state[:config]
+      agent = AgentWithInlineModelMap.new!()
+      config = Jido.AI.get_strategy_config(agent)
 
       assert config.model == %{provider: :openai, id: "gpt-4o-mini", base_url: "http://localhost:4000/v1"}
     end
 
     test "tuple model specs are evaluated and forwarded into strategy config" do
-      agent = AgentWithTupleModelSpec.new()
-      state = StratState.get(agent, %{})
-      config = state[:config]
+      agent = AgentWithTupleModelSpec.new!()
+      config = Jido.AI.get_strategy_config(agent)
 
       assert config.model == {:openai, "gpt-4o-mini", []}
     end
 
     test "stream_timeout_ms alias is forwarded into strategy config" do
-      agent = AgentWithStreamTimeoutAlias.new()
-      state = StratState.get(agent, %{})
-      config = state[:config]
-
-      assert config.stream_timeout_ms == 45_000
-      assert config.stream_receive_timeout_ms == 45_000
+      agent = AgentWithStreamTimeoutAlias.new!()
+      {:ok, profile} = Jido.AI.Configuration.profile(agent)
+      assert profile.requests.idle_timeout == 45_000
     end
 
     test "system_prompt from module attribute is resolved at compile time" do
-      agent = AgentWithModuleAttrSystemPrompt.new()
-      state = StratState.get(agent, %{})
-      config = state[:config]
+      agent = AgentWithModuleAttrSystemPrompt.new!()
+      config = Jido.AI.get_strategy_config(agent)
 
       assert config.system_prompt == "You are a helpful testing assistant."
     end
 
     test "false system_prompt is treated as omitted" do
-      default_config = StratState.get(BasicAgent.new(), %{})[:config]
-      config = StratState.get(AgentWithFalseSystemPrompt.new(), %{})[:config]
+      default_config = Jido.AI.get_strategy_config(BasicAgent.new!())
+      config = Jido.AI.get_strategy_config(AgentWithFalseSystemPrompt.new!())
 
       assert config.system_prompt == default_config.system_prompt
     end
 
     test "nil system_prompt is treated as omitted" do
-      default_config = StratState.get(BasicAgent.new(), %{})[:config]
-      config = StratState.get(AgentWithNilSystemPrompt.new(), %{})[:config]
+      default_config = Jido.AI.get_strategy_config(BasicAgent.new!())
+      config = Jido.AI.get_strategy_config(AgentWithNilSystemPrompt.new!())
 
       assert config.system_prompt == default_config.system_prompt
     end
@@ -481,19 +458,25 @@ defmodule Jido.AI.AgentTest do
     test "signal_routes option is forwarded to the base agent" do
       expected_routes = [{"custom.state.patch", TestSignalAction}]
 
-      assert AgentWithSignalRoutes.signal_routes() == expected_routes
-      assert AgentWithSignalRoutes.signal_routes(%{agent_module: AgentWithSignalRoutes}) == expected_routes
+      routes = AgentWithSignalRoutes.agent().routes
+
+      assert Enum.all?(expected_routes, fn {path, target} ->
+               Enum.any?(routes, &(&1.path == path and &1.target == target))
+             end)
     end
 
     test "signal_routes option supports static params route format" do
-      assert [{"custom.static", {TestSignalAction, %{mode: :patch}}}] =
-               AgentWithSignalRouteStaticParams.signal_routes()
+      assert Enum.any?(
+               AgentWithSignalRouteStaticParams.agent().routes,
+               &(&1.path == "custom.static" and &1.target == {TestSignalAction, %{mode: :patch}})
+             )
     end
 
     test "signal_routes option supports module attributes" do
-      assert AgentWithSignalRoutesFromAttribute.signal_routes() == [
-               {"custom.attr.patch", TestSignalAction}
-             ]
+      assert Enum.any?(
+               AgentWithSignalRoutesFromAttribute.agent().routes,
+               &(&1.path == "custom.attr.patch" and &1.target == TestSignalAction)
+             )
     end
 
     test "signal_routes option is used by AgentServer routing" do
@@ -501,23 +484,23 @@ defmodule Jido.AI.AgentTest do
       registry = Module.concat(__MODULE__, :"SignalRouteRegistry#{suffix}")
       start_supervised!({Registry, keys: :unique, name: registry})
 
-      {:ok, pid} =
-        Jido.AgentServer.start_link(
-          agent: AgentWithSignalRoutes,
-          id: "signal-route-agent-#{suffix}",
-          registry: registry
+      pid =
+        start_supervised!(
+          {Jido.AgentServer,
+           [
+             agent: AgentWithSignalRoutes,
+             id: "signal-route-agent-#{suffix}",
+             registry: registry
+           ]}
         )
 
-      on_exit(fn -> if Process.alive?(pid), do: GenServer.stop(pid) end)
-
       signal =
-        Jido.Signal.new!("custom.state.patch", %{patched_by_signal: true}, source: "/jido_ai/agent_test")
+        Jido.Signal.new!("custom.state.patch", %{model: "signal-model"}, source: "/jido_ai/agent_test")
 
       assert {:ok, agent} = Jido.AgentServer.call(pid, signal)
-      assert agent.state.patched_by_signal == true
+      assert agent.state.model == "signal-model"
 
-      assert {:ok, server_state} = Jido.AgentServer.state(pid)
-      assert server_state.agent.state.patched_by_signal == true
+      assert Jido.AgentServer.agent(pid).state.model == "signal-model"
     end
 
     test "raises when module attribute system_prompt does not resolve to a binary" do
@@ -540,7 +523,7 @@ defmodule Jido.AI.AgentTest do
     end
 
     test "tools list resolves module aliases" do
-      agent = BasicAgent.new()
+      agent = BasicAgent.new!()
       tools = ReAct.list_tools(agent)
 
       # Should be actual module atoms, not AST
@@ -550,7 +533,7 @@ defmodule Jido.AI.AgentTest do
     end
 
     test "agent_skills wires the catalog, loading tool, and scoped specs" do
-      agent = AgentWithAgentSkills.new()
+      agent = AgentWithAgentSkills.new!()
       state = StratState.get(agent, %{})
       config = state[:config]
 
@@ -568,7 +551,7 @@ defmodule Jido.AI.AgentTest do
     test "agent_skills accepts runtime specs and an MFA resource provider" do
       start_supervised!(Jido.AI.Skill.Registry)
 
-      agent = AgentWithRuntimeAgentSkills.new()
+      agent = AgentWithRuntimeAgentSkills.new!()
       state = StratState.get(agent, %{})
       config = state.config
 
@@ -690,7 +673,7 @@ defmodule Jido.AI.AgentTest do
 
   describe "request lifecycle hooks" do
     test "on_before_cmd marks request as failed on react_request_error" do
-      agent = BasicAgent.new()
+      agent = BasicAgent.new!()
       agent = Request.start_request(agent, "req_1", "query", stream_to: {:pid, self()})
       tag = Request.Stream.message_tag()
 
@@ -712,7 +695,7 @@ defmodule Jido.AI.AgentTest do
     end
 
     test "on_after_cmd cancel does not overwrite completed request" do
-      agent = BasicAgent.new()
+      agent = BasicAgent.new!()
       agent = Request.start_request(agent, "req_1", "query")
       agent = Request.complete_request(agent, "req_1", "done")
 
@@ -732,7 +715,7 @@ defmodule Jido.AI.AgentTest do
       raw_error = %{type: :provider_error, status: 503, message: "try later"}
 
       agent =
-        BasicAgent.new()
+        BasicAgent.new!()
         |> Request.start_request("req_failed", "query")
         |> with_failed_strategy(raw_error)
 
@@ -755,7 +738,7 @@ defmodule Jido.AI.AgentTest do
       thinking_trace = [%{call_id: "call_1", iteration: 1, thinking: "Step by step..."}]
 
       agent =
-        BasicAgent.new()
+        BasicAgent.new!()
         |> Request.start_request("req_meta", "query")
         |> with_completed_strategy("final answer", %{
           usage: %{input_tokens: 7, output_tokens: 3, reasoning_tokens: 18},

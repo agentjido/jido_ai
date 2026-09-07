@@ -31,10 +31,10 @@ defmodule Jido.AI.Examples.CalculatorAgent do
     name: "calculator_agent",
     description: "A calculator agent that uses skills for arithmetic",
     tools: [
-      Jido.Tools.Arithmetic.Add,
-      Jido.Tools.Arithmetic.Subtract,
-      Jido.Tools.Arithmetic.Multiply,
-      Jido.Tools.Arithmetic.Divide
+      Jido.AI.Tools.Arithmetic.Add,
+      Jido.AI.Tools.Arithmetic.Subtract,
+      Jido.AI.Tools.Arithmetic.Multiply,
+      Jido.AI.Tools.Arithmetic.Divide
     ],
     system_prompt: """
     You are a helpful calculator assistant. You MUST use tool calls for all arithmetic operations.

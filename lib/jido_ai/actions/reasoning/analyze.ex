@@ -40,9 +40,6 @@ defmodule Jido.AI.Actions.Reasoning.Analyze do
   use Jido.Action,
     name: "reasoning_analyze",
     description: "Perform deep analysis of text/data with structured output",
-    category: "ai",
-    tags: ["reasoning", "analysis"],
-    vsn: "1.0.0",
     schema:
       Zoi.object(%{
         model:
@@ -63,6 +60,10 @@ defmodule Jido.AI.Actions.Reasoning.Analyze do
           |> Zoi.default(0.3),
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
+
+  def category, do: "ai"
+  def tags, do: ["reasoning", "analysis"]
+  def vsn, do: "1.0.0"
 
   alias Jido.AI.Actions.Helpers
   alias Jido.AI.Turn

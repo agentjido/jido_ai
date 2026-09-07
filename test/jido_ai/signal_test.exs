@@ -33,10 +33,10 @@ defmodule Jido.AI.SignalTest do
 
   describe "typed signal validation" do
     test "reports missing required fields" do
-      assert {:error, message} = LLMDelta.new(%{call_id: "call_missing_delta"})
-      assert message =~ "missing required field :delta"
+      assert {:error, [%Zoi.Error{code: :required, path: [:delta]}]} =
+               LLMDelta.new(%{call_id: "call_missing_delta"})
 
-      assert_raise RuntimeError, ~r/missing required field :delta/, fn ->
+      assert_raise Zoi.ParseError, fn ->
         LLMDelta.new!(%{call_id: "call_missing_delta"})
       end
     end
@@ -49,7 +49,7 @@ defmodule Jido.AI.SignalTest do
                  unknown: true
                })
 
-      assert message =~ "received unknown field :unknown"
+      assert [%Zoi.Error{code: :unrecognized_key}] = message
     end
 
     test "rejects invalid field types" do
@@ -60,7 +60,7 @@ defmodule Jido.AI.SignalTest do
                  seq: "1"
                })
 
-      assert message =~ "expected :seq to be an integer"
+      assert [%Zoi.Error{code: :invalid_type, path: [:seq]}] = message
     end
 
     test "accepts string keys for schema fields and applies signal options" do

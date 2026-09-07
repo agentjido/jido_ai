@@ -24,7 +24,7 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapterTest do
     use Jido.Action,
       name: "test_calculator",
       description: "Basic calculator for CLI adapter tests",
-      schema: []
+      schema: Zoi.object(%{})
 
     @impl true
     def run(params, _context), do: {:ok, params}
@@ -82,10 +82,10 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapterTest do
       assert config.max_tokens == 4_096
 
       assert config.tools == [
-               Jido.Tools.Arithmetic.Add,
-               Jido.Tools.Arithmetic.Subtract,
-               Jido.Tools.Arithmetic.Multiply,
-               Jido.Tools.Arithmetic.Divide
+               Jido.AI.Tools.Arithmetic.Add,
+               Jido.AI.Tools.Arithmetic.Subtract,
+               Jido.AI.Tools.Arithmetic.Multiply,
+               Jido.AI.Tools.Arithmetic.Divide
              ]
 
       assert is_binary(config.system_prompt)
@@ -130,7 +130,7 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapterTest do
     end
 
     test "await propagates status errors" do
-      expect(Jido.AgentServer, :status, fn _pid -> {:error, :not_found} end)
+      expect(Jido.AI.CLI.Adapter, :status, fn _pid -> {:error, :not_found} end)
       assert {:error, :not_found} = ReActAdapter.await(self(), 100, %{})
     end
 
@@ -145,7 +145,7 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapterTest do
           }
         )
 
-      expect(Jido.AgentServer, :status, fn _pid -> {:ok, status} end)
+      expect(Jido.AI.CLI.Adapter, :status, fn _pid -> {:ok, status} end)
 
       assert {:ok, %{answer: "ReAct answer", meta: meta}} = ReActAdapter.await(self(), 100, %{})
       assert meta.status == :success
@@ -159,7 +159,7 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapterTest do
     test "await inspects non-binary failure results for CLI-safe output" do
       status = AdapterTestSupport.status(result: {:provider_error, :overloaded}, snapshot_status: :failure)
 
-      expect(Jido.AgentServer, :status, fn _pid -> {:ok, status} end)
+      expect(Jido.AI.CLI.Adapter, :status, fn _pid -> {:ok, status} end)
 
       assert {:ok, %{answer: "{:provider_error, :overloaded}", meta: meta}} =
                ReActAdapter.await(self(), 100, %{})

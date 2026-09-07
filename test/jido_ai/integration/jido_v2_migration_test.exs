@@ -53,24 +53,24 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
 
   describe "Strategy Configuration" do
     test "ReAct strategy initializes with tools" do
-      agent = %Agent{id: "test-agent", name: "test", state: %{}}
+      agent = %Agent{id: "test-agent", name: "test", state: %{}, schema: Zoi.object(%{}), module: Jido.Agent}
 
       assert {agent, []} = ReAct.init(agent, %{strategy_opts: [tools: [TestCalculator]]})
       assert agent.id == "test-agent"
     end
 
     test "ReAct strategy initializes with model alias" do
-      agent = %Agent{id: "test-agent", name: "test", state: %{}}
+      agent = %Agent{id: "test-agent", name: "test", state: %{}, schema: Zoi.object(%{}), module: Jido.Agent}
 
       assert {agent, []} = ReAct.init(agent, %{strategy_opts: [model: :fast, tools: [TestCalculator]]})
       assert is_map(agent.state)
     end
 
     test "ReAct strategy executes plugin-routed module actions through fallback" do
-      agent = %Agent{id: "test-agent", name: "test", state: %{}}
+      agent = %Agent{id: "test-agent", name: "test", state: %{}, schema: Zoi.object(%{}), module: Jido.Agent}
       {agent, _} = ReAct.init(agent, %{strategy_opts: [tools: [TestCalculator]]})
 
-      instruction = %Jido.Instruction{action: PluginFallbackAction, params: %{}}
+      instruction = %Jido.Instruction{target: PluginFallbackAction, params: %{}}
 
       {updated_agent, directives} =
         ReAct.cmd(agent, [instruction], %{agent_module: __MODULE__, strategy_opts: [tools: [TestCalculator]]})
@@ -80,13 +80,13 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
     end
 
     test "ReAct strategy lazy-loads plugin-routed action modules before fallback execution" do
-      agent = %Agent{id: "test-agent", name: "test", state: %{}}
+      agent = %Agent{id: "test-agent", name: "test", state: %{}, schema: Zoi.object(%{}), module: Jido.Agent}
       {agent, _} = ReAct.init(agent, %{strategy_opts: [tools: [TestCalculator]]})
 
       action = compile_lazy_plugin_action()
       assert :code.is_loaded(action) == false
 
-      instruction = %Jido.Instruction{action: action, params: %{}}
+      instruction = %Jido.Instruction{target: action, params: %{}}
 
       {updated_agent, directives} =
         ReAct.cmd(agent, [instruction], %{agent_module: __MODULE__, strategy_opts: [tools: [TestCalculator]]})
@@ -118,7 +118,7 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
 
   describe "Plugin Mounting" do
     test "Chat plugin can be mounted" do
-      agent = %Agent{id: "test-agent", name: "test", state: %{}}
+      agent = %Agent{id: "test-agent", name: "test", state: %{}, schema: Zoi.object(%{}), module: Jido.Agent}
 
       assert {:ok, plugin_state} = Chat.mount(agent, %{})
       assert is_map(plugin_state)
@@ -126,7 +126,7 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
     end
 
     test "strategy plugins can be mounted" do
-      agent = %Agent{id: "test-agent", name: "test", state: %{}}
+      agent = %Agent{id: "test-agent", name: "test", state: %{}, schema: Zoi.object(%{}), module: Jido.Agent}
 
       assert {:ok, cod_state} = ChainOfDraft.mount(agent, %{})
       assert {:ok, cot_state} = ChainOfThought.mount(agent, %{})
@@ -140,7 +140,7 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
     end
 
     test "plugin states are independent" do
-      agent = %Agent{id: "test-agent", name: "test", state: %{}}
+      agent = %Agent{id: "test-agent", name: "test", state: %{}, schema: Zoi.object(%{}), module: Jido.Agent}
 
       {:ok, chat_state} = Chat.mount(agent, %{default_max_tokens: 2048})
       {:ok, planning_state} = Planning.mount(agent, %{default_max_tokens: 4096})

@@ -3,11 +3,25 @@ defmodule Jido.AI.Signal.EmbedResult do
   Signal for embedding generation completion.
   """
 
-  use Jido.AI.Signal.Definition,
+  use Jido.Signal,
     type: "ai.embed.result",
     default_source: "/ai/embed",
-    schema: [
-      call_id: [type: :string, required: true, doc: "Correlation ID for the embedding call"],
-      result: [type: :any, required: true, doc: "{:ok, result} | {:error, reason}"]
-    ]
+    schema:
+      Zoi.object(
+        %{
+          call_id: Zoi.string(),
+          result: Zoi.any()
+        },
+        unrecognized_keys: :error
+      )
+
+  defoverridable validate_data: 1
+
+  def validate_data(data) do
+    Jido.AI.Signal.Definition.validate_data(data, schema())
+  end
+
+  def extension_policy, do: %{}
+  def to_json, do: Jido.AI.Signal.Definition.metadata(__MODULE__)
+  def __signal_metadata__, do: to_json()
 end

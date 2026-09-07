@@ -1,401 +1,285 @@
 defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
-  @moduledoc """
-  Integration tests for Phase 9.1 StateOps migration in strategies.
+  use Jido.AI.Test.ReasoningCase, async: false
+  alias Jido.AI.{Authoring, Context}
+  alias Jido.AI.Test.StateMigration.{Agent, Change, Double, Update}
 
-  These tests verify that:
-  - StateOps helpers create proper state operations
-  - StateOps have correct structure and types
-  - ReAct strategy integrates with StateOps helpers
-  - StateOps can be composed
-  """
+  # See docs/v3-spike/state-test-transfer.md for all old case mappings.
+  defp start(jido, opts \\ []) do
+    {:ok, profile} = Configuration.profile(Agent.agent())
+    profile = %{profile | requests: %{profile.requests | streaming: Keyword.get(opts, :streaming, false)}}
 
-  use ExUnit.Case, async: false
+    base = %{
+      name: "state_transfer",
+      schema: Agent.domain_schema(),
+      routes: [{"ai.react.query", Authoring.ai(:assistant)}, {"state.change", Change}]
+    }
 
-  alias Jido.Agent
-  alias Jido.Agent.StateOp
-  alias Jido.Agent.Strategy.State, as: StratState
-  alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
-  alias Jido.AI.Reasoning.Helpers
-
-  # ============================================================================
-  # Test Fixtures
-  # ============================================================================
-
-  defmodule TestAction do
-    use Jido.Action,
-      name: "test_action",
-      description: "A test action"
-
-    def run(%{value: value}, _context), do: {:ok, %{result: value * 2}}
+    assert {:ok, definition} = Authoring.lower(base, [Map.from_struct(profile)])
+    start_agent(jido, Jido.Agent.instantiate!(definition))
   end
 
-  defp create_agent(opts \\ []) do
-    %Agent{id: "test-agent", name: "test", state: %{}}
-    |> then(fn agent ->
-      ctx = %{strategy_opts: [tools: [TestAction]] ++ opts}
-      {agent, []} = ReAct.init(agent, ctx)
-      agent
+  defp ask(server, mock, query \\ "Work"),
+    do: request(server, mock, :react, query, context: %{observer: self()})
+
+  defp call(id, kind, value \\ 1), do: %{id: id, name: "state_update", arguments: %{kind: kind, value: value}}
+
+  test "new ReAct state has a profile and an idle session with no live handles", %{jido: jido} do
+    server = start(jido)
+    assert {:ok, view} = Session.snapshot(server)
+    assert view.details.phase == :idle
+    assert view.request == nil and view.live == nil
+    assert view.details.tool_calls == []
+    assert {:ok, profile} = Configuration.profile(view.agent)
+    assert profile.reasoning.method == :react
+    assert view.agent.state.requests == %{} and view.agent.state.count == 0
+    assert :ok = Jido.Action.validate_static_data(view.agent.state)
+  end
+
+  test "admission records the query and live iteration without a Strategy state field", %{jido: jido} do
+    mock = mock([%{reply: {:wait, :model, {:text, "Done"}}}])
+    server = start(jido)
+    assert {:ok, handle} = ask(server, mock, "test query")
+    assert_receive {:mock_llm_waiting, ^mock, :model, _}, 2_000
+    assert {:ok, view} = Session.snapshot(server)
+    assert view.request.query == "test query" and view.request.status == :pending
+    assert view.details.phase == :awaiting_llm and view.details.iteration == 1
+    assert view.details.model_calls == 1 and view.details.active_request_id == handle.id
+    assert is_binary(view.details.current_llm_call_id)
+    assert Process.alive?(view.live.worker_pid)
+    assert List.last(view.details.conversation).content == "test query"
+    refute Map.has_key?(view.agent.state, :__strategy__)
+    assert :ok = MockLLM.release(mock, :model)
+    assert {:ok, "Done"} = Request.await(handle)
+    assert_script_done(mock)
+  end
+
+  test "pending tools are tracked by ID and each completed tool leaves the pending set", %{jido: jido} do
+    mock =
+      mock([
+        %{reply: {:tools, [call("one", "hold", 1), call("two", "hold", 2)]}},
+        %{reply: {:wait, :answer, {:text, "Done"}}}
+      ])
+
+    server = start(jido)
+    assert {:ok, handle} = ask(server, mock)
+    assert_receive {:state_tool, first, "hold", 1, _}, 2_000
+    assert_receive {:state_tool, second, "hold", 2, _}, 2_000
+    assert {:ok, view} = Session.snapshot(server)
+    assert view.details.phase == :executing_tool
+    assert Enum.sort(Enum.map(view.details.tool_calls, & &1.id)) == ["one", "two"]
+    send(first, :release)
+
+    eventually(fn ->
+      {:ok, live} = Session.snapshot(server)
+      Enum.map(live.details.tool_calls, & &1.id) == ["two"]
     end)
+
+    send(second, :release)
+    assert_receive {:mock_llm_waiting, ^mock, :answer, _}, 2_000
+    assert {:ok, ready} = Session.snapshot(server)
+    assert ready.details.tool_calls == []
+    assert Enum.sort(Enum.map(ready.details.tool_results, & &1.id)) == ["one", "two"]
+    assert ready.details.model_calls == 2 and ready.details.iteration == 2
+    assert :ok = MockLLM.release(mock, :answer)
+    assert {:ok, "Done"} = Request.await(handle)
+    assert_script_done(mock)
   end
 
-  # ============================================================================
-  # StateOps Helpers Tests
-  # ============================================================================
+  test "stream text appends in order and the terminal answer retains the whole text", %{jido: jido} do
+    mock =
+      mock([%{reply: {:stream, [%{content: "Hello"}, %{content: " "}, %{content: "world"}, {:wait, :text}], "stop"}}])
 
-  describe "Helpers" do
-    test "update_strategy_state/1 creates SetState operation" do
-      op = Helpers.update_strategy_state(%{status: :running, iteration: 1})
+    server = start(jido, streaming: true)
+    assert {:ok, handle} = ask(server, mock)
+    assert_receive {:mock_llm_waiting, ^mock, :text, _}, 2_000
 
-      assert %StateOp.SetState{} = op
-      assert op.attrs.status == :running
-      assert op.attrs.iteration == 1
-    end
+    eventually(fn ->
+      {:ok, view} = Session.snapshot(server)
+      view.details.streaming_text == "Hello world"
+    end)
 
-    test "set_strategy_field/2 creates SetPath operation" do
-      op = Helpers.set_strategy_field(:status, :running)
+    assert :ok = MockLLM.release(mock, :text)
+    assert {:ok, "Hello world"} = Request.await(handle)
+    deltas = Enum.filter(events(handle), &(&1.kind == :llm_delta and &1.data.chunk_type == :content))
+    assert Enum.map(deltas, & &1.data.delta) == ["Hello", " ", "world"]
+    assert record(server, handle).result == "Hello world"
+    assert_script_done(mock)
+  end
 
-      assert %StateOp.SetPath{} = op
-      assert op.path == [:status]
-      assert op.value == :running
-    end
+  test "tool candidates commit with the answer and preserve unrelated live changes", %{jido: jido} do
+    mock = mock([%{reply: {:tools, [call("set", "update", 5)]}}, %{reply: {:wait, :answer, {:text, "Done"}}}])
+    server = start(jido)
+    assert {:ok, handle} = ask(server, mock)
+    assert_receive {:mock_llm_waiting, ^mock, :answer, _}, 2_000
+    assert Server.agent(server).state.count == 0
+    signal = Jido.Signal.new!("state.change", %{label: "outside"}, source: "/test")
+    assert {:ok, _} = Server.call(server, signal)
+    assert :ok = MockLLM.release(mock, :answer)
+    assert {:ok, "Done"} = Request.await(handle)
 
-    test "set_iteration_status/1 creates SetPath operation for status" do
-      op = Helpers.set_iteration_status(:awaiting_llm)
+    assert %{count: 5, label: "outside", data: %{status: :running, iteration: 5}, answer: "Done"} =
+             Server.agent(server).state
 
-      assert %StateOp.SetPath{} = op
-      assert op.path == [:status]
-      assert op.value == :awaiting_llm
-    end
+    assert [%{effects: %{allowed_count: 1}}] = record(server, handle).meta.tool_results
+    assert_script_done(mock)
+  end
 
-    test "set_iteration/1 creates SetPath operation for iteration" do
-      op = Helpers.set_iteration(5)
+  test "later tools read the staged candidate before the final Agent commit", %{jido: jido} do
+    mock =
+      mock([
+        %{reply: {:tools, [call("set", "update", 5)]}},
+        %{reply: {:tools, [call("read", "read")]}},
+        %{reply: {:text, "Done"}}
+      ])
 
-      assert %StateOp.SetPath{} = op
-      assert op.path == [:iteration]
-      assert op.value == 5
-    end
+    server = start(jido)
+    assert {:ok, handle} = ask(server, mock)
+    assert {:ok, "Done"} = Request.await(handle)
+    assert_receive {:state_tool, _, "read", _, %{count: 5, data: %{iteration: 5}}}
+    [_, _, wire] = MockLLM.report(mock).requests
+    tool = Enum.find(wire.body["messages"], &(&1["tool_call_id"] == "read"))
+    assert Jason.decode!(tool["content"])["result"]["count"] == 5
+    assert Server.agent(server).state.count == 5
+    assert_script_done(mock)
+  end
 
-    test "append_conversation/1 creates SetState operation" do
-      message = %{role: :user, content: "Hello"}
-      op = Helpers.append_conversation([message])
-
-      assert %StateOp.SetState{} = op
-      assert op.attrs.conversation == [message]
-    end
-
-    test "set_pending_tools/1 creates SetState operation" do
-      tools = [%{id: "call_1", name: "search"}]
-      op = Helpers.set_pending_tools(tools)
-
-      assert %StateOp.SetState{} = op
-      assert op.attrs.pending_tool_calls == tools
-    end
-
-    test "clear_pending_tools/0 creates SetState operation with empty list" do
-      op = Helpers.clear_pending_tools()
-
-      assert %StateOp.SetState{} = op
-      assert op.attrs.pending_tool_calls == []
-    end
-
-    test "set_call_id/1 creates SetPath operation" do
-      op = Helpers.set_call_id("call_123")
-
-      assert %StateOp.SetPath{} = op
-      assert op.path == [:current_llm_call_id]
-      assert op.value == "call_123"
-    end
-
-    test "set_final_answer/1 creates SetPath operation" do
-      op = Helpers.set_final_answer("42")
-
-      assert %StateOp.SetPath{} = op
-      assert op.path == [:final_answer]
-      assert op.value == "42"
-    end
-
-    test "set_usage/1 creates SetState operation" do
-      usage = %{input_tokens: 10, output_tokens: 20}
-      op = Helpers.set_usage(usage)
-
-      assert %StateOp.SetState{} = op
-      assert op.attrs.usage == usage
-    end
-
-    test "delete_keys/1 creates DeleteKeys operation" do
-      op = Helpers.delete_keys([:temp, :cache])
-
-      assert %StateOp.DeleteKeys{} = op
-      assert op.keys == [:temp, :cache]
-    end
-
-    test "reset_strategy_state/0 creates ReplaceState operation" do
-      op = Helpers.reset_strategy_state()
-
-      assert %StateOp.ReplaceState{} = op
-      assert op.state.status == :idle
-      assert op.state.iteration == 0
-      assert op.state.conversation == []
-    end
-
-    test "compose/1 returns list of state operations" do
-      ops = [
-        Helpers.set_iteration_status(:running),
-        Helpers.set_iteration(1)
-      ]
-
-      result = Helpers.compose(ops)
-
-      assert is_list(result)
-      assert length(result) == 2
-      assert %StateOp.SetPath{} = Enum.at(result, 0)
-      assert %StateOp.SetPath{} = Enum.at(result, 1)
+  for kind <- ["invalid", "protected"] do
+    test "#{kind} candidate cannot change committed domain or request state", %{jido: jido} do
+      mock = mock([%{reply: {:tools, [call("bad", unquote(kind))]}}])
+      server = start(jido)
+      assert {:ok, handle} = ask(server, mock)
+      assert {:error, _} = Request.await(handle)
+      assert Server.agent(server).state.count == 0 and Server.agent(server).state.data == %{}
+      assert Server.agent(server).state.answer == nil
+      assert record(server, handle).status == :failed
+      assert map_size(Server.agent(server).state.requests) == 1
+      assert_script_done(mock)
     end
   end
 
-  # ============================================================================
-  # StateOp Structure Verification
-  # ============================================================================
-
-  describe "StateOp Structure" do
-    test "SetState operation has required fields" do
-      op = Helpers.update_strategy_state(%{field: "value"})
-
-      assert Map.has_key?(op, :__struct__)
-      assert Map.has_key?(op, :attrs)
-      assert is_map(op.attrs)
-    end
-
-    test "SetPath operation has required fields" do
-      op = Helpers.set_strategy_field(:test, "value")
-
-      assert Map.has_key?(op, :__struct__)
-      assert Map.has_key?(op, :path)
-      assert Map.has_key?(op, :value)
-      assert is_list(op.path)
-    end
-
-    test "DeleteKeys operation has required fields" do
-      op = Helpers.delete_keys([:temp])
-
-      assert Map.has_key?(op, :__struct__)
-      assert Map.has_key?(op, :keys)
-      assert is_list(op.keys)
-    end
-
-    test "ReplaceState operation has required fields" do
-      op = Helpers.reset_strategy_state()
-
-      assert Map.has_key?(op, :__struct__)
-      assert Map.has_key?(op, :state)
-      assert is_map(op.state)
-    end
+  test "cancellation discards staged domain changes and clears live work", %{jido: jido} do
+    mock = mock([%{reply: {:tools, [call("set", "update", 5)]}}, %{reply: {:wait, :answer, {:text, "unused"}}}])
+    server = start(jido)
+    assert {:ok, handle} = ask(server, mock)
+    assert_receive {:mock_llm_waiting, ^mock, :answer, _}, 2_000
+    assert :ok = Session.cancel(handle, reason: :stop)
+    assert {:error, {:cancelled, :stop}} = Request.await(handle)
+    assert Server.agent(server).state.count == 0 and Server.agent(server).state.data == %{}
+    assert {:ok, view} = Session.snapshot(server)
+    assert view.details.active_request_id == nil and view.details.tool_calls == [] and view.live == nil
+    assert view.details.cancel_reason == :stop
+    eventually(fn -> MockLLM.report(mock).waiting == [] end)
+    assert_script_done(mock)
   end
 
-  # ============================================================================
-  # ReAct Strategy StateOps Integration
-  # ============================================================================
+  test "a later request resets usage and active fields while keeping prior results", %{jido: jido} do
+    mock =
+      mock([
+        %{reply: {:tools, [call("set", "update", 2)]}},
+        %{reply: {:text, "First"}},
+        %{reply: {:wait, :next, {:text, "Next"}}}
+      ])
 
-  describe "ReAct Strategy StateOps" do
-    test "initial state has expected structure" do
-      agent = create_agent()
-
-      strategy_state = StratState.get(agent, %{})
-
-      assert is_map(strategy_state)
-      assert Map.has_key?(strategy_state, :config)
-      assert Map.has_key?(strategy_state, :status)
-      assert Map.has_key?(strategy_state, :iteration)
-    end
-
-    test "start instruction initializes state correctly" do
-      agent = create_agent()
-
-      instruction = %Jido.Instruction{
-        action: ReAct.start_action(),
-        params: %{query: "test query"}
-      }
-
-      {updated_agent, _directives} = ReAct.cmd(agent, [instruction], %{})
-
-      updated_state = StratState.get(updated_agent, %{})
-
-      # State should be updated with query information
-      assert is_map(updated_state)
-    end
-
-    test "register_tool instruction updates tool list" do
-      agent = create_agent()
-
-      instruction = %Jido.Instruction{
-        action: ReAct.register_tool_action(),
-        params: %{tool_module: TestAction}
-      }
-
-      {_updated_agent, _directives} = ReAct.cmd(agent, [instruction], %{})
-
-      # Tool should be registered
-      tools = ReAct.list_tools(agent)
-      assert TestAction in tools
-    end
+    server = start(jido)
+    assert {:ok, first} = ask(server, mock)
+    assert {:ok, "First"} = Request.await(first)
+    assert record(server, first).meta.usage.total_tokens == 30
+    assert {:ok, next} = ask(server, mock, "Again")
+    assert_receive {:mock_llm_waiting, ^mock, :next, _}, 2_000
+    assert {:ok, view} = Session.snapshot(server)
+    assert view.details.iteration == 1 and view.details.model_calls == 1
+    assert view.details.usage == %{} and view.details.streaming_text == ""
+    assert view.details.tool_calls == [] and view.details.tool_results == []
+    assert view.details.active_request_id == next.id
+    assert Server.agent(server).state.count == 2
+    assert :ok = MockLLM.release(mock, :next)
+    assert {:ok, "Next"} = Request.await(next)
+    assert record(server, next).meta.usage.total_tokens == 15
+    assert record(server, first).result == "First"
+    assert {:ok, done} = Session.snapshot(server)
+    assert done.details.active_request_id == nil and done.live == nil
+    assert done.details.termination_reason == :final_answer
+    assert_script_done(mock)
   end
 
-  # ============================================================================
-  # StateOps Composition Tests
-  # ============================================================================
+  test "tool registration rebuilds all catalog views in the same order and can clear them", %{jido: jido} do
+    server = start(jido)
+    assert {:ok, _} = Jido.AI.register_tool(server, Double)
+    assert {:ok, _} = Jido.AI.register_tool(server, Double)
+    config = Jido.AI.get_strategy_config(Server.agent(server))
+    assert config.tools == [Double, Update]
+    assert config.actions_by_name == %{"state_update" => Update, "state_double" => Double}
+    assert Enum.map(config.reqllm_tools, & &1.name) == ["state_double", "state_update"]
 
-  describe "StateOps Composition" do
-    test "multiple state operations can be created" do
-      ops = [
-        Helpers.set_iteration(1),
-        Helpers.set_iteration_status(:running),
-        Helpers.set_final_answer("answer")
-      ]
+    mock =
+      mock([
+        %{reply: {:tools, [%{id: "double", name: "state_double", arguments: %{value: 5}}]}},
+        %{reply: {:text, "10"}},
+        %{reply: {:text, "Empty"}}
+      ])
 
-      assert length(ops) == 3
-
-      # Verify each op has correct structure
-      assert %StateOp.SetPath{path: [:iteration], value: 1} = Enum.at(ops, 0)
-      assert %StateOp.SetPath{path: [:status], value: :running} = Enum.at(ops, 1)
-      assert %StateOp.SetPath{path: [:final_answer], value: "answer"} = Enum.at(ops, 2)
-    end
-
-    test "different state op types can be composed" do
-      ops = [
-        Helpers.update_strategy_state(%{field1: "value1"}),
-        Helpers.set_strategy_field(:field2, "value2"),
-        Helpers.set_iteration(5),
-        Helpers.delete_keys([:temp])
-      ]
-
-      assert length(ops) == 4
-      assert %StateOp.SetState{} = Enum.at(ops, 0)
-      assert %StateOp.SetPath{} = Enum.at(ops, 1)
-      assert %StateOp.SetPath{} = Enum.at(ops, 2)
-      assert %StateOp.DeleteKeys{} = Enum.at(ops, 3)
-    end
-
-    test "conversation state ops can be created" do
-      ops = [
-        Helpers.append_conversation([
-          %{role: :user, content: "Hello"}
-        ])
-      ]
-
-      assert length(ops) == 1
-      assert %StateOp.SetState{attrs: %{conversation: [%{role: :user, content: "Hello"}]}} = hd(ops)
-    end
+    assert {:ok, first} = ask(server, mock)
+    assert {:ok, "10"} = Request.await(first)
+    [wire, result] = MockLLM.report(mock).requests
+    assert Enum.map(wire.body["tools"], & &1["function"]["name"]) == ["state_double", "state_update"]
+    tool = Enum.find(result.body["messages"], &(&1["tool_call_id"] == "double"))
+    assert Jason.decode!(tool["content"])["result"] == %{"result" => 10}
+    assert {:ok, _} = Jido.AI.unregister_tool(server, "state_update")
+    assert {:ok, _} = Jido.AI.unregister_tool(server, "state_double")
+    empty = Jido.AI.get_strategy_config(Server.agent(server))
+    assert empty.tools == [] and empty.actions_by_name == %{} and empty.reqllm_tools == []
+    assert {:ok, next} = ask(server, mock, "No tools")
+    assert {:ok, "Empty"} = Request.await(next)
+    assert Map.get(List.last(MockLLM.report(mock).requests).body, "tools", []) == []
+    assert_script_done(mock)
   end
 
-  # ============================================================================
-  # StateOps Type Safety Tests
-  # ============================================================================
-
-  describe "StateOps Type Safety" do
-    test "SetPath operations have correct value types" do
-      int_op = Helpers.set_iteration(5)
-      atom_op = Helpers.set_iteration_status(:running)
-      string_op = Helpers.set_final_answer("answer")
-
-      assert is_integer(int_op.value)
-      assert is_atom(atom_op.value)
-      assert is_binary(string_op.value)
-    end
-
-    test "SetState operations have map attrs" do
-      op1 = Helpers.update_strategy_state(%{status: :running})
-      op2 = Helpers.set_pending_tools([])
-      op3 = Helpers.set_usage(%{input_tokens: 10})
-
-      assert is_map(op1.attrs)
-      assert is_map(op2.attrs)
-      assert is_map(op3.attrs)
-    end
-
-    test "DeleteKeys operations have list of keys" do
-      op = Helpers.delete_keys([:temp, :cache])
-
-      assert is_list(op.keys)
-      assert Enum.all?(op.keys, &is_atom/1)
-    end
-
-    test "ReplaceState operation has map state" do
-      op = Helpers.reset_strategy_state()
-
-      assert is_map(op.state)
-      assert is_map(op.state)
-      assert Map.has_key?(op.state, :status)
-      assert Map.has_key?(op.state, :iteration)
-    end
+  test "model generation and tool options come from the normalized profile", %{jido: jido} do
+    mock = mock([%{reply: {:text, "Done"}}])
+    server = start_reasoning(jido, :react, tools: [], max_tokens: 40, temperature: 0.2)
+    config = Jido.AI.get_strategy_config(Server.agent(server))
+    assert config.max_tokens == 40 and config.temperature == 0.2
+    assert config.tools == [] and config.actions_by_name == %{} and config.reqllm_tools == []
+    assert {:ok, handle} = ask(server, mock)
+    assert {:ok, "Done"} = Request.await(handle)
+    assert [wire] = MockLLM.report(mock).requests
+    assert wire.body["max_tokens"] == 40 and wire.body["temperature"] == 0.2
+    assert wire.body["model"] == "gpt-4o-mini"
+    assert_script_done(mock)
   end
 
-  # ============================================================================
-  # Phase 9.1 Success Criteria
-  # ============================================================================
+  test "history replacement preserves message order and empty replacement clears it", %{jido: jido} do
+    mock = mock([%{reply: {:text, "Answer"}}, %{reply: {:text, "Fresh answer"}}])
+    server = start(jido)
 
-  describe "Phase 9.1 Success Criteria" do
-    test "Helpers module exists and is accessible" do
-      assert Code.ensure_loaded?(Helpers)
-      assert function_exported?(Helpers, :update_strategy_state, 1)
-      assert function_exported?(Helpers, :set_strategy_field, 2)
-      assert function_exported?(Helpers, :set_iteration_status, 1)
-      assert function_exported?(Helpers, :set_iteration, 1)
-    end
+    context =
+      Context.new(system_prompt: "History prompt") |> Context.append_user("Hello") |> Context.append_assistant("Hi")
 
-    test "state ops can be composed" do
-      ops = [
-        Helpers.set_iteration(1),
-        Helpers.set_iteration_status(:running)
-      ]
+    assert {:ok, _} = Session.modify_context(server, %{type: :replace, result_context: context})
+    assert {:ok, first} = ask(server, mock, "Continue")
+    assert {:ok, "Answer"} = Request.await(first)
+    assert [wire] = MockLLM.report(mock).requests
+    assert Enum.map(wire.body["messages"], & &1["content"]) == ["History prompt", "Hello", "Hi", "Continue"]
+    assert {:ok, _} = Session.modify_context(server, %{type: :replace, result_context: Context.new()})
+    assert {:ok, next} = ask(server, mock, "Fresh")
+    assert {:ok, "Fresh answer"} = Request.await(next)
+    last = List.last(MockLLM.report(mock).requests)
+    assert Enum.map(last.body["messages"], & &1["content"]) == ["History prompt", "Fresh"]
+    assert_script_done(mock)
+  end
 
-      assert length(ops) == 2
-      assert %StateOp.SetPath{} = hd(ops)
-      assert %StateOp.SetPath{} = Enum.at(ops, 1)
-    end
-
-    test "ReAct strategy uses StratState for state management" do
-      agent = create_agent()
-
-      assert function_exported?(StratState, :get, 2)
-      assert function_exported?(StratState, :put, 2)
-
-      state = StratState.get(agent, %{})
-      assert is_map(state)
-    end
-
-    test "all StateOp types are available" do
-      assert Code.ensure_loaded?(StateOp.SetState)
-      assert Code.ensure_loaded?(StateOp.SetPath)
-      assert Code.ensure_loaded?(StateOp.DeleteKeys)
-      assert Code.ensure_loaded?(StateOp.ReplaceState)
-    end
-
-    test "StateOps helpers create correct op types" do
-      assert %StateOp.SetState{} = Helpers.update_strategy_state(%{})
-      assert %StateOp.SetPath{} = Helpers.set_strategy_field(:test, "value")
-      assert %StateOp.DeleteKeys{} = Helpers.delete_keys([])
-      assert %StateOp.ReplaceState{} = Helpers.reset_strategy_state()
-    end
-
-    test "ReAct strategy init returns agent and directives" do
-      agent = %Agent{id: "test", name: "test", state: %{}}
-
-      assert {updated_agent, directives} = ReAct.init(agent, %{strategy_opts: [tools: [TestAction]]})
-      assert %Agent{} = updated_agent
-      assert is_list(directives)
-    end
-
-    test "ReAct strategy cmd returns agent and directives" do
-      agent = create_agent()
-
-      instruction = %Jido.Instruction{
-        action: ReAct.start_action(),
-        params: %{query: "test"}
-      }
-
-      assert {updated_agent, directives} = ReAct.cmd(agent, [instruction], %{})
-      assert %Agent{} = updated_agent
-      assert is_list(directives)
-    end
+  test "history prepend and append use committed context entries without losing a sibling", %{jido: jido} do
+    mock = mock([%{reply: {:text, "Done"}}])
+    initial = Agent.new!(state: %{label: "keep"})
+    context = Context.new() |> Context.append_user("first") |> Context.append_assistant("second")
+    changed = Jido.AI.update_context_entries(initial, context.entries)
+    assert initial.state.messages == [] and changed.state.label == "keep"
+    server = start_agent(jido, changed)
+    assert {:ok, handle} = ask(server, mock, "third")
+    assert {:ok, "Done"} = Request.await(handle)
+    assert [wire] = MockLLM.report(mock).requests
+    assert Enum.map(wire.body["messages"], & &1["content"]) == ["State test", "first", "second", "third"]
+    assert Server.agent(server).state.label == "keep"
+    assert_script_done(mock)
   end
 end

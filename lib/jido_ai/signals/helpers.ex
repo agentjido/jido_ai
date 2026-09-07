@@ -41,8 +41,12 @@ defmodule Jido.AI.Signal.Helpers do
   @deprecated "Use Jido.AI.Error.normalize_result/3"
   @spec normalize_result(term(), atom(), String.t()) ::
           {:ok, term(), [term()]} | {:error, error_envelope(), [term()]}
-  defdelegate normalize_result(result, fallback_type \\ :invalid_result, fallback_message \\ "Invalid result envelope"),
-    to: Error
+  defdelegate normalize_result(
+                result,
+                fallback_type \\ :invalid_result,
+                fallback_message \\ "Invalid result envelope"
+              ),
+              to: Error
 
   @doc """
   Returns whether a result or error should be treated as retryable by runtime policy.
@@ -82,7 +86,8 @@ defmodule Jido.AI.Signal.Helpers do
   @spec sanitize_delta(term(), pos_integer()) :: term()
   def sanitize_delta(delta, max_chars \\ 4_000)
 
-  def sanitize_delta(delta, max_chars) when is_binary(delta) and is_integer(max_chars) and max_chars > 0 do
+  def sanitize_delta(delta, max_chars)
+      when is_binary(delta) and is_integer(max_chars) and max_chars > 0 do
     delta
     |> String.replace(~r/[\x00-\x08\x0B\x0C\x0E-\x1F]/u, "")
     |> String.slice(0, max_chars)

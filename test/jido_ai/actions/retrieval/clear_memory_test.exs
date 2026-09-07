@@ -4,6 +4,11 @@ defmodule Jido.AI.Actions.Retrieval.ClearMemoryTest do
   alias Jido.AI.Actions.Retrieval.ClearMemory
   alias Jido.AI.Retrieval.Store
 
+  setup do
+    start_supervised!({Store, []})
+    :ok
+  end
+
   @moduletag :unit
   @moduletag :capture_log
 

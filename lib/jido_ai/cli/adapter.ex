@@ -98,6 +98,34 @@ defmodule Jido.AI.CLI.Adapter do
   @spec supported_types() :: [String.t()]
   def supported_types, do: @supported_types
 
+  @doc false
+  def status(server) do
+    with {:ok, view} <- Jido.AI.Session.snapshot(server) do
+      request = view.request
+      meta = if request, do: request.meta, else: %{}
+      phase = if request, do: request.status, else: :idle
+
+      {:ok,
+       %{
+         agent_id: view.agent.id,
+         raw_state: view.agent.state,
+         snapshot: %{
+           status:
+             case phase do
+               :completed -> :success
+               :failed -> :failure
+               :cancelled -> :failure
+               :pending -> :running
+               _ -> :idle
+             end,
+           done?: phase in [:completed, :failed, :cancelled],
+           result: if(request, do: request.result || request.error),
+           details: Map.merge(meta, view.details)
+         }
+       }}
+    end
+  end
+
   defp resolve_type(type) do
     case Map.fetch(@type_to_adapter, type) do
       {:ok, adapter} ->

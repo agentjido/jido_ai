@@ -10,7 +10,7 @@ defmodule Jido.AI.Actions.Skill.RuntimeContext do
   """
   @spec session_id(map()) :: term()
   def session_id(context) when is_map(context) do
-    context[:session_id] || context["session_id"] ||
+    context[:jido_ai_skill_session] || context[:session_id] || context["session_id"] ||
       context[:agent_id] || context["agent_id"] ||
       context[:request_id] || context["request_id"] || self()
   end

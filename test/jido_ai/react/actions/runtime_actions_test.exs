@@ -15,17 +15,30 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.RuntimeActionsTest do
 
   describe "Start action" do
     test "starts runtime stream and returns metadata envelope" do
-      Mimic.stub(ReAct, :stream, fn query, config, opts ->
+      Mimic.stub(ReAct, :start, fn query, config, opts ->
         assert query == "hello"
         assert %Config{} = config
         assert opts[:request_id] == "req_start"
         assert opts[:run_id] == "run_start"
-        [:event_1]
+
+        {:ok,
+         %{
+           request_id: "req_start",
+           run_id: "run_start",
+           events: [:event_1],
+           checkpoint_token: nil
+         }}
       end)
 
       params = %{query: "hello", request_id: "req_start", run_id: "run_start", model: :fast}
 
-      assert {:ok, %{request_id: "req_start", run_id: "run_start", events: [:event_1], checkpoint_token: nil}} =
+      assert {:ok,
+              %{
+                request_id: "req_start",
+                run_id: "run_start",
+                events: [:event_1],
+                checkpoint_token: nil
+              }} =
                Start.run(params, %{})
     end
 
@@ -66,7 +79,8 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.RuntimeActionsTest do
         {:ok, %{result: "from_events"}}
       end)
 
-      assert {:ok, %{result: "from_events"}} = Collect.run(%{events: [:e1, :e2], model: :fast}, %{})
+      assert {:ok, %{result: "from_events"}} =
+               Collect.run(%{events: [:e1, :e2], model: :fast}, %{})
     end
 
     test "collects from checkpoint token with options and resolved supervisor" do
@@ -76,6 +90,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.RuntimeActionsTest do
         assert opts[:run_until_terminal?] == false
         assert opts[:query] == "resume"
         assert opts[:task_supervisor] == self()
+        assert opts[:context] == %{task_supervisor: self()}
         assert config.llm.req_http_options == [plug: {Req.Test, []}]
         assert config.llm.llm_opts == [reasoning_effort: :high]
         {:ok, %{result: "from_checkpoint"}}

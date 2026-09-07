@@ -29,10 +29,10 @@ defmodule Jido.AI.Examples.SkillsDemoAgent do
     name: "skills_demo_agent",
     description: "Demo agent showcasing module and file-based skills",
     tools: [
-      Jido.Tools.Arithmetic.Add,
-      Jido.Tools.Arithmetic.Subtract,
-      Jido.Tools.Arithmetic.Multiply,
-      Jido.Tools.Arithmetic.Divide,
+      Jido.AI.Tools.Arithmetic.Add,
+      Jido.AI.Tools.Arithmetic.Subtract,
+      Jido.AI.Tools.Arithmetic.Multiply,
+      Jido.AI.Tools.Arithmetic.Divide,
       Jido.AI.Examples.Tools.ConvertTemperature,
       Jido.AI.Examples.Tools.ConvertDistance,
       Jido.AI.Examples.Tools.ConvertWeight

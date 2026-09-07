@@ -2,7 +2,6 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent.Strategy.State, as: StratState
-  alias Jido.Agent.StateOp
   alias Jido.AI.Reasoning.TreeOfThoughts.Strategy, as: TreeOfThoughts
 
   # Helper to create a mock agent
@@ -10,7 +9,9 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
     %Jido.Agent{
       id: "test-agent",
       name: "test",
-      state: %{}
+      state: %{},
+      schema: Zoi.object(%{}),
+      module: Jido.Agent
     }
     |> then(fn agent ->
       ctx = %{strategy_opts: opts, agent_module: Keyword.get(opts, :agent_module)}
@@ -209,10 +210,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
     test "processes start instruction and returns directive" do
       agent = create_agent()
 
-      instruction = %Jido.Instruction{
-        action: TreeOfThoughts.start_action(),
-        params: %{prompt: "Solve the puzzle"}
-      }
+      instruction = %Jido.Instruction{target: TreeOfThoughts.start_action(), params: %{prompt: "Solve the puzzle"}}
 
       {agent, directives} = TreeOfThoughts.cmd(agent, [instruction], %{})
 
@@ -230,10 +228,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
     test "directive contains correct model from config" do
       agent = create_agent(model: "test:model")
 
-      instruction = %Jido.Instruction{
-        action: TreeOfThoughts.start_action(),
-        params: %{prompt: "Test"}
-      }
+      instruction = %Jido.Instruction{target: TreeOfThoughts.start_action(), params: %{prompt: "Test"}}
 
       {_agent, [directive]} = TreeOfThoughts.cmd(agent, [instruction], %{})
 
@@ -243,10 +238,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
     test "creates root node on start" do
       agent = create_agent()
 
-      instruction = %Jido.Instruction{
-        action: TreeOfThoughts.start_action(),
-        params: %{prompt: "Problem to solve"}
-      }
+      instruction = %Jido.Instruction{target: TreeOfThoughts.start_action(), params: %{prompt: "Problem to solve"}}
 
       {agent, _directives} = TreeOfThoughts.cmd(agent, [instruction], %{})
 
@@ -269,10 +261,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
       agent = create_agent()
 
       # First start exploration
-      start_instruction = %Jido.Instruction{
-        action: TreeOfThoughts.start_action(),
-        params: %{prompt: "Solve puzzle"}
-      }
+      start_instruction = %Jido.Instruction{target: TreeOfThoughts.start_action(), params: %{prompt: "Solve puzzle"}}
 
       {agent, _} = TreeOfThoughts.cmd(agent, [start_instruction], %{})
 
@@ -282,7 +271,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
 
       # Now send result with thoughts
       result_instruction = %Jido.Instruction{
-        action: TreeOfThoughts.llm_result_action(),
+        target: TreeOfThoughts.llm_result_action(),
         params: %{
           call_id: call_id,
           result: {:ok, %{text: "1. Approach A\n2. Approach B\n3. Approach C"}}
@@ -310,10 +299,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
         )
         |> then(fn agent -> %{agent | state: Map.put(agent.state, :tot_counter, 9)} end)
 
-      start_instruction = %Jido.Instruction{
-        action: TreeOfThoughts.start_action(),
-        params: %{prompt: "Use a tool"}
-      }
+      start_instruction = %Jido.Instruction{target: TreeOfThoughts.start_action(), params: %{prompt: "Use a tool"}}
 
       {agent, _start_directives} = TreeOfThoughts.cmd(agent, [start_instruction], %{})
       state = StratState.get(agent, %{})
@@ -321,15 +307,13 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
       agent = StratState.put(agent, Map.put(state, :last_request_id, "req_tot_ctx"))
 
       llm_result_instruction = %Jido.Instruction{
-        action: TreeOfThoughts.llm_result_action(),
+        target: TreeOfThoughts.llm_result_action(),
         params: %{
           call_id: call_id,
           result: %{
             type: :tool_calls,
             text: "Calling tool",
-            tool_calls: [
-              %{id: "call_snapshot", name: OrderingSlowTool.name(), arguments: %{}}
-            ],
+            tool_calls: [%{id: "call_snapshot", name: OrderingSlowTool.name(), arguments: %{}}],
             usage: %{}
           }
         }
@@ -356,10 +340,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
           tool_context: %{test_pid: self()}
         )
 
-      start_instruction = %Jido.Instruction{
-        action: TreeOfThoughts.start_action(),
-        params: %{prompt: "Use a tool"}
-      }
+      start_instruction = %Jido.Instruction{target: TreeOfThoughts.start_action(), params: %{prompt: "Use a tool"}}
 
       {agent, _start_directives} = TreeOfThoughts.cmd(agent, [start_instruction], %{})
       state = StratState.get(agent, %{})
@@ -367,7 +348,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
       agent = StratState.put(agent, Map.put(state, :last_request_id, "req_tot_intercept"))
 
       llm_result_instruction = %Jido.Instruction{
-        action: TreeOfThoughts.llm_result_action(),
+        target: TreeOfThoughts.llm_result_action(),
         params: %{
           call_id: call_id,
           result: %{
@@ -436,7 +417,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
       agent = StratState.put(agent, configured_state)
 
       result_instruction = %Jido.Instruction{
-        action: TreeOfThoughts.tool_result_action(),
+        target: TreeOfThoughts.tool_result_action(),
         params: %{
           call_id: "call_1",
           tool_name: OrderingSlowTool.name(),
@@ -498,11 +479,11 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
       agent = StratState.put(agent, configured_state)
 
       second_result_instruction = %Jido.Instruction{
-        action: TreeOfThoughts.tool_result_action(),
+        target: TreeOfThoughts.tool_result_action(),
         params: %{
           call_id: "call_2",
           tool_name: OrderingFastTool.name(),
-          result: {:ok, %{tool: :fast}, [%StateOp.SetState{attrs: %{tot_order_marker: 2}}]}
+          result: {:ok, %{tool: :fast}, [Jido.AI.Effects.state(Map.merge(agent.state, %{tot_order_marker: 2}))]}
         }
       }
 
@@ -511,11 +492,11 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
       refute Map.has_key?(agent.state, :tot_order_marker)
 
       first_result_instruction = %Jido.Instruction{
-        action: TreeOfThoughts.tool_result_action(),
+        target: TreeOfThoughts.tool_result_action(),
         params: %{
           call_id: "call_1",
           tool_name: OrderingSlowTool.name(),
-          result: {:ok, %{tool: :slow}, [%StateOp.SetState{attrs: %{tot_order_marker: 1}}]}
+          result: {:ok, %{tool: :slow}, [Jido.AI.Effects.state(Map.merge(agent.state, %{tot_order_marker: 1}))]}
         }
       }
 
@@ -564,7 +545,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
       agent = StratState.put(agent, configured_state)
 
       second_result_instruction = %Jido.Instruction{
-        action: TreeOfThoughts.tool_result_action(),
+        target: TreeOfThoughts.tool_result_action(),
         params: %{
           call_id: "call_2",
           tool_name: OrderingFastTool.name(),
@@ -576,7 +557,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
       assert directives == []
 
       first_result_instruction = %Jido.Instruction{
-        action: TreeOfThoughts.tool_result_action(),
+        target: TreeOfThoughts.tool_result_action(),
         params: %{
           call_id: "call_1",
           tool_name: OrderingSlowTool.name(),
@@ -610,7 +591,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
     test "returns running snapshot during exploration" do
       agent = create_agent()
 
-      start = %Jido.Instruction{action: :tot_start, params: %{prompt: "Test"}}
+      start = %Jido.Instruction{target: :tot_start, params: %{prompt: "Test"}}
       {agent, _} = TreeOfThoughts.cmd(agent, [start], %{})
 
       snapshot = TreeOfThoughts.snapshot(agent, %{})
@@ -639,7 +620,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.StrategyTest do
     test "returns nodes from agent state" do
       agent = create_agent()
 
-      start = %Jido.Instruction{action: :tot_start, params: %{prompt: "Test"}}
+      start = %Jido.Instruction{target: :tot_start, params: %{prompt: "Test"}}
       {agent, _} = TreeOfThoughts.cmd(agent, [start], %{})
 
       nodes = TreeOfThoughts.get_nodes(agent)

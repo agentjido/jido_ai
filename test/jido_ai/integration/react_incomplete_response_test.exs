@@ -11,7 +11,7 @@ defmodule Jido.AI.Integration.ReActIncompleteResponseTest do
   defmodule BasicAgent do
     use Jido.AI.Agent,
       name: "incomplete_response_test_agent",
-      model: "test:model",
+      model: "openai:gpt-4o-mini",
       tools: []
   end
 

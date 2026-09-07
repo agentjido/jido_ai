@@ -70,7 +70,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.CLIAdapter do
     if System.monotonic_time(:millisecond) >= deadline do
       {:error, :timeout}
     else
-      case Jido.AgentServer.status(pid) do
+      case Jido.AI.CLI.Adapter.status(pid) do
         {:ok, status} ->
           if status.snapshot.done? do
             result = status.snapshot.result

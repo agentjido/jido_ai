@@ -1,12 +1,10 @@
 defmodule Jido.AI.AoTAgentTest do
-  use ExUnit.Case, async: true
-
-  alias Jido.AI.Request
+  use Jido.AI.Test.ReasoningCase, async: false
 
   defmodule TestAoTAgent do
     use Jido.AI.AoTAgent,
       name: "test_aot_agent",
-      model: "test:model",
+      model: "openai:gpt-4o-mini",
       profile: :short,
       search_style: :bfs,
       temperature: 0.2,
@@ -32,14 +30,15 @@ defmodule Jido.AI.AoTAgentTest do
   end
 
   describe "strategy configuration" do
-    test "uses AlgorithmOfThoughts strategy" do
-      assert TestAoTAgent.strategy() == Jido.AI.Reasoning.AlgorithmOfThoughts.Strategy
+    test "selects AlgorithmOfThoughts in the native profile" do
+      assert {:ok, profile} = Configuration.profile(TestAoTAgent.agent())
+      assert profile.reasoning.method == :algorithm_of_thoughts
     end
 
     test "passes custom AoT options to strategy" do
       opts = TestAoTAgent.strategy_opts()
 
-      assert opts[:model] == "test:model"
+      assert opts[:model] == "openai:gpt-4o-mini"
       assert opts[:profile] == :short
       assert opts[:search_style] == :bfs
       assert opts[:temperature] == 0.2
@@ -59,44 +58,36 @@ defmodule Jido.AI.AoTAgentTest do
     end
   end
 
-  describe "request lifecycle hooks" do
-    test "on_before_cmd marks request as failed on aot_request_error" do
-      agent = TestAoTAgent.new()
-      agent = Request.start_request(agent, "req_1", "query")
-
-      {:ok, agent, _action} =
-        TestAoTAgent.on_before_cmd(
-          agent,
-          {:aot_request_error, %{request_id: "req_1", reason: :busy, message: "busy"}}
-        )
-
-      assert get_in(agent.state, [:requests, "req_1", :status]) == :failed
-      assert get_in(agent.state, [:requests, "req_1", :error]) == {:rejected, :busy, "busy"}
+  describe "request lifecycle" do
+    test "busy admission keeps the active request and sends correlated failure", %{jido: jido} do
+      mock = mock([%{reply: {:stream, [{:wait, :held}, %{content: "answer: done"}], "stop"}}])
+      server = start_agent(jido, TestAoTAgent)
+      opts = [model: MockLLM.model(), llm_opts: MockLLM.options(mock), stream_to: self()]
+      assert {:ok, first} = TestAoTAgent.explore(server, "first", opts)
+      assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
+      assert {:error, :busy} = TestAoTAgent.explore(server, "second", Keyword.put(opts, :request_id, "rejected"))
+      assert_receive {:jido_ai_request_event, %{request_id: "rejected", kind: :request_failed, data: %{error: :busy}}}
+      assert Map.keys(Server.agent(server).state.requests) == [first.id]
+      assert record(server, first).status == :pending
+      assert :ok = MockLLM.release(mock, :held)
+      assert {:ok, %{answer: "done"}} = TestAoTAgent.await(first)
+      assert_script_done(mock)
     end
 
-    test "on_after_cmd finalizes pending request on delegated worker completion" do
-      agent =
-        TestAoTAgent.new()
-        |> Request.start_request("req_done", "query")
-        |> with_completed_strategy(%{answer: "resolved"})
+    test "completion stores the full result in both request and public state", %{jido: jido} do
+      mock = mock([%{reply: {:text, "answer: resolved"}}])
+      server = start_agent(jido, TestAoTAgent)
 
-      {:ok, updated_agent, directives} =
-        TestAoTAgent.on_after_cmd(
-          agent,
-          {:aot_worker_event, %{request_id: "req_done", event: %{request_id: "req_done"}}},
-          [:noop]
-        )
+      assert {:ok, handle} =
+               TestAoTAgent.explore(server, "query", model: MockLLM.model(), llm_opts: MockLLM.options(mock))
 
-      assert directives == [:noop]
-      assert get_in(updated_agent.state, [:requests, "req_done", :status]) == :completed
-      assert get_in(updated_agent.state, [:requests, "req_done", :result]) == %{answer: "resolved"}
-      assert updated_agent.state.last_result == %{answer: "resolved"}
-      assert updated_agent.state.completed == true
+      assert {:ok, result} = TestAoTAgent.await(handle)
+      assert result.answer == "resolved"
+      assert record(server, handle).status == :completed
+      assert record(server, handle).result == result
+      assert Server.agent(server).state.last_result == result
+      assert Server.agent(server).state.completed
+      assert_script_done(mock)
     end
-  end
-
-  defp with_completed_strategy(agent, result) do
-    strategy_state = %{status: :completed, result: result}
-    put_in(agent.state[:__strategy__], strategy_state)
   end
 end

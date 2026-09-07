@@ -25,18 +25,18 @@ unless Code.ensure_loaded?(Jido.Tools.Weather.Geocode) do
     alias Jido.Action.Error
 
     use Jido.Action,
+      schema:
+        Zoi.object(%{
+          location: Zoi.string(description: "Location as city/state, address, zipcode, or place name")
+        }),
       name: "weather_geocode",
-      description: "Convert a location string to lat,lng coordinates",
-      category: "Weather",
-      tags: ["weather", "location", "geocode"],
-      vsn: "1.0.0",
-      schema: [
-        location: [
-          type: :string,
-          required: true,
-          doc: "Location as city/state, address, zipcode, or place name"
-        ]
-      ]
+      description: "Convert a location string to lat,lng coordinates"
+
+    def category, do: "Weather"
+
+    def tags, do: ["weather", "location", "geocode"]
+
+    def vsn, do: "1.0.0"
 
     @deadline_key :__jido_deadline_ms__
 
@@ -151,18 +151,15 @@ unless Code.ensure_loaded?(Jido.Tools.Weather.LocationToGrid) do
     alias Jido.Action.Error
 
     use Jido.Action,
+      schema: Zoi.object(%{location: Zoi.string(description: "Location as 'lat,lng' coordinates")}),
       name: "weather_location_to_grid",
-      description: "Convert location to NWS grid coordinates and forecast URLs",
-      category: "Weather",
-      tags: ["weather", "location", "nws"],
-      vsn: "1.0.0",
-      schema: [
-        location: [
-          type: :string,
-          required: true,
-          doc: "Location as 'lat,lng' coordinates"
-        ]
-      ]
+      description: "Convert location to NWS grid coordinates and forecast URLs"
+
+    def category, do: "Weather"
+
+    def tags, do: ["weather", "location", "nws"]
+
+    def vsn, do: "1.0.0"
 
     @deadline_key :__jido_deadline_ms__
 
@@ -270,28 +267,26 @@ unless Code.ensure_loaded?(Jido.Tools.Weather.Forecast) do
     alias Jido.Action.Error
 
     use Jido.Action,
+      schema:
+        Zoi.object(%{
+          forecast_url: Zoi.string(description: "NWS forecast URL from LocationToGrid action"),
+          periods:
+            Zoi.integer(description: "Number of forecast periods to return (max available)")
+            |> Zoi.default(14)
+            |> Zoi.optional(),
+          format:
+            Zoi.enum([:detailed, :summary], description: "Level of detail in forecast")
+            |> Zoi.default(:summary)
+            |> Zoi.optional()
+        }),
       name: "weather_forecast",
-      description: "Get detailed weather forecast from NWS forecast URL",
-      category: "Weather",
-      tags: ["weather", "forecast", "nws"],
-      vsn: "1.0.0",
-      schema: [
-        forecast_url: [
-          type: :string,
-          required: true,
-          doc: "NWS forecast URL from LocationToGrid action"
-        ],
-        periods: [
-          type: :integer,
-          default: 14,
-          doc: "Number of forecast periods to return (max available)"
-        ],
-        format: [
-          type: {:in, [:detailed, :summary]},
-          default: :summary,
-          doc: "Level of detail in forecast"
-        ]
-      ]
+      description: "Get detailed weather forecast from NWS forecast URL"
+
+    def category, do: "Weather"
+
+    def tags, do: ["weather", "forecast", "nws"]
+
+    def vsn, do: "1.0.0"
 
     @deadline_key :__jido_deadline_ms__
 
@@ -430,23 +425,22 @@ unless Code.ensure_loaded?(Jido.Tools.Weather.HourlyForecast) do
     alias Jido.Action.Error
 
     use Jido.Action,
+      schema:
+        Zoi.object(%{
+          hourly_forecast_url: Zoi.string(description: "NWS hourly forecast URL from LocationToGrid action"),
+          hours:
+            Zoi.integer(description: "Number of hours to return (max 156)")
+            |> Zoi.default(24)
+            |> Zoi.optional()
+        }),
       name: "weather_hourly_forecast",
-      description: "Get hourly weather forecast from NWS API",
-      category: "Weather",
-      tags: ["weather", "hourly", "forecast", "nws"],
-      vsn: "1.0.0",
-      schema: [
-        hourly_forecast_url: [
-          type: :string,
-          required: true,
-          doc: "NWS hourly forecast URL from LocationToGrid action"
-        ],
-        hours: [
-          type: :integer,
-          default: 24,
-          doc: "Number of hours to return (max 156)"
-        ]
-      ]
+      description: "Get hourly weather forecast from NWS API"
+
+    def category, do: "Weather"
+
+    def tags, do: ["weather", "hourly", "forecast", "nws"]
+
+    def vsn, do: "1.0.0"
 
     @deadline_key :__jido_deadline_ms__
 
@@ -566,18 +560,18 @@ unless Code.ensure_loaded?(Jido.Tools.Weather.CurrentConditions) do
     alias Jido.Action.Error
 
     use Jido.Action,
+      schema:
+        Zoi.object(%{
+          observation_stations_url: Zoi.string(description: "NWS observation stations URL from LocationToGrid action")
+        }),
       name: "weather_current_conditions",
-      description: "Get current weather conditions from nearest NWS observation station",
-      category: "Weather",
-      tags: ["weather", "current", "conditions", "nws"],
-      vsn: "1.0.0",
-      schema: [
-        observation_stations_url: [
-          type: :string,
-          required: true,
-          doc: "NWS observation stations URL from LocationToGrid action"
-        ]
-      ]
+      description: "Get current weather conditions from nearest NWS observation station"
+
+    def category, do: "Weather"
+
+    def tags, do: ["weather", "current", "conditions", "nws"]
+
+    def vsn, do: "1.0.0"
 
     @deadline_key :__jido_deadline_ms__
 
@@ -758,28 +752,29 @@ unless Code.ensure_loaded?(Jido.Tools.Weather) do
     """
 
     use Jido.Action,
+      schema:
+        Zoi.object(%{
+          location:
+            Zoi.string(description: "Location as coordinates (lat,lng) - defaults to Chicago, IL")
+            |> Zoi.default("41.8781,-87.6298")
+            |> Zoi.optional(),
+          periods:
+            Zoi.integer(description: "Number of forecast periods to return")
+            |> Zoi.default(5)
+            |> Zoi.optional(),
+          format:
+            Zoi.enum([:text, :map, :detailed], description: "Output format (text/map/detailed)")
+            |> Zoi.default(:text)
+            |> Zoi.optional()
+        }),
       name: "weather",
-      description: "Get weather forecast using the National Weather Service API",
-      category: "Weather",
-      tags: ["weather", "nws", "forecast"],
-      vsn: "3.0.0",
-      schema: [
-        location: [
-          type: :string,
-          doc: "Location as coordinates (lat,lng) - defaults to Chicago, IL",
-          default: "41.8781,-87.6298"
-        ],
-        periods: [
-          type: :integer,
-          doc: "Number of forecast periods to return",
-          default: 5
-        ],
-        format: [
-          type: {:in, [:text, :map, :detailed]},
-          doc: "Output format (text/map/detailed)",
-          default: :text
-        ]
-      ]
+      description: "Get weather forecast using the National Weather Service API"
+
+    def category, do: "Weather"
+
+    def tags, do: ["weather", "nws", "forecast"]
+
+    def vsn, do: "3.0.0"
 
     @impl Jido.Action
     def run(params, context) do

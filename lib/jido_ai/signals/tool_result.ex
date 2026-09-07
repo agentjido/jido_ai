@@ -3,18 +3,30 @@ defmodule Jido.AI.Signal.ToolResult do
   Signal for tool execution completion.
   """
 
-  use Jido.AI.Signal.Definition,
+  use Jido.Signal,
     type: "ai.tool.result",
     default_source: "/ai/tool",
-    schema: [
-      call_id: [type: :string, required: true, doc: "Tool call ID from the LLM"],
-      tool_name: [type: :string, required: true, doc: "Name of the executed tool"],
-      result: [
-        type: :any,
-        required: true,
-        doc:
-          "Canonical: {:ok, result, effects} | {:error, reason, effects} (legacy 2-tuples are normalized at boundaries)"
-      ],
-      metadata: [type: :map, default: %{}, doc: "Optional request/run/origin metadata for correlation"]
-    ]
+    schema:
+      Zoi.object(
+        %{
+          call_id: Zoi.string(),
+          tool_name: Zoi.string(),
+          result: Zoi.any(),
+          metadata:
+            Zoi.any()
+            |> Zoi.refine({Jido.AI.Signal.Definition, :map_value, []})
+            |> Zoi.default(%{})
+        },
+        unrecognized_keys: :error
+      )
+
+  defoverridable validate_data: 1
+
+  def validate_data(data) do
+    Jido.AI.Signal.Definition.validate_data(data, schema())
+  end
+
+  def extension_policy, do: %{}
+  def to_json, do: Jido.AI.Signal.Definition.metadata(__MODULE__)
+  def __signal_metadata__, do: to_json()
 end

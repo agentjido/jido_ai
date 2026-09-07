@@ -14,10 +14,10 @@ defmodule Jido.AI.Examples.Skills.Calculator do
         use Jido.AI.Agent,
           name: "my_agent",
           tools: [
-            Jido.Tools.Arithmetic.Add,
-            Jido.Tools.Arithmetic.Subtract,
-            Jido.Tools.Arithmetic.Multiply,
-            Jido.Tools.Arithmetic.Divide
+            Jido.AI.Tools.Arithmetic.Add,
+            Jido.AI.Tools.Arithmetic.Subtract,
+            Jido.AI.Tools.Arithmetic.Multiply,
+            Jido.AI.Tools.Arithmetic.Divide
           ]
       end
       
@@ -36,10 +36,10 @@ defmodule Jido.AI.Examples.Skills.Calculator do
     license: "Apache-2.0",
     allowed_tools: ~w(add subtract multiply divide),
     actions: [
-      Jido.Tools.Arithmetic.Add,
-      Jido.Tools.Arithmetic.Subtract,
-      Jido.Tools.Arithmetic.Multiply,
-      Jido.Tools.Arithmetic.Divide
+      Jido.AI.Tools.Arithmetic.Add,
+      Jido.AI.Tools.Arithmetic.Subtract,
+      Jido.AI.Tools.Arithmetic.Multiply,
+      Jido.AI.Tools.Arithmetic.Divide
     ],
     tags: ["math", "arithmetic", "utility"],
     body: """

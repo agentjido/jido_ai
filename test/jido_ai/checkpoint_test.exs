@@ -17,16 +17,14 @@ defmodule Jido.AI.CheckpointTest do
     @moduledoc false
     use Jido.AI.Agent,
       name: "checkpoint_test_agent",
-      tools: [ReadTool],
-      token_secret: "test-secret-that-is-long-enough-123"
+      tools: [ReadTool]
   end
 
   defmodule CustomCheckpointAgent do
     @moduledoc false
     use Jido.AI.Agent,
       name: "custom_checkpoint_test_agent",
-      tools: [ReadTool],
-      token_secret: "test-secret-that-is-long-enough-123"
+      tools: [ReadTool]
 
     @impl true
     def checkpoint(agent, ctx) do
@@ -47,17 +45,17 @@ defmodule Jido.AI.CheckpointTest do
   describe "terminal request state" do
     test "completed, failed, and cancelled requests drop their stream sinks" do
       completed =
-        CheckpointAgent.new()
+        CheckpointAgent.new!()
         |> Request.start_request("completed", "query", stream_to: {:pid, self()})
         |> Request.complete_request("completed", "answer")
 
       failed =
-        CheckpointAgent.new()
+        CheckpointAgent.new!()
         |> Request.start_request("failed", "query", stream_to: {:pid, self()})
         |> Request.fail_request("failed", :error)
 
       cancelling =
-        CheckpointAgent.new()
+        CheckpointAgent.new!()
         |> Request.start_request("cancelled", "query", stream_to: {:pid, self()})
 
       {:ok, cancelled, _directives} =
@@ -82,7 +80,7 @@ defmodule Jido.AI.CheckpointTest do
   describe "checkpoint and restore" do
     test "an active streamed request is stored as interrupted without runtime handles" do
       agent =
-        CheckpointAgent.new()
+        CheckpointAgent.new!()
         |> Request.start_request("active", "query", stream_to: {:pid, self()})
         |> mark_react_run_active("active")
 
@@ -112,7 +110,7 @@ defmodule Jido.AI.CheckpointTest do
 
     test "consumer checkpoint overrides keep the sanitized payload" do
       agent =
-        CustomCheckpointAgent.new()
+        CustomCheckpointAgent.new!()
         |> Request.start_request("custom", "query", stream_to: {:pid, self()})
 
       {:ok, payload} = CustomCheckpointAgent.checkpoint(agent, %{})
@@ -123,7 +121,7 @@ defmodule Jido.AI.CheckpointTest do
     end
 
     test "legacy request sinks are removed during restore" do
-      agent = CheckpointAgent.new()
+      agent = CheckpointAgent.new!()
       {:ok, payload} = CheckpointAgent.checkpoint(agent, %{})
 
       legacy_request = %{

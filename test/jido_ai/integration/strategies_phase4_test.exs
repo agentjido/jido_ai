@@ -34,7 +34,9 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
     %Agent{
       id: "test-agent-#{System.unique_integer([:positive])}",
       name: "test_agent",
-      state: %{}
+      state: %{},
+      schema: Zoi.object(%{}),
+      module: Jido.Agent
     }
     |> then(fn agent ->
       ctx = %{strategy_opts: opts}
@@ -56,10 +58,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       assert state[:status] == :idle
 
       # Process start instruction
-      instruction = %Instruction{
-        action: ChainOfThought.start_action(),
-        params: %{prompt: "What is 2 + 2?"}
-      }
+      instruction = %Instruction{target: ChainOfThought.start_action(), params: %{prompt: "What is 2 + 2?"}}
 
       {updated_agent, directives} = ChainOfThought.cmd(agent, [instruction], %{})
 
@@ -80,7 +79,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       # Start reasoning
       start_instruction = %Instruction{
-        action: ChainOfThought.start_action(),
+        target: ChainOfThought.start_action(),
         params: %{prompt: "What is 2 + 2?", request_id: "req_cot_phase4"}
       }
 
@@ -89,7 +88,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       # Simulate worker lifecycle + completion event
       child_started = %Instruction{
-        action: :cot_worker_child_started,
+        target: :cot_worker_child_started,
         params: %{
           parent_id: "parent",
           child_id: "child",
@@ -114,7 +113,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       result_instruction =
         %Instruction{
-          action: :cot_worker_event,
+          target: :cot_worker_event,
           params: %{
             request_id: "req_cot_phase4",
             event: %{
@@ -158,7 +157,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       {agent, _ctx} = create_agent(TreeOfThoughts)
 
       instruction = %Instruction{
-        action: TreeOfThoughts.start_action(),
+        target: TreeOfThoughts.start_action(),
         params: %{prompt: "Analyze alternatives for solving this puzzle"}
       }
 
@@ -185,7 +184,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       {agent, _ctx} = create_agent(GraphOfThoughts)
 
       instruction = %Instruction{
-        action: GraphOfThoughts.start_action(),
+        target: GraphOfThoughts.start_action(),
         params: %{prompt: "Synthesize multiple perspectives on this topic"}
       }
 
@@ -204,7 +203,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
         use Jido.Action,
           name: "calculator",
           description: "Performs calculations",
-          schema: [expression: [type: :string, required: true]]
+          schema: Zoi.object(%{expression: Zoi.string()})
 
         @impl true
         def run(params, _context) do
@@ -224,7 +223,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
         use Jido.Action,
           name: "search",
           description: "Searches for information",
-          schema: [query: [type: :string, required: true]]
+          schema: Zoi.object(%{query: Zoi.string()})
 
         @impl true
         def run(params, _context) do
@@ -234,10 +233,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       {agent, _ctx} = create_agent(ReAct, tools: [TestSearch])
 
-      instruction = %Instruction{
-        action: ReAct.start_action(),
-        params: %{query: "Search for Elixir documentation"}
-      }
+      instruction = %Instruction{target: ReAct.start_action(), params: %{query: "Search for Elixir documentation"}}
 
       {updated_agent, directives} = ReAct.cmd(agent, [instruction], %{})
 
@@ -323,10 +319,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
     test "CoT start emits SpawnAgent directive in delegated mode" do
       {agent, _ctx} = create_agent(ChainOfThought, model: "anthropic:claude-sonnet-4-20250514")
 
-      instruction = %Instruction{
-        action: ChainOfThought.start_action(),
-        params: %{prompt: "Explain recursion"}
-      }
+      instruction = %Instruction{target: ChainOfThought.start_action(), params: %{prompt: "Explain recursion"}}
 
       {_agent, [directive]} = ChainOfThought.cmd(agent, [instruction], %{})
 
@@ -340,7 +333,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
         use Jido.Action,
           name: "test_tool",
           description: "A test tool",
-          schema: [input: [type: :string, required: true]]
+          schema: Zoi.object(%{input: Zoi.string()})
 
         @impl true
         def run(_params, _context), do: {:ok, %{output: "test"}}
@@ -348,10 +341,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       {agent, _ctx} = create_agent(ReAct, tools: [DirectiveTestTool])
 
-      instruction = %Instruction{
-        action: ReAct.start_action(),
-        params: %{query: "Use the test tool"}
-      }
+      instruction = %Instruction{target: ReAct.start_action(), params: %{query: "Use the test tool"}}
 
       {_agent, [directive]} = ReAct.cmd(agent, [instruction], %{})
 
@@ -364,7 +354,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
         use Jido.Action,
           name: "exec_test",
           description: "Execution test tool",
-          schema: [value: [type: :string, required: true]]
+          schema: Zoi.object(%{value: Zoi.string()})
 
         @impl true
         def run(params, _context), do: {:ok, %{result: params.value}}
@@ -372,15 +362,12 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       {agent, _ctx} = create_agent(ReAct, tools: [ToolExecTestTool])
 
-      start_instruction = %Instruction{
-        action: ReAct.start_action(),
-        params: %{query: "Execute the test"}
-      }
+      start_instruction = %Instruction{target: ReAct.start_action(), params: %{query: "Execute the test"}}
 
       {agent, [%AgentDirective.SpawnAgent{}]} = ReAct.cmd(agent, [start_instruction], %{})
 
       child_started = %Instruction{
-        action: :ai_react_worker_child_started,
+        target: :ai_react_worker_child_started,
         params: %{
           parent_id: "parent",
           child_id: "child",
@@ -409,10 +396,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
     test "simple prompt selects CoD strategy" do
       {agent, _ctx} = create_agent(Adaptive)
 
-      instruction = %Instruction{
-        action: Adaptive.start_action(),
-        params: %{prompt: "What is the capital of France?"}
-      }
+      instruction = %Instruction{target: Adaptive.start_action(), params: %{prompt: "What is the capital of France?"}}
 
       {updated_agent, _directives} = Adaptive.cmd(agent, [instruction], %{})
 
@@ -425,7 +409,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       {agent, _ctx} = create_agent(Adaptive, tools: [])
 
       instruction = %Instruction{
-        action: Adaptive.start_action(),
+        target: Adaptive.start_action(),
         params: %{prompt: "Search for the latest news about Elixir programming"}
       }
 
@@ -439,7 +423,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       {agent, _ctx} = create_agent(Adaptive)
 
       instruction = %Instruction{
-        action: Adaptive.start_action(),
+        target: Adaptive.start_action(),
         params: %{
           prompt:
             "Analyze multiple alternatives and evaluate the trade-offs between using GenServer vs Agent for state management in Elixir. Consider different scenarios and compare their pros and cons."
@@ -456,7 +440,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       {agent, _ctx} = create_agent(Adaptive)
 
       instruction = %Instruction{
-        action: Adaptive.start_action(),
+        target: Adaptive.start_action(),
         params: %{
           prompt:
             "Synthesize these different perspectives and combine the viewpoints to create a unified understanding of functional programming paradigms."
@@ -474,10 +458,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       {agent, _ctx} = create_agent(Adaptive, strategy: :tot)
 
       # Force ToT even for a simple prompt
-      instruction = %Instruction{
-        action: Adaptive.start_action(),
-        params: %{prompt: "What is 2 + 2?"}
-      }
+      instruction = %Instruction{target: Adaptive.start_action(), params: %{prompt: "What is 2 + 2?"}}
 
       {updated_agent, _directives} = Adaptive.cmd(agent, [instruction], %{})
 
@@ -490,7 +471,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       # Start with a prompt that selects CoD
       start_instruction = %Instruction{
-        action: Adaptive.start_action(),
+        target: Adaptive.start_action(),
         params: %{prompt: "What is the meaning of life?", request_id: "req_adaptive_cot"}
       }
 
@@ -502,7 +483,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       assert state[:strategy_type] == :cod
 
       child_started = %Instruction{
-        action: :adaptive_child_started,
+        target: :adaptive_child_started,
         params: %{
           parent_id: "parent",
           child_id: "child",
@@ -535,11 +516,8 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       result_instruction =
         %Instruction{
-          action: :adaptive_cot_worker_event,
-          params: %{
-            request_id: "req_adaptive_cot",
-            event: completion_event
-          }
+          target: :adaptive_cot_worker_event,
+          params: %{request_id: "req_adaptive_cot", event: completion_event}
         }
 
       {final_agent, _directives} = Adaptive.cmd(agent, [result_instruction], %{})
@@ -582,10 +560,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
       {agent, _ctx} = create_agent(Adaptive, available_strategies: [:cot, :react], tools: [])
 
       # Even with exploration keywords, should fall back to ReAct (not ToT)
-      instruction = %Instruction{
-        action: Adaptive.start_action(),
-        params: %{prompt: "Explore multiple alternatives"}
-      }
+      instruction = %Instruction{target: Adaptive.start_action(), params: %{prompt: "Explore multiple alternatives"}}
 
       {updated_agent, _directives} = Adaptive.cmd(agent, [instruction], %{})
 
@@ -628,7 +603,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
         {agent, ctx} = create_agent(strategy, opts)
         snapshot = strategy.snapshot(agent, ctx)
 
-        assert %Jido.Agent.Strategy.Snapshot{} = snapshot
+        assert is_struct(snapshot, Jido.Agent.Strategy.Snapshot)
         assert is_atom(snapshot.status)
         assert is_boolean(snapshot.done?)
       end
@@ -665,7 +640,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       ChainOfThought.cmd(
         cot_agent,
-        [%Instruction{action: ChainOfThought.start_action(), params: %{prompt: "test"}}],
+        [%Instruction{target: ChainOfThought.start_action(), params: %{prompt: "test"}}],
         %{}
       )
 
@@ -673,7 +648,7 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       TreeOfThoughts.cmd(
         tot_agent,
-        [%Instruction{action: TreeOfThoughts.start_action(), params: %{prompt: "test"}}],
+        [%Instruction{target: TreeOfThoughts.start_action(), params: %{prompt: "test"}}],
         %{}
       )
 
@@ -681,12 +656,12 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
 
       GraphOfThoughts.cmd(
         got_agent,
-        [%Instruction{action: GraphOfThoughts.start_action(), params: %{prompt: "test"}}],
+        [%Instruction{target: GraphOfThoughts.start_action(), params: %{prompt: "test"}}],
         %{}
       )
 
       {react_agent, _} = create_agent(ReAct, tools: [])
-      ReAct.cmd(react_agent, [%Instruction{action: ReAct.start_action(), params: %{query: "test"}}], %{})
+      ReAct.cmd(react_agent, [%Instruction{target: ReAct.start_action(), params: %{query: "test"}}], %{})
 
       :telemetry.detach(handler_id)
 

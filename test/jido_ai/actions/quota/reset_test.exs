@@ -4,6 +4,11 @@ defmodule Jido.AI.Actions.Quota.ResetTest do
   alias Jido.AI.Actions.Quota.Reset
   alias Jido.AI.Quota.Store
 
+  setup do
+    start_supervised!({Store, []})
+    :ok
+  end
+
   @moduletag :unit
   @moduletag :capture_log
 
@@ -55,9 +60,14 @@ defmodule Jido.AI.Actions.Quota.ResetTest do
       assert quota.scope == plugin_scope
       assert quota.reset == true
 
-      plugin_status = Store.status(plugin_scope, %{max_requests: nil, max_total_tokens: nil}, 60_000)
-      state_status = Store.status(state_scope, %{max_requests: nil, max_total_tokens: nil}, 60_000)
-      agent_status = Store.status(agent_scope, %{max_requests: nil, max_total_tokens: nil}, 60_000)
+      plugin_status =
+        Store.status(plugin_scope, %{max_requests: nil, max_total_tokens: nil}, 60_000)
+
+      state_status =
+        Store.status(state_scope, %{max_requests: nil, max_total_tokens: nil}, 60_000)
+
+      agent_status =
+        Store.status(agent_scope, %{max_requests: nil, max_total_tokens: nil}, 60_000)
 
       assert plugin_status.usage.requests == 0
       assert state_status.usage.requests == 1

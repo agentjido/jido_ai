@@ -2,22 +2,23 @@ defmodule Jido.AI.Examples.Tools.Github.SafeUpdateIssue do
   @moduledoc "Guarded GitHub issue update action for examples. Defaults to read-only mode."
 
   use Jido.Action,
+    schema:
+      Zoi.object(%{
+        owner: Zoi.string(description: "Repository owner"),
+        repo: Zoi.string(description: "Repository name"),
+        number: Zoi.integer(description: "Issue number"),
+        title: Zoi.string(description: "Updated issue title") |> Zoi.optional(),
+        body: Zoi.string(description: "Updated issue body") |> Zoi.optional(),
+        state: Zoi.string(description: "Issue state") |> Zoi.optional(),
+        labels: Zoi.list(Zoi.string([]), description: "Issue labels") |> Zoi.optional(),
+        assignees: Zoi.list(Zoi.string([]), description: "Issue assignees") |> Zoi.optional(),
+        milestone: Zoi.integer(description: "Milestone ID") |> Zoi.optional(),
+        metadata: Zoi.map(description: "Metadata map") |> Zoi.optional(),
+        lock_reason: Zoi.string(description: "Lock reason") |> Zoi.optional(),
+        assignee: Zoi.string(description: "Primary assignee") |> Zoi.optional()
+      }),
     name: "github_issues_update_safe",
-    description: "Update a GitHub issue only when example write mode is explicitly enabled",
-    schema: [
-      owner: [type: :string, required: true, doc: "Repository owner"],
-      repo: [type: :string, required: true, doc: "Repository name"],
-      number: [type: :integer, required: true, doc: "Issue number"],
-      title: [type: :string, required: false, doc: "Updated issue title"],
-      body: [type: :string, required: false, doc: "Updated issue body"],
-      state: [type: :string, required: false, doc: "Issue state"],
-      labels: [type: {:list, :string}, required: false, doc: "Issue labels"],
-      assignees: [type: {:list, :string}, required: false, doc: "Issue assignees"],
-      milestone: [type: :integer, required: false, doc: "Milestone ID"],
-      metadata: [type: :map, required: false, doc: "Metadata map"],
-      lock_reason: [type: :string, required: false, doc: "Lock reason"],
-      assignee: [type: :string, required: false, doc: "Primary assignee"]
-    ]
+    description: "Update a GitHub issue only when example write mode is explicitly enabled"
 
   @impl true
   def run(params, context) do

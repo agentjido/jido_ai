@@ -76,7 +76,7 @@ defmodule Jido.AI.Reasoning.Adaptive.CLIAdapter do
     if now >= deadline do
       {:error, :timeout}
     else
-      case Jido.AgentServer.status(pid) do
+      case Jido.AI.CLI.Adapter.status(pid) do
         {:ok, status} ->
           if status.snapshot.done? do
             answer =

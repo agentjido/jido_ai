@@ -40,12 +40,12 @@ defmodule Jido.AI.Integration.StrategyModuleActionFallbackTest do
   end
 
   test "fallback executes module actions on ReAct strategy" do
-    agent = %Agent{id: "react-agent", name: "react", state: %{}}
+    agent = %Agent{id: "react-agent", name: "react", state: %{}, schema: Zoi.object(%{}), module: Jido.Agent}
     ctx = %{agent_module: __MODULE__, strategy_opts: [tools: [TestTool]]}
 
     {agent, _} = ReAct.init(agent, ctx)
 
-    instruction = %Jido.Instruction{action: MarkerAction, params: %{marker: :react}}
+    instruction = %Jido.Instruction{target: MarkerAction, params: %{marker: :react}}
     {updated_agent, directives} = ReAct.cmd(agent, [instruction], ctx)
 
     assert updated_agent.state.strategy_marker == :react
@@ -76,12 +76,19 @@ defmodule Jido.AI.Integration.StrategyModuleActionFallbackTest do
   end
 
   defp assert_strategy_fallback(strategy_module, marker) do
-    agent = %Agent{id: "#{marker}-agent", name: "#{marker}", state: %{}}
+    agent = %Agent{
+      id: "#{marker}-agent",
+      name: "#{marker}",
+      state: %{},
+      schema: Zoi.object(%{}),
+      module: Jido.Agent
+    }
+
     ctx = %{agent_module: __MODULE__, strategy_opts: []}
 
     {agent, _} = strategy_module.init(agent, ctx)
 
-    instruction = %Jido.Instruction{action: MarkerAction, params: %{marker: marker}}
+    instruction = %Jido.Instruction{target: MarkerAction, params: %{marker: marker}}
     {updated_agent, directives} = strategy_module.cmd(agent, [instruction], ctx)
 
     assert updated_agent.state.strategy_marker == marker

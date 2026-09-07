@@ -2,10 +2,9 @@ defmodule Jido.AI.Examples.Tools.TaskList do
   @moduledoc """
   LLM tools for task list management in a `Jido.AI.Agent`.
 
-  These tools manage tasks stored in the agent's Memory `:tasks` space.
-  The current task list is injected into `tool_context` by the agent's
-  `on_before_cmd/2` callback, and task mutations are persisted back
-  via `on_after_cmd/3`.
+  These tools read tasks from the current Agent state. The Agent applies
+  successful mutations through its tool-result callback and commits the
+  proposed state before the next tool runs.
 
   ## Task Structure
 
@@ -109,16 +108,17 @@ defmodule Jido.AI.Examples.Tools.TaskList.GetState do
   @moduledoc "Get the current state of the task list."
 
   use Jido.Action,
+    schema:
+      Zoi.object(%{
+        status_filter:
+          Zoi.string(
+            description: "Optional filter: 'pending', 'in_progress', 'done', 'blocked', or 'all' (default: 'all')"
+          )
+          |> Zoi.optional()
+      }),
     name: "tasklist_get_state",
     description:
-      "Get the current task list state including all tasks and summary counts. Use this to understand what tasks exist and their current status.",
-    schema: [
-      status_filter: [
-        type: :string,
-        required: false,
-        doc: "Optional filter: 'pending', 'in_progress', 'done', 'blocked', or 'all' (default: 'all')"
-      ]
-    ]
+      "Get the current task list state including all tasks and summary counts. Use this to understand what tasks exist and their current status."
 
   @impl true
   def run(params, context) do
@@ -152,6 +152,7 @@ defmodule Jido.AI.Examples.Tools.TaskList.GetState do
 
   defp get_tasks_from_context(context) do
     cond do
+      match?(%{agent_state: %{tasks: tasks}} when is_list(tasks), context) -> context.agent_state.tasks
       is_list(context[:tasks]) -> context[:tasks]
       match?(%{tool_context: %{tasks: t}} when is_list(t), context) -> context.tool_context.tasks
       true -> []
@@ -163,10 +164,10 @@ defmodule Jido.AI.Examples.Tools.TaskList.NextTask do
   @moduledoc "Get the next task to work on."
 
   use Jido.Action,
+    schema: Zoi.object(%{}),
     name: "tasklist_next_task",
     description:
-      "Get the next pending task to work on (highest priority first). Returns the task details or indicates all tasks are complete.",
-    schema: []
+      "Get the next pending task to work on (highest priority first). Returns the task details or indicates all tasks are complete."
 
   @impl true
   def run(_params, context) do
@@ -219,6 +220,7 @@ defmodule Jido.AI.Examples.Tools.TaskList.NextTask do
 
   defp get_tasks_from_context(context) do
     cond do
+      match?(%{agent_state: %{tasks: tasks}} when is_list(tasks), context) -> context.agent_state.tasks
       is_list(context[:tasks]) -> context[:tasks]
       match?(%{tool_context: %{tasks: t}} when is_list(t), context) -> context.tool_context.tasks
       true -> []
@@ -230,11 +232,9 @@ defmodule Jido.AI.Examples.Tools.TaskList.StartTask do
   @moduledoc "Mark a task as in-progress."
 
   use Jido.Action,
+    schema: Zoi.object(%{task_id: Zoi.string(description: "The ID of the task to start")}),
     name: "tasklist_start_task",
-    description: "Mark a task as in-progress. Use this before starting work on a task.",
-    schema: [
-      task_id: [type: :string, required: true, doc: "The ID of the task to start"]
-    ]
+    description: "Mark a task as in-progress. Use this before starting work on a task."
 
   @impl true
   def run(%{task_id: task_id}, context) do
@@ -267,6 +267,7 @@ defmodule Jido.AI.Examples.Tools.TaskList.StartTask do
 
   defp get_tasks_from_context(context) do
     cond do
+      match?(%{agent_state: %{tasks: tasks}} when is_list(tasks), context) -> context.agent_state.tasks
       is_list(context[:tasks]) -> context[:tasks]
       match?(%{tool_context: %{tasks: t}} when is_list(t), context) -> context.tool_context.tasks
       true -> []
@@ -278,12 +279,13 @@ defmodule Jido.AI.Examples.Tools.TaskList.CompleteTask do
   @moduledoc "Mark a task as complete with an optional result."
 
   use Jido.Action,
+    schema:
+      Zoi.object(%{
+        task_id: Zoi.string(description: "The ID of the task to complete"),
+        result: Zoi.string(description: "Description of what was accomplished") |> Zoi.optional()
+      }),
     name: "tasklist_complete_task",
-    description: "Mark a task as done. Include a result describing what was accomplished.",
-    schema: [
-      task_id: [type: :string, required: true, doc: "The ID of the task to complete"],
-      result: [type: :string, required: false, doc: "Description of what was accomplished"]
-    ]
+    description: "Mark a task as done. Include a result describing what was accomplished."
 
   @impl true
   def run(%{task_id: task_id} = params, context) do
@@ -323,6 +325,7 @@ defmodule Jido.AI.Examples.Tools.TaskList.CompleteTask do
 
   defp get_tasks_from_context(context) do
     cond do
+      match?(%{agent_state: %{tasks: tasks}} when is_list(tasks), context) -> context.agent_state.tasks
       is_list(context[:tasks]) -> context[:tasks]
       match?(%{tool_context: %{tasks: t}} when is_list(t), context) -> context.tool_context.tasks
       true -> []
@@ -334,12 +337,13 @@ defmodule Jido.AI.Examples.Tools.TaskList.BlockTask do
   @moduledoc "Mark a task as blocked with a reason."
 
   use Jido.Action,
+    schema:
+      Zoi.object(%{
+        task_id: Zoi.string(description: "The ID of the task to block"),
+        reason: Zoi.string(description: "Why the task is blocked")
+      }),
     name: "tasklist_block_task",
-    description: "Mark a task as blocked when it cannot proceed. Provide a reason explaining the blocker.",
-    schema: [
-      task_id: [type: :string, required: true, doc: "The ID of the task to block"],
-      reason: [type: :string, required: true, doc: "Why the task is blocked"]
-    ]
+    description: "Mark a task as blocked when it cannot proceed. Provide a reason explaining the blocker."
 
   @impl true
   def run(%{task_id: task_id, reason: reason}, context) do
@@ -373,6 +377,7 @@ defmodule Jido.AI.Examples.Tools.TaskList.BlockTask do
 
   defp get_tasks_from_context(context) do
     cond do
+      match?(%{agent_state: %{tasks: tasks}} when is_list(tasks), context) -> context.agent_state.tasks
       is_list(context[:tasks]) -> context[:tasks]
       match?(%{tool_context: %{tasks: t}} when is_list(t), context) -> context.tool_context.tasks
       true -> []
@@ -384,14 +389,15 @@ defmodule Jido.AI.Examples.Tools.TaskList.UpdateTask do
   @moduledoc "Update a task's title, description, or priority."
 
   use Jido.Action,
+    schema:
+      Zoi.object(%{
+        task_id: Zoi.string(description: "The ID of the task to update"),
+        title: Zoi.string(description: "New title for the task") |> Zoi.optional(),
+        description: Zoi.string(description: "New description for the task") |> Zoi.optional(),
+        priority: Zoi.integer(description: "New priority (lower = higher priority)") |> Zoi.optional()
+      }),
     name: "tasklist_update_task",
-    description: "Update a task's title, description, or priority.",
-    schema: [
-      task_id: [type: :string, required: true, doc: "The ID of the task to update"],
-      title: [type: :string, required: false, doc: "New title for the task"],
-      description: [type: :string, required: false, doc: "New description for the task"],
-      priority: [type: :integer, required: false, doc: "New priority (lower = higher priority)"]
-    ]
+    description: "Update a task's title, description, or priority."
 
   @impl true
   def run(%{task_id: task_id} = params, context) do
@@ -428,6 +434,7 @@ defmodule Jido.AI.Examples.Tools.TaskList.UpdateTask do
 
   defp get_tasks_from_context(context) do
     cond do
+      match?(%{agent_state: %{tasks: tasks}} when is_list(tasks), context) -> context.agent_state.tasks
       is_list(context[:tasks]) -> context[:tasks]
       match?(%{tool_context: %{tasks: t}} when is_list(t), context) -> context.tool_context.tasks
       true -> []

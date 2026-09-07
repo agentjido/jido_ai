@@ -24,7 +24,7 @@ defmodule Jido.AI.TestSupport.DirectiveExec do
 
   @spec assert_signal_cast(String.t(), timeout()) :: Jido.Signal.t()
   def assert_signal_cast(type, timeout \\ 1_000) when is_binary(type) do
-    assert_receive {:"$gen_cast", {:signal, %Jido.Signal{type: ^type} = signal}}, timeout
+    assert_receive {:"$gen_cast", {:signal, _admission_token, %Jido.Signal{type: ^type} = signal}}, timeout
     signal
   end
 end

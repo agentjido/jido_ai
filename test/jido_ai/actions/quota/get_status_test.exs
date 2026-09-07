@@ -4,6 +4,11 @@ defmodule Jido.AI.Actions.Quota.GetStatusTest do
   alias Jido.AI.Actions.Quota.GetStatus
   alias Jido.AI.Quota.Store
 
+  setup do
+    start_supervised!({Store, []})
+    :ok
+  end
+
   @moduletag :unit
   @moduletag :capture_log
 
@@ -54,7 +59,9 @@ defmodule Jido.AI.Actions.Quota.GetStatusTest do
         plugin_state: %{
           quota: %{scope: plugin_scope, window_ms: 30_000, max_requests: 1, max_total_tokens: 10}
         },
-        state: %{quota: %{scope: state_scope, window_ms: 99_000, max_requests: 99, max_total_tokens: 999}},
+        state: %{
+          quota: %{scope: state_scope, window_ms: 99_000, max_requests: 99, max_total_tokens: 999}
+        },
         agent: %{id: "agent_scope"}
       }
 

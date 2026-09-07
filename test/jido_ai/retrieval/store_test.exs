@@ -3,6 +3,11 @@ defmodule Jido.AI.Retrieval.StoreTest do
 
   alias Jido.AI.Retrieval.Store
 
+  setup do
+    start_supervised!({Store, []})
+    :ok
+  end
+
   @moduletag :unit
 
   defp unique_namespace(prefix) do

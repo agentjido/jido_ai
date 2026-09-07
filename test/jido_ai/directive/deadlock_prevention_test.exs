@@ -44,9 +44,9 @@ defmodule Jido.AI.Directive.DeadlockPreventionTest do
 
       state = %{request_count: 1}
 
-      assert {:ok, ^state} = Jido.AgentServer.DirectiveExec.exec(directive, nil, state)
+      assert {:ok, ^state} = Jido.AI.Directive.Execution.exec(directive, nil, state)
 
-      assert_receive {:"$gen_cast", {:signal, signal}}
+      assert_receive {:"$gen_cast", {:signal, _admission_token, signal}}
       assert signal.type == "ai.tool.result"
       assert signal.data.call_id == "tc_123"
       assert signal.data.tool_name == "unknown_tool"
@@ -96,9 +96,9 @@ defmodule Jido.AI.Directive.DeadlockPreventionTest do
 
       state = %{request_count: 1}
 
-      assert {:ok, ^state} = Jido.AgentServer.DirectiveExec.exec(directive, nil, state)
+      assert {:ok, ^state} = Jido.AI.Directive.Execution.exec(directive, nil, state)
 
-      assert_receive {:"$gen_cast", {:signal, signal}}
+      assert_receive {:"$gen_cast", {:signal, _admission_token, signal}}
       assert signal.type == "ai.request.error"
       assert signal.data.request_id == "req_456"
       assert signal.data.reason == :busy

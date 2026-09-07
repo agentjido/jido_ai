@@ -1,0 +1,815 @@
+{
+  "baseline_sha": "fc5bc1434ddb69493fe8a68443f03bc6a198c5a2",
+  "old_case_count": 76,
+  "new_case_count": 39,
+  "cases": [
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "update_strategy_state/1",
+      "test": "creates SetState operation with given attributes",
+      "replacement_ids": [
+        "U/change"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "set_strategy_field/2",
+      "test": "creates SetPath operation for a single field",
+      "replacement_ids": [
+        "U/order",
+        "U/status"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "set_iteration_status/1",
+      "test": "creates SetPath operation for status",
+      "replacement_ids": [
+        "I/admit"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "set_iteration/1",
+      "test": "creates SetPath operation for iteration counter",
+      "replacement_ids": [
+        "U/counter",
+        "I/reset"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "set_iteration/1",
+      "test": "accepts zero as valid iteration",
+      "replacement_ids": [
+        "U/zero"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "append_conversation/1",
+      "test": "creates SetState operation for conversation list",
+      "replacement_ids": [
+        "I/entries",
+        "U/append"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "prepend_conversation/2",
+      "test": "creates SetState operation with message prepended",
+      "replacement_ids": [
+        "I/entries",
+        "U/prepend"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "prepend_conversation/2",
+      "test": "works with empty existing conversation",
+      "replacement_ids": [
+        "U/empty-list"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "set_conversation/1",
+      "test": "creates SetState operation for entire conversation",
+      "replacement_ids": [
+        "I/history",
+        "U/replace-list"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "set_pending_tools/1",
+      "test": "creates SetState operation for pending tools",
+      "replacement_ids": [
+        "I/tools"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "add_pending_tool/1",
+      "test": "creates SetState operation for single tool",
+      "replacement_ids": [
+        "U/tools",
+        "I/tools"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "clear_pending_tools/0",
+      "test": "creates SetState operation to clear tools",
+      "replacement_ids": [
+        "I/tools"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "remove_pending_tool/1",
+      "test": "creates DeletePath operation for tool ID",
+      "replacement_ids": [
+        "U/delete-path",
+        "I/tools"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "set_call_id/1",
+      "test": "creates SetPath operation for call ID",
+      "replacement_ids": [
+        "I/admit"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "clear_call_id/0",
+      "test": "creates DeletePath operation for call ID",
+      "replacement_ids": [
+        "I/cancel",
+        "I/reset"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "set_final_answer/1",
+      "test": "creates SetPath operation for final answer",
+      "replacement_ids": [
+        "I/stream",
+        "U/answer"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "set_termination_reason/1",
+      "test": "creates SetPath operation for termination reason",
+      "replacement_ids": [
+        "I/reset"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "set_streaming_text/1",
+      "test": "creates SetPath operation for streaming text",
+      "replacement_ids": [
+        "I/stream"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "append_streaming_text/1",
+      "test": "creates SetPath operation to append streaming text",
+      "replacement_ids": [
+        "I/stream"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "set_usage/1",
+      "test": "creates SetState operation for usage metadata",
+      "replacement_ids": [
+        "U/usage",
+        "I/reset"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "delete_temp_keys/0",
+      "test": "creates DeleteKeys operation for temp keys",
+      "replacement_ids": [
+        "U/delete"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "delete_keys/1",
+      "test": "creates DeleteKeys operation for specified keys",
+      "replacement_ids": [
+        "U/delete"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "reset_strategy_state/0",
+      "test": "creates ReplaceState operation with initial values",
+      "replacement_ids": [
+        "U/reset",
+        "I/reset"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "compose/1",
+      "test": "returns list of state operations unchanged",
+      "replacement_ids": [
+        "U/order",
+        "U/compose"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "compose/1",
+      "test": "handles empty list",
+      "replacement_ids": [
+        "U/empty"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "update_config/1",
+      "test": "creates SetState operation for config",
+      "replacement_ids": [
+        "I/config",
+        "I/catalog"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "update_config/1",
+      "test": "creates SetState operation with nested config",
+      "replacement_ids": [
+        "I/catalog",
+        "U/nested"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "set_config_field/2",
+      "test": "creates SetPath operation for nested config field",
+      "replacement_ids": [
+        "I/catalog"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "set_config_field/2",
+      "test": "creates SetPath operation for model field",
+      "replacement_ids": [
+        "I/config"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "update_config_fields/1",
+      "test": "creates multiple SetPath operations",
+      "replacement_ids": [
+        "I/config",
+        "I/catalog"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "update_config_fields/1",
+      "test": "handles empty map",
+      "replacement_ids": [
+        "U/empty"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "update_config_fields/1",
+      "test": "creates SetPath operations in field order",
+      "replacement_ids": [
+        "I/config",
+        "I/catalog"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "update_tools_config/3",
+      "test": "creates three SetPath operations for tools config",
+      "replacement_ids": [
+        "I/catalog"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "update_tools_config/3",
+      "test": "handles empty tools list",
+      "replacement_ids": [
+        "I/catalog"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "update_tools_config/3",
+      "test": "creates operations in consistent order",
+      "replacement_ids": [
+        "I/catalog"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "apply_to_state/2",
+      "test": "applies SetState operation",
+      "replacement_ids": [
+        "U/change"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "apply_to_state/2",
+      "test": "applies SetPath operation for nested key",
+      "replacement_ids": [
+        "U/new-path"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "apply_to_state/2",
+      "test": "applies multiple SetPath operations",
+      "replacement_ids": [
+        "I/catalog",
+        "U/nested"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "apply_to_state/2",
+      "test": "applies DeleteKeys operation",
+      "replacement_ids": [
+        "U/delete"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "apply_to_state/2",
+      "test": "applies ReplaceState operation",
+      "replacement_ids": [
+        "U/reset"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "apply_to_state/2",
+      "test": "applies operations in order",
+      "replacement_ids": [
+        "U/order"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "describe": "apply_to_state/2",
+      "test": "deep merges nested maps with SetState",
+      "replacement_ids": [
+        "U/nested"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "Helpers",
+      "test": "update_strategy_state/1 creates SetState operation",
+      "replacement_ids": [
+        "U/change",
+        "I/commit"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "Helpers",
+      "test": "set_strategy_field/2 creates SetPath operation",
+      "replacement_ids": [
+        "U/status",
+        "U/order"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "Helpers",
+      "test": "set_iteration_status/1 creates SetPath operation for status",
+      "replacement_ids": [
+        "I/admit"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "Helpers",
+      "test": "set_iteration/1 creates SetPath operation for iteration",
+      "replacement_ids": [
+        "U/counter",
+        "I/reset"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "Helpers",
+      "test": "append_conversation/1 creates SetState operation",
+      "replacement_ids": [
+        "I/entries"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "Helpers",
+      "test": "set_pending_tools/1 creates SetState operation",
+      "replacement_ids": [
+        "I/tools"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "Helpers",
+      "test": "clear_pending_tools/0 creates SetState operation with empty list",
+      "replacement_ids": [
+        "I/tools"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "Helpers",
+      "test": "set_call_id/1 creates SetPath operation",
+      "replacement_ids": [
+        "I/admit"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "Helpers",
+      "test": "set_final_answer/1 creates SetPath operation",
+      "replacement_ids": [
+        "I/stream"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "Helpers",
+      "test": "set_usage/1 creates SetState operation",
+      "replacement_ids": [
+        "I/reset"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "Helpers",
+      "test": "delete_keys/1 creates DeleteKeys operation",
+      "replacement_ids": [
+        "U/delete"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "Helpers",
+      "test": "reset_strategy_state/0 creates ReplaceState operation",
+      "replacement_ids": [
+        "U/reset",
+        "I/reset"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "Helpers",
+      "test": "compose/1 returns list of state operations",
+      "replacement_ids": [
+        "U/order",
+        "U/compose"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "StateOp Structure",
+      "test": "SetState operation has required fields",
+      "replacement_ids": [
+        "U/change",
+        "U/schema"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "StateOp Structure",
+      "test": "SetPath operation has required fields",
+      "replacement_ids": [
+        "U/new-path",
+        "U/schema"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "StateOp Structure",
+      "test": "DeleteKeys operation has required fields",
+      "replacement_ids": [
+        "U/delete"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "StateOp Structure",
+      "test": "ReplaceState operation has required fields",
+      "replacement_ids": [
+        "U/reset"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "ReAct Strategy StateOps",
+      "test": "initial state has expected structure",
+      "replacement_ids": [
+        "I/idle"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "ReAct Strategy StateOps",
+      "test": "start instruction initializes state correctly",
+      "replacement_ids": [
+        "I/admit"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "ReAct Strategy StateOps",
+      "test": "register_tool instruction updates tool list",
+      "replacement_ids": [
+        "I/catalog"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "StateOps Composition",
+      "test": "multiple state operations can be created",
+      "replacement_ids": [
+        "U/order"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "StateOps Composition",
+      "test": "different state op types can be composed",
+      "replacement_ids": [
+        "U/compose",
+        "U/conflict"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "StateOps Composition",
+      "test": "conversation state ops can be created",
+      "replacement_ids": [
+        "I/entries"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "StateOps Type Safety",
+      "test": "SetPath operations have correct value types",
+      "replacement_ids": [
+        "U/counter",
+        "U/status",
+        "U/answer"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "StateOps Type Safety",
+      "test": "SetState operations have map attrs",
+      "replacement_ids": [
+        "U/change",
+        "U/tools",
+        "U/usage"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "StateOps Type Safety",
+      "test": "DeleteKeys operations have list of keys",
+      "replacement_ids": [
+        "U/delete"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "StateOps Type Safety",
+      "test": "ReplaceState operation has map state",
+      "replacement_ids": [
+        "U/reset"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "Phase 9.1 Success Criteria",
+      "test": "Helpers module exists and is accessible",
+      "replacement_ids": [
+        "U/change",
+        "U/order",
+        "I/admit",
+        "I/reset"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "Phase 9.1 Success Criteria",
+      "test": "state ops can be composed",
+      "replacement_ids": [
+        "U/order",
+        "U/compose"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "Phase 9.1 Success Criteria",
+      "test": "ReAct strategy uses StratState for state management",
+      "replacement_ids": [
+        "I/idle",
+        "I/admit",
+        "I/reset"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "Phase 9.1 Success Criteria",
+      "test": "all StateOp types are available",
+      "replacement_ids": [
+        "U/change",
+        "U/delete",
+        "U/new-path",
+        "U/reset"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "Phase 9.1 Success Criteria",
+      "test": "StateOps helpers create correct op types",
+      "replacement_ids": [
+        "U/change",
+        "U/delete",
+        "U/new-path",
+        "U/reset"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "Phase 9.1 Success Criteria",
+      "test": "ReAct strategy init returns agent and directives",
+      "replacement_ids": [
+        "I/idle"
+      ]
+    },
+    {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "describe": "Phase 9.1 Success Criteria",
+      "test": "ReAct strategy cmd returns agent and directives",
+      "replacement_ids": [
+        "I/admit",
+        "I/commit"
+      ]
+    }
+  ],
+  "native_cases": {
+    "U/change": {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "test": "complete state updates preserve unrelated fields and leave the source immutable"
+    },
+    "U/nested": {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "test": "nested edits preserve siblings and explicit merges replace only selected values"
+    },
+    "U/new-path": {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "test": "a new nested path is explicit and retains unrelated Agent fields"
+    },
+    "U/prepend": {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "test": "candidate lists keep prepend order without a hidden merge"
+    },
+    "U/append": {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "test": "candidate lists keep append order without a hidden merge"
+    },
+    "U/replace-list": {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "test": "candidate lists keep replace order without a hidden merge"
+    },
+    "U/empty-list": {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "test": "candidate lists keep empty order without a hidden merge"
+    },
+    "U/delete": {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "test": "deletion removes selected temporary keys and keeps unrelated data"
+    },
+    "U/delete-path": {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "test": "nested deletion removes one pending ID and an absent key is harmless"
+    },
+    "U/reset": {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "test": "an explicit domain reset removes old values and retains Plugin state"
+    },
+    "U/order": {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "test": "ordered map changes form one complete state candidate"
+    },
+    "U/compose": {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "test": "disjoint state proposals and pending directives assemble without dispatch"
+    },
+    "U/conflict": {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "test": "conflicting proposals reject the entire candidate and its directives"
+    },
+    "U/empty": {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "test": "empty effects and an unchanged candidate preserve the Agent"
+    },
+    "U/protect": {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "test": "a complete proposal cannot replace Plugin-owned request records"
+    },
+    "U/schema": {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "test": "schema errors reject state and all pending work"
+    },
+    "U/portable": {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "test": "unportable data cannot enter a state candidate"
+    },
+    "I/idle": {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "test": "new ReAct state has a profile and an idle session with no live handles"
+    },
+    "I/admit": {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "test": "admission records the query and live iteration without a Strategy state field"
+    },
+    "I/tools": {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "test": "pending tools are tracked by ID and each completed tool leaves the pending set"
+    },
+    "I/stream": {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "test": "stream text appends in order and the terminal answer retains the whole text"
+    },
+    "I/commit": {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "test": "tool candidates commit with the answer and preserve unrelated live changes"
+    },
+    "I/stage": {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "test": "later tools read the staged candidate before the final Agent commit"
+    },
+    "I/invalid": {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "test": "invalid candidate cannot change committed domain or request state"
+    },
+    "I/protect": {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "test": "protected candidate cannot change committed domain or request state"
+    },
+    "I/cancel": {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "test": "cancellation discards staged domain changes and clears live work"
+    },
+    "I/reset": {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "test": "a later request resets usage and active fields while keeping prior results"
+    },
+    "I/catalog": {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "test": "tool registration rebuilds all catalog views in the same order and can clear them"
+    },
+    "I/config": {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "test": "model generation and tool options come from the normalized profile"
+    },
+    "I/history": {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "test": "history replacement preserves message order and empty replacement clears it"
+    },
+    "I/entries": {
+      "path": "test/jido_ai/strategy/stateops_integration_test.exs",
+      "test": "history prepend and append use committed context entries without losing a sibling"
+    },
+    "U/zero": {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "test": "candidate values retain the zero type and value"
+    },
+    "U/counter": {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "test": "candidate values retain the counter type and value"
+    },
+    "U/status": {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "test": "candidate values retain the status type and value"
+    },
+    "U/answer": {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "test": "candidate values retain the answer type and value"
+    },
+    "U/false": {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "test": "candidate values retain the false type and value"
+    },
+    "U/cleared": {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "test": "candidate values retain the cleared type and value"
+    },
+    "U/tools": {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "test": "candidate values retain the tools type and value"
+    },
+    "U/usage": {
+      "path": "test/jido_ai/strategy/state_ops_helpers_test.exs",
+      "test": "candidate values retain the usage type and value"
+    }
+  }
+}

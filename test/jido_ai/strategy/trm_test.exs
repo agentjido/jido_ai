@@ -10,7 +10,9 @@ defmodule Jido.AI.Reasoning.TRM.StrategyTest do
     %Agent{
       id: Jido.Util.generate_id(),
       name: "test_trm_agent",
-      state: %{}
+      state: %{},
+      schema: Zoi.object(%{}),
+      module: Jido.Agent
     }
   end
 
@@ -147,10 +149,7 @@ defmodule Jido.AI.Reasoning.TRM.StrategyTest do
     end
 
     test "creates reasoning directive", %{agent: agent, ctx: ctx} do
-      instruction = %Jido.Instruction{
-        action: :trm_start,
-        params: %{prompt: "What is machine learning?"}
-      }
+      instruction = %Jido.Instruction{target: :trm_start, params: %{prompt: "What is machine learning?"}}
 
       {_agent, directives} = TRM.cmd(agent, [instruction], ctx)
 
@@ -163,10 +162,7 @@ defmodule Jido.AI.Reasoning.TRM.StrategyTest do
     end
 
     test "updates state to reasoning", %{agent: agent, ctx: ctx} do
-      instruction = %Jido.Instruction{
-        action: :trm_start,
-        params: %{prompt: "What is AI?"}
-      }
+      instruction = %Jido.Instruction{target: :trm_start, params: %{prompt: "What is AI?"}}
 
       {agent, _} = TRM.cmd(agent, [instruction], ctx)
 
@@ -177,10 +173,7 @@ defmodule Jido.AI.Reasoning.TRM.StrategyTest do
     end
 
     test "handles string keys in params", %{agent: agent, ctx: ctx} do
-      instruction = %Jido.Instruction{
-        action: :trm_start,
-        params: %{"prompt" => "String key prompt"}
-      }
+      instruction = %Jido.Instruction{target: :trm_start, params: %{"prompt" => "String key prompt"}}
 
       {agent, directives} = TRM.cmd(agent, [instruction], ctx)
 
@@ -197,10 +190,7 @@ defmodule Jido.AI.Reasoning.TRM.StrategyTest do
       {agent, _} = TRM.init(agent, ctx)
 
       # Start reasoning
-      start_instr = %Jido.Instruction{
-        action: :trm_start,
-        params: %{prompt: "What is 2+2?"}
-      }
+      start_instr = %Jido.Instruction{target: :trm_start, params: %{prompt: "What is 2+2?"}}
 
       {agent, [directive]} = TRM.cmd(agent, [start_instr], ctx)
       call_id = directive.id
@@ -214,12 +204,8 @@ defmodule Jido.AI.Reasoning.TRM.StrategyTest do
       call_id: call_id
     } do
       instruction = %Jido.Instruction{
-        action: :trm_llm_result,
-        params: %{
-          call_id: call_id,
-          result: {:ok, %{text: "The answer is 4"}},
-          phase: :reasoning
-        }
+        target: :trm_llm_result,
+        params: %{call_id: call_id, result: {:ok, %{text: "The answer is 4"}}, phase: :reasoning}
       }
 
       {_agent, directives} = TRM.cmd(agent, [instruction], ctx)
@@ -232,12 +218,8 @@ defmodule Jido.AI.Reasoning.TRM.StrategyTest do
 
     test "updates state after reasoning result", %{agent: agent, ctx: ctx, call_id: call_id} do
       instruction = %Jido.Instruction{
-        action: :trm_llm_result,
-        params: %{
-          call_id: call_id,
-          result: {:ok, %{text: "The answer is 4"}},
-          phase: :reasoning
-        }
+        target: :trm_llm_result,
+        params: %{call_id: call_id, result: {:ok, %{text: "The answer is 4"}}, phase: :reasoning}
       }
 
       {agent, _} = TRM.cmd(agent, [instruction], ctx)
@@ -258,22 +240,15 @@ defmodule Jido.AI.Reasoning.TRM.StrategyTest do
 
     test "completes full reason-supervise-improve cycle", %{agent: agent, ctx: ctx} do
       # 1. Start
-      start_instr = %Jido.Instruction{
-        action: :trm_start,
-        params: %{prompt: "What is 2+2?"}
-      }
+      start_instr = %Jido.Instruction{target: :trm_start, params: %{prompt: "What is 2+2?"}}
 
       {agent, [reason_dir]} = TRM.cmd(agent, [start_instr], ctx)
       assert reason_dir.metadata.phase == :reasoning
 
       # 2. Reasoning result -> Supervise
       reasoning_instr = %Jido.Instruction{
-        action: :trm_llm_result,
-        params: %{
-          call_id: reason_dir.id,
-          result: {:ok, %{text: "The answer is 4"}},
-          phase: :reasoning
-        }
+        target: :trm_llm_result,
+        params: %{call_id: reason_dir.id, result: {:ok, %{text: "The answer is 4"}}, phase: :reasoning}
       }
 
       {agent, [supervise_dir]} = TRM.cmd(agent, [reasoning_instr], ctx)
@@ -281,7 +256,7 @@ defmodule Jido.AI.Reasoning.TRM.StrategyTest do
 
       # 3. Supervision result -> Improve
       supervision_instr = %Jido.Instruction{
-        action: :trm_llm_result,
+        target: :trm_llm_result,
         params: %{
           call_id: supervise_dir.id,
           result: {:ok, %{text: "Score: 0.6. Needs more detail."}},
@@ -294,7 +269,7 @@ defmodule Jido.AI.Reasoning.TRM.StrategyTest do
 
       # 4. Improvement result -> loops back to reasoning (step 2 < max_steps 2)
       improvement_instr = %Jido.Instruction{
-        action: :trm_llm_result,
+        target: :trm_llm_result,
         params: %{
           call_id: improve_dir.id,
           result: {:ok, %{text: "2+2=4 because adding two and two gives four."}},
@@ -317,20 +292,14 @@ defmodule Jido.AI.Reasoning.TRM.StrategyTest do
     end
 
     test "infers phase from current status when llm response phase is omitted", %{agent: agent, ctx: ctx} do
-      start_instr = %Jido.Instruction{
-        action: :trm_start,
-        params: %{prompt: "What is 2+2?"}
-      }
+      start_instr = %Jido.Instruction{target: :trm_start, params: %{prompt: "What is 2+2?"}}
 
       {agent, [reason_dir]} = TRM.cmd(agent, [start_instr], ctx)
       assert reason_dir.metadata.phase == :reasoning
 
       reasoning_instr = %Jido.Instruction{
-        action: :trm_llm_result,
-        params: %{
-          call_id: reason_dir.id,
-          result: {:ok, %{text: "The answer is 4"}}
-        }
+        target: :trm_llm_result,
+        params: %{call_id: reason_dir.id, result: {:ok, %{text: "The answer is 4"}}}
       }
 
       {agent, [supervise_dir]} = TRM.cmd(agent, [reasoning_instr], ctx)
@@ -338,11 +307,8 @@ defmodule Jido.AI.Reasoning.TRM.StrategyTest do
       assert State.get(agent, %{})[:status] == :supervising
 
       supervision_instr = %Jido.Instruction{
-        action: :trm_llm_result,
-        params: %{
-          call_id: supervise_dir.id,
-          result: {:ok, %{text: "Score: 0.6. Needs more detail."}}
-        }
+        target: :trm_llm_result,
+        params: %{call_id: supervise_dir.id, result: {:ok, %{text: "Score: 0.6. Needs more detail."}}}
       }
 
       {agent, [improve_dir]} = TRM.cmd(agent, [supervision_instr], ctx)
@@ -370,10 +336,7 @@ defmodule Jido.AI.Reasoning.TRM.StrategyTest do
       {agent, _} = TRM.init(agent, ctx)
 
       # Start reasoning
-      instruction = %Jido.Instruction{
-        action: :trm_start,
-        params: %{prompt: "Test question"}
-      }
+      instruction = %Jido.Instruction{target: :trm_start, params: %{prompt: "Test question"}}
 
       {agent, _} = TRM.cmd(agent, [instruction], ctx)
       snapshot = TRM.snapshot(agent, ctx)
@@ -572,10 +535,7 @@ defmodule Jido.AI.Reasoning.TRM.StrategyTest do
       {agent, _} = TRM.init(agent, ctx)
 
       # Start reasoning
-      start_instr = %Jido.Instruction{
-        action: :trm_start,
-        params: %{prompt: "What is AI?"}
-      }
+      start_instr = %Jido.Instruction{target: :trm_start, params: %{prompt: "What is AI?"}}
 
       {agent, [directive]} = TRM.cmd(agent, [start_instr], ctx)
       call_id = directive.id
@@ -585,12 +545,8 @@ defmodule Jido.AI.Reasoning.TRM.StrategyTest do
 
     test "processes streaming partial", %{agent: agent, ctx: ctx, call_id: call_id} do
       instruction = %Jido.Instruction{
-        action: :trm_llm_partial,
-        params: %{
-          call_id: call_id,
-          delta: "Hello ",
-          chunk_type: :content
-        }
+        target: :trm_llm_partial,
+        params: %{call_id: call_id, delta: "Hello ", chunk_type: :content}
       }
 
       {agent, directives} = TRM.cmd(agent, [instruction], ctx)
@@ -605,12 +561,12 @@ defmodule Jido.AI.Reasoning.TRM.StrategyTest do
 
     test "accumulates multiple partials", %{agent: agent, ctx: ctx, call_id: call_id} do
       instr1 = %Jido.Instruction{
-        action: :trm_llm_partial,
+        target: :trm_llm_partial,
         params: %{call_id: call_id, delta: "Hello ", chunk_type: :content}
       }
 
       instr2 = %Jido.Instruction{
-        action: :trm_llm_partial,
+        target: :trm_llm_partial,
         params: %{call_id: call_id, delta: "world!", chunk_type: :content}
       }
 
@@ -628,10 +584,7 @@ defmodule Jido.AI.Reasoning.TRM.StrategyTest do
       ctx = build_ctx()
       {agent, _} = TRM.init(agent, ctx)
 
-      instruction = %Jido.Instruction{
-        action: :trm_start,
-        params: %{prompt: "What is the meaning of life?"}
-      }
+      instruction = %Jido.Instruction{target: :trm_start, params: %{prompt: "What is the meaning of life?"}}
 
       {_agent, [directive]} = TRM.cmd(agent, [instruction], ctx)
 
@@ -667,10 +620,7 @@ defmodule Jido.AI.Reasoning.TRM.StrategyTest do
       ctx = build_ctx()
       {agent, _} = TRM.init(agent, ctx)
 
-      instruction = %Jido.Instruction{
-        action: :unknown_action,
-        params: %{foo: "bar"}
-      }
+      instruction = %Jido.Instruction{target: :unknown_action, params: %{foo: "bar"}}
 
       {agent, directives} = TRM.cmd(agent, [instruction], ctx)
 

@@ -2,13 +2,14 @@ defmodule Jido.AI.Examples.Tools.ConvertTemperature do
   @moduledoc "Converts temperature between Celsius, Fahrenheit, and Kelvin."
 
   use Jido.Action,
+    schema:
+      Zoi.object(%{
+        value: Zoi.float(description: "The temperature value to convert"),
+        from: Zoi.string(description: "Source unit: celsius, fahrenheit, or kelvin"),
+        to: Zoi.string(description: "Target unit: celsius, fahrenheit, or kelvin")
+      }),
     name: "convert_temperature",
-    description: "Converts temperature between Celsius, Fahrenheit, and Kelvin.",
-    schema: [
-      value: [type: :float, required: true, doc: "The temperature value to convert"],
-      from: [type: :string, required: true, doc: "Source unit: celsius, fahrenheit, or kelvin"],
-      to: [type: :string, required: true, doc: "Target unit: celsius, fahrenheit, or kelvin"]
-    ]
+    description: "Converts temperature between Celsius, Fahrenheit, and Kelvin."
 
   @impl true
   def run(params, _context) do
@@ -39,13 +40,14 @@ defmodule Jido.AI.Examples.Tools.ConvertDistance do
   @moduledoc "Converts distance between metric and imperial units."
 
   use Jido.Action,
+    schema:
+      Zoi.object(%{
+        value: Zoi.float(description: "The distance value to convert"),
+        from: Zoi.string(description: "Source unit"),
+        to: Zoi.string(description: "Target unit")
+      }),
     name: "convert_distance",
-    description: "Converts distance between meters, kilometers, miles, feet, inches, and yards.",
-    schema: [
-      value: [type: :float, required: true, doc: "The distance value to convert"],
-      from: [type: :string, required: true, doc: "Source unit"],
-      to: [type: :string, required: true, doc: "Target unit"]
-    ]
+    description: "Converts distance between meters, kilometers, miles, feet, inches, and yards."
 
   @impl true
   def run(params, _context) do
@@ -82,13 +84,14 @@ defmodule Jido.AI.Examples.Tools.ConvertWeight do
   @moduledoc "Converts weight between metric and imperial units."
 
   use Jido.Action,
+    schema:
+      Zoi.object(%{
+        value: Zoi.float(description: "The weight value to convert"),
+        from: Zoi.string(description: "Source unit"),
+        to: Zoi.string(description: "Target unit")
+      }),
     name: "convert_weight",
-    description: "Converts weight between kilograms, pounds, ounces, grams, and stones.",
-    schema: [
-      value: [type: :float, required: true, doc: "The weight value to convert"],
-      from: [type: :string, required: true, doc: "Source unit"],
-      to: [type: :string, required: true, doc: "Target unit"]
-    ]
+    description: "Converts weight between kilograms, pounds, ounces, grams, and stones."
 
   @impl true
   def run(params, _context) do

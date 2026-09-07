@@ -1,13 +1,10 @@
 defmodule Jido.AI.CoTAgentTest do
-  use ExUnit.Case, async: true
-
-  alias Jido.AI.Request
-  alias Jido.AI.Reasoning.ChainOfThought.Strategy, as: ChainOfThought
+  use Jido.AI.Test.ReasoningCase, async: false
 
   defmodule TestCoTAgent do
     use Jido.AI.CoTAgent,
       name: "test_cot_agent",
-      model: "test:model"
+      model: "openai:gpt-4o-mini"
   end
 
   defmodule DefaultCoTAgent do
@@ -52,8 +49,9 @@ defmodule Jido.AI.CoTAgentTest do
   end
 
   describe "strategy configuration" do
-    test "uses ChainOfThought strategy" do
-      assert TestCoTAgent.strategy() == ChainOfThought
+    test "selects ChainOfThought in the native AI profile" do
+      assert {:ok, profile} = Configuration.profile(TestCoTAgent.agent())
+      assert profile.reasoning.method == :chain_of_thought
     end
 
     test "uses expected defaults when not provided" do
@@ -107,82 +105,72 @@ defmodule Jido.AI.CoTAgentTest do
     end
   end
 
-  describe "request lifecycle hooks" do
-    test "on_before_cmd marks request as failed on cot_request_error" do
-      agent = TestCoTAgent.new()
-      agent = Request.start_request(agent, "req_1", "query")
-
-      {:ok, agent, _action} =
-        TestCoTAgent.on_before_cmd(
-          agent,
-          {:cot_request_error, %{request_id: "req_1", reason: :busy, message: "busy"}}
-        )
-
-      assert get_in(agent.state, [:requests, "req_1", :status]) == :failed
-      assert get_in(agent.state, [:requests, "req_1", :error]) == {:rejected, :busy, "busy"}
+  describe "request lifecycle" do
+    test "busy admission returns the rejected request ID and keeps active work", %{jido: jido} do
+      mock = mock([%{reply: {:stream, [{:wait, :held}, %{content: "Conclusion: done"}], "stop"}}])
+      server = start_agent(jido, TestCoTAgent)
+      opts = [model: MockLLM.model(), llm_opts: MockLLM.options(mock), stream_to: self()]
+      assert {:ok, first} = TestCoTAgent.think(server, "First", opts)
+      assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
+      assert {:error, :busy} = TestCoTAgent.think(server, "Second", Keyword.put(opts, :request_id, "rejected"))
+      assert_receive {:jido_ai_request_event, %{request_id: "rejected", kind: :request_failed, data: %{error: :busy}}}
+      assert Map.keys(Server.agent(server).state.requests) == [first.id]
+      assert :ok = MockLLM.release(mock, :held)
+      assert {:ok, "done"} = TestCoTAgent.await(first)
+      assert_script_done(mock)
     end
 
-    test "on_after_cmd finalizes pending request on terminal delegated worker event" do
-      agent =
-        TestCoTAgent.new()
-        |> Request.start_request("req_done", "query")
-        |> with_completed_strategy("final reasoning")
+    test "completion commits the request and public result fields", %{jido: jido} do
+      mock = mock([%{reply: {:text, "final reasoning"}}])
+      server = start_agent(jido, TestCoTAgent)
 
-      {:ok, updated_agent, directives} =
-        TestCoTAgent.on_after_cmd(
-          agent,
-          {:cot_worker_event, %{request_id: "req_done", event: %{request_id: "req_done"}}},
-          [:noop]
-        )
+      assert {:ok, handle} =
+               TestCoTAgent.think(server, "query", model: MockLLM.model(), llm_opts: MockLLM.options(mock))
 
-      assert directives == [:noop]
-      assert get_in(updated_agent.state, [:requests, "req_done", :status]) == :completed
-      assert get_in(updated_agent.state, [:requests, "req_done", :result]) == "final reasoning"
-      assert updated_agent.state.last_result == "final reasoning"
-      assert updated_agent.state.completed == true
+      assert {:ok, "final reasoning"} = TestCoTAgent.await(handle)
+      assert record(server, handle).status == :completed
+      assert record(server, handle).result == "final reasoning"
+      assert Server.agent(server).state.last_result == "final reasoning"
+      assert Server.agent(server).state.completed
+      assert_script_done(mock)
     end
 
-    test "on_after_cmd stores request meta from completed strategy snapshots" do
-      agent =
-        TestCoTAgent.new()
-        |> Request.start_request("req_done", "query")
-        |> with_completed_strategy("final reasoning", %{usage: %{input_tokens: 5, output_tokens: 2}})
+    test "completion stores usage from the provider response", %{jido: jido} do
+      mock =
+        mock([
+          %{
+            reply:
+              {:stream, [%{content: "final reasoning"}], "stop",
+               %{prompt_tokens: 5, completion_tokens: 2, total_tokens: 7}}
+          }
+        ])
 
-      {:ok, updated_agent, directives} =
-        TestCoTAgent.on_after_cmd(
-          agent,
-          {:cot_worker_event, %{request_id: "req_done", event: %{request_id: "req_done"}}},
-          [:noop]
-        )
+      server = start_agent(jido, TestCoTAgent)
 
-      assert directives == [:noop]
+      assert {:ok, handle} =
+               TestCoTAgent.think(server, "query", model: MockLLM.model(), llm_opts: MockLLM.options(mock))
 
-      assert get_in(updated_agent.state, [:requests, "req_done", :meta]) == %{
-               usage: %{input_tokens: 5, output_tokens: 2}
-             }
+      assert {:ok, "final reasoning"} = TestCoTAgent.await(handle)
+      assert %{input_tokens: 5, output_tokens: 2, total_tokens: 7} = record(server, handle).meta.usage
+      assert record(server, handle).meta.model_calls == 1
+      assert_script_done(mock)
     end
 
-    test "on_after_cmd marks pending request failed on terminal failure snapshot" do
-      raw_error = %{type: :provider_error, status: 503, message: "busy"}
+    test "failure stores the provider cause and closes the pending request", %{jido: jido} do
+      mock = mock([%{reply: {:error, 503, "busy"}}])
+      server = start_agent(jido, TestCoTAgent)
 
-      agent =
-        TestCoTAgent.new()
-        |> Request.start_request("req_failed", "query")
-        |> with_failed_strategy("req_failed", raw_error)
+      assert {:ok, handle} =
+               TestCoTAgent.think(server, "query", model: MockLLM.model(), llm_opts: MockLLM.options(mock))
 
-      {:ok, updated_agent, directives} =
-        TestCoTAgent.on_after_cmd(
-          agent,
-          {:cot_worker_event, %{request_id: "req_failed", event: %{request_id: "req_failed"}}},
-          [:noop]
-        )
-
-      assert directives == [:noop]
-      assert get_in(updated_agent.state, [:requests, "req_failed", :status]) == :failed
-      assert match?({:failed, _, ^raw_error}, get_in(updated_agent.state, [:requests, "req_failed", :error]))
-
-      assert updated_agent.state.last_result == inspect(raw_error)
-      assert updated_agent.state.completed == true
+      assert {:error, error} = TestCoTAgent.await(handle)
+      assert %ReqLLM.Error.API.Stream{cause: %ReqLLM.Error.API.Request{status: 503, reason: "busy"}} = error
+      assert error.cause.response_body["message"] == "busy"
+      assert record(server, handle).status == :failed
+      assert record(server, handle).error == error
+      assert Server.agent(server).state.last_result == inspect(error)
+      assert Server.agent(server).state.completed
+      assert_script_done(mock)
     end
   end
 
@@ -207,35 +195,5 @@ defmodule Jido.AI.CoTAgentTest do
       %{"en" => doc} when is_binary(doc) -> doc
       doc when is_binary(doc) -> doc
     end
-  end
-
-  defp with_completed_strategy(agent, result, overrides \\ %{}) do
-    strategy_state = Map.merge(%{status: :completed, result: result, steps: []}, overrides)
-    put_in(agent.state[:__strategy__], strategy_state)
-  end
-
-  defp with_failed_strategy(agent, request_id, result) do
-    failed_event = %{
-      id: "evt_failed",
-      seq: 1,
-      at_ms: 1_700_000_000_100,
-      run_id: request_id,
-      request_id: request_id,
-      iteration: 1,
-      kind: :request_failed,
-      llm_call_id: "cot_call_1",
-      tool_call_id: nil,
-      tool_name: nil,
-      data: %{error: result}
-    }
-
-    {agent, _directives} =
-      ChainOfThought.cmd(
-        agent,
-        [%Jido.Instruction{action: :cot_worker_event, params: %{request_id: request_id, event: failed_event}}],
-        %{}
-      )
-
-    agent
   end
 end

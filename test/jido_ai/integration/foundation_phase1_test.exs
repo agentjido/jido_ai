@@ -321,9 +321,7 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
       use Jido.Action,
         name: "test_action",
         description: "A test action for integration testing",
-        schema: [
-          input: [type: :string, required: true, doc: "Test input"]
-        ]
+        schema: Zoi.object(%{input: Zoi.string(description: "Test input")})
 
       @impl true
       def run(_params, _context), do: {:ok, %{}}

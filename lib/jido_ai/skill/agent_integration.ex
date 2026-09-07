@@ -1,7 +1,8 @@
 defmodule Jido.AI.Skill.AgentIntegration do
   @moduledoc """
-  Builds the Agent Skills catalog, loading tool, and reserved tool context for a
-  `Jido.AI.Agent` when the agent instance initializes.
+  Builds the Agent Skills catalog, loading tools, and reserved tool context.
+  The v3 AI Session calls this when the live Agent starts. Compilation and
+  static Agent construction do not scan skill files.
 
   Discovery is explicit because scanning a project loads instructions from its
   filesystem. Passing `true` trusts the standard project and user skill roots;
@@ -14,21 +15,26 @@ defmodule Jido.AI.Skill.AgentIntegration do
 
       agent_skills: [
         specs: runtime_specs,
-        resource_provider: &MyApp.SkillResources.handle/2,
+        resource_provider: {MyApp.SkillResources, :handle},
         resource_policy: [max_text_bytes: 131_072]
       ]
 
   Runtime specs are validated, preserved without filesystem discovery or
   filesystem roots, and added to the same scoped catalog as discovered skills.
-  Runtime specs take precedence over discovered skills with the same name;
-  shadowed discovered entries are reported in diagnostics. Duplicate runtime
-  names are rejected.
+  The `:modules` option accepts trusted modules with `manifest/0`. Runtime specs
+  take precedence over module specs, then discovered files with the same name.
+  Shadowed entries are reported in diagnostics. Duplicate runtime names are
+  rejected. Module actions join the automatic tool catalog; module Plugins
+  must be declared separately in the Agent definition.
+
+  Static AI profiles accept boolean or MFA trust callbacks. Direct calls to
+  this module also accept the existing runtime trust function.
 
   The catalog contains metadata-only discovered specs. Full files are read and
   strictly validated only after the model selects a filesystem skill. Runtime
   specs keep their inline body and metadata exactly as supplied.
 
-  Enabled agents receive both `load_skill` and `load_skill_resource`. The
+  Agents with a nonempty catalog receive `load_skill` and `load_skill_resource`. The
   optional `:resource_policy` sets listing and text-loading limits for both
   actions.
   """
@@ -52,7 +58,7 @@ defmodule Jido.AI.Skill.AgentIntegration do
   - `false` or `nil` - disable Agent Skills integration
   - `true` - trust and discover the standard project and user roots
   - a list of paths - trust and discover only those roots
-  - keyword options - accepts `:specs`, `:resource_provider`, `:paths`,
+  - keyword options - accepts `:specs`, `:modules`, `:resource_provider`, `:paths`,
     `:trust`, `:max_depth`, `:max_directories`, `:exclude_directories`, and
     `:resource_policy`
   """
@@ -91,7 +97,9 @@ defmodule Jido.AI.Skill.AgentIntegration do
 
   defp prepare_options(opts) do
     runtime_specs_or_opts = Keyword.get(opts, :specs, [])
-    paths = paths_option(opts, runtime_specs_or_opts)
+    modules = Keyword.get(opts, :modules, [])
+    explicit_specs? = runtime_specs_or_opts != [] or modules != []
+    paths = paths_option(opts, explicit_specs?)
     policy_or_opts = Keyword.get(opts, :resource_policy, ResourcePolicy.default())
     provider_or_nil = Keyword.get(opts, :resource_provider)
 
@@ -101,11 +109,12 @@ defmodule Jido.AI.Skill.AgentIntegration do
       |> Keyword.put_new(:trust, false)
 
     with {:ok, runtime_specs} <- runtime_specs(runtime_specs_or_opts),
+         {:ok, module_specs} <- module_specs(modules),
          {:ok, provider} <- ResourceProvider.validate(provider_or_nil),
          {:ok, resource_policy} <- ResourcePolicy.new(policy_or_opts),
          {:ok, metadata, diagnostics} <- discover(paths, discovery_opts),
          {:ok, discovered_specs} <- catalog_specs(metadata),
-         {specs, diagnostics} <- merge_specs(runtime_specs, discovered_specs, diagnostics) do
+         {specs, diagnostics} <- merge_specs(runtime_specs, module_specs ++ discovered_specs, diagnostics) do
       specs = Enum.sort_by(specs, & &1.name)
       tool_context = tool_context(specs, provider, resource_policy)
 
@@ -120,10 +129,10 @@ defmodule Jido.AI.Skill.AgentIntegration do
     end
   end
 
-  defp paths_option(opts, runtime_specs) do
+  defp paths_option(opts, explicit_specs?) do
     cond do
       Keyword.has_key?(opts, :paths) -> Keyword.get(opts, :paths)
-      runtime_specs != [] -> []
+      explicit_specs? -> []
       true -> :default
     end
   end
@@ -163,6 +172,22 @@ defmodule Jido.AI.Skill.AgentIntegration do
 
   defp runtime_specs(_specs), do: {:error, {:invalid_agent_skills_option, :specs}}
 
+  defp module_specs(modules) when is_list(modules) do
+    Enum.reduce_while(modules, {:ok, []}, fn module, {:ok, specs} ->
+      with true <- is_atom(module) and module != nil and Code.ensure_loaded?(module),
+           true <- function_exported?(module, :manifest, 0),
+           %Spec{} = spec <- module.manifest(),
+           true <- is_binary(spec.name) and spec.name != "" and is_binary(spec.description),
+           :ok <- Jido.Action.validate_static_data(spec) do
+        {:cont, {:ok, specs ++ [spec]}}
+      else
+        _ -> {:halt, {:error, {:invalid_agent_skills_option, :modules}}}
+      end
+    end)
+  end
+
+  defp module_specs(_), do: {:error, {:invalid_agent_skills_option, :modules}}
+
   defp unique_runtime_name(name, index, names) do
     case Map.fetch(names, name) do
       :error -> :ok
@@ -195,6 +220,7 @@ defmodule Jido.AI.Skill.AgentIntegration do
   end
 
   defp source_label(%Spec{source: {:file, path}}), do: "'#{path}'"
+  defp source_label(%Spec{source: {:module, module}}), do: inspect(module)
   defp source_label(%Spec{}), do: "a runtime spec"
 
   defp tool_context([], _provider, _resource_policy), do: %{}

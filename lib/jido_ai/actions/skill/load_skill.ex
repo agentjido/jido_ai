@@ -41,9 +41,6 @@ defmodule Jido.AI.Actions.Skill.LoadSkill do
     Loads the full instructions for an available skill by name. Call this after
     selecting a skill from a compact skill index.
     """,
-    category: "ai",
-    tags: ["skills", "lazy-loading"],
-    vsn: "1.0.0",
     schema:
       Zoi.object(%{
         name: Zoi.string(description: "The available skill name to load"),
@@ -52,6 +49,13 @@ defmodule Jido.AI.Actions.Skill.LoadSkill do
           |> Zoi.default(true)
           |> Zoi.optional()
       })
+
+  def category, do: "ai"
+  def tags, do: ["skills", "lazy-loading"]
+  def vsn, do: "1.0.0"
+
+  @impl Jido.Action
+  def on_before_validate_params(params), do: Jido.AI.ActionInput.before_validate(schema(), params)
 
   alias Jido.AI.Actions.Skill.RuntimeContext
   alias Jido.AI.Skill.{Activation, Registry, ResourceProvider, Resources, Spec}

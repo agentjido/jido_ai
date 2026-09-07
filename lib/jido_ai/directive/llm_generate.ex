@@ -58,7 +58,7 @@ defmodule Jido.AI.Directive.LLMGenerate do
   end
 end
 
-defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
+defmodule Jido.AI.Directive.LLMGenerate.Execution do
   @moduledoc """
   Spawns an async task to generate an LLM response (non-streaming) and sends
   the result back to the agent.
@@ -114,7 +114,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
       error_type: nil
     }
 
-    agent_pid = self()
+    agent_pid = Map.fetch!(state, :agent_server)
     task_supervisor = Helpers.get_task_supervisor(state)
 
     case Task.Supervisor.start_child(task_supervisor, fn ->
@@ -225,7 +225,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMGenerate do
 
     messages = Helpers.build_directive_messages(context, system_prompt)
 
-    case ReqLLM.Generation.generate_text(model, messages, opts) do
+    case Jido.AI.Models.request(:text, model, messages, opts) do
       {:ok, response} ->
         turn = Turn.from_response(response, model: model)
 

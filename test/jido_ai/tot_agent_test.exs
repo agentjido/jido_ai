@@ -7,7 +7,7 @@ defmodule Jido.AI.ToTAgentTest do
     use Jido.AI.ToTAgent,
       name: "test_tot_agent",
       description: "Test ToT agent for unit tests",
-      model: "test:model",
+      model: "openai:gpt-4o-mini",
       branching_factor: 2,
       max_depth: 2,
       traversal_strategy: :bfs,
@@ -67,7 +67,7 @@ defmodule Jido.AI.ToTAgentTest do
 
     test "passes custom model to strategy" do
       opts = TestToTAgent.strategy_opts()
-      assert opts[:model] == "test:model"
+      assert opts[:model] == "openai:gpt-4o-mini"
     end
 
     test "passes custom branching_factor to strategy" do
@@ -129,24 +129,24 @@ defmodule Jido.AI.ToTAgentTest do
 
   describe "state schema" do
     test "includes model field" do
-      agent = TestToTAgent.new()
+      agent = TestToTAgent.new!()
       assert Map.has_key?(agent.state, :model)
     end
 
     test "includes last_prompt field" do
-      agent = TestToTAgent.new()
+      agent = TestToTAgent.new!()
       assert Map.has_key?(agent.state, :last_prompt)
       assert agent.state.last_prompt == ""
     end
 
     test "includes last_result field" do
-      agent = TestToTAgent.new()
+      agent = TestToTAgent.new!()
       assert Map.has_key?(agent.state, :last_result)
       assert agent.state.last_result == nil
     end
 
     test "includes completed field" do
-      agent = TestToTAgent.new()
+      agent = TestToTAgent.new!()
       assert Map.has_key?(agent.state, :completed)
       assert agent.state.completed == false
     end
@@ -168,7 +168,7 @@ defmodule Jido.AI.ToTAgentTest do
 
   describe "on_before_cmd/2" do
     test "captures last_prompt on tot_start" do
-      agent = TestToTAgent.new()
+      agent = TestToTAgent.new!()
       action = {:tot_start, %{prompt: "Test prompt"}}
 
       {:ok, updated_agent, _action} = TestToTAgent.on_before_cmd(agent, action)
@@ -179,7 +179,7 @@ defmodule Jido.AI.ToTAgentTest do
     end
 
     test "passes through other actions unchanged" do
-      agent = TestToTAgent.new()
+      agent = TestToTAgent.new!()
       action = {:other_action, %{data: "test"}}
 
       {:ok, updated_agent, returned_action} = TestToTAgent.on_before_cmd(agent, action)
@@ -192,7 +192,7 @@ defmodule Jido.AI.ToTAgentTest do
   describe "on_after_cmd/3" do
     test "finalizes pending request on terminal delegated worker event" do
       agent =
-        TestToTAgent.new()
+        TestToTAgent.new!()
         |> Jido.AI.Request.start_request("req_done", "query")
         |> with_completed_strategy("best path")
 
@@ -213,7 +213,7 @@ defmodule Jido.AI.ToTAgentTest do
 
   describe "strategy state" do
     test "agent initializes with strategy state" do
-      agent = TestToTAgent.new()
+      agent = TestToTAgent.new!()
       ctx = %{strategy_opts: TestToTAgent.strategy_opts()}
       {agent, _directives} = Jido.AI.Reasoning.TreeOfThoughts.Strategy.init(agent, ctx)
 
@@ -228,7 +228,7 @@ defmodule Jido.AI.ToTAgentTest do
     end
 
     test "strategy receives intersected effect policy from macro options" do
-      agent = EffectPolicyToTAgent.new()
+      agent = EffectPolicyToTAgent.new!()
       ctx = %{strategy_opts: EffectPolicyToTAgent.strategy_opts()}
       {agent, _directives} = Jido.AI.Reasoning.TreeOfThoughts.Strategy.init(agent, ctx)
 

@@ -4,6 +4,11 @@ defmodule Jido.AI.Actions.Retrieval.UpsertMemoryTest do
   alias Jido.AI.Actions.Retrieval.UpsertMemory
   alias Jido.AI.Retrieval.Store
 
+  setup do
+    start_supervised!({Store, []})
+    :ok
+  end
+
   @moduletag :unit
   @moduletag :capture_log
 
@@ -54,7 +59,8 @@ defmodule Jido.AI.Actions.Retrieval.UpsertMemoryTest do
 
   describe "schema-enforced errors via Jido.Exec" do
     test "rejects missing text" do
-      assert {:error, _reason} = Jido.Exec.run(UpsertMemory, %{namespace: unique_namespace("missing_text")}, %{})
+      assert {:error, _reason} =
+               Jido.Exec.run(UpsertMemory, %{namespace: unique_namespace("missing_text")}, %{})
     end
 
     test "rejects invalid metadata type" do

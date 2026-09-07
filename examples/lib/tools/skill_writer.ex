@@ -2,11 +2,9 @@ defmodule Jido.AI.Examples.Tools.ValidateSkillName do
   @moduledoc "Validates a proposed skill name against agentskills.io rules."
 
   use Jido.Action,
+    schema: Zoi.object(%{name: Zoi.string(description: "The proposed skill name to validate")}),
     name: "validate_skill_name",
-    description: "Validates a skill name matches the pattern: lowercase alphanumeric with hyphens, max 64 chars.",
-    schema: [
-      name: [type: :string, required: true, doc: "The proposed skill name to validate"]
-    ]
+    description: "Validates a skill name matches the pattern: lowercase alphanumeric with hyphens, max 64 chars."
 
   @name_regex ~r/^[a-z0-9]+(-[a-z0-9]+)*$/
   @max_length 64
@@ -40,22 +38,19 @@ defmodule Jido.AI.Examples.Tools.WriteModuleSkill do
   @moduledoc "Generates Elixir module code for a Jido.AI.Skill."
 
   use Jido.Action,
+    schema:
+      Zoi.object(%{
+        module_name: Zoi.string(description: "Full module name, e.g., 'MyApp.Skills.CodeReview'"),
+        name: Zoi.string(description: "Skill name (lowercase-hyphenated)"),
+        description: Zoi.string(description: "Skill description (1-1024 chars)"),
+        license: Zoi.string(description: "License identifier, e.g., 'MIT'") |> Zoi.optional(),
+        allowed_tools: Zoi.list(Zoi.string([]), description: "List of allowed tool names") |> Zoi.optional(),
+        actions: Zoi.list(Zoi.string([]), description: "List of action module names") |> Zoi.optional(),
+        tags: Zoi.list(Zoi.string([]), description: "List of tags") |> Zoi.optional(),
+        body: Zoi.string(description: "Skill body content (markdown)")
+      }),
     name: "write_module_skill",
-    description: "Generates Elixir module source code for a skill using `use Jido.AI.Skill`.",
-    schema: [
-      module_name: [
-        type: :string,
-        required: true,
-        doc: "Full module name, e.g., 'MyApp.Skills.CodeReview'"
-      ],
-      name: [type: :string, required: true, doc: "Skill name (lowercase-hyphenated)"],
-      description: [type: :string, required: true, doc: "Skill description (1-1024 chars)"],
-      license: [type: :string, required: false, doc: "License identifier, e.g., 'MIT'"],
-      allowed_tools: [type: {:list, :string}, required: false, doc: "List of allowed tool names"],
-      actions: [type: {:list, :string}, required: false, doc: "List of action module names"],
-      tags: [type: {:list, :string}, required: false, doc: "List of tags"],
-      body: [type: :string, required: true, doc: "Skill body content (markdown)"]
-    ]
+    description: "Generates Elixir module source code for a skill using `use Jido.AI.Skill`."
 
   @impl true
   def run(params, _context) do
@@ -132,17 +127,18 @@ defmodule Jido.AI.Examples.Tools.WriteFileSkill do
   @moduledoc "Generates a SKILL.md file with YAML frontmatter."
 
   use Jido.Action,
+    schema:
+      Zoi.object(%{
+        name: Zoi.string(description: "Skill name (lowercase-hyphenated)"),
+        description: Zoi.string(description: "Skill description (1-1024 chars)"),
+        license: Zoi.string(description: "License identifier, e.g., 'MIT'") |> Zoi.optional(),
+        allowed_tools: Zoi.list(Zoi.string([]), description: "List of allowed tool names") |> Zoi.optional(),
+        tags: Zoi.list(Zoi.string([]), description: "List of tags") |> Zoi.optional(),
+        metadata: Zoi.map(description: "Additional metadata as key-value pairs") |> Zoi.optional(),
+        body: Zoi.string(description: "Skill body content (markdown)")
+      }),
     name: "write_file_skill",
-    description: "Generates a SKILL.md file content with YAML frontmatter and markdown body.",
-    schema: [
-      name: [type: :string, required: true, doc: "Skill name (lowercase-hyphenated)"],
-      description: [type: :string, required: true, doc: "Skill description (1-1024 chars)"],
-      license: [type: :string, required: false, doc: "License identifier, e.g., 'MIT'"],
-      allowed_tools: [type: {:list, :string}, required: false, doc: "List of allowed tool names"],
-      tags: [type: {:list, :string}, required: false, doc: "List of tags"],
-      metadata: [type: :map, required: false, doc: "Additional metadata as key-value pairs"],
-      body: [type: :string, required: true, doc: "Skill body content (markdown)"]
-    ]
+    description: "Generates a SKILL.md file content with YAML frontmatter and markdown body."
 
   @impl true
   def run(params, _context) do

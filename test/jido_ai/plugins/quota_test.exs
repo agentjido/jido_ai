@@ -1,5 +1,5 @@
 defmodule Jido.AI.Plugins.QuotaTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias Jido.AI.Plugins.Quota
   alias Jido.AI.Quota.Store
@@ -9,16 +9,21 @@ defmodule Jido.AI.Plugins.QuotaTest do
   @fallback_scope "quota_plugin_test_fallback"
 
   setup do
+    start_supervised!({Store, []})
     :ok = Store.reset(@scope)
     :ok = Store.reset(@fallback_scope)
     :ok
   end
 
-  defp ctx(state) do
-    %{
-      agent: %Jido.Agent{state: %{quota: state}},
-      plugin_instance: %{state_key: :quota}
-    }
+  defp command(signal, state) do
+    definition =
+      Jido.Agent.new!(%{
+        name: "quota_test",
+        schema: Zoi.object(%{}),
+        plugins: [{Quota, Map.to_list(state)}]
+      })
+
+    %Jido.Agent.Command{agent: Jido.Agent.instantiate!(definition), signal: signal, context: %{}}
   end
 
   defp quota_state(overrides) do
@@ -42,7 +47,7 @@ defmodule Jido.AI.Plugins.QuotaTest do
       usage_signal =
         Signal.new!("ai.usage", %{call_id: "c1", model: "test:model", total_tokens: 12}, source: "/test")
 
-      assert {:ok, :continue} = Quota.handle_signal(usage_signal, ctx(state))
+      assert {:ok, _command} = Quota.admit(nil, command(usage_signal, state), [])
 
       status =
         Store.status(
@@ -66,7 +71,7 @@ defmodule Jido.AI.Plugins.QuotaTest do
           source: "/test"
         )
 
-      assert {:ok, :continue} = Quota.handle_signal(usage_signal, ctx(state))
+      assert {:ok, _command} = Quota.admit(nil, command(usage_signal, state), [])
 
       status =
         Store.status(
@@ -81,33 +86,32 @@ defmodule Jido.AI.Plugins.QuotaTest do
     end
   end
 
-  describe "request rewrite behavior" do
-    test "rewrites over-budget budgeted signals to ai.request.error" do
+  describe "structured budget rejection" do
+    test "rejects over-budget signals with a correlated quota error" do
       state = quota_state(%{max_total_tokens: 10})
 
       usage_signal =
         Signal.new!("ai.usage", %{call_id: "c3", model: "test:model", total_tokens: 12}, source: "/test")
 
-      assert {:ok, :continue} = Quota.handle_signal(usage_signal, ctx(state))
+      assert {:ok, _command} = Quota.admit(nil, command(usage_signal, state), [])
 
       request_signal =
         Signal.new!("chat.message", %{prompt: "hello", call_id: "req_123"}, source: "/test")
 
-      assert {:ok, {:continue, rewritten}} = Quota.handle_signal(request_signal, ctx(state))
-      assert rewritten.type == "ai.request.error"
-      assert rewritten.data.request_id == "req_123"
-      assert rewritten.data.reason == :quota_exceeded
-      assert rewritten.data.message == "quota exceeded for current window"
+      assert {:error, error} = Quota.admit(nil, command(request_signal, state), [])
+      assert error.details.request_id == "req_123"
+      assert error.type == :quota_exceeded
+      assert error.message == "quota exceeded for current window"
     end
 
-    test "does not rewrite non-budgeted signals even when over budget" do
+    test "permits non-budgeted signals even when over budget" do
       state = quota_state(%{max_total_tokens: 10})
 
       usage_signal = Signal.new!("ai.usage", %{call_id: "c4", total_tokens: 12}, source: "/test")
-      assert {:ok, :continue} = Quota.handle_signal(usage_signal, ctx(state))
+      assert {:ok, _command} = Quota.admit(nil, command(usage_signal, state), [])
 
       signal = Signal.new!("quota.status", %{scope: @scope}, source: "/test")
-      assert {:ok, :continue} = Quota.handle_signal(signal, ctx(state))
+      assert {:ok, _command} = Quota.admit(nil, command(signal, state), [])
     end
   end
 end

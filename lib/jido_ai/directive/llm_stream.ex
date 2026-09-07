@@ -65,7 +65,7 @@ defmodule Jido.AI.Directive.LLMStream do
   end
 end
 
-defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
+defmodule Jido.AI.Directive.LLMStream.Execution do
   @moduledoc """
   Spawns an async task to stream an LLM response and sends results back to the agent.
 
@@ -91,7 +91,6 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
 
   alias Jido.AI.{Error, Observe, Signal, Turn}
   alias Jido.AI.Directive.Helpers
-  alias Jido.Tracing.Context, as: TraceContext
 
   def exec(directive, _input_signal, state) do
     %{
@@ -127,7 +126,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
       error_type: nil
     }
 
-    agent_pid = self()
+    agent_pid = Map.fetch!(state, :agent_server)
     task_supervisor = Helpers.get_task_supervisor(state)
 
     stream_opts = %{
@@ -147,7 +146,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
     }
 
     # Capture parent trace context before spawning
-    parent_trace_ctx = TraceContext.get()
+    parent_trace_ctx = Process.get({:jido, :trace_context})
 
     case Task.Supervisor.start_child(task_supervisor, fn ->
            # Restore trace context in child task
@@ -250,7 +249,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMStream do
 
     messages = Helpers.build_directive_messages(context, system_prompt)
 
-    case ReqLLM.stream_text(model, messages, opts) do
+    case Jido.AI.Models.request(:stream, model, messages, opts) do
       {:ok, stream_response} ->
         on_content = fn text ->
           partial_signal =

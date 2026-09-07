@@ -88,7 +88,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.CLIAdapterTest do
     end
 
     test "await propagates status errors" do
-      expect(Jido.AgentServer, :status, fn _pid -> {:error, :not_found} end)
+      expect(Jido.AI.CLI.Adapter, :status, fn _pid -> {:error, :not_found} end)
       assert {:error, :not_found} = AoTAdapter.await(self(), 100, %{})
     end
 
@@ -99,7 +99,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.CLIAdapterTest do
           details: %{profile: :long, search_style: :bfs}
         )
 
-      expect(Jido.AgentServer, :status, fn _pid -> {:ok, status} end)
+      expect(Jido.AI.CLI.Adapter, :status, fn _pid -> {:ok, status} end)
 
       assert {:ok, %{answer: "42", meta: meta}} = AoTAdapter.await(self(), 100, %{})
       assert meta.status == :success
@@ -111,7 +111,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.CLIAdapterTest do
 
     test "await falls back to raw state answer when snapshot result is empty" do
       status = AdapterTestSupport.status(result: nil, raw_state: %{last_result: %{answer: "fallback answer"}})
-      expect(Jido.AgentServer, :status, fn _pid -> {:ok, status} end)
+      expect(Jido.AI.CLI.Adapter, :status, fn _pid -> {:ok, status} end)
 
       assert {:ok, %{answer: "fallback answer"}} = AoTAdapter.await(self(), 100, %{})
     end

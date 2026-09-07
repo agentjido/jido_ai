@@ -42,9 +42,6 @@ defmodule Jido.AI.Actions.Reasoning.Explain do
   use Jido.Action,
     name: "reasoning_explain",
     description: "Get explanations for complex topics at different detail levels",
-    category: "ai",
-    tags: ["reasoning", "explanation", "teaching"],
-    vsn: "1.0.0",
     schema:
       Zoi.object(%{
         model:
@@ -62,6 +59,10 @@ defmodule Jido.AI.Actions.Reasoning.Explain do
         temperature: Zoi.float(description: "Sampling temperature") |> Zoi.default(0.5),
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
+
+  def category, do: "ai"
+  def tags, do: ["reasoning", "explanation", "teaching"]
+  def vsn, do: "1.0.0"
 
   alias Jido.AI.Actions.Helpers
   alias Jido.AI.Turn

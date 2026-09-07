@@ -28,7 +28,7 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
         agent = init_agent(strategy, opts)
 
         first_instruction = %Jido.Instruction{
-          action: strategy.start_action(),
+          target: strategy.start_action(),
           params: %{prompt: "first", request_id: "req_1"}
         }
 
@@ -40,7 +40,7 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
                end)
 
         second_instruction = %Jido.Instruction{
-          action: strategy.start_action(),
+          target: strategy.start_action(),
           params: %{prompt: "second", request_id: "req_2"}
         }
 
@@ -62,7 +62,7 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
         agent = init_agent(strategy, opts)
 
         instruction = %Jido.Instruction{
-          action: strategy.start_action(),
+          target: strategy.start_action(),
           params: %{prompt: "first", request_id: "req_happy"}
         }
 
@@ -82,7 +82,7 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
       agent = init_agent(ChainOfThought, [])
 
       start_instruction = %Jido.Instruction{
-        action: ChainOfThought.start_action(),
+        target: ChainOfThought.start_action(),
         params: %{prompt: "first", request_id: request_id}
       }
 
@@ -90,7 +90,7 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
       flush_signal_casts()
 
       started_instruction = %Jido.Instruction{
-        action: :cot_worker_event,
+        target: :cot_worker_event,
         params: %{
           request_id: request_id,
           event: %{
@@ -117,7 +117,7 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
       assert request_started.data.query == "first"
 
       completed_instruction = %Jido.Instruction{
-        action: :cot_worker_event,
+        target: :cot_worker_event,
         params: %{
           request_id: request_id,
           event: %{
@@ -158,7 +158,7 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
       agent = init_agent(ChainOfThought, [])
 
       start_instruction = %Jido.Instruction{
-        action: ChainOfThought.start_action(),
+        target: ChainOfThought.start_action(),
         params: %{prompt: "first", request_id: request_id}
       }
 
@@ -166,7 +166,7 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
       flush_signal_casts()
 
       failed_instruction = %Jido.Instruction{
-        action: :cot_worker_event,
+        target: :cot_worker_event,
         params: %{
           request_id: request_id,
           event: %{
@@ -208,7 +208,7 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
       agent = init_agent(AlgorithmOfThoughts, [])
 
       start_instruction = %Jido.Instruction{
-        action: AlgorithmOfThoughts.start_action(),
+        target: AlgorithmOfThoughts.start_action(),
         params: %{prompt: "Solve 4,4,6,8 to get 24", request_id: request_id}
       }
 
@@ -231,8 +231,11 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
       """
 
       complete_instruction = %Jido.Instruction{
-        action: AlgorithmOfThoughts.llm_result_action(),
-        params: %{call_id: call_id, result: {:ok, %{text: response, usage: %{input_tokens: 4, output_tokens: 9}}}}
+        target: AlgorithmOfThoughts.llm_result_action(),
+        params: %{
+          call_id: call_id,
+          result: {:ok, %{text: response, usage: %{input_tokens: 4, output_tokens: 9}}}
+        }
       }
 
       {_agent, []} = AlgorithmOfThoughts.cmd(agent, [complete_instruction], %{})
@@ -255,7 +258,7 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
       agent = init_agent(GraphOfThoughts, max_nodes: 2)
 
       start_instruction = %Jido.Instruction{
-        action: GraphOfThoughts.start_action(),
+        target: GraphOfThoughts.start_action(),
         params: %{prompt: "Compare two ideas", request_id: request_id}
       }
 
@@ -267,7 +270,7 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
       assert_receive {:telemetry_event, [:jido, :ai, :request, :start], _, %{request_id: ^request_id}}, 200
 
       complete_instruction = %Jido.Instruction{
-        action: GraphOfThoughts.llm_result_action(),
+        target: GraphOfThoughts.llm_result_action(),
         params: %{
           call_id: call_id,
           result: {:ok, %{text: "Thought 1: compare tradeoffs", usage: %{input_tokens: 2, output_tokens: 3}}}
@@ -294,7 +297,7 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
       agent = init_agent(GraphOfThoughts, [])
 
       start_instruction = %Jido.Instruction{
-        action: GraphOfThoughts.start_action(),
+        target: GraphOfThoughts.start_action(),
         params: %{prompt: "Analyze this", request_id: request_id}
       }
 
@@ -302,7 +305,7 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
       flush_signal_casts()
 
       failed_instruction = %Jido.Instruction{
-        action: GraphOfThoughts.llm_result_action(),
+        target: GraphOfThoughts.llm_result_action(),
         params: %{call_id: call_id, result: {:error, :overloaded}}
       }
 
@@ -326,7 +329,7 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
       agent = init_agent(TRM, [])
 
       start_instruction = %Jido.Instruction{
-        action: TRM.start_action(),
+        target: TRM.start_action(),
         params: %{prompt: "What is 2+2?", request_id: request_id}
       }
 
@@ -338,7 +341,7 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
       assert_receive {:telemetry_event, [:jido, :ai, :request, :start], _, %{request_id: ^request_id}}, 200
 
       failed_instruction = %Jido.Instruction{
-        action: TRM.llm_result_action(),
+        target: TRM.llm_result_action(),
         params: %{call_id: call_id, result: {:error, :provider_down}, phase: :reasoning}
       }
 
@@ -362,7 +365,7 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
       agent = init_agent(TRM, max_supervision_steps: 1, act_threshold: 0.99)
 
       start_instruction = %Jido.Instruction{
-        action: TRM.start_action(),
+        target: TRM.start_action(),
         params: %{prompt: "What is 2+2?", request_id: request_id}
       }
 
@@ -370,14 +373,18 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
       flush_signal_casts()
 
       reasoning_instruction = %Jido.Instruction{
-        action: TRM.llm_result_action(),
-        params: %{call_id: reasoning_call_id, result: {:ok, %{text: "The answer is 4"}}, phase: :reasoning}
+        target: TRM.llm_result_action(),
+        params: %{
+          call_id: reasoning_call_id,
+          result: {:ok, %{text: "The answer is 4"}},
+          phase: :reasoning
+        }
       }
 
       {agent, [%Directive.LLMStream{id: supervision_call_id}]} = TRM.cmd(agent, [reasoning_instruction], %{})
 
       supervision_instruction = %Jido.Instruction{
-        action: TRM.llm_result_action(),
+        target: TRM.llm_result_action(),
         params: %{
           call_id: supervision_call_id,
           result: {:ok, %{text: "Score: 0.7. Looks correct."}},
@@ -388,12 +395,15 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
       {agent, [%Directive.LLMStream{id: improvement_call_id}]} = TRM.cmd(agent, [supervision_instruction], %{})
 
       improvement_instruction = %Jido.Instruction{
-        action: TRM.llm_result_action(),
+        target: TRM.llm_result_action(),
         params: %{
           call_id: improvement_call_id,
           result:
             {:ok,
-             %{text: "2 + 2 = 4 because adding two and two gives four.", usage: %{input_tokens: 4, output_tokens: 8}}},
+             %{
+               text: "2 + 2 = 4 because adding two and two gives four.",
+               usage: %{input_tokens: 4, output_tokens: 8}
+             }},
           phase: :improving
         }
       }
@@ -413,7 +423,14 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
   end
 
   defp init_agent(strategy, strategy_opts) do
-    agent = %Jido.Agent{id: "agent-#{strategy}", name: "test", state: %{}}
+    agent = %Jido.Agent{
+      id: "agent-#{strategy}",
+      name: "test",
+      state: %{},
+      schema: Zoi.object(%{}),
+      module: Jido.Agent
+    }
+
     {agent, _directives} = strategy.init(agent, %{strategy_opts: strategy_opts})
     agent
   end

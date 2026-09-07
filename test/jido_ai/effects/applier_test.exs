@@ -3,30 +3,31 @@ defmodule Jido.AI.Effects.ApplierTest do
 
   alias Jido.AI.Effects.Applier
   alias Jido.Agent.Directive
-  alias Jido.Agent.StateOp
+  alias Jido.AI.Effects.State
 
   defmodule EffectsApplierAgent do
     use Jido.Agent,
-      name: "effects_applier_agent"
+      name: "effects_applier_agent",
+      schema: Zoi.object(%{status: Zoi.atom() |> Zoi.default(:idle)})
   end
 
   test "normalize_result supports both 2-tuple and 3-tuple envelopes" do
     assert Applier.normalize_result({:ok, :value}) == {:ok, :value, []}
 
-    assert Applier.normalize_result({:ok, :value, [%StateOp.SetState{attrs: %{a: 1}}]}) ==
-             {:ok, :value, [%StateOp.SetState{attrs: %{a: 1}}]}
+    assert Applier.normalize_result({:ok, :value, [%State{state: %{a: 1}}]}) ==
+             {:ok, :value, [%State{state: %{a: 1}}]}
 
     assert Applier.normalize_result({:error, :boom}) == {:error, :boom, []}
   end
 
   test "filter_result drops disallowed effects and reports stats" do
     emit = %Directive.Emit{signal: %{type: "ai.test"}}
-    state_op = %StateOp.SetState{attrs: %{count: 1}}
+    state_op = %State{state: %{count: 1}}
 
     {filtered_result, stats} =
       Applier.filter_result(
         {:ok, :done, [state_op, emit]},
-        %{mode: :allow_list, allow: [StateOp.SetState]}
+        %{mode: :allow_list, allow: [State]}
       )
 
     assert filtered_result == {:ok, :done, [state_op]}
@@ -36,16 +37,16 @@ defmodule Jido.AI.Effects.ApplierTest do
     assert stats.dropped_effects == [emit]
   end
 
-  test "apply_result mutates agent state and returns directives from allowed effects" do
-    agent = EffectsApplierAgent.new()
-    emit = %Directive.Emit{signal: %{type: "ai.done"}}
-    state_op = %StateOp.SetState{attrs: %{status: :complete}}
+  test "apply_result assembles complete agent state and returns directives from allowed effects" do
+    agent = EffectsApplierAgent.new!()
+    emit = %Directive.Emit{signal: Jido.Signal.new!("ai.done", %{}, %{source: "/effects/test"})}
+    state_op = %State{state: %{status: :complete}}
 
     {updated_agent, directives, stats, filtered_result} =
       Applier.apply_result(
         agent,
         {:ok, :done, [state_op, emit]},
-        %{mode: :allow_list, allow: [StateOp.SetState, Directive.Emit]}
+        %{mode: :allow_list, allow: [State, Directive.Emit]}
       )
 
     assert updated_agent.state.status == :complete
@@ -55,7 +56,7 @@ defmodule Jido.AI.Effects.ApplierTest do
   end
 
   test "apply_result handles invalid envelopes safely" do
-    agent = EffectsApplierAgent.new()
+    agent = EffectsApplierAgent.new!()
 
     {updated_agent, directives, stats, filtered_result} =
       Applier.apply_result(agent, :bad_result, %{mode: :allow_all})

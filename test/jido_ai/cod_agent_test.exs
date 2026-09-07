@@ -1,14 +1,12 @@
 defmodule Jido.AI.CoDAgentTest do
-  use ExUnit.Case, async: true
+  use Jido.AI.Test.ReasoningCase, async: false
 
-  alias Jido.AI.Request
   alias Jido.AI.Reasoning.ChainOfDraft
-  alias Jido.AI.Reasoning.ChainOfDraft.Strategy, as: ChainOfDraftStrategy
 
   defmodule TestCoDAgent do
     use Jido.AI.CoDAgent,
       name: "test_cod_agent",
-      model: "test:model"
+      model: "openai:gpt-4o-mini"
   end
 
   defmodule DefaultCoDAgent do
@@ -44,8 +42,9 @@ defmodule Jido.AI.CoDAgentTest do
   end
 
   describe "strategy configuration" do
-    test "uses ChainOfDraft strategy" do
-      assert DefaultCoDAgent.strategy() == ChainOfDraftStrategy
+    test "selects ChainOfDraft in the native AI profile" do
+      assert {:ok, profile} = Configuration.profile(DefaultCoDAgent.agent())
+      assert profile.reasoning.method == :chain_of_draft
     end
 
     test "uses expected defaults when not provided" do
@@ -99,53 +98,22 @@ defmodule Jido.AI.CoDAgentTest do
     end
   end
 
-  describe "request lifecycle hooks" do
-    test "on_after_cmd keeps last_result string while request failure stores raw term" do
-      raw_error = %{type: :provider_error, status: 503, message: "busy"}
+  describe "request lifecycle" do
+    test "failure keeps last_result printable and stores the provider error", %{jido: jido} do
+      mock = mock([%{reply: {:error, 503, "busy"}}])
+      server = start_agent(jido, TestCoDAgent)
 
-      agent =
-        TestCoDAgent.new()
-        |> Request.start_request("req_failed", "query")
-        |> with_failed_strategy("req_failed", raw_error)
+      assert {:ok, handle} =
+               TestCoDAgent.draft(server, "query", model: MockLLM.model(), llm_opts: MockLLM.options(mock))
 
-      {:ok, updated_agent, directives} =
-        TestCoDAgent.on_after_cmd(
-          agent,
-          {:cod_worker_event, %{request_id: "req_failed", event: %{request_id: "req_failed"}}},
-          [:noop]
-        )
-
-      assert directives == [:noop]
-      assert get_in(updated_agent.state, [:requests, "req_failed", :status]) == :failed
-      assert match?({:failed, _, ^raw_error}, get_in(updated_agent.state, [:requests, "req_failed", :error]))
-
-      assert updated_agent.state.last_result == inspect(raw_error)
-      assert updated_agent.state.completed == true
+      assert {:error, error} = TestCoDAgent.await(handle)
+      assert %ReqLLM.Error.API.Stream{cause: %ReqLLM.Error.API.Request{status: 503, reason: "busy"}} = error
+      assert error.cause.response_body["message"] == "busy"
+      assert record(server, handle).status == :failed
+      assert record(server, handle).error == error
+      assert Server.agent(server).state.last_result == inspect(error)
+      assert Server.agent(server).state.completed
+      assert_script_done(mock)
     end
-  end
-
-  defp with_failed_strategy(agent, request_id, result) do
-    failed_event = %{
-      id: "evt_failed",
-      seq: 1,
-      at_ms: 1_700_000_000_100,
-      run_id: request_id,
-      request_id: request_id,
-      iteration: 1,
-      kind: :request_failed,
-      llm_call_id: "cod_call_1",
-      tool_call_id: nil,
-      tool_name: nil,
-      data: %{error: result}
-    }
-
-    {agent, _directives} =
-      ChainOfDraftStrategy.cmd(
-        agent,
-        [%Jido.Instruction{action: :cod_worker_event, params: %{request_id: request_id, event: failed_event}}],
-        %{}
-      )
-
-    agent
   end
 end

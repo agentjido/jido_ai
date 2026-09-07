@@ -19,7 +19,7 @@ defmodule Jido.AI.Reasoning.HelpersTest do
     use Jido.Action,
       name: "failing_action",
       description: "Always fails",
-      schema: []
+      schema: Zoi.object(%{})
 
     @impl true
     def run(_params, _context), do: {:error, :something_broke}
@@ -27,13 +27,15 @@ defmodule Jido.AI.Reasoning.HelpersTest do
 
   describe "execute_action_instruction/3" do
     test "error details include the failure reason" do
-      agent = %Jido.Agent{id: "test-agent", name: "test", state: %{}}
-
-      instruction = %Jido.Instruction{
-        action: FailingAction,
-        params: %{},
-        context: %{}
+      agent = %Jido.Agent{
+        id: "test-agent",
+        name: "test",
+        state: %{},
+        schema: Zoi.object(%{}),
+        module: Jido.Agent
       }
+
+      instruction = %Jido.Instruction{target: FailingAction, params: %{}, context: %{}}
 
       {_agent, [%Jido.Agent.Directive.Error{error: error}]} =
         Helpers.execute_action_instruction(agent, instruction)
@@ -86,13 +88,20 @@ defmodule Jido.AI.Reasoning.HelpersTest do
   end
 
   defp expect_exec_opts(assertion) do
-    Mimic.expect(Jido.Exec, :run, fn %Jido.Instruction{opts: opts} ->
+    Mimic.expect(Jido.Exec, :run, fn %Jido.Instruction{}, %{}, %{}, opts ->
       assertion.(opts)
       {:error, :something_broke}
     end)
   end
 
-  defp test_agent, do: %Jido.Agent{id: "test-agent", name: "test", state: %{}}
+  defp test_agent,
+    do: %Jido.Agent{
+      id: "test-agent",
+      name: "test",
+      state: %{},
+      schema: Zoi.object(%{}),
+      module: Jido.Agent
+    }
 
   defp preserve_env(app, key) do
     original = Application.fetch_env(app, key)
@@ -106,6 +115,6 @@ defmodule Jido.AI.Reasoning.HelpersTest do
   end
 
   defp test_instruction do
-    %Jido.Instruction{action: FailingAction, params: %{}, context: %{}}
+    %Jido.Instruction{target: FailingAction, params: %{}, context: %{}}
   end
 end

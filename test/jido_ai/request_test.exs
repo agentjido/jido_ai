@@ -21,12 +21,16 @@ defmodule JidoTest.AI.RequestTest do
       GenServer.call(pid, :last_signal)
     end
 
+    def last_context(pid), do: GenServer.call(pid, :last_context)
+
     @impl true
     def init(opts) do
       {:ok,
        %{
          await_result: Keyword.get(opts, :await_result, {:ok, %{status: :completed, result: "ok"}}),
          await_delay_ms: Keyword.get(opts, :await_delay_ms, 0),
+         request_id: Keyword.get(opts, :request_id),
+         last_context: nil,
          last_signal: nil
        }}
     end
@@ -36,28 +40,32 @@ defmodule JidoTest.AI.RequestTest do
       {:reply, state.last_signal, state}
     end
 
-    def handle_call({:await_completion, _opts}, _from, state) do
+    def handle_call(:last_context, _from, state), do: {:reply, state.last_context, state}
+
+    def handle_call(:agent, _from, state), do: {:reply, agent(), state}
+
+    def handle_call({:plugin_state, Jido.AI.Session.Plugin}, _from, state) do
       if state.await_delay_ms > 0, do: Process.sleep(state.await_delay_ms)
-      {:reply, state.await_result, state}
+      {:ok, record} = state.await_result
+      {:reply, {:ok, %{state.request_id => record}}, state}
     end
 
-    # Return a non-State tuple so AgentServer.status/1 falls back to {:error, :timeout}
-    # in Request.await timeout diagnostics.
-    def handle_call(:get_state, _from, state) do
-      {:reply, {:error, :unsupported}, state}
+    def handle_call({:signal, ref, signal, _deadline, context}, _from, state) when is_reference(ref) do
+      id = signal.data.request_id
+      agent = %{agent() | state: %{requests: %{id => %{id: id, status: :pending}}}}
+      {:reply, {:ok, agent}, %{state | last_signal: signal, last_context: context}}
     end
 
-    @impl true
-    def handle_cast({:signal, signal}, state) do
-      {:noreply, %{state | last_signal: signal}}
-    end
-
-    def handle_cast({:cancel_await_completion, _waiter_id}, state) do
-      {:noreply, state}
-    end
-
-    def handle_cast(_msg, state) do
-      {:noreply, state}
+    # This fixture tests the client message contract. Session execution is
+    # covered by the real Agent integration tests.
+    defp agent do
+      %Jido.Agent{
+        module: __MODULE__,
+        name: "request_transport_fixture",
+        schema: Zoi.object(%{}),
+        state: %{requests: %{}},
+        plugins: [{Jido.AI.Session.Plugin, []}]
+      }
     end
   end
 
@@ -440,15 +448,17 @@ defmodule JidoTest.AI.RequestTest do
       assert signal.data.query == "What is 2+2?"
       assert signal.data.prompt == "What is 2+2?"
       assert signal.data.request_id == "req_123"
-      assert signal.data.tool_context == %{actor: "user_1"}
-      assert signal.data.tools == [:tool_override]
-      assert signal.data.allowed_tools == ["calculator"]
-      assert signal.data.request_transformer == TestRequestTransformer
-      assert signal.data.max_iterations == 3
-      assert signal.data.stream_timeout_ms == 4_321
-      assert signal.data.stream_to == {:pid, self()}
-      assert signal.data.req_http_options == [plug: {Req.Test, []}]
-      assert signal.data.llm_opts == [thinking: "enabled", reasoning_effort: :high]
+      resources = FakeRuntimeServer.last_context(server).jido_ai_request
+      assert Map.keys(signal.data) |> Enum.sort() == [:extra_refs, :prompt, :query, :request_id]
+      assert resources.tool_context == %{actor: "user_1"}
+      assert resources.tools == [:tool_override]
+      assert resources.allowed_tools == ["calculator"]
+      assert resources.request_transformer == TestRequestTransformer
+      assert resources.max_iterations == 3
+      assert resources.stream_timeout_ms == 4_321
+      assert resources.stream_to == {:pid, self()}
+      assert resources.req_http_options == [plug: {Req.Test, []}]
+      assert resources.llm_opts == [thinking: "enabled", reasoning_effort: :high]
       assert signal.data.extra_refs == %{slack_ts: "1234.001", custom_id: "abc"}
     end
 
@@ -503,7 +513,10 @@ defmodule JidoTest.AI.RequestTest do
 
     test "await/2 returns successful result for completed request payload" do
       server =
-        start_runtime_server(await_result: {:ok, %{status: :completed, result: "The answer is 4"}})
+        start_runtime_server(
+          request_id: "req_ok",
+          await_result: {:ok, %{status: :completed, result: "The answer is 4"}}
+        )
 
       handle = Handle.new("req_ok", server, "query")
       assert {:ok, "The answer is 4"} = Request.await(handle, timeout: 100)
@@ -511,7 +524,10 @@ defmodule JidoTest.AI.RequestTest do
 
     test "await/2 returns rejection reason for failed request payload" do
       server =
-        start_runtime_server(await_result: {:ok, %{status: :failed, error: {:rejected, :busy, "Agent is busy"}}})
+        start_runtime_server(
+          request_id: "req_busy",
+          await_result: {:ok, %{status: :failed, error: {:rejected, :busy, "Agent is busy"}}}
+        )
 
       handle = Handle.new("req_busy", server, "query")
       assert {:error, {:rejected, :busy, "Agent is busy"}} = Request.await(handle, timeout: 100)
@@ -519,7 +535,11 @@ defmodule JidoTest.AI.RequestTest do
 
     test "await/2 normalizes AgentServer timeout diagnostics to :timeout" do
       server =
-        start_runtime_server(await_result: {:ok, %{status: :completed, result: "too late"}}, await_delay_ms: 50)
+        start_runtime_server(
+          request_id: "req_timeout",
+          await_result: {:ok, %{status: :completed, result: "too late"}},
+          await_delay_ms: 50
+        )
 
       handle = Handle.new("req_timeout", server, "query")
       assert {:error, :timeout} = Request.await(handle, timeout: 5)
@@ -527,10 +547,18 @@ defmodule JidoTest.AI.RequestTest do
 
     test "await_many/2 preserves input order under concurrent completion" do
       slow_server =
-        start_runtime_server(await_result: {:ok, %{status: :completed, result: "slow"}}, await_delay_ms: 40)
+        start_runtime_server(
+          request_id: "req_slow",
+          await_result: {:ok, %{status: :completed, result: "slow"}},
+          await_delay_ms: 40
+        )
 
       fast_server =
-        start_runtime_server(await_result: {:ok, %{status: :completed, result: "fast"}}, await_delay_ms: 1)
+        start_runtime_server(
+          request_id: "req_fast",
+          await_result: {:ok, %{status: :completed, result: "fast"}},
+          await_delay_ms: 1
+        )
 
       requests = [
         Handle.new("req_slow", slow_server, "slow"),

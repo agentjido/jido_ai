@@ -26,7 +26,9 @@ defmodule Jido.AI.Reasoning.Adaptive.StrategyTest do
     %Jido.Agent{
       id: "test-agent",
       name: "test_adaptive_agent",
-      state: %{}
+      state: %{},
+      schema: Zoi.object(%{}),
+      module: Jido.Agent
     }
     |> then(fn agent ->
       ctx = %{strategy_opts: opts}

@@ -1,72 +1,54 @@
 defmodule Jido.AI.Plugins.Reasoning.ChainOfDraftTest do
   use ExUnit.Case, async: true
+  alias Jido.AI.Plugins.Reasoning.ChainOfDraft, as: Capability
 
-  alias Jido.AI.Plugins.Reasoning.ChainOfDraft
+  defmodule Overwrite do
+    use Jido.Action, name: "overwrite_cod_defaults"
 
-  describe "plugin_spec/1" do
-    test "returns valid plugin spec" do
-      spec = ChainOfDraft.plugin_spec(%{})
-
-      assert spec.module == ChainOfDraft
-      assert spec.name == "reasoning_chain_of_draft"
-      assert spec.state_key == :reasoning_cod
-      assert spec.category == "ai"
-      assert spec.actions == [Jido.AI.Actions.Reasoning.RunStrategy]
+    def run(_, context) do
+      next = put_in(context.agent_state.reasoning_cod.timeout, 1)
+      {:ok, next}
     end
   end
 
-  describe "mount/2" do
-    test "initializes state with defaults" do
-      {:ok, state} = ChainOfDraft.mount(%Jido.Agent{}, %{})
+  test "core creates owned defaults for the fixed method" do
+    definition = definition([])
+    agent = Jido.Agent.instantiate!(definition)
 
-      assert state.strategy == :cod
-      assert state.default_model == :reasoning
-      assert state.timeout == 30_000
-      assert state.options == %{}
-    end
+    assert agent.state.reasoning_cod == %{
+             strategy: :cod,
+             default_model: :reasoning,
+             timeout: 30_000,
+             options: %{}
+           }
 
-    test "mounted state validates against plugin schema" do
-      {:ok, state} = ChainOfDraft.mount(%Jido.Agent{}, %{})
-      assert {:ok, _parsed_state} = Zoi.parse(ChainOfDraft.schema(), state)
-    end
+    assert agent.state.result == nil
   end
 
-  describe "signal routing" do
-    test "routes reasoning.cod.run to RunStrategy" do
-      routes = ChainOfDraft.signal_routes(%{})
-      route_map = Map.new(routes)
-
-      assert route_map["reasoning.cod.run"] == Jido.AI.Actions.Reasoning.RunStrategy
-    end
+  test "configured defaults survive an empty restored state and reject another method" do
+    config = [default_model: :fast, timeout: 800, options: %{system_prompt: "Use facts"}]
+    {:reasoning_cod, schema} = Capability.state_spec(config)
+    assert {:ok, state} = Zoi.parse(schema, %{})
+    assert state.default_model == :fast and state.timeout == 800
+    assert state.options == %{system_prompt: "Use facts"}
+    assert {:error, _} = Zoi.parse(schema, %{state | strategy: :invalid})
+    assert {:error, _} = Zoi.parse(schema, %{state | timeout: 0})
   end
 
-  describe "handle_signal/2" do
-    test "forces strategy :cod and overrides caller strategy input" do
-      signal =
-        Jido.Signal.new!(
-          "reasoning.cod.run",
-          %{prompt: "solve this quickly", strategy: :cot, timeout: 45_000, options: %{depth: 2}},
-          source: "/test"
-        )
+  test "an ordinary Action cannot replace the owned defaults" do
+    agent = definition([]) |> Jido.Agent.instantiate!()
+    signal = Jido.Signal.new!("defaults.replace", %{}, source: "/test")
+    assert {:error, error} = Jido.Agent.cmd(agent, signal)
+    assert inspect(error) =~ "Plugin"
+    assert agent.state.reasoning_cod.timeout == 30_000
+  end
 
-      assert {:ok, {:override, {Jido.AI.Actions.Reasoning.RunStrategy, params}}} =
-               ChainOfDraft.handle_signal(signal, %{})
-
-      assert params.strategy == :cod
-      assert params.prompt == "solve this quickly"
-      assert params.timeout == 45_000
-      assert params.options == %{depth: 2}
-    end
-
-    test "normalizes non-map payload data and still injects strategy" do
-      signal =
-        Jido.Signal.new!("reasoning.cod.run", %{prompt: "placeholder"}, source: "/test")
-        |> Map.put(:data, :not_a_map)
-
-      assert {:ok, {:override, {Jido.AI.Actions.Reasoning.RunStrategy, params}}} =
-               ChainOfDraft.handle_signal(signal, %{})
-
-      assert params == %{strategy: :cod}
-    end
+  defp definition(config) do
+    Jido.Agent.new!(%{
+      name: "cod_capability_contract",
+      schema: Zoi.object(%{result: Zoi.any() |> Zoi.default(nil)}),
+      plugins: [{Capability, config}],
+      routes: [{"defaults.replace", Overwrite}]
+    })
   end
 end

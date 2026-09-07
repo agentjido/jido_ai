@@ -39,7 +39,7 @@ defmodule Jido.AI.Directive.LLMEmbed do
   end
 end
 
-defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMEmbed do
+defmodule Jido.AI.Directive.LLMEmbed.Execution do
   @moduledoc """
   Spawns an async task to generate embeddings and sends the result back to the agent.
 
@@ -62,7 +62,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMEmbed do
     dimensions = Map.get(directive, :dimensions)
     timeout = Map.get(directive, :timeout)
 
-    agent_pid = self()
+    agent_pid = Map.fetch!(state, :agent_server)
     task_supervisor = Helpers.get_task_supervisor(state)
 
     case Task.Supervisor.start_child(task_supervisor, fn ->
@@ -101,7 +101,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.LLMEmbed do
       |> add_dimensions_opt(dimensions)
       |> Helpers.add_timeout_opt(timeout)
 
-    case ReqLLM.Embedding.embed(model, texts, opts) do
+    case Jido.AI.Models.request(:embedding, model, texts, opts) do
       {:ok, embeddings} ->
         {:ok, %{embeddings: embeddings, count: count_embeddings(embeddings)}}
 

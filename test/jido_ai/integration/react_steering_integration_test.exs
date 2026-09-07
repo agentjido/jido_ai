@@ -9,7 +9,7 @@ defmodule Jido.AI.Integration.ReActSteeringIntegrationTest do
   defmodule SteeringAgent do
     use Jido.AI.Agent,
       name: "react_steering_agent",
-      model: "test:model",
+      model: "openai:gpt-4o-mini",
       tools: []
   end
 

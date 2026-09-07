@@ -1,71 +1,284 @@
 defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
-  use ExUnit.Case, async: true
+  use Jido.AI.Test.ReasoningCase, async: false
 
-  alias Jido.Agent.Directive, as: AgentDirective
-  alias Jido.Agent.Strategy.State, as: StratState
-  alias Jido.AI.Directive
-  alias Jido.AI.PendingInputServer
-  alias Jido.AI.Request
-  alias Jido.AI.Runtime.Event
-  alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
+  alias Jido.AI.Reasoning.ReAct
+  alias Jido.AI.Reasoning.ReAct.{Config, Token}
+  alias Jido.AI.Usage
   alias Jido.Thread
-  alias Jido.Thread.Agent, as: ThreadAgent
+  alias Jido.AI.Context
+  alias Jido.AI.Context.Operations, as: ContextOps
   alias ReqLLM.Message.ContentPart
 
   defmodule TestCalculator do
     use Jido.Action,
       name: "calculator",
-      description: "A simple calculator"
+      description: "A simple calculator",
+      schema: Zoi.object(%{operation: Zoi.string(), a: Zoi.number(), b: Zoi.number()})
 
-    def run(%{operation: "add", a: a, b: b}, _ctx), do: {:ok, %{result: a + b}}
-    def run(%{operation: "multiply", a: a, b: b}, _ctx), do: {:ok, %{result: a * b}}
+    def run(%{operation: operation, a: a, b: b}, context) do
+      if context[:hold_tool] do
+        send(context.observer, {:calculator_held, self()})
+
+        receive do
+          :release -> :ok
+        end
+      end
+
+      if context[:observe_context] do
+        send(
+          context.observer,
+          {:calculator_context, Map.take(context, [:state, :agent_state, :agent_module, :agent_id, :tenant, :region])}
+        )
+      end
+
+      case operation do
+        "add" -> {:ok, %{result: a + b}}
+        "multiply" -> {:ok, %{result: a * b}}
+      end
+    end
   end
 
   defmodule TestSearch do
     use Jido.Action,
       name: "search",
-      description: "Search for information"
+      description: "Search for information",
+      schema: Zoi.object(%{query: Zoi.string()})
 
+    def run(%{query: "timeout"}, _ctx), do: {:error, %{type: :timeout, message: "search timed out"}}
     def run(%{query: query}, _ctx), do: {:ok, %{results: ["Found: #{query}"]}}
   end
 
-  defmodule TestRequestTransformer do
-    def transform_request(request, _state, _config, _context), do: {:ok, request}
+  defmodule PreparedRequest do
+    @behaviour Jido.AI.Control
+
+    def check(request, context) do
+      send(context.observer, {:prepared_request, request, context.jido_ai_profiles.assistant})
+      if context[:capture_only], do: {:error, :configuration_observed}, else: :ok
+    end
   end
 
-  defp create_agent(opts) do
-    %Jido.Agent{
-      id: "test-agent",
-      name: "test",
-      state: %{}
+  defmodule NativeTransform do
+    def transform_request(request, state, config, context) do
+      send(context.observer, {:native_transform, request, state.iteration, config})
+      {:ok, %{llm_opts: [temperature: 0.35]}}
+    end
+  end
+
+  defmodule RawFailure do
+    @behaviour Jido.AI.Control
+    def check(_, context), do: {:error, context.failure}
+  end
+
+  defp raw_failure(jido, raw) do
+    mock =
+      start_supervised!({MockLLM, script: [%{reply: {:text, "Provider answer"}}], observer: self()}, id: make_ref())
+
+    server = native_start(jido, [tools: []], %{controls: %{output: [RawFailure]}})
+    assert {:ok, handle} = request(server, mock, :react, "Fail", context: %{observer: self(), failure: raw})
+    assert {:error, ^raw} = Request.await(handle)
+    assert {:ok, view} = Session.snapshot(server)
+    assert view.request.status == :failed and view.request.error == raw
+    assert view.live == nil and view.details.active_request_id == nil
+    streamed = events(handle)
+    assert List.last(streamed).kind == :request_failed and List.last(streamed).data.error == raw
+    assert ReAct.collect_stream(streamed).result == raw
+    assert_script_done(mock)
+    view
+  end
+
+  defp native_checkpoint(jido) do
+    mock = mock([%{reply: {:text, "Done"}}])
+    server = start_reasoning(jido, :react, tools: [])
+    assert {:ok, handle} = request(server, mock, :react, "Checkpoint")
+    assert {:ok, "Done"} = Request.await(handle)
+    assert {:ok, view} = Session.snapshot(server)
+    assert view.live == nil and view.details.active_request_id == nil
+    assert {:ok, saved} = Jido.Agent.checkpoint(view.agent)
+    assert saved.state.requests[handle.id] == view.request
+    assert saved.state.requests[handle.id].result == "Done"
+
+    assert Usage.token_counts(saved.state.requests[handle.id].meta.usage) == %{
+             input_tokens: 10,
+             output_tokens: 5,
+             total_tokens: 15
+           }
+
+    assert :ok = Jido.Action.validate_static_data(saved)
+    assert_script_done(mock)
+    {server, handle, saved}
+  end
+
+  defp standalone_terminal(jido) do
+    mock = start_supervised!({MockLLM, script: [%{reply: {:text, "Token done"}}], observer: self()}, id: make_ref())
+
+    config =
+      Config.new(%{
+        model: MockLLM.model(),
+        tools: [],
+        streaming: false,
+        llm_opts: MockLLM.options(mock),
+        token_secret: "react-terminal-contract"
+      })
+
+    result = ReAct.run("Token", config, context: %{jido: jido})
+    assert result.result == "Token done"
+    assert {:ok, state, _} = Token.decode_state(result.final_token, config)
+    assert state.status == :completed and state.result == "Token done"
+    assert state.usage == result.usage
+    assert_script_done(mock)
+    {mock, config, result}
+  end
+
+  defmodule CaptureMessages do
+    def transform_request(request, state, _config, context) do
+      send(context.observer, {:model_messages, state.request_id, request.messages})
+      {:ok, %{}}
+    end
+  end
+
+  defp native_definition(opts, changes \\ %{}) do
+    opts = Keyword.merge([name: "react_setup", tools: [TestCalculator], model: MockLLM.model(), streaming: false], opts)
+    source = Jido.AI.Agent.Options.lower!(opts)
+
+    plugins =
+      Enum.map(source[:plugins], fn
+        {Jido.AI.Runtime.Plugin, config} ->
+          profile = config[:profiles].assistant
+          source = profile |> Map.from_struct() |> Map.merge(changes)
+          source = Map.update!(source, :controls, &Map.put(&1, :model, [PreparedRequest]))
+          assert {:ok, profile} = Jido.AI.Profile.new(source)
+          {Jido.AI.Runtime.Plugin, Keyword.put(config, :profiles, %{assistant: profile})}
+
+        plugin ->
+          plugin
+      end)
+
+    source
+    |> Keyword.put(:plugins, plugins)
+    |> Jido.Agent.new!()
+  end
+
+  defp native_start(jido, opts \\ [], changes \\ %{}),
+    do: start_agent(jido, Jido.Agent.instantiate!(native_definition(opts, changes)))
+
+  # Old setup cases inspected the deferred worker payload before any model call.
+  # This control observes the equivalent prepared request and stops explicitly.
+  # HTTP transport and provider acceptance are covered by separate live cases.
+  defp prepared(jido, base, overrides \\ []) do
+    mock = mock([])
+    server = native_start(jido, base)
+    context = %{observer: self(), capture_only: true, ai: %{assistant: %{options: MockLLM.options(mock)}}}
+    assert {:ok, handle} = request(server, mock, :react, "Inspect setup", Keyword.put(overrides, :context, context))
+    assert {:error, :configuration_observed} = Request.await(handle)
+    assert_receive {:prepared_request, request, profile}, 1_000
+    assert MockLLM.report(mock).requests == []
+    assert_script_done(mock)
+    assert :ok = Jido.Action.validate_static_data(Server.agent(server).state)
+    {request, profile}
+  end
+
+  defp user_texts(server) do
+    Server.agent(server).state.messages
+    |> Enum.filter(&(&1.role == :user))
+    |> Enum.map(& &1.content)
+  end
+
+  defp context_agent(opts) do
+    source = definition(:react, Keyword.merge([tools: [TestCalculator], model: MockLLM.model()], opts))
+
+    schema = %{
+      source.schema
+      | fields: Keyword.put(source.schema.fields, :custom_counter, Zoi.integer() |> Zoi.default(7))
     }
-    |> then(fn agent ->
-      ctx = %{strategy_opts: opts, agent_module: Keyword.get(opts, :agent_module)}
-      {agent, []} = ReAct.init(agent, ctx)
-      agent
-    end)
+
+    Jido.Agent.instantiate!(%{source | schema: schema})
   end
 
-  defp instruction(action, params) do
-    %Jido.Instruction{action: action, params: params}
+  defp calculation do
+    %{reply: {:tools, [%{id: "calc", name: "calculator", arguments: %{operation: "add", a: 2, b: 3}}]}}
   end
 
-  defp context_replace_instruction(context, opts \\ []) do
-    instruction(
-      ReAct.context_modify_action(),
-      %{
-        op_id: Keyword.get(opts, :op_id, "op_#{Jido.Util.generate_id()}"),
-        context_ref: Keyword.get(opts, :context_ref, "default"),
-        operation: %{
-          type: :replace,
-          reason: Keyword.get(opts, :reason, :manual),
-          result_context: context
-        }
-      }
-    )
+  defp current_context(server), do: Jido.AI.get_strategy_context(Server.agent(server))
+  defp context_lane(server), do: Server.agent(server).state[ContextOps.key()].assistant
+  defp thread_messages(server), do: Thread.filter_by_kind(context_lane(server).thread, :ai_message)
+  defp context_operations(server), do: Thread.filter_by_kind(context_lane(server).thread, :ai_context_operation)
+
+  defp replace_context(server, value, opts \\ []),
+    do: Session.modify_context(server, %{type: :replace, result_context: value}, opts)
+
+  defp deferred_context(jido, terminal) do
+    first =
+      case terminal do
+        :task_loss -> calculation()
+        :failure -> %{reply: {:wait, :active, {:error, 503, "Unavailable"}}}
+        :complete -> %{reply: {:wait, :active, {:text, "Old answer"}}}
+      end
+
+    mock = mock([first, %{reply: {:text, "Next answer"}}])
+    server = start_reasoning(jido, :react, tools: [TestCalculator], system_prompt: "Original prompt")
+    context = %{observer: self(), hold_tool: terminal == :task_loss}
+    assert {:ok, handle} = request(server, mock, :react, "Q1", context: context)
+
+    worker =
+      if terminal == :task_loss do
+        assert_receive {:calculator_held, tool}, 2_000
+        tool
+      else
+        assert_receive {:mock_llm_waiting, ^mock, :active, provider}, 2_000
+        provider
+      end
+
+    monitor = Process.monitor(worker)
+    before = current_context(server)
+    replacement = Context.new(system_prompt: "Recovered prompt") |> Context.append_user("Recovered history")
+    assert {:ok, _} = replace_context(server, replacement, op_id: "deferred", context_ref: "recovered")
+    assert current_context(server) == before
+    pending = context_lane(server).pending_context_op
+    assert pending.operation.type == :replace and pending.operation.result_context == replacement
+    assert context_lane(server).applied_context_ops == []
+    assert {:ok, %{instructions: "Original prompt"}} = Configuration.profile(Server.agent(server))
+
+    case terminal do
+      :task_loss ->
+        assert {:ok, view} = Session.snapshot(server)
+        assert view.details.phase == :executing_tool
+        Process.exit(view.live.worker_pid, :kill)
+        assert {:error, :worker_crash} = Request.await(handle)
+
+      :failure ->
+        assert :ok = MockLLM.release(mock, :active)
+        assert {:error, error} = Request.await(handle)
+        assert error.details.status == 503
+
+      :complete ->
+        assert :ok = MockLLM.release(mock, :active)
+        assert {:ok, "Old answer"} = Request.await(handle)
+    end
+
+    assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 2_000
+    assert current_context(server).entries == replacement.entries
+    assert current_context(server).system_prompt == "Recovered prompt"
+    assert context_lane(server).pending_context_op == nil
+    assert context_lane(server).applied_context_ops == ["deferred"]
+    assert [entry] = context_operations(server)
+    assert entry.payload.operation.type == :replace and entry.payload.operation.reason == :manual
+    assert List.last(Thread.to_list(context_lane(server).thread)).id == entry.id
+    assert {:ok, next} = request(server, mock, :react, "Continue")
+    assert {:ok, "Next answer"} = Request.await(next)
+    [first_wire, second_wire] = MockLLM.report(mock).requests
+    assert Enum.map(first_wire.body["messages"], & &1["content"]) == ["Original prompt", "Q1"]
+
+    assert Enum.map(second_wire.body["messages"], & &1["content"]) == [
+             "Recovered prompt",
+             "Recovered history",
+             "Continue"
+           ]
+
+    assert :ok = Jido.Action.validate_static_data(Server.agent(server).state)
+    assert_script_done(mock)
   end
 
-  defp runtime_event(kind, request_id, seq, data) do
+  defp collection_event(kind, request_id, seq, data) do
     %{
       id: "evt_#{seq}",
       seq: seq,
@@ -81,750 +294,481 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
     }
   end
 
-  defp with_stream_request(agent, request_id, sink \\ self()) do
-    requests =
-      agent.state
-      |> Map.get(:requests, %{})
-      |> Map.put(request_id, %{stream_to: {:pid, sink}})
-
-    %{agent | state: Map.put(agent.state, :requests, requests)}
-  end
-
   describe "init validation" do
-    test "raises for unsupported request_policy values" do
-      assert_raise ArgumentError, ~r/unsupported request_policy/, fn ->
-        create_agent(tools: [TestCalculator], request_policy: :queue)
+    test "definition rejects unsupported request policy" do
+      assert_raise Jido.AI.Error.Validation.Invalid, ~r/requests:.*reject on busy/, fn ->
+        native_definition(request_policy: :queue)
       end
     end
 
-    test "raises for invalid request_transformer values" do
-      assert_raise ArgumentError, ~r/Request transformer :not_a_module is not loaded/, fn ->
-        create_agent(tools: [TestCalculator], request_transformer: :not_a_module)
+    test "definition rejects an unloaded request transformer" do
+      assert_raise Jido.AI.Error.Validation.Invalid, ~r/request_transformer/, fn ->
+        native_definition(request_transformer: :not_a_module)
       end
     end
 
-    test "treats false system_prompt as no prompt for direct strategy callers" do
-      agent = create_agent(tools: [TestCalculator], system_prompt: false)
-      state = StratState.get(agent, %{})
-
-      assert state.config.system_prompt == nil
-      assert state.context.system_prompt == nil
+    test "explicit nil instructions preserve the old direct no-prompt behavior", %{jido: jido} do
+      mock = mock([%{reply: {:text, "Done"}}])
+      server = native_start(jido, [], %{instructions: nil})
+      assert {:ok, profile} = Configuration.profile(Server.agent(server))
+      assert profile.instructions == nil
+      assert {:ok, handle} = request(server, mock, :react, "No prompt", context: %{observer: self()})
+      assert {:ok, "Done"} = Request.await(handle)
+      [wire] = MockLLM.report(mock).requests
+      assert wire.body["messages"] == [%{"role" => "user", "content" => "No prompt"}]
+      assert_script_done(mock)
     end
 
-    test "raises for non-binary system_prompt values" do
-      assert_raise ArgumentError, ~r/invalid system_prompt/, fn ->
-        create_agent(tools: [TestCalculator], system_prompt: 123)
+    test "definition rejects a non-text system prompt" do
+      assert_raise Jido.AI.Error.Validation.Invalid, ~r/instructions/, fn ->
+        native_definition(system_prompt: 123)
       end
     end
   end
 
   describe "signal_routes/1" do
-    test "routes delegated worker signals and compatibility observability signals" do
-      routes = ReAct.signal_routes(%{})
-      route_map = Map.new(routes)
+    test "native routes bind ReAct and ignore compatibility observations", %{jido: jido} do
+      server = native_start(jido)
+      signal = Jido.Signal.new!("ai.react.query", %{query: "Work"}, source: "/test")
+      assert %{id: :assistant, mode: :session} = Jido.AI.Authoring.request_binding(Server.agent(server), signal)
+      assert Jido.AI.Authoring.request_method(Server.agent(server), signal) == :react
+      assert {:ok, router} = Jido.Signal.Router.new(Server.agent(server).routes)
 
-      assert route_map["ai.react.query"] == {:strategy_cmd, :ai_react_start}
-      assert route_map["ai.react.steer"] == {:strategy_cmd, :ai_react_steer}
-      assert route_map["ai.react.inject"] == {:strategy_cmd, :ai_react_inject}
-      assert route_map["ai.react.set_system_prompt"] == {:strategy_cmd, :ai_react_set_system_prompt}
-      refute Map.has_key?(route_map, "ai.react.set_context")
-      assert route_map["ai.react.context.modify"] == {:strategy_cmd, :ai_react_context_modify}
-      assert route_map["ai.react.worker.event"] == {:strategy_cmd, :ai_react_worker_event}
-      assert route_map["jido.agent.child.started"] == {:strategy_cmd, :ai_react_worker_child_started}
-      assert route_map["jido.agent.child.exit"] == {:strategy_cmd, :ai_react_worker_child_exit}
+      for type <- [
+            "ai.react.cancel",
+            "jido.ai.session.control",
+            "ai.react.set_system_prompt",
+            "ai.react.context.modify"
+          ] do
+        assert {:ok, _} = Jido.Signal.Router.route(router, %{signal | type: type})
+      end
 
-      assert route_map["ai.llm.response"] == Jido.Actions.Control.Noop
-      assert route_map["ai.tool.result"] == Jido.Actions.Control.Noop
-      assert route_map["ai.llm.delta"] == Jido.Actions.Control.Noop
+      before = Server.agent(server).state
+
+      for type <- ["ai.llm.response", "ai.tool.result", "ai.llm.delta"] do
+        assert {:ok, after_signal} =
+                 Server.call(server, Jido.Signal.new!(type, %{request_id: "unowned"}, source: "/test"))
+
+        assert after_signal.state == before
+      end
+
+      assert {:ok, %{request: nil, live: nil}} = Session.snapshot(server)
     end
   end
 
   describe "delegation lifecycle" do
-    test "start lazily spawns worker and stores deferred start payload" do
-      agent = create_agent(tools: [TestCalculator])
-
-      start_instruction = instruction(ReAct.start_action(), %{query: "What is 2 + 2?", request_id: "req_1"})
-      {agent, directives} = ReAct.cmd(agent, [start_instruction], %{})
-
-      assert [%AgentDirective.SpawnAgent{} = spawn] = directives
-      assert spawn.tag == :react_worker
-      assert spawn.agent == Jido.AI.Reasoning.ReAct.Worker.Agent
-
-      state = StratState.get(agent, %{})
-      assert state.status == :awaiting_llm
-      assert state.active_request_id == "req_1"
-      assert state.react_worker_status == :starting
-      assert is_map(state.pending_worker_start)
-      assert state.pending_worker_start.request_id == "req_1"
-      assert state.pending_worker_start.query == "What is 2 + 2?"
-      assert state.pending_worker_start.config.streaming == true
+    test "start commits one request before its owned model worker runs", %{jido: jido} do
+      mock = mock([%{reply: {:wait, :held, {:text, "4"}}}])
+      server = native_start(jido, streaming: true)
+      assert {:ok, %{request: nil, live: nil}} = Session.snapshot(server)
+      assert {:ok, handle} = request(server, mock, :react, "What is 2 + 2?", context: %{observer: self()})
+      assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
+      assert %{status: :pending, query: "What is 2 + 2?"} = record(server, handle)
+      assert {:ok, view} = Session.snapshot(server)
+      assert view.details.active_request_id == handle.id
+      assert view.details.phase == :awaiting_llm
+      assert Process.alive?(view.live.worker_pid)
+      assert [%{body: %{"stream" => true}}] = MockLLM.report(mock).requests
+      assert :ok = MockLLM.release(mock, :held)
+      assert {:ok, "4"} = Request.await(handle)
+      assert record(server, handle).meta.model_calls == 1
+      assert_script_done(mock)
     end
 
-    test "start payload context includes state snapshot key" do
-      agent =
-        create_agent(
-          tools: [TestCalculator],
-          tool_context: %{state: %{override: true}, tenant: "acme"}
-        )
-        |> then(fn agent -> %{agent | state: Map.put(agent.state, :custom_counter, 7)} end)
+    test "a real tool receives the Agent state snapshot and ignores a forged state binding", %{jido: jido} do
+      assert_raise Jido.AI.Error.Validation.Invalid, ~r/tool_context/, fn ->
+        definition(:react, tools: [TestCalculator], tool_context: %{state: %{override: true}, tenant: "acme"})
+      end
 
-      start_instruction = instruction(ReAct.start_action(), %{query: "What is 2 + 2?", request_id: "req_ctx"})
-      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
+      mock = mock([calculation(), %{reply: {:text, "Five"}}])
+      server = start_agent(jido, context_agent(tool_context: %{tenant: "acme"}))
 
-      state = StratState.get(agent, %{})
-      context = state.pending_worker_start.context
+      assert {:ok, handle} =
+               request(server, mock, :react, "Add",
+                 context: %{observer: self(), observe_context: true},
+                 tool_context: %{"state" => %{override: true}, state: %{override: true}, agent_state: %{override: true}}
+               )
 
-      assert is_map(context.state)
-      assert context.state.custom_counter == 7
-      assert context.state.__strategy__.status == :idle
-      assert context.tenant == "acme"
-      refute Map.has_key?(context.state, :override)
+      assert {:ok, "Five"} = Request.await(handle)
+      assert_receive {:calculator_context, seen}, 1_000
+      assert seen.state.custom_counter == 7 and seen.agent_state == seen.state
+      refute Map.has_key?(seen.state, :override)
+      assert seen.tenant == "acme"
+      assert Server.agent(server).state.custom_counter == 7
+      [_, wire] = MockLLM.report(mock).requests
+      result = Enum.find(wire.body["messages"], &(&1["role"] == "tool"))
+      assert Jason.decode!(result["content"]) == %{"ok" => true, "result" => %{"result" => 5}}
+      assert_script_done(mock)
     end
 
-    test "start propagates streaming option into runtime config" do
-      agent = create_agent(tools: [TestCalculator], streaming: false)
-
-      start_instruction = instruction(ReAct.start_action(), %{query: "What is 2 + 2?", request_id: "req_1"})
-      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
-
-      state = StratState.get(agent, %{})
-      assert state.pending_worker_start.config.streaming == false
+    test "start uses buffered HTTP when streaming is disabled", %{jido: jido} do
+      mock = mock([%{reply: {:text, "4"}}])
+      server = native_start(jido, streaming: false)
+      assert {:ok, handle} = request(server, mock, :react, "Add", context: %{observer: self()})
+      assert {:ok, "4"} = Request.await(handle)
+      assert [%{body: %{"stream" => false}}] = MockLLM.report(mock).requests
+      refute Enum.any?(events(handle), &(&1.kind == :llm_delta))
+      assert_script_done(mock)
     end
 
-    test "start propagates max_tokens option into runtime config" do
-      agent = create_agent(tools: [TestCalculator], max_tokens: 4_096)
-
-      start_instruction = instruction(ReAct.start_action(), %{query: "What is 2 + 2?", request_id: "req_1"})
-      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
-
-      state = StratState.get(agent, %{})
-      assert state.pending_worker_start.config.llm.max_tokens == 4_096
+    test "start sends the configured token limit over HTTP", %{jido: jido} do
+      mock = mock([%{reply: {:text, "4"}}])
+      server = native_start(jido, max_tokens: 4_096)
+      assert {:ok, handle} = request(server, mock, :react, "Add", context: %{observer: self()})
+      assert {:ok, "4"} = Request.await(handle)
+      assert [%{body: %{"max_tokens" => 4_096}}] = MockLLM.report(mock).requests
+      assert_script_done(mock)
     end
 
-    test "start preserves configured max_iterations when request omits override" do
-      agent = create_agent(tools: [TestCalculator], max_iterations: 4)
-
-      start_instruction = instruction(ReAct.start_action(), %{query: "What is 2 + 2?", request_id: "req_1"})
-      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
-
-      state = StratState.get(agent, %{})
-      assert state.pending_worker_start.config.max_iterations == 4
+    test "prepared request keeps the declared iteration limit", %{jido: jido} do
+      {_, profile} = prepared(jido, max_iterations: 4)
+      assert profile.controls.max_iterations == 4
+      assert profile.controls.max_model_calls == 4
     end
 
-    test "start applies request-scoped max_iterations override to runtime config" do
-      agent = create_agent(tools: [TestCalculator], max_iterations: 4)
-
-      start_instruction =
-        instruction(ReAct.start_action(), %{
-          query: "What is 2 + 2?",
-          request_id: "req_1",
-          max_iterations: 2
-        })
-
-      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
-
-      state = StratState.get(agent, %{})
-      assert state.pending_worker_start.config.max_iterations == 2
+    test "prepared request uses its iteration override", %{jido: jido} do
+      {_, profile} = prepared(jido, [max_iterations: 4], max_iterations: 2)
+      assert profile.controls.max_iterations == 2
+      assert profile.controls.max_model_calls == 2
     end
 
-    test "start ignores invalid request-scoped max_iterations override" do
-      agent = create_agent(tools: [TestCalculator], max_iterations: 4)
-
-      start_instruction =
-        instruction(ReAct.start_action(), %{
-          query: "What is 2 + 2?",
-          request_id: "req_1",
-          max_iterations: 0
-        })
-
-      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
-
-      state = StratState.get(agent, %{})
-      assert state.pending_worker_start.config.max_iterations == 4
+    test "invalid iteration override keeps the declared limit", %{jido: jido} do
+      {_, profile} = prepared(jido, [max_iterations: 4], max_iterations: 0)
+      assert profile.controls.max_iterations == 4
+      assert profile.controls.max_model_calls == 4
     end
 
-    test "start propagates stream_timeout_ms option into runtime config" do
-      agent = create_agent(tools: [TestCalculator], stream_timeout_ms: 123_456)
-
-      start_instruction = instruction(ReAct.start_action(), %{query: "What is 2 + 2?", request_id: "req_1"})
-      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
-
-      state = StratState.get(agent, %{})
-      assert state.pending_worker_start.config.stream_timeout_ms == 123_456
+    test "prepared request keeps its declared idle timeout", %{jido: jido} do
+      {_, profile} = prepared(jido, stream_timeout_ms: 123_456)
+      assert profile.requests.idle_timeout == 123_456
     end
 
-    test "start applies request-scoped stream_timeout_ms override to runtime config" do
-      agent = create_agent(tools: [TestCalculator], stream_timeout_ms: 123_456)
-
-      start_instruction =
-        instruction(ReAct.start_action(), %{
-          query: "What is 2 + 2?",
-          request_id: "req_1",
-          stream_timeout_ms: 222_222
-        })
-
-      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
-
-      state = StratState.get(agent, %{})
-      assert state.pending_worker_start.config.stream_timeout_ms == 222_222
+    test "prepared request uses its idle timeout override", %{jido: jido} do
+      {_, profile} = prepared(jido, [stream_timeout_ms: 123_456], stream_timeout_ms: 222_222)
+      assert profile.requests.idle_timeout == 222_222
     end
 
-    test "start merges base and run req_http_options into runtime config" do
-      agent =
-        create_agent(
-          tools: [TestCalculator],
-          req_http_options: [plug: {Req.Test, []}]
-        )
+    test "prepared request merges declared and request HTTP options", %{jido: jido} do
+      {request, _} =
+        prepared(jido, [req_http_options: [plug: {Req.Test, []}]], req_http_options: [adapter: [recv_timeout: 1234]])
 
-      start_instruction =
-        instruction(ReAct.start_action(), %{
-          query: "What is 2 + 2?",
-          request_id: "req_1",
-          req_http_options: [adapter: [recv_timeout: 1234]]
-        })
-
-      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
-
-      state = StratState.get(agent, %{})
-
-      assert state.pending_worker_start.config.llm.req_http_options == [
-               plug: {Req.Test, []},
-               adapter: [recv_timeout: 1234]
-             ]
+      assert request.options[:req_http_options] ==
+               [plug: {Req.Test, []}, retry: false, receive_timeout: 5_000, adapter: [recv_timeout: 1234]]
     end
 
-    test "start merges base and run llm_opts into runtime config" do
-      agent =
-        create_agent(
-          tools: [TestCalculator],
-          llm_opts: [thinking: %{type: :enabled, budget_tokens: 1_024}, reasoning_effort: :low]
-        )
-
-      start_instruction =
-        instruction(ReAct.start_action(), %{
-          query: "What is 2 + 2?",
-          request_id: "req_1",
+    test "prepared request merges declared and request generation options", %{jido: jido} do
+      {request, _} =
+        prepared(
+          jido,
+          [llm_opts: [thinking: %{type: :enabled, budget_tokens: 1_024}, reasoning_effort: :low]],
           llm_opts: [reasoning_effort: :high]
-        })
-
-      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
-
-      state = StratState.get(agent, %{})
-
-      assert state.pending_worker_start.config.llm.llm_opts == [
-               thinking: %{type: :enabled, budget_tokens: 1_024},
-               reasoning_effort: :high
-             ]
-    end
-
-    test "start applies request-scoped allowed_tools filter to runtime config" do
-      agent = create_agent(tools: [TestCalculator, TestSearch])
-
-      start_instruction =
-        instruction(ReAct.start_action(), %{
-          query: "Search only",
-          request_id: "req_allowed_tools",
-          allowed_tools: ["search"]
-        })
-
-      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
-      state = StratState.get(agent, %{})
-
-      assert Map.keys(state.pending_worker_start.config.tools) == ["search"]
-    end
-
-    test "start applies request-scoped tools override to runtime config" do
-      agent = create_agent(tools: [TestCalculator])
-
-      start_instruction =
-        instruction(ReAct.start_action(), %{
-          query: "Use search instead",
-          request_id: "req_tools_override",
-          tools: [TestSearch]
-        })
-
-      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
-      state = StratState.get(agent, %{})
-
-      assert Map.keys(state.pending_worker_start.config.tools) == ["search"]
-      assert state.pending_worker_start.config.request_transformer == nil
-    end
-
-    test "start applies request-scoped request_transformer override to runtime config" do
-      agent = create_agent(tools: [TestCalculator])
-
-      start_instruction =
-        instruction(ReAct.start_action(), %{
-          query: "Transform this request",
-          request_id: "req_transformer_override",
-          request_transformer: TestRequestTransformer
-        })
-
-      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
-      state = StratState.get(agent, %{})
-
-      assert state.pending_worker_start.config.request_transformer == TestRequestTransformer
-    end
-
-    test "start installs agent module and tool context in worker context" do
-      agent =
-        create_agent(
-          tools: [TestCalculator],
-          agent_module: __MODULE__,
-          tool_context: %{tenant_id: "tenant-1"}
         )
 
-      {agent, [_spawn]} =
-        ReAct.cmd(
-          agent,
-          [instruction(ReAct.start_action(), %{query: "Use a tool", request_id: "req_plugin"})],
-          %{}
-        )
-
-      context = StratState.get(agent, %{}).pending_worker_start.context
-
-      assert context.agent_module == __MODULE__
-      assert context.tool_context == %{tenant_id: "tenant-1"}
+      assert request.options[:thinking] == %{type: :enabled, budget_tokens: 1_024}
+      assert request.options[:reasoning_effort] == :high
     end
 
-    test "start applies request-scoped stream timeout override to runtime config" do
-      agent = create_agent(tools: [TestCalculator], stream_receive_timeout_ms: 4_500)
-
-      start_instruction =
-        instruction(ReAct.start_action(), %{
-          query: "What is 2 + 2?",
-          request_id: "req_timeout_override",
-          stream_timeout_ms: 9_000
-        })
-
-      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
-      state = StratState.get(agent, %{})
-
-      assert state.pending_worker_start.config.stream_timeout_ms == 9_000
+    test "prepared request applies the allowed tool filter", %{jido: jido} do
+      {request, profile} = prepared(jido, [tools: [TestCalculator, TestSearch]], allowed_tools: ["search"])
+      assert Enum.map(profile.tools, & &1.name) == ["search"]
+      assert Enum.map(request.options[:tools], & &1.name) == ["search"]
     end
 
-    test "start rejects unknown allowed_tools with request error directive" do
-      agent = create_agent(tools: [TestCalculator])
-
-      start_instruction =
-        instruction(ReAct.start_action(), %{
-          query: "bad tool",
-          request_id: "req_bad_allowed_tools",
-          allowed_tools: ["search"]
-        })
-
-      {agent, directives} = ReAct.cmd(agent, [start_instruction], %{})
-
-      assert [%Directive.EmitRequestError{} = directive] = directives
-      assert directive.request_id == "req_bad_allowed_tools"
-      assert directive.reason == :unknown_allowed_tools
-
-      state = StratState.get(agent, %{})
-      assert state.status == :idle
+    test "prepared request uses the request tool catalog", %{jido: jido} do
+      {request, profile} = prepared(jido, [tools: [TestCalculator]], tools: [TestSearch])
+      assert Enum.map(profile.tools, & &1.name) == ["search"]
+      assert Enum.map(request.options[:tools], & &1.name) == ["search"]
+      assert profile.reasoning.request_transformer == nil
     end
 
-    test "start accepts string-key llm_opts maps and normalizes ReqLLM options" do
-      agent =
-        create_agent(
-          tools: [TestCalculator],
-          llm_opts: %{
-            "thinking" => %{type: :enabled, budget_tokens: 1_024},
-            "reasoning_effort" => :low,
-            "top_p" => 0.7
-          }
-        )
-
-      start_instruction =
-        instruction(ReAct.start_action(), %{
-          query: "What is 2 + 2?",
-          request_id: "req_1",
-          llm_opts: %{"reasoning_effort" => :high, "top_p" => 0.9, "unknown_provider_flag" => true}
-        })
-
-      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
-
-      state = StratState.get(agent, %{})
-      llm_opts = state.pending_worker_start.config.llm.llm_opts
-
-      assert Keyword.get(llm_opts, :thinking) == %{type: :enabled, budget_tokens: 1_024}
-      assert Keyword.get(llm_opts, :reasoning_effort) == :high
-      assert Keyword.get(llm_opts, :top_p) == 0.9
-      refute Keyword.has_key?(llm_opts, nil)
+    test "request transformer override runs before the model control", %{jido: jido} do
+      {request, profile} = prepared(jido, [], request_transformer: NativeTransform)
+      assert profile.reasoning.request_transformer == NativeTransform
+      assert request.options[:temperature] == 0.35
+      assert_receive {:native_transform, _, 1, _}, 1_000
     end
 
-    test "start maps existing-atom string llm_opts keys for provider options" do
-      existing_key = :custom_provider_flag
-      existing_key_string = Atom.to_string(existing_key)
+    test "a real tool receives the host module identity and admitted context defaults", %{jido: jido} do
+      mock = mock([calculation(), %{reply: {:text, "Five"}}])
+      server = start_agent(jido, context_agent(tool_context: %{tenant: "tenant-1"}))
+      agent = Server.agent(server)
 
-      agent = create_agent(tools: [TestCalculator])
+      assert {:ok, handle} =
+               request(server, mock, :react, "Add",
+                 context: %{observer: self(), observe_context: true},
+                 tool_context: %{agent_module: __MODULE__, agent_id: "forged"}
+               )
 
-      start_instruction =
-        instruction(ReAct.start_action(), %{
-          query: "What is 2 + 2?",
-          request_id: "req_1",
-          llm_opts: %{existing_key_string => true}
-        })
-
-      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
-
-      state = StratState.get(agent, %{})
-      llm_opts = state.pending_worker_start.config.llm.llm_opts
-
-      assert Keyword.get(llm_opts, existing_key) == true
+      assert {:ok, "Five"} = Request.await(handle)
+      assert_receive {:calculator_context, seen}, 1_000
+      assert seen.agent_module == agent.module and seen.agent_module == Jido.Agent
+      assert seen.agent_id == agent.id
+      assert seen.tenant == "tenant-1"
+      assert {:ok, profile} = Configuration.profile(Server.agent(server))
+      assert profile.tool_context == %{tenant: "tenant-1"}
+      assert :ok = Jido.Action.validate_static_data(Server.agent(server).state)
+      assert_script_done(mock)
     end
 
-    test "start drops non-existing string llm_opts keys and filters nil keys" do
-      agent = create_agent(tools: [TestCalculator])
-
-      start_instruction =
-        instruction(ReAct.start_action(), %{
-          query: "What is 2 + 2?",
-          request_id: "req_1",
-          llm_opts: %{"__jido_ai_nonexistent_llm_opt_key__" => true}
-        })
-
-      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
-
-      state = StratState.get(agent, %{})
-      llm_opts = state.pending_worker_start.config.llm.llm_opts
-
-      assert llm_opts == []
-      refute Keyword.has_key?(llm_opts, nil)
+    test "request idle timeout overrides the legacy receive timeout alias", %{jido: jido} do
+      {_, profile} = prepared(jido, [stream_receive_timeout_ms: 4_500], stream_timeout_ms: 9_000)
+      assert profile.requests.idle_timeout == 9_000
     end
 
-    test "start normalizes provider_options maps in llm_opts using provider schema keys" do
-      agent = create_agent(tools: [TestCalculator], model: "openai:gpt-4o")
+    test "unknown allowed tools fail admission before model work", %{jido: jido} do
+      mock = mock([])
+      server = native_start(jido)
 
-      start_instruction =
-        instruction(ReAct.start_action(), %{
-          query: "What is 2 + 2?",
-          request_id: "req_1",
-          llm_opts: %{
-            "provider_options" => %{
-              "verbosity" => "high",
-              "__jido_ai_nonexistent_provider_option__" => true
+      assert {:error, {:unknown_allowed_tools, ["search"]}} =
+               request(server, mock, :react, "Bad tool", allowed_tools: ["search"], context: %{observer: self()})
+
+      assert {:ok, %{request: nil, live: nil}} = Session.snapshot(server)
+      assert Server.agent(server).state.requests == %{}
+      refute_receive {:prepared_request, _, _}, 0
+      assert MockLLM.report(mock).requests == []
+      assert_script_done(mock)
+    end
+
+    test "prepared request normalizes string generation option names", %{jido: jido} do
+      {request, _} =
+        prepared(
+          jido,
+          [
+            llm_opts: %{
+              "thinking" => %{type: :enabled, budget_tokens: 1_024},
+              "reasoning_effort" => :low,
+              "top_p" => 0.7
             }
-          }
-        })
-
-      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
-
-      state = StratState.get(agent, %{})
-      llm_opts = state.pending_worker_start.config.llm.llm_opts
-      provider_options = Keyword.get(llm_opts, :provider_options)
-
-      assert provider_options == [verbosity: "high"]
-      refute Keyword.has_key?(provider_options, nil)
-    end
-
-    test "child started flushes deferred start to worker pid" do
-      agent = create_agent(tools: [TestCalculator])
-
-      {agent, _spawn_directives} =
-        ReAct.cmd(agent, [instruction(ReAct.start_action(), %{query: "go", request_id: "req_child"})], %{})
-
-      child_started =
-        instruction(:ai_react_worker_child_started, %{
-          parent_id: "parent",
-          child_id: "child",
-          child_module: Jido.AI.Reasoning.ReAct.Worker.Agent,
-          tag: :react_worker,
-          pid: self(),
-          meta: %{}
-        })
-
-      {agent, directives} = ReAct.cmd(agent, [child_started], %{})
-
-      assert [%AgentDirective.Emit{} = emit] = directives
-      assert emit.signal.type == "ai.react.worker.start"
-      assert emit.signal.data.request_id == "req_child"
-      assert emit.dispatch == {:pid, [target: self()]}
-
-      state = StratState.get(agent, %{})
-      assert state.react_worker_pid == self()
-      assert state.react_worker_status == :running
-      assert state.pending_worker_start == nil
-    end
-
-    test "worker runtime event updates state and emits lifecycle signals" do
-      agent = create_agent(tools: [TestCalculator])
-      agent = with_stream_request(agent, "req_evt")
-      tag = Request.Stream.message_tag()
-
-      event = runtime_event(:request_started, "req_evt", 1, %{query: "hello"})
-
-      {agent, []} =
-        ReAct.cmd(agent, [instruction(:ai_react_worker_event, %{request_id: "req_evt", event: event})], %{})
-
-      state = StratState.get(agent, %{})
-      assert state.status == :awaiting_llm
-      assert state.active_request_id == "req_evt"
-
-      trace = state.request_traces["req_evt"]
-      assert trace.truncated? == false
-      assert length(trace.events) == 1
-
-      assert_receive {^tag, %Event{kind: :request_started, request_id: "req_evt"}}
-    end
-
-    test "steer queues input for an active run" do
-      agent = create_agent(tools: [TestCalculator])
-
-      {agent, [_spawn]} =
-        ReAct.cmd(
-          agent,
-          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_steer"})],
-          %{}
-        )
-
-      state = StratState.get(agent, %{})
-      assert is_pid(state.pending_input_server)
-      assert Process.alive?(state.pending_input_server)
-
-      {agent, []} =
-        ReAct.cmd(
-          agent,
-          [
-            instruction(ReAct.steer_action(), %{
-              content: "Actually answer Q2",
-              expected_request_id: "req_steer",
-              source: "/test/steer",
-              extra_refs: %{origin: "suite"}
-            })
           ],
-          %{}
+          llm_opts: %{"reasoning_effort" => :high, "top_p" => 0.9, "unknown_provider_flag" => true}
         )
 
-      state = StratState.get(agent, %{})
-      assert state.last_pending_input_control.kind == :steer
-      assert state.last_pending_input_control.status == :queued
-      assert state.last_pending_input_control.request_id == "req_steer"
-
-      [queued] = PendingInputServer.drain(state.pending_input_server)
-      assert queued.content == "Actually answer Q2"
-      assert queued.source == "/test/steer"
-      assert queued.refs == %{origin: "suite"}
+      assert request.options[:thinking] == %{type: :enabled, budget_tokens: 1_024}
+      assert request.options[:reasoning_effort] == :high
+      assert request.options[:top_p] == 0.9
+      refute Keyword.has_key?(request.options, nil)
     end
 
-    test "queued input is dropped if the request fails before runtime drain" do
-      agent = create_agent(tools: [TestCalculator])
-
-      {agent, [_spawn]} =
-        ReAct.cmd(
-          agent,
-          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_drop"})],
-          %{}
-        )
-
-      {agent, []} =
-        ReAct.cmd(
-          agent,
-          [
-            instruction(ReAct.steer_action(), %{
-              content: "Actually answer Q2",
-              expected_request_id: "req_drop",
-              source: "/test/steer"
-            })
-          ],
-          %{}
-        )
-
-      state = StratState.get(agent, %{})
-      assert state.last_pending_input_control.status == :queued
-
-      event =
-        runtime_event(:request_failed, "req_drop", 2, %{
-          error: :boom
-        })
-
-      {agent, []} =
-        ReAct.cmd(
-          agent,
-          [instruction(:ai_react_worker_event, %{request_id: "req_drop", event: event})],
-          %{}
-        )
-
-      state = StratState.get(agent, %{})
-      assert state.status == :error
-      assert state.pending_input_server == nil
-
-      core_thread = ThreadAgent.get(agent)
-      ai_messages = Thread.filter_by_kind(core_thread, :ai_message)
-
-      assert Enum.map(ai_messages, & &1.payload.content) == ["Q1"]
-      refute Enum.any?(ai_messages, &(&1.payload.content == "Actually answer Q2"))
+    test "prepared request retains an existing atom option name", %{jido: jido} do
+      existing_key = :custom_provider_flag
+      {request, _} = prepared(jido, [], llm_opts: %{Atom.to_string(existing_key) => true})
+      assert request.options[existing_key] == true
     end
 
-    test "inject rejects while idle" do
-      agent = create_agent(tools: [TestCalculator])
+    test "prepared request drops unknown option names without atom creation", %{jido: jido} do
+      key = "__jido_ai_nonexistent_llm_opt_key__"
+      assert_raise ArgumentError, fn -> String.to_existing_atom(key) end
+      {request, _} = prepared(jido, [], llm_opts: %{key => true})
+      refute Keyword.has_key?(request.options, nil)
+      assert_raise ArgumentError, fn -> String.to_existing_atom(key) end
+      assert Enum.all?(Keyword.keys(request.options), &is_atom/1)
 
-      {agent, []} =
-        ReAct.cmd(
-          agent,
-          [instruction(ReAct.inject_action(), %{content: "Programmatic input"})],
-          %{}
-        )
-
-      state = StratState.get(agent, %{})
-      assert state.last_pending_input_control.kind == :inject
-      assert state.last_pending_input_control.status == :rejected
-      assert state.last_pending_input_control.reason == :idle
+      assert MapSet.new(Keyword.keys(request.options)) ==
+               MapSet.new([
+                 :max_retries,
+                 :api_key,
+                 :base_url,
+                 :req_http_options,
+                 :tools,
+                 :receive_timeout,
+                 :max_tokens,
+                 :temperature
+               ])
     end
 
-    test "steer rejects request_id mismatches without mutating the queue" do
-      agent = create_agent(tools: [TestCalculator])
-
-      {agent, [_spawn]} =
-        ReAct.cmd(
-          agent,
-          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_live"})],
-          %{}
+    test "prepared request normalizes provider option keys by schema", %{jido: jido} do
+      {request, _} =
+        prepared(jido, [model: "openai:gpt-4o"],
+          llm_opts: %{"provider_options" => %{"verbosity" => "high", "__jido_ai_nonexistent_provider_option__" => true}}
         )
 
-      {agent, []} =
-        ReAct.cmd(
-          agent,
-          [
-            instruction(ReAct.steer_action(), %{
-              content: "Wrong run",
-              expected_request_id: "req_other"
-            })
-          ],
-          %{}
-        )
-
-      state = StratState.get(agent, %{})
-      assert state.last_pending_input_control.kind == :steer
-      assert state.last_pending_input_control.status == :rejected
-      assert state.last_pending_input_control.reason == :request_mismatch
-      assert [] == PendingInputServer.drain(state.pending_input_server)
+      assert request.options[:provider_options] == [verbosity: "high"]
+      refute Keyword.has_key?(request.options[:provider_options], nil)
     end
 
-    test "steer rejects blank content without mutating the queue" do
-      agent = create_agent(tools: [TestCalculator])
-
-      {agent, [_spawn]} =
-        ReAct.cmd(
-          agent,
-          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_blank"})],
-          %{}
-        )
-
-      {agent, []} =
-        ReAct.cmd(
-          agent,
-          [
-            instruction(ReAct.steer_action(), %{
-              content: "   ",
-              expected_request_id: "req_blank"
-            })
-          ],
-          %{}
-        )
-
-      state = StratState.get(agent, %{})
-      assert state.last_pending_input_control.kind == :steer
-      assert state.last_pending_input_control.status == :rejected
-      assert state.last_pending_input_control.reason == :empty_content
-      assert [] == PendingInputServer.drain(state.pending_input_server)
+    test "the owned worker receives the prompt exactly once", %{jido: jido} do
+      mock = mock([%{reply: {:wait, :held, {:text, "4"}}}])
+      server = start_reasoning(jido, :react, tools: [])
+      assert {:ok, handle} = request(server, mock, :react, "Test prompt")
+      assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
+      assert [wire] = MockLLM.report(mock).requests
+      assert Enum.count(wire.body["messages"], &(&1["role"] == "user" and &1["content"] == "Test prompt")) == 1
+      assert :ok = MockLLM.release(mock, :held)
+      assert {:ok, "4"} = Request.await(handle)
+      assert length(MockLLM.report(mock).requests) == 1
+      assert record(server, handle).meta.model_calls == 1
+      assert_script_done(mock)
     end
 
-    test "input_injected runtime events update run context and append a user thread entry" do
-      agent = create_agent(tools: [TestCalculator])
+    test "owned runtime events update inspection and publish one request lifecycle", %{jido: jido} do
+      mock = mock([%{reply: {:wait, :held, {:text, "Done"}}}])
+      server = start_reasoning(jido, :react, tools: [])
+      assert {:ok, handle} = request(server, mock, :react, "Hello")
+      assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
+      assert {:ok, active} = Session.snapshot(server)
+      assert active.details.phase == :awaiting_llm
+      assert active.details.active_request_id == handle.id
+      assert Enum.map(active.details.trace.events, & &1.kind) == [:request_started, :llm_started]
+      refute active.details.trace.truncated?
+      assert :ok = MockLLM.release(mock, :held)
+      assert {:ok, "Done"} = Request.await(handle)
+      all = events(handle)
+      assert hd(all).kind == :request_started
+      assert List.last(all).kind == :request_completed
+      assert Enum.count(all, &(&1.kind == :request_started)) == 1
+      assert Enum.count(all, &(&1.kind == :request_completed)) == 1
+      assert Enum.all?(all, &(&1.request_id == handle.id and &1.run_id == active.request.run_id))
+      assert {:ok, done} = Session.snapshot(server)
+      assert done.details.phase == :request_completed and done.live == nil
+      assert done.details.trace.events == Enum.take(all, done.details.trace.seq)
+      assert_script_done(mock)
+    end
 
-      {agent, [_spawn]} =
-        ReAct.cmd(
-          agent,
-          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_input_injected"})],
-          %{}
-        )
+    test "steer queues request input and preserves its source and refs on consumption", %{jido: jido} do
+      mock = mock([%{reply: {:wait, :held, {:text, "First"}}}, %{reply: {:text, "Revised"}}])
+      server = start_reasoning(jido, :react, tools: [])
+      assert {:ok, handle} = request(server, mock, :react, "Q1")
+      assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
+      id = handle.id
 
-      event =
-        runtime_event(:input_injected, "req_input_injected", 2, %{
-          content: "Actually answer Q2",
-          source: "/test/runtime",
-          refs: %{origin: "suite"}
-        })
+      assert {:ok, %{status: :queued, request_id: ^id, input_id: input_id}} =
+               Session.steer(handle, "Actually answer Q2", source: "/test/steer", extra_refs: %{origin: "suite"})
 
-      {agent, []} =
-        ReAct.cmd(
-          agent,
-          [instruction(:ai_react_worker_event, %{request_id: "req_input_injected", event: event})],
-          %{}
-        )
+      assert user_texts(server) == ["Q1"]
+      assert :ok = MockLLM.release(mock, :held)
+      assert {:ok, "Revised"} = Request.await(handle)
+      assert [injected] = Enum.filter(events(handle), &(&1.kind == :input_injected))
+      assert injected.data.input_id == input_id
+      assert injected.data.source == "/test/steer"
+      assert injected.data.refs == %{origin: "suite"}
+      assert user_texts(server) == ["Q1", "Actually answer Q2"]
+      assert_script_done(mock)
+    end
 
-      state = StratState.get(agent, %{})
-      assert state.status == :awaiting_llm
-      assert state.result == nil
+    test "provider failure discards undrained input before the next request", %{jido: jido} do
+      mock = mock([%{reply: {:wait, :held, {:error, 429, "Rate limited"}}}, %{reply: {:text, "Next"}}])
+      server = start_reasoning(jido, :react, tools: [])
+      assert {:ok, first} = request(server, mock, :react, "Q1")
+      assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
+      assert {:ok, %{status: :queued}} = Session.steer(first, "Discard this input")
+      assert :ok = MockLLM.release(mock, :held)
+      assert {:error, error} = Request.await(first)
+      assert error.details.status == 429
+      assert record(server, first).status == :failed
+      assert {:ok, %{live: nil, details: %{active_request_id: nil}}} = Session.snapshot(server)
+      refute Enum.any?(events(first), &(&1.kind == :input_injected))
+      assert user_texts(server) == ["Q1"]
+      assert {:ok, next} = request(server, mock, :react, "Q2")
+      assert {:ok, "Next"} = Request.await(next)
+      assert user_texts(server) == ["Q1", "Q2"]
+      [_, wire] = MockLLM.report(mock).requests
+      refute Enum.any?(wire.body["messages"], &(&1["content"] == "Discard this input"))
+      assert_script_done(mock)
+    end
 
-      run_messages = Jido.AI.Context.to_messages(state.run_context)
-      run_users = Enum.filter(run_messages, &(&1.role == :user))
-      assert Enum.map(run_users, & &1.content) == ["Q1", "Actually answer Q2"]
+    test "idle injection rejects without starting work or changing history", %{jido: jido} do
+      mock = mock([])
+      server = start_reasoning(jido, :react, tools: [])
+      before = Server.agent(server).state
+      assert {:error, %{status: :rejected, reason: :idle, kind: :inject}} = Session.inject(server, "Programmatic input")
+      assert Server.agent(server).state == before
+      assert {:ok, %{request: nil, live: nil}} = Session.snapshot(server)
+      assert MockLLM.report(mock).requests == []
+      assert_script_done(mock)
+    end
 
-      assert List.last(run_users).refs == %{
-               origin: "suite",
-               request_id: "req_input_injected",
-               run_id: "req_input_injected",
-               signal_id: "evt_2"
+    test "stale steering rejects without adding an input or model call", %{jido: jido} do
+      mock = mock([%{reply: {:wait, :held, {:text, "Done"}}}])
+      server = start_reasoning(jido, :react, tools: [])
+      assert {:ok, handle} = request(server, mock, :react, "Q1")
+      assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
+      before = Server.agent(server).state.messages
+
+      assert {:error, %{status: :rejected, reason: :request_mismatch}} =
+               Session.steer(server, "Wrong request", expected_request_id: "stale")
+
+      assert Server.agent(server).state.messages == before
+      assert :ok = MockLLM.release(mock, :held)
+      assert {:ok, "Done"} = Request.await(handle)
+      refute Enum.any?(events(handle), &(&1.kind == :input_injected))
+      assert user_texts(server) == ["Q1"]
+      assert record(server, handle).meta.model_calls == 1
+      assert_script_done(mock)
+    end
+
+    test "blank steering rejects without adding an input or model call", %{jido: jido} do
+      mock = mock([%{reply: {:wait, :held, {:text, "Done"}}}])
+      server = start_reasoning(jido, :react, tools: [])
+      assert {:ok, handle} = request(server, mock, :react, "Q1")
+      assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
+      before = Server.agent(server).state.messages
+      assert {:error, %{status: :rejected, reason: :empty_content}} = Session.steer(handle, "   ")
+      assert Server.agent(server).state.messages == before
+      assert :ok = MockLLM.release(mock, :held)
+      assert {:ok, "Done"} = Request.await(handle)
+      refute Enum.any?(events(handle), &(&1.kind == :input_injected))
+      assert user_texts(server) == ["Q1"]
+      assert record(server, handle).meta.model_calls == 1
+      assert_script_done(mock)
+    end
+
+    test "consumed injection commits one user message before the next model call", %{jido: jido} do
+      mock = mock([%{reply: {:wait, :held, {:text, "First"}}}, %{reply: {:text, "Revised"}}])
+      server = start_reasoning(jido, :react, tools: [])
+      assert {:ok, handle} = request(server, mock, :react, "Q1")
+      assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
+
+      assert {:ok, %{input_id: input_id}} =
+               Session.inject(handle, "Actually answer Q2", source: "/test/runtime", extra_refs: %{origin: "suite"})
+
+      assert user_texts(server) == ["Q1"]
+      assert :ok = MockLLM.release(mock, :held)
+      assert {:ok, "Revised"} = Request.await(handle)
+      assert [injected] = Enum.filter(events(handle), &(&1.kind == :input_injected))
+      assert injected.data.input_id == input_id and injected.request_id == handle.id
+      assert user_texts(server) == ["Q1", "Actually answer Q2"]
+      entry = Enum.find(Server.agent(server).state.messages, &(&1.content == "Actually answer Q2"))
+      assert entry.refs == %{request_id: handle.id, run_id: injected.run_id, source: "/test/runtime", origin: "suite"}
+      [_, wire] = MockLLM.report(mock).requests
+      users = Enum.filter(wire.body["messages"], &(&1["role"] == "user"))
+      assert Enum.map(users, & &1["content"]) == ["Q1", "Actually answer Q2"]
+      assert_script_done(mock)
+    end
+
+    test "native checkpoints and standalone tokens keep terminal result and usage", %{jido: jido} do
+      {_server, _handle, saved} = native_checkpoint(jido)
+      {_, config, result} = standalone_terminal(jido)
+      assert result.termination_reason == :final_answer
+      assert is_binary(result.final_token)
+      assert {:ok, replay} = ReAct.collect(result.final_token, config, run_until_terminal?: false)
+      assert replay.result == result.result and replay.usage == result.usage
+      assert replay.final_token == result.final_token
+      assert {:ok, restored} = Jido.Agent.restore(Jido.Agent, saved)
+      assert restored.state == saved.state
+    end
+
+    test "request usage sums real model calls and collection keeps nested provider metadata", %{jido: jido} do
+      first = %{prompt_tokens: 10, completion_tokens: 5, total_tokens: 15}
+      second = %{prompt_tokens: 7, completion_tokens: 3, total_tokens: 10}
+      mock = mock([%{reply: {:wait, :draft, response("Draft one", first)}}, %{reply: response("Draft two", second)}])
+      server = start_reasoning(jido, :react, tools: [])
+      assert {:ok, handle} = request(server, mock, :react, "Draft")
+      assert_receive {:mock_llm_waiting, ^mock, :draft, _}, 2_000
+      assert {:ok, _} = Session.inject(handle, "Revise")
+      assert :ok = MockLLM.release(mock, :draft)
+      assert {:ok, "Draft two"} = Request.await(handle)
+
+      assert Usage.token_counts(record(server, handle).meta.usage) == %{
+               input_tokens: 17,
+               output_tokens: 8,
+               total_tokens: 25
              }
 
-      core_thread = ThreadAgent.get(agent)
-      ai_messages = Thread.filter_by_kind(core_thread, :ai_message)
-      assert Enum.map(ai_messages, & &1.payload.role) == [:user, :user]
+      assert record(server, handle).meta.model_calls == 2
+      assert_script_done(mock)
 
-      injected_entry = List.last(ai_messages)
-      assert injected_entry.payload.content == "Actually answer Q2"
-      assert injected_entry.refs.request_id == "req_input_injected"
-      assert injected_entry.refs.run_id == "req_input_injected"
-      assert injected_entry.refs.signal_id == "evt_2"
-      assert injected_entry.refs.source == "/test/runtime"
-      assert injected_entry.refs.origin == "suite"
-    end
-
-    test "request_completed event marks request terminal and keeps checkpoint token" do
-      agent = create_agent(tools: [TestCalculator])
-
-      {agent, [_spawn]} =
-        ReAct.cmd(
-          agent,
-          [instruction(ReAct.start_action(), %{query: "q", request_id: "req_done"})],
-          %{}
-        )
-
-      events = [
-        runtime_event(:checkpoint, "req_done", 2, %{token: "tok_1", reason: :after_llm}),
-        runtime_event(:request_completed, "req_done", 3, %{
-          result: "done",
-          termination_reason: :final_answer,
-          usage: %{input_tokens: 10, output_tokens: 5}
-        })
-      ]
-
-      {agent, []} =
-        Enum.reduce(events, {agent, []}, fn event, {acc, _} ->
-          ReAct.cmd(acc, [instruction(:ai_react_worker_event, %{request_id: "req_done", event: event})], %{})
-        end)
-
-      state = StratState.get(agent, %{})
-      assert state.status == :completed
-      assert state.active_request_id == nil
-      assert state.result == "done"
-      assert state.usage == %{input_tokens: 10, output_tokens: 5}
-      assert state.checkpoint_token == "tok_1"
-      assert state.react_worker_status == :ready
-      assert state.pending_input_server == nil
-    end
-
-    test "llm_completed events merge nested provider usage without crashing" do
-      agent = create_agent(tools: [TestCalculator])
-
-      {agent, [_spawn]} =
-        ReAct.cmd(
-          agent,
-          [instruction(ReAct.start_action(), %{query: "q", request_id: "req_usage"})],
-          %{}
-        )
-
+      # This public event boundary retains provider metadata after SDK decoding.
+      # HTTP dialect normalization is checked separately above and in 02_24.
       usage_1 = %{
         input_tokens: 10,
         output_tokens: 5,
@@ -843,33 +787,13 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
         image_usage: %{images: 2}
       }
 
-      events = [
-        runtime_event(:llm_completed, "req_usage", 1, %{
-          turn_type: :final_answer,
-          text: "draft one",
-          thinking_content: nil,
-          reasoning_details: [],
-          tool_calls: [],
-          usage: usage_1
-        }),
-        runtime_event(:llm_completed, "req_usage", 2, %{
-          turn_type: :final_answer,
-          text: "draft two",
-          thinking_content: nil,
-          reasoning_details: [],
-          tool_calls: [],
-          usage: usage_2
-        })
-      ]
+      result =
+        ReAct.collect_stream([
+          collection_event(:llm_completed, "nested", 1, %{usage: usage_1}),
+          collection_event(:llm_completed, "nested", 2, %{usage: usage_2})
+        ])
 
-      {agent, []} =
-        Enum.reduce(events, {agent, []}, fn event, {acc, _} ->
-          ReAct.cmd(acc, [instruction(:ai_react_worker_event, %{request_id: "req_usage", event: event})], %{})
-        end)
-
-      state = StratState.get(agent, %{})
-
-      assert state.usage == %{
+      assert result.usage == %{
                input_tokens: 17,
                output_tokens: 8,
                total_cost: 0.003,
@@ -879,159 +803,137 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
              }
     end
 
-    test "request_completed with empty usage preserves accumulated LLM usage" do
-      agent = create_agent(tools: [TestCalculator])
+    test "empty final model usage and empty terminal event usage preserve earlier accounting", %{jido: jido} do
+      usage = %{prompt_tokens: 3, completion_tokens: 1, total_tokens: 4}
+      {:raw, first} = response(nil, usage)
 
-      {agent, [_spawn]} =
-        ReAct.cmd(
-          agent,
-          [instruction(ReAct.start_action(), %{query: "q", request_id: "req_empty_terminal_usage"})],
-          %{}
-        )
+      first = %{
+        first
+        | choices: [
+            %{
+              index: 0,
+              finish_reason: "tool_calls",
+              message: %{
+                role: "assistant",
+                content: nil,
+                tool_calls: [
+                  %{
+                    id: "calc",
+                    type: "function",
+                    function: %{name: "calculator", arguments: Jason.encode!(%{operation: "add", a: 2, b: 3})}
+                  }
+                ]
+              }
+            }
+          ]
+      }
 
-      events = [
-        runtime_event(:llm_completed, "req_empty_terminal_usage", 1, %{
-          turn_type: :final_answer,
-          text: "Yo",
-          thinking_content: nil,
-          reasoning_details: [],
-          tool_calls: [],
-          usage: %{input_tokens: 3, output_tokens: 1}
-        }),
-        runtime_event(:request_completed, "req_empty_terminal_usage", 2, %{
-          result: "Yo",
-          termination_reason: :final_answer,
-          usage: %{}
-        })
-      ]
+      mock = mock([%{reply: {:raw, first}}, %{reply: response("5", %{})}])
+      server = start_reasoning(jido, :react, tools: [TestCalculator])
+      assert {:ok, handle} = request(server, mock, :react, "Add")
+      assert {:ok, "5"} = Request.await(handle)
+      streamed = events(handle)
 
-      {agent, []} =
-        Enum.reduce(events, {agent, []}, fn event, {acc, _} ->
-          ReAct.cmd(
-            acc,
-            [instruction(:ai_react_worker_event, %{request_id: "req_empty_terminal_usage", event: event})],
-            %{}
-          )
+      assert Usage.token_counts(record(server, handle).meta.usage) == %{
+               input_tokens: 3,
+               output_tokens: 1,
+               total_tokens: 4
+             }
+
+      assert record(server, handle).meta.model_calls == 2
+      # A terminal event with absent usage must retain the preceding LLM totals.
+      empty_terminal =
+        Enum.map(streamed, fn event ->
+          if event.kind == :request_completed, do: %{event | data: Map.put(event.data, :usage, %{})}, else: event
         end)
 
-      state = StratState.get(agent, %{})
-
-      assert state.status == :completed
-      assert state.result == "Yo"
-      assert state.usage == %{input_tokens: 3, output_tokens: 1}
+      collected = ReAct.collect_stream(empty_terminal)
+      assert collected.result == "5" and collected.termination_reason == :final_answer
+      assert Usage.token_counts(collected.usage) == %{input_tokens: 3, output_tokens: 1, total_tokens: 4}
+      assert_script_done(mock)
     end
 
-    test "completed request history is reused for the next turn" do
-      agent = create_agent(tools: [TestCalculator])
-      reasoning_details = [%{signature: "sig_123", provider: :openai}]
-
-      {agent, [_spawn]} =
-        ReAct.cmd(agent, [instruction(ReAct.start_action(), %{query: "Who am I?", request_id: "req_turn_1"})], %{})
-
-      first_turn_events = [
-        runtime_event(:request_started, "req_turn_1", 1, %{query: "Who am I?"}),
-        runtime_event(:llm_completed, "req_turn_1", 2, %{
-          turn_type: :final_answer,
-          text: "You asked who you are.",
-          thinking_content: nil,
-          reasoning_details: reasoning_details,
-          tool_calls: [],
-          usage: %{}
-        }),
-        runtime_event(:request_completed, "req_turn_1", 3, %{
-          result: "You asked who you are.",
-          termination_reason: :final_answer,
-          usage: %{}
-        })
+    test "the next request reuses committed history and opaque reasoning details", %{jido: jido} do
+      details = [
+        %ReqLLM.Message.ReasoningDetails{
+          text: "Remember the question",
+          signature: "sig_123",
+          encrypted?: true,
+          provider: :openai,
+          format: "responses/v1",
+          index: 0,
+          provider_data: %{"token" => "opaque"}
+        }
       ]
 
-      {agent, []} =
-        Enum.reduce(first_turn_events, {agent, []}, fn event, {acc, _} ->
-          ReAct.cmd(acc, [instruction(:ai_react_worker_event, %{request_id: "req_turn_1", event: event})], %{})
-        end)
+      wire_details = Enum.map(details, &ReqLLM.Message.ReasoningDetails.to_openai_compatible/1)
+      delta = %{content: "You asked who you are.", reasoning_details: wire_details}
+      mock = mock([%{reply: {:stream, [delta], "stop"}}, %{reply: {:text, "You asked who you are."}}])
+      server = start_reasoning(jido, :react, tools: [], streaming: true)
+      assert {:ok, first} = request(server, mock, :react, "Who am I?")
+      assert {:ok, "You asked who you are."} = Request.await(first)
+      assert {:ok, next} = request(server, mock, :react, "What did I just ask?")
+      assert {:ok, "You asked who you are."} = Request.await(next)
+      [_, wire] = MockLLM.report(mock).requests
+      history = Enum.reject(wire.body["messages"], &(&1["role"] == "system"))
 
-      {agent, [_spawn]} =
-        ReAct.cmd(
-          agent,
-          [instruction(ReAct.start_action(), %{query: "What did I just ask?", request_id: "req_turn_2"})],
-          %{}
-        )
-
-      state = StratState.get(agent, %{})
-      history = Jido.AI.Context.to_messages(state.pending_worker_start.state.context)
-      history = Enum.reject(history, &(&1.role == :system))
-
-      assert history == [
-               %{role: :user, content: "Who am I?"},
-               %{
-                 role: :assistant,
-                 content: "You asked who you are.",
-                 reasoning_details: reasoning_details,
-                 refs: %{request_id: "req_turn_1", run_id: "req_turn_1", signal_id: "evt_2"}
-               },
-               %{role: :user, content: "What did I just ask?"}
+      assert Enum.map(history, &Map.take(&1, ["role", "content"])) == [
+               %{"role" => "user", "content" => "Who am I?"},
+               %{"role" => "assistant", "content" => "You asked who you are."},
+               %{"role" => "user", "content" => "What did I just ask?"}
              ]
+
+      assert Enum.at(history, 1)["reasoning_details"] == wire_details
+      assistant = Enum.find(Server.agent(server).state.messages, &(&1.role == :assistant))
+      assert assistant.reasoning_details == details
+      assert assistant.refs.request_id == first.id and assistant.refs.run_id == record(server, first).run_id
+      assert_script_done(mock)
     end
 
-    test "snapshot exposes conversation projected from thread state" do
-      agent = create_agent(tools: [TestCalculator])
+    test "inspection projects the committed message history", %{jido: jido} do
+      mock = mock([%{reply: {:text, "Tracked"}}])
+      server = start_reasoning(jido, :react, tools: [])
+      assert {:ok, handle} = request(server, mock, :react, "Track this")
+      assert {:ok, "Tracked"} = Request.await(handle)
+      assert {:ok, view} = Session.snapshot(server)
+      conversation = Enum.reject(view.details.conversation, &(&1.role == :system))
 
-      {agent, [_spawn]} =
-        ReAct.cmd(agent, [instruction(ReAct.start_action(), %{query: "Track this", request_id: "req_snap"})], %{})
+      assert Enum.map(conversation, &Map.take(&1, [:role, :content])) ==
+               [%{role: :user, content: "Track this"}, %{role: :assistant, content: "Tracked"}]
 
-      events = [
-        runtime_event(:request_started, "req_snap", 1, %{query: "Track this"}),
-        runtime_event(:llm_completed, "req_snap", 2, %{
-          turn_type: :final_answer,
-          text: "Tracked",
-          thinking_content: nil,
-          tool_calls: [],
-          usage: %{}
-        }),
-        runtime_event(:request_completed, "req_snap", 3, %{
-          result: "Tracked",
-          termination_reason: :final_answer,
-          usage: %{}
-        })
-      ]
-
-      {agent, []} =
-        Enum.reduce(events, {agent, []}, fn event, {acc, _} ->
-          ReAct.cmd(acc, [instruction(:ai_react_worker_event, %{request_id: "req_snap", event: event})], %{})
-        end)
-
-      snapshot = ReAct.snapshot(agent, %{})
-      conversation = Enum.reject(snapshot.details.conversation, &(&1.role == :system))
-
-      assert conversation == [
-               %{role: :user, content: "Track this"},
-               %{
-                 role: :assistant,
-                 content: "Tracked",
-                 refs: %{request_id: "req_snap", run_id: "req_snap", signal_id: "evt_2"}
-               }
-             ]
+      assert Enum.all?(conversation, &(&1.refs.request_id == handle.id and &1.refs.run_id == view.request.run_id))
+      assert :ok = Jido.Action.validate_static_data(view.agent.state)
+      assert_script_done(mock)
     end
 
-    test "snapshot formats pending tool calls with string keys" do
-      agent = create_agent(tools: [TestCalculator])
+    test "inspection normalizes string-key provider calls while a real tool runs", %{jido: jido} do
+      call = %{
+        "id" => "call_string",
+        "type" => "function",
+        "function" => %{"name" => "calculator", "arguments" => Jason.encode!(%{operation: "add", a: 2, b: 3})}
+      }
 
-      state =
-        agent
-        |> StratState.get(%{})
-        |> Map.put(:status, :awaiting_tool)
-        |> Map.put(:pending_tool_calls, [
+      wire = %{
+        "id" => "string-call",
+        "object" => "chat.completion",
+        "model" => "gpt-4o-mini",
+        "choices" => [
           %{
-            "id" => "call_string",
-            "name" => "calculator",
-            "arguments" => %{"operation" => "add", "a" => 2, "b" => 3},
-            "result" => nil
+            "index" => 0,
+            "message" => %{"role" => "assistant", "content" => nil, "tool_calls" => [call]},
+            "finish_reason" => "tool_calls"
           }
-        ])
+        ],
+        "usage" => %{"prompt_tokens" => 3, "completion_tokens" => 1, "total_tokens" => 4}
+      }
 
-      agent = StratState.put(agent, state)
+      mock = mock([%{reply: {:raw, wire}}, %{reply: {:text, "5"}}])
+      server = start_reasoning(jido, :react, tools: [TestCalculator])
+      assert {:ok, handle} = request(server, mock, :react, "Add", context: %{observer: self(), hold_tool: true})
+      assert_receive {:calculator_held, tool}, 2_000
+      assert {:ok, view} = Session.snapshot(server)
 
-      assert ReAct.snapshot(agent, %{}).details.tool_calls == [
+      assert view.details.tool_calls == [
                %{
                  id: "call_string",
                  name: "calculator",
@@ -1040,721 +942,481 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
                  result: nil
                }
              ]
+
+      send(tool, :release)
+      assert {:ok, "5"} = Request.await(handle)
+      assert {:ok, done} = Session.snapshot(server)
+      assert done.details.tool_calls == []
+      assert [%{id: "call_string", result: {:ok, %{result: 5}, []}}] = done.details.tool_results
+      assert_script_done(mock)
     end
 
-    test "snapshot exposes completed tool results after final answer" do
-      agent = create_agent(tools: [TestCalculator, TestSearch])
-
-      {agent, [_spawn]} =
-        ReAct.cmd(agent, [instruction(ReAct.start_action(), %{query: "Use tools", request_id: "req_tools"})], %{})
-
-      replayed_tool_result =
-        runtime_event(:tool_completed, "req_tools", 3, %{
-          tool_call_id: "call_calc",
-          tool_name: "calculator",
-          result: {:ok, %{result: 5}, []}
-        })
-
-      events = [
-        runtime_event(:request_started, "req_tools", 1, %{query: "Use tools"}),
-        runtime_event(:llm_completed, "req_tools", 2, %{
-          turn_type: :tool_calls,
-          text: "",
-          thinking_content: nil,
-          tool_calls: [
-            %{
-              id: "call_calc",
-              name: "calculator",
-              arguments: %{"operation" => "add", "a" => 2, "b" => 3}
-            },
-            %{
-              id: "call_search",
-              name: "search",
-              arguments: %{"query" => "jido"}
-            }
-          ],
-          usage: %{}
-        }),
-        replayed_tool_result,
-        replayed_tool_result,
-        runtime_event(:tool_completed, "req_tools", 4, %{
-          tool_call_id: "call_search",
-          tool_name: "search",
-          result: {:error, %{type: :timeout, message: "search timed out"}, []}
-        }),
-        runtime_event(:llm_completed, "req_tools", 5, %{
-          turn_type: :final_answer,
-          text: "The tools finished.",
-          thinking_content: nil,
-          tool_calls: [],
-          usage: %{}
-        }),
-        runtime_event(:request_completed, "req_tools", 6, %{
-          result: "The tools finished.",
-          termination_reason: :final_answer,
-          usage: %{}
-        })
+    test "completed tool inspection keeps one result per call after replay and the final answer", %{jido: jido} do
+      calls = [
+        %{id: "call_calc", name: "calculator", arguments: %{operation: "add", a: 2, b: 3}},
+        %{id: "call_search", name: "search", arguments: %{query: "timeout"}}
       ]
 
-      {agent, []} =
-        Enum.reduce(events, {agent, []}, fn event, {acc, _} ->
-          ReAct.cmd(acc, [instruction(:ai_react_worker_event, %{request_id: "req_tools", event: event})], %{})
-        end)
+      mock =
+        mock([
+          %{reply: {:tools, calls}},
+          %{reply: {:wait, :final, {:text, "The tools finished."}}},
+          %{reply: {:wait, :next, {:text, "Next"}}}
+        ])
 
-      snapshot = ReAct.snapshot(agent, %{})
+      server = start_reasoning(jido, :react, tools: [TestCalculator, TestSearch])
+      assert {:ok, handle} = request(server, mock, :react, "Use tools")
+      assert_receive {:mock_llm_waiting, ^mock, :final, _}, 2_000
+      assert {:ok, before} = Session.snapshot(server)
+      replay = Enum.find(before.details.trace.events, &(&1.kind == :tool_completed and &1.tool_call_id == "call_calc"))
+      assert replay != nil
 
-      assert snapshot.result == "The tools finished."
+      assert :ok =
+               GenServer.call(owner(server), {:event, handle.id, before.request.run_id, :tool_completed, replay.data})
 
-      assert snapshot.details.tool_results == [
+      assert {:ok, replayed} = Session.snapshot(server)
+      assert replayed.details.phase == :awaiting_llm
+      assert replayed.details.tool_results == before.details.tool_results
+      assert :ok = MockLLM.release(mock, :final)
+      assert {:ok, "The tools finished."} = Request.await(handle)
+      assert {:ok, done} = Session.snapshot(server)
+      assert done.request.result == "The tools finished."
+      assert done.details.tool_calls == []
+
+      assert Enum.map(done.details.tool_results, &Map.take(&1, [:id, :name, :arguments, :result])) == [
                %{
                  id: "call_calc",
                  name: "calculator",
-                 arguments: %{"operation" => "add", "a" => 2, "b" => 3},
+                 arguments: %{operation: "add", a: 2, b: 3},
                  result: {:ok, %{result: 5}, []}
                },
                %{
                  id: "call_search",
                  name: "search",
-                 arguments: %{"query" => "jido"},
+                 arguments: %{query: "timeout"},
                  result:
                    {:error,
                     %{
                       type: :timeout,
                       message: "search timed out",
-                      details: %{},
+                      details: %{tool_name: "search", tool_call_id: "call_search"},
                       retryable?: true
                     }, []}
                }
              ]
 
-      refute Map.has_key?(snapshot.details, :tool_calls)
+      [_, final_wire] = MockLLM.report(mock).requests
+      assert Enum.count(final_wire.body["messages"], &(&1["role"] == "tool")) == 2
 
-      {agent, [_spawn]} =
-        ReAct.cmd(agent, [instruction(ReAct.start_action(), %{query: "Next run", request_id: "req_next"})], %{})
+      assert :ok =
+               GenServer.call(owner(server), {:event, handle.id, before.request.run_id, :tool_completed, replay.data})
 
-      refute Map.has_key?(ReAct.snapshot(agent, %{}).details, :tool_results)
+      assert {:ok, retained} = Session.snapshot(server, request_id: handle.id)
+      assert retained.request == done.request
+      assert {:ok, next} = request(server, mock, :react, "Next run")
+      assert_receive {:mock_llm_waiting, ^mock, :next, _}, 2_000
+      assert {:ok, fresh} = Session.snapshot(server)
+      assert fresh.details.tool_results == [] and fresh.details.tool_calls == []
+      assert {:ok, retained} = Session.snapshot(server, request_id: handle.id)
+      assert retained.details.tool_results == done.details.tool_results
+      assert :ok = MockLLM.release(mock, :next)
+      assert {:ok, "Next"} = Request.await(next)
+      assert_script_done(mock)
     end
 
-    test "request completion clears ephemeral req_http_options" do
-      agent = create_agent(tools: [TestCalculator])
+    test "request HTTP and generation overrides end before the next request", %{jido: jido} do
+      mock = mock([%{reply: {:text, "First"}}, %{reply: {:text, "Next"}}])
+      server = start_reasoning(jido, :react, tools: [], llm_opts: [temperature: 0.3])
+      definition = Jido.Agent.definition(Server.agent(server))
 
-      {agent, [_spawn]} =
-        ReAct.cmd(
-          agent,
-          [
-            instruction(ReAct.start_action(), %{
-              query: "q",
-              request_id: "req_ephemeral",
-              req_http_options: [plug: {Req.Test, []}],
-              llm_opts: [thinking: %{type: :enabled, budget_tokens: 256}]
-            })
-          ],
-          %{}
-        )
+      assert {:ok, first} =
+               request(server, mock, :react, "Q1",
+                 llm_opts: MockLLM.options(mock) ++ [temperature: 0.8],
+                 req_http_options: [headers: [{"x-request-only", "first"}]]
+               )
 
-      event =
-        runtime_event(:request_completed, "req_ephemeral", 2, %{
-          result: "done",
-          termination_reason: :final_answer,
-          usage: %{}
-        })
-
-      {agent, []} =
-        ReAct.cmd(
-          agent,
-          [instruction(:ai_react_worker_event, %{request_id: "req_ephemeral", event: event})],
-          %{}
-        )
-
-      state = StratState.get(agent, %{})
-      refute Map.has_key?(state, :run_req_http_options)
-      refute Map.has_key?(state, :run_llm_opts)
+      assert {:ok, "First"} = Request.await(first)
+      assert {:ok, %{live: nil}} = Session.snapshot(server)
+      assert {:ok, next} = request(server, mock, :react, "Q2")
+      assert {:ok, "Next"} = Request.await(next)
+      [first_wire, next_wire] = MockLLM.report(mock).requests
+      assert first_wire.body["temperature"] == 0.8 and next_wire.body["temperature"] == 0.3
+      assert first_wire.headers["x-request-only"] == "first"
+      refute Map.has_key?(next_wire.headers, "x-request-only")
+      assert Jido.Agent.definition(Server.agent(server)) == definition
+      assert :ok = Jido.Action.validate_static_data(Server.agent(server).state)
+      refute inspect(Server.agent(server).state) =~ "x-request-only"
+      assert_script_done(mock)
     end
 
-    test "terminal checkpoint after request completion does not reopen active request" do
-      agent = create_agent(tools: [TestCalculator])
-
-      events = [
-        runtime_event(:request_started, "req_terminal_checkpoint", 1, %{query: "q"}),
-        runtime_event(:request_completed, "req_terminal_checkpoint", 2, %{
-          result: "done",
-          termination_reason: :final_answer,
-          usage: %{}
-        }),
-        runtime_event(:checkpoint, "req_terminal_checkpoint", 3, %{token: "tok_terminal", reason: :terminal})
-      ]
-
-      {agent, []} =
-        Enum.reduce(events, {agent, []}, fn event, {acc, _} ->
-          ReAct.cmd(
-            acc,
-            [instruction(:ai_react_worker_event, %{request_id: "req_terminal_checkpoint", event: event})],
-            %{}
-          )
-        end)
-
-      state = StratState.get(agent, %{})
-      assert state.status == :completed
-      assert state.checkpoint_token == "tok_terminal"
-      assert state.active_request_id == nil
+    test "terminal checkpoint restore and token collection do not reopen completed work", %{jido: jido} do
+      {server, handle, saved} = native_checkpoint(jido)
+      assert :ok = Server.stop(server, :normal)
+      copy = saved |> :erlang.term_to_binary() |> :erlang.binary_to_term([:safe])
+      assert {:ok, restored} = Jido.Agent.restore(Jido.Agent, copy)
+      server = start_agent(jido, restored)
+      assert {:ok, view} = Session.snapshot(server, request_id: handle.id)
+      assert view.request.status == :completed and view.request.result == "Done"
+      assert view.live == nil and view.details.active_request_id == nil
+      assert view.details.phase == :request_completed
+      {mock, config, result} = standalone_terminal(jido)
+      completion = Enum.find_index(result.trace, &(&1.kind == :request_completed))
+      terminal = Enum.find_index(result.trace, &(&1.kind == :checkpoint and &1.data.reason == :terminal))
+      assert is_integer(completion) and terminal > completion
+      assert Enum.at(result.trace, terminal).data.token == result.final_token
+      assert {:ok, replay} = ReAct.collect(result.final_token, config, [])
+      assert replay.result == "Token done" and replay.termination_reason == :final_answer
+      assert length(MockLLM.report(mock).requests) == 1
+      assert_script_done(mock)
     end
 
-    test "cancel forwards worker cancel signal for active request" do
-      agent = create_agent(tools: [TestCalculator])
+    test "cancellation keeps its reason and closes the provider connection", %{jido: jido} do
+      mock = mock([%{reply: {:wait, :held, {:text, "unused"}}}])
+      server = start_reasoning(jido, :react, tools: [])
+      assert {:ok, handle} = request(server, mock, :react)
+      assert_receive {:mock_llm_waiting, ^mock, :held, provider}, 2_000
+      monitor = Process.monitor(provider)
+      assert :ok = Session.cancel(handle, reason: :user_cancelled)
+      assert {:error, {:cancelled, :user_cancelled}} = Request.await(handle)
+      assert record(server, handle).error == {:cancelled, :user_cancelled}
+      assert_receive {:DOWN, ^monitor, :process, ^provider, _}, 2_000
 
-      state =
-        agent
-        |> StratState.get(%{})
-        |> Map.put(:status, :awaiting_llm)
-        |> Map.put(:active_request_id, "req_cancel")
-        |> Map.put(:react_worker_pid, self())
-        |> Map.put(:react_worker_status, :running)
+      assert {:ok, %{live: nil, details: %{active_request_id: nil, cancel_reason: :user_cancelled}}} =
+               Session.snapshot(server)
 
-      agent = StratState.put(agent, state)
-
-      cancel_instruction =
-        instruction(ReAct.cancel_action(), %{request_id: "req_cancel", reason: :user_cancelled})
-
-      {agent, directives} = ReAct.cmd(agent, [cancel_instruction], %{})
-
-      assert [%AgentDirective.Emit{} = emit] = directives
-      assert emit.signal.type == "ai.react.worker.cancel"
-      assert emit.signal.data.request_id == "req_cancel"
-      assert emit.signal.data.reason == :user_cancelled
-      assert emit.dispatch == {:pid, [target: self()]}
-
-      state = StratState.get(agent, %{})
-      assert state.cancel_reason == :user_cancelled
+      eventually(fn -> MockLLM.report(mock).waiting == [] end)
+      assert_script_done(mock)
     end
 
-    test "worker crash while active request marks request failed" do
-      agent = create_agent(tools: [TestCalculator])
-      agent = with_stream_request(agent, "req_crash")
-      tag = Request.Stream.message_tag()
-
-      state =
-        agent
-        |> StratState.get(%{})
-        |> Map.put(:status, :awaiting_tool)
-        |> Map.put(:active_request_id, "req_crash")
-        |> Map.put(:react_worker_pid, self())
-        |> Map.put(:react_worker_status, :running)
-
-      agent = StratState.put(agent, state)
-
-      crash_instruction =
-        instruction(:ai_react_worker_child_exit, %{
-          tag: :react_worker,
-          pid: self(),
-          reason: :killed
-        })
-
-      {agent, []} = ReAct.cmd(agent, [crash_instruction], %{})
-
-      state = StratState.get(agent, %{})
-      assert state.status == :error
-      assert state.active_request_id == nil
-      assert state.react_worker_pid == nil
-      assert state.react_worker_status == :missing
-      assert state.result == {:react_worker_exit, :killed}
-
-      assert_receive {^tag,
-                      %Event{
-                        kind: :request_failed,
-                        request_id: "req_crash",
-                        data: %{error: {:react_worker_exit, :killed}, reason: :react_worker_exit}
-                      }}
+    test "a worker crash fails its request and permits a later request", %{jido: jido} do
+      mock = mock([%{reply: {:wait, :held, {:text, "unused"}}}, %{reply: {:text, "Next"}}])
+      server = start_reasoning(jido, :react, tools: [])
+      assert {:ok, first} = request(server, mock, :react)
+      assert_receive {:mock_llm_waiting, ^mock, :held, provider}, 2_000
+      monitor = Process.monitor(provider)
+      assert {:ok, view} = Session.snapshot(server)
+      Process.exit(view.live.worker_pid, :kill)
+      assert {:error, :worker_crash} = Request.await(first)
+      assert record(server, first).error == :worker_crash
+      assert_receive {:DOWN, ^monitor, :process, ^provider, _}, 2_000
+      assert {:ok, %{live: nil, details: %{active_request_id: nil}}} = Session.snapshot(server)
+      assert {:ok, next} = request(server, mock, :react, "Next")
+      assert {:ok, "Next"} = Request.await(next)
+      eventually(fn -> MockLLM.report(mock).waiting == [] end)
+      assert_script_done(mock)
     end
 
-    test "propagates runtime ordering metadata to LLMDelta signals" do
-      agent = create_agent(tools: [TestCalculator])
-      request_id = "req_delta_meta"
+    test "streamed deltas preserve request run call and sequence IDs", %{jido: jido} do
+      mock =
+        mock([%{reply: {:stream, [%{content: "Step 1: Add."}, {:wait, :held}, %{content: "\n4"}], "stop"}}])
 
-      event = runtime_event(:llm_delta, request_id, 17, %{chunk_type: :content, delta: "ordered"})
-
-      {_agent, []} =
-        ReAct.cmd(agent, [instruction(:ai_react_worker_event, %{request_id: request_id, event: event})], %{})
-
-      assert_receive {:"$gen_cast", {:signal, signal}}
-      assert signal.type == "ai.llm.delta"
-      assert signal.data.call_id == "call_req_delta_meta"
-      assert signal.data.delta == "ordered"
-      assert signal.data.chunk_type == :content
-      assert signal.data.seq == 17
-      assert signal.data.run_id == request_id
-      assert signal.data.request_id == request_id
-      assert signal.data.iteration == 1
+      server = start_reasoning(jido, :react, tools: [], streaming: true)
+      assert {:ok, handle} = request(server, mock, :react)
+      assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
+      assert_receive {:jido_ai_request_event, %{kind: :llm_delta} = delta}, 1_000
+      assert delta.data.delta == "Step 1: Add." and delta.data.chunk_type == :content
+      assert delta.request_id == handle.id and delta.run_id == record(server, handle).run_id
+      assert delta.method == :react
+      assert_receive {:signal, %{type: "ai.llm.delta", data: data}}, 1_000
+      assert data.call_id == delta.llm_call_id and is_binary(data.call_id)
+      assert data.seq == delta.seq and data.run_id == delta.run_id and data.request_id == handle.id
+      assert data.delta == delta.data.delta and data.chunk_type == :content
+      assert :ok = MockLLM.release(mock, :held)
+      assert {:ok, "Step 1: Add.\n4"} = Request.await(handle)
+      all = Enum.sort_by([delta | events(handle)], & &1.seq)
+      assert Enum.map(all, & &1.seq) == Enum.to_list(1..length(all))
+      assert List.last(all).kind == :request_completed
+      assert_script_done(mock)
     end
 
-    test "passes complete content parts without appending them to text state" do
-      agent = create_agent(tools: [TestCalculator])
-      request_id = "req_content_part"
+    test "complete content parts reach both streams and the stored multimodal result", %{jido: jido} do
       image = ContentPart.image(<<1, 2, 3>>, "image/png")
+      delta = %{images: [%{type: "image_url", image_url: %{url: "data:image/png;base64,AQID"}}]}
+      mock = mock([%{reply: {:stream, [delta, {:wait, :held}], "stop"}}])
+      server = start_reasoning(jido, :react, tools: [], streaming: true)
+      assert {:ok, handle} = request(server, mock, :react)
+      assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
 
-      delta_event =
-        runtime_event(:llm_delta, request_id, 18, %{
-          chunk_type: :content_part,
-          delta: image
-        })
+      assert_receive {:jido_ai_request_event, %{kind: :llm_delta, data: %{chunk_type: :content_part, delta: ^image}}},
+                     1_000
 
-      {agent, []} =
-        ReAct.cmd(
-          agent,
-          [instruction(:ai_react_worker_event, %{request_id: request_id, event: delta_event})],
-          %{}
-        )
-
-      assert_receive {:"$gen_cast", {:signal, signal}}
-      assert signal.type == "ai.llm.delta"
-      assert signal.data.chunk_type == :content_part
-      assert signal.data.delta == image
-      assert StratState.get(agent, %{}).streaming_text == ""
-
-      completed_event =
-        runtime_event(:llm_completed, request_id, 19, %{
-          turn_type: :final_answer,
-          text: "",
-          content_parts: [image],
-          tool_calls: [],
-          usage: %{}
-        })
-
-      {agent, []} =
-        ReAct.cmd(
-          agent,
-          [instruction(:ai_react_worker_event, %{request_id: request_id, event: completed_event})],
-          %{}
-        )
-
-      assert StratState.get(agent, %{}).result == [image]
+      assert_receive {:signal, %{type: "ai.llm.delta", data: %{chunk_type: :content_part, delta: ^image}}}, 1_000
+      assert {:ok, active} = Session.snapshot(server)
+      assert active.details.streaming_text == ""
+      assert :ok = MockLLM.release(mock, :held)
+      assert {:ok, [^image]} = Request.await(handle)
+      assert record(server, handle).result == [image]
+      assert {:ok, %{details: %{streaming_text: ""}}} = Session.snapshot(server)
+      assert :ok = Jido.Action.validate_static_data(Server.agent(server).state)
+      assert_script_done(mock)
     end
 
-    test "uses runtime event model for LLM delta telemetry" do
-      agent = create_agent(tools: [TestCalculator])
-      request_id = "req_delta_model_meta"
-      handler_id = "react-delta-model-#{System.unique_integer([:positive])}"
+    test "delta telemetry uses the effective runtime model", %{jido: jido} do
+      handler_id = "react-model-#{System.unique_integer([:positive])}"
+      request_id = "model-#{System.unique_integer([:positive])}"
       parent = self()
 
-      :telemetry.attach(
-        handler_id,
-        Jido.AI.Observe.llm(:delta),
-        fn _event, _measurements, metadata, _config ->
-          if metadata.request_id == request_id do
-            send(parent, {:delta_metadata, metadata})
-          end
-        end,
-        nil
-      )
+      :ok =
+        :telemetry.attach(
+          handler_id,
+          Jido.AI.Observe.llm(:delta),
+          fn _, _, metadata, _ ->
+            if metadata.request_id == request_id, do: send(parent, {:delta_metadata, metadata})
+          end,
+          nil
+        )
 
       on_exit(fn -> :telemetry.detach(handler_id) end)
-
-      event =
-        runtime_event(:llm_delta, request_id, 18, %{
-          chunk_type: :content,
-          delta: "ordered",
-          model: "anthropic:claude-sonnet-4-5"
-        })
-
-      {_agent, []} =
-        ReAct.cmd(agent, [instruction(:ai_react_worker_event, %{request_id: request_id, event: event})], %{})
-
-      assert_receive {:delta_metadata, metadata}, 200
-      assert metadata.model == "anthropic:claude-sonnet-4-5"
+      mock = mock([%{reply: {:stream, [%{content: "Runtime model"}], "stop"}}])
+      server = start_reasoning(jido, :react, tools: [], model: "openai:gpt-4o", streaming: true)
+      assert {:ok, handle} = request(server, mock, :react, "Use override", request_id: request_id)
+      assert {:ok, "Runtime model"} = Request.await(handle)
+      assert_receive {:delta_metadata, metadata}, 1_000
+      assert metadata.model == "openai:gpt-4o-mini"
+      assert [%{body: %{"model" => "gpt-4o-mini"}}] = MockLLM.report(mock).requests
+      assert {:ok, view} = Session.snapshot(server)
+      assert view.details.model == metadata.model
+      assert_script_done(mock)
     end
 
-    test "stores request trace up to 2000 events then marks truncated" do
-      agent = create_agent(tools: [TestCalculator])
-      request_id = "req_trace"
+    test "the trace keeps its first 2000 events and records overflow through completion", %{jido: jido} do
+      mock = mock([%{reply: {:wait, :held, {:text, "Done"}}}])
+      server = start_reasoning(jido, :react, tools: [])
+      assert {:ok, handle} = request(server, mock, :react)
+      assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
+      assert {:ok, view} = Session.snapshot(server)
 
-      {agent, []} =
-        Enum.reduce(1..2001, {agent, []}, fn seq, {acc, _} ->
-          event = runtime_event(:llm_delta, request_id, seq, %{chunk_type: :content, delta: "x"})
-          ReAct.cmd(acc, [instruction(:ai_react_worker_event, %{request_id: request_id, event: event})], %{})
-        end)
+      for n <- 1..2_010 do
+        assert :ok =
+                 GenServer.call(
+                   owner(server),
+                   {:event, handle.id, view.request.run_id, :llm_delta, %{delta: "x", chunk_type: :content, n: n}}
+                 )
+      end
 
-      state = StratState.get(agent, %{})
-      trace = state.request_traces[request_id]
-
-      assert trace.truncated? == true
-      assert length(trace.events) == 2000
+      assert {:ok, active} = Session.snapshot(server)
+      assert active.details.trace.truncated?
+      assert Enum.map(active.details.trace.events, & &1.seq) == Enum.to_list(1..2_000)
+      assert active.details.trace.seq == 2_012
+      assert :ok = MockLLM.release(mock, :held)
+      assert {:ok, "Done"} = Request.await(handle)
+      assert {:ok, done} = Session.snapshot(server)
+      assert done.details.trace.events == active.details.trace.events
+      assert done.details.trace.truncated? and done.details.trace.seq > active.details.trace.seq
+      assert done.request.status == :completed
+      assert_script_done(mock)
     end
 
-    test "request_failed with {:incomplete_response, :incomplete} preserves structured error" do
-      agent = create_agent(tools: [TestCalculator])
+    test "blank provider failure and the exact incomplete tuple retain their error values", %{jido: jido} do
+      mock = mock([%{reply: {:stream, [], "incomplete"}}])
+      server = start_reasoning(jido, :react, tools: [], streaming: true)
+      assert {:ok, handle} = request(server, mock, :react)
+      # The Chat SDK maps the wire value to :error. Do not claim :incomplete decoding.
+      assert {:error, {:incomplete_response, :error}} = Request.await(handle)
+      assert {:ok, view} = Session.snapshot(server)
+      assert view.request.error == {:incomplete_response, :error}
+      assert view.request.meta.error_type == :llm_response
+      assert_script_done(mock)
+      raw = {:incomplete_response, :incomplete}
+      # An exact domain error uses the real output control, after a model call.
+      assert raw_failure(jido, raw).request.error == raw
 
-      {agent, [_spawn]} =
-        ReAct.cmd(
-          agent,
-          [instruction(ReAct.start_action(), %{query: "Q_incomplete", request_id: "req_incomplete"})],
-          %{}
-        )
+      collected =
+        ReAct.collect_stream([collection_event(:request_failed, "exact", 1, %{error: raw, error_type: :llm_response})])
 
-      # This matches what runner.ex emits via fail_run when validate_terminal_response/1
-      # detects a blank text + failure finish_reason.
-      incomplete_error = {:incomplete_response, :incomplete}
-
-      failed_event =
-        runtime_event(:request_failed, "req_incomplete", 2, %{
-          error: incomplete_error,
-          error_type: :llm_response
-        })
-
-      {agent, []} =
-        ReAct.cmd(
-          agent,
-          [instruction(:ai_react_worker_event, %{request_id: "req_incomplete", event: failed_event})],
-          %{}
-        )
-
-      snapshot = ReAct.snapshot(agent, %{})
-      assert snapshot.status == :failure
-      assert snapshot.done?
-      # The raw error tuple must be preserved — not stringified or wrapped
-      assert snapshot.result == incomplete_error
+      assert collected.result == raw and collected.termination_reason == :failed
     end
   end
 
   describe "tool configuration and compatibility" do
-    test "register_tool adds tool to config and list_tools/1" do
-      agent = create_agent(tools: [TestCalculator])
-      assert ReAct.list_tools(agent) == [TestCalculator]
-
-      {agent, []} =
-        ReAct.cmd(agent, [instruction(ReAct.register_tool_action(), %{tool_module: TestSearch})], %{})
-
-      tools = ReAct.list_tools(agent)
-      assert TestCalculator in tools
-      assert TestSearch in tools
-    end
-
-    test "unregister_tool removes tool from config" do
-      agent = create_agent(tools: [TestCalculator, TestSearch])
-
-      {agent, []} =
-        ReAct.cmd(agent, [instruction(ReAct.unregister_tool_action(), %{tool_name: "search"})], %{})
-
-      tools = ReAct.list_tools(agent)
-      assert TestCalculator in tools
-      refute TestSearch in tools
-    end
-
-    test "set_tool_context replaces base tool context" do
-      agent = create_agent(tools: [TestCalculator], tool_context: %{tenant: "a", region: "us"})
-
-      {agent, []} =
-        ReAct.cmd(
-          agent,
-          [instruction(ReAct.set_tool_context_action(), %{tool_context: %{tenant: "b"}})],
-          %{}
-        )
-
-      state = StratState.get(agent, %{})
-      assert state.config.base_tool_context == %{tenant: "b"}
-    end
-
-    test "set_system_prompt replaces base system prompt" do
-      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
-
-      {agent, []} =
-        ReAct.cmd(
-          agent,
-          [instruction(ReAct.set_system_prompt_action(), %{system_prompt: "Updated prompt"})],
-          %{}
-        )
-
-      state = StratState.get(agent, %{})
-      assert state.config.system_prompt == "Updated prompt"
-    end
-
-    test "context.modify replace updates base conversation context" do
-      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
-
-      context =
-        Jido.AI.Context.new(system_prompt: "Restored prompt")
-        |> Jido.AI.Context.append_messages([
-          %{role: :user, content: "Hello"},
-          %{role: :assistant, content: "Hi there"}
+    test "tool registration updates the live catalog and the next provider request", %{jido: jido} do
+      mock =
+        mock([
+          %{reply: {:tools, [%{id: "search", name: "search", arguments: %{query: "jido"}}]}},
+          %{reply: {:text, "Found"}}
         ])
 
-      {agent, []} =
-        ReAct.cmd(
-          agent,
-          [context_replace_instruction(context)],
-          %{}
-        )
+      server = start_reasoning(jido, :react, tools: [TestCalculator])
+      assert Jido.AI.list_tools(Server.agent(server)) == [TestCalculator]
+      assert {:ok, _} = Configuration.live(server, :register, TestSearch)
+      assert MapSet.new(Jido.AI.list_tools(Server.agent(server))) == MapSet.new([TestCalculator, TestSearch])
+      assert {:ok, handle} = request(server, mock, :react, "Search")
+      assert {:ok, "Found"} = Request.await(handle)
+      [first, final] = MockLLM.report(mock).requests
+      assert MapSet.new(Enum.map(first.body["tools"], & &1["function"]["name"])) == MapSet.new(["calculator", "search"])
+      result = Enum.find(final.body["messages"], &(&1["role"] == "tool"))
+      assert Jason.decode!(result["content"]) == %{"ok" => true, "result" => %{"results" => ["Found: jido"]}}
+      assert_script_done(mock)
+    end
 
-      state = StratState.get(agent, %{})
-      assert state.context == context
-      assert state.config.system_prompt == "Restored prompt"
+    test "tool removal updates the live catalog and the next provider request", %{jido: jido} do
+      mock = mock([calculation(), %{reply: {:text, "Five"}}])
+      server = start_reasoning(jido, :react, tools: [TestCalculator, TestSearch])
+      assert {:ok, _} = Configuration.live(server, :unregister, "search")
+      assert Jido.AI.list_tools(Server.agent(server)) == [TestCalculator]
+      assert {:ok, handle} = request(server, mock, :react, "Add")
+      assert {:ok, "Five"} = Request.await(handle)
 
-      messages = Jido.AI.Context.to_messages(state.context)
-      non_system = Enum.reject(messages, &(&1.role == :system))
+      for wire <- MockLLM.report(mock).requests do
+        assert Enum.map(wire.body["tools"], & &1["function"]["name"]) == ["calculator"]
+      end
 
-      assert non_system == [
-               %{role: :user, content: "Hello"},
-               %{role: :assistant, content: "Hi there"}
+      assert record(server, handle).meta.tool_calls == 1
+      assert_script_done(mock)
+    end
+
+    test "context replacement removes old defaults before real tool execution", %{jido: jido} do
+      mock = mock([calculation(), %{reply: {:text, "Five"}}])
+      server = start_reasoning(jido, :react, tools: [TestCalculator], tool_context: %{tenant: "a", region: "us"})
+      assert {:ok, _} = Configuration.live(server, :tool_context, %{tenant: "b"})
+      assert {:ok, profile} = Configuration.profile(Server.agent(server))
+      assert profile.tool_context == %{tenant: "b"}
+      assert {:ok, handle} = request(server, mock, :react, "Add", context: %{observer: self(), observe_context: true})
+      assert {:ok, "Five"} = Request.await(handle)
+      assert_receive {:calculator_context, seen}, 1_000
+      assert seen.tenant == "b"
+      refute Map.has_key?(seen, :region)
+      assert_script_done(mock)
+    end
+
+    test "prompt replacement reaches the next provider request exactly once", %{jido: jido} do
+      mock = mock([%{reply: {:text, "Done"}}])
+      server = start_reasoning(jido, :react, tools: [], system_prompt: "Original prompt")
+      assert {:ok, _} = Configuration.live(server, :prompt, "Updated prompt")
+      assert {:ok, profile} = Configuration.profile(Server.agent(server))
+      assert profile.instructions == "Updated prompt"
+      assert {:ok, handle} = request(server, mock, :react, "Work")
+      assert {:ok, "Done"} = Request.await(handle)
+      [wire] = MockLLM.report(mock).requests
+
+      assert Enum.filter(wire.body["messages"], &(&1["role"] == "system")) == [
+               %{"role" => "system", "content" => "Updated prompt"}
              ]
+
+      assert_script_done(mock)
     end
 
-    test "context.modify replace with nil system_prompt preserves existing config prompt" do
-      agent = create_agent(tools: [TestCalculator], system_prompt: "Keep me")
-
-      context =
-        Jido.AI.Context.new()
-        |> Jido.AI.Context.append_messages([%{role: :user, content: "test"}])
-
-      {agent, []} =
-        ReAct.cmd(
-          agent,
-          [context_replace_instruction(context)],
-          %{}
-        )
-
-      {agent, [_spawn]} =
-        ReAct.cmd(
-          agent,
-          [instruction(ReAct.start_action(), %{query: "next turn", request_id: "req_nil_prompt"})],
-          %{}
-        )
-
-      state = StratState.get(agent, %{})
-      assert state.context == context
-      assert state.config.system_prompt == "Keep me"
-      assert state.pending_worker_start.state.context.system_prompt == nil
-    end
-
-    test "context.modify replace while active run is deferred and applied after request completion" do
-      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
-
-      {agent, [_spawn]} =
-        ReAct.cmd(
-          agent,
-          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_deferred_complete"})],
-          %{}
-        )
+    test "context replacement updates committed history and the next model prompt", %{jido: jido} do
+      mock = mock([%{reply: {:text, "Done"}}])
+      server = start_reasoning(jido, :react, tools: [], system_prompt: "Original prompt")
 
       replacement =
-        Jido.AI.Context.new(system_prompt: "Restored prompt")
-        |> Jido.AI.Context.append_messages([
-          %{role: :user, content: "Restored user"},
-          %{role: :assistant, content: "Restored assistant"}
-        ])
+        Context.new(system_prompt: "Restored prompt")
+        |> Context.append_messages([%{role: :user, content: "Hello"}, %{role: :assistant, content: "Hi there"}])
 
-      {agent, []} =
-        ReAct.cmd(
-          agent,
-          [context_replace_instruction(replacement)],
-          %{}
-        )
-
-      state = StratState.get(agent, %{})
-      assert state.pending_context_op.operation.type == :replace
-      assert state.pending_context_op.operation.result_context == replacement
-      assert state.config.system_prompt == "Original prompt"
-
-      completion_events = [
-        runtime_event(:llm_completed, "req_deferred_complete", 2, %{
-          turn_type: :final_answer,
-          text: "A1",
-          thinking_content: nil,
-          tool_calls: [],
-          usage: %{}
-        }),
-        runtime_event(:request_completed, "req_deferred_complete", 3, %{
-          result: "A1",
-          termination_reason: :final_answer,
-          usage: %{}
-        })
-      ]
-
-      {agent, []} =
-        Enum.reduce(completion_events, {agent, []}, fn event, {acc, _} ->
-          ReAct.cmd(
-            acc,
-            [instruction(:ai_react_worker_event, %{request_id: "req_deferred_complete", event: event})],
-            %{}
-          )
-        end)
-
-      state = StratState.get(agent, %{})
-      assert state.context == replacement
-      assert state.pending_context_op == nil
-      assert state.config.system_prompt == "Restored prompt"
-
-      core_thread = ThreadAgent.get(agent)
-      ai_entries = Thread.filter_by_kind(core_thread, [:ai_message, :ai_context_operation])
-      last_entry = List.last(ai_entries)
-      assert last_entry.kind == :ai_context_operation
-      assert last_entry.payload.operation.type == :replace
-      assert last_entry.payload.operation.reason == :manual
+      assert {:ok, _} = replace_context(server, replacement, op_id: "replace")
+      assert current_context(server).entries == replacement.entries
+      assert current_context(server).system_prompt == "Restored prompt"
+      assert {:ok, handle} = request(server, mock, :react, "Continue")
+      assert {:ok, "Done"} = Request.await(handle)
+      [wire] = MockLLM.report(mock).requests
+      assert Enum.map(wire.body["messages"], & &1["content"]) == ["Restored prompt", "Hello", "Hi there", "Continue"]
+      assert_script_done(mock)
     end
 
-    test "request_failed preserves raw error in snapshot result" do
-      agent = create_agent(tools: [TestCalculator])
-
-      {agent, [_spawn]} =
-        ReAct.cmd(
-          agent,
-          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_raw_error"})],
-          %{}
-        )
-
-      error_struct = %{type: :stream_error, status: 503, message: "Too many connections"}
-
-      failed_event =
-        runtime_event(:request_failed, "req_raw_error", 2, %{
-          error: error_struct
-        })
-
-      {agent, []} =
-        ReAct.cmd(
-          agent,
-          [instruction(:ai_react_worker_event, %{request_id: "req_raw_error", event: failed_event})],
-          %{}
-        )
-
-      snapshot = ReAct.snapshot(agent, %{})
-      assert snapshot.status == :failure
-      assert snapshot.done?
-      assert snapshot.result == error_struct
+    test "a promptless context replacement preserves the configured model prompt", %{jido: jido} do
+      mock = mock([%{reply: {:text, "Done"}}])
+      server = start_reasoning(jido, :react, tools: [], system_prompt: "Keep me")
+      replacement = Context.append_user(Context.new(), "test")
+      assert {:ok, _} = replace_context(server, replacement, op_id: "nil-prompt")
+      assert current_context(server).entries == replacement.entries
+      assert current_context(server).system_prompt == "Keep me"
+      assert [entry] = context_operations(server)
+      assert entry.payload.operation.result_context.system_prompt == nil
+      assert {:ok, handle} = request(server, mock, :react, "next turn")
+      assert {:ok, "Done"} = Request.await(handle)
+      [wire] = MockLLM.report(mock).requests
+      assert Enum.map(wire.body["messages"], & &1["content"]) == ["Keep me", "test", "next turn"]
+      assert_script_done(mock)
     end
 
-    test "context.modify replace while active run is deferred and applied after request failure" do
-      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
-
-      {agent, [_spawn]} =
-        ReAct.cmd(
-          agent,
-          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_deferred_failed"})],
-          %{}
-        )
-
-      replacement =
-        Jido.AI.Context.new(system_prompt: "Recovered prompt")
-        |> Jido.AI.Context.append_messages([%{role: :user, content: "Recovered history"}])
-
-      {agent, []} =
-        ReAct.cmd(
-          agent,
-          [context_replace_instruction(replacement)],
-          %{}
-        )
-
-      failed_event =
-        runtime_event(:request_failed, "req_deferred_failed", 2, %{
-          error: {:runtime, :boom}
-        })
-
-      {agent, []} =
-        ReAct.cmd(
-          agent,
-          [instruction(:ai_react_worker_event, %{request_id: "req_deferred_failed", event: failed_event})],
-          %{}
-        )
-
-      state = StratState.get(agent, %{})
-      assert state.context == replacement
-      assert state.pending_context_op == nil
-      assert state.config.system_prompt == "Recovered prompt"
+    test "deferred context applies once after completion and before the next request", %{jido: jido} do
+      deferred_context(jido, :complete)
     end
 
-    test "context.modify replace while active run is deferred and applied after worker crash terminalization" do
-      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
-
-      active_state =
-        agent
-        |> StratState.get(%{})
-        |> Map.put(:status, :awaiting_tool)
-        |> Map.put(:active_request_id, "req_deferred_crash")
-        |> Map.put(:react_worker_pid, self())
-        |> Map.put(:react_worker_status, :running)
-
-      agent = StratState.put(agent, active_state)
-
-      replacement =
-        Jido.AI.Context.new(system_prompt: "Crash replacement")
-        |> Jido.AI.Context.append_messages([%{role: :user, content: "Recovered after crash"}])
-
-      {agent, []} =
-        ReAct.cmd(
-          agent,
-          [context_replace_instruction(replacement)],
-          %{}
-        )
-
-      crash_instruction =
-        instruction(:ai_react_worker_child_exit, %{
-          tag: :react_worker,
-          pid: self(),
-          reason: :killed
-        })
-
-      {agent, []} = ReAct.cmd(agent, [crash_instruction], %{})
-
-      state = StratState.get(agent, %{})
-      assert state.status == :error
-      assert state.context == replacement
-      assert state.pending_context_op == nil
-      assert state.config.system_prompt == "Crash replacement"
+    test "request inspection preserves a raw error map after real model work", %{jido: jido} do
+      raw = %{type: :stream_error, status: 503, message: "Too many connections"}
+      view = raw_failure(jido, raw)
+      assert view.request.error == raw and view.details.phase == :request_failed
+      assert :ok = Jido.Action.validate_static_data(view.agent.state)
     end
 
-    test "context.modify replace with invalid params is a no-op" do
-      agent = create_agent(tools: [TestCalculator], system_prompt: "Original")
-
-      {agent, []} =
-        ReAct.cmd(
-          agent,
-          [context_replace_instruction("not a context")],
-          %{}
-        )
-
-      state = StratState.get(agent, %{})
-      assert state.config.system_prompt == "Original"
-      assert %Jido.AI.Context{} = state.context
+    test "deferred context applies once after provider failure and before the next request", %{jido: jido} do
+      deferred_context(jido, :failure)
     end
 
-    test "context.modify replace applies immediately while idle and appends core thread operation event" do
-      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
+    test "deferred context applies once after a worker crash during tool execution", %{jido: jido} do
+      deferred_context(jido, :task_loss)
+    end
 
-      replacement =
-        Jido.AI.Context.new(system_prompt: "Compacted prompt")
-        |> Jido.AI.Context.append_messages([%{role: :user, content: "summary"}])
+    test "invalid legacy context input is a no-op and native context input returns an error", %{jido: jido} do
+      mock = mock([])
+      server = start_reasoning(jido, :react, tools: [], system_prompt: "Original")
+      before = Server.agent(server).state
 
-      {agent, []} =
-        ReAct.cmd(
-          agent,
-          [
-            instruction(ReAct.context_modify_action(), %{
-              op_id: "op_compact",
-              context_ref: "default",
-              operation: %{
-                type: :replace,
-                reason: :compaction,
-                result_context: replacement,
-                meta: %{window: %{from: 1, to: 100}}
-              }
-            })
-          ],
-          %{}
+      signal =
+        Jido.Signal.new!(
+          "ai.react.context.modify",
+          %{op_id: "invalid", operation: %{type: :replace, result_context: "not a context"}},
+          source: "/test"
         )
 
-      state = StratState.get(agent, %{})
-      assert state.context == replacement
-      assert state.active_context_ref == "default"
-      assert "op_compact" in state.applied_context_ops
-      assert is_integer(state.projection_cursor_seq)
+      assert {:ok, _} = Server.call(server, signal)
+      assert Server.agent(server).state == before
+      assert {:error, _} = replace_context(server, "not a context", op_id: "invalid")
+      assert Server.agent(server).state == before
+      assert current_context(server).system_prompt == "Original"
+      assert MockLLM.report(mock).requests == []
+      assert_script_done(mock)
+    end
 
-      core_thread = ThreadAgent.get(agent)
-      [entry] = Thread.filter_by_kind(core_thread, :ai_context_operation)
+    test "idle compaction records its operation metadata in the core Thread", %{jido: jido} do
+      mock = mock([%{reply: {:text, "Done"}}])
+      server = start_reasoning(jido, :react, tools: [], system_prompt: "Original prompt")
+      replacement = Context.new(system_prompt: "Compacted prompt") |> Context.append_user("summary")
 
+      assert {:ok, _} =
+               Session.modify_context(
+                 server,
+                 %{
+                   type: :replace,
+                   reason: :compaction,
+                   result_context: replacement,
+                   base_seq: 100,
+                   meta: %{window: %{from: 1, to: 100}}
+                 },
+                 op_id: "op_compact",
+                 context_ref: "default"
+               )
+
+      assert current_context(server).entries == replacement.entries
+      assert current_context(server).system_prompt == "Compacted prompt"
+      assert context_lane(server).active_context_ref == "default"
+      assert context_lane(server).applied_context_ops == ["op_compact"]
+      assert [entry] = context_operations(server)
+      assert entry.refs == %{op_id: "op_compact", context_ref: "default"}
       assert entry.payload.op_id == "op_compact"
-      assert entry.payload.context_ref == "default"
-      assert entry.payload.operation.type == :replace
-      assert entry.payload.operation.reason == :compaction
+
+      assert entry.payload.operation == %{
+               type: :replace,
+               reason: :compaction,
+               result_context: replacement,
+               base_seq: 100,
+               meta: %{window: %{from: 1, to: 100}}
+             }
+
+      assert is_integer(context_lane(server).thread.rev)
+      assert {:ok, handle} = request(server, mock, :react, "Continue")
+      assert {:ok, "Done"} = Request.await(handle)
+      assert_script_done(mock)
     end
 
-    test "compaction preserves durable skill tool output and its assistant tool call" do
-      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
+    test "compaction keeps only the trusted matched skill pair in history and model input", %{jido: jido} do
+      mock = mock([%{reply: {:text, "Compacted"}}])
+
+      agent =
+        definition(:react, tools: [TestCalculator], model: MockLLM.model(), system_prompt: "Original prompt")
+        |> Jido.Agent.instantiate!()
 
       original =
         Jido.AI.Context.new(system_prompt: "Original prompt")
@@ -1784,8 +1446,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
           refs: %{durable: true, kind: :skill_activation, skill_name: "unmatched"}
         )
 
-      state = StratState.get(agent, %{}) |> Map.put(:context, original)
-      agent = StratState.put(agent, state)
+      server = start_agent(jido, Jido.AI.update_context_entries(agent, original.entries))
 
       replacement =
         Jido.AI.Context.new(system_prompt: "Compacted prompt")
@@ -1800,14 +1461,14 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
           refs: %{durable: true, kind: :skill_activation, skill_name: "insights"}
         )
 
-      {agent, []} =
-        ReAct.cmd(
-          agent,
-          [context_replace_instruction(replacement, reason: :compaction, op_id: "op_durable")],
-          %{}
-        )
+      assert {:ok, _} =
+               Session.modify_context(
+                 server,
+                 %{type: :replace, reason: :compaction, result_context: replacement},
+                 op_id: "op_durable"
+               )
 
-      compacted = StratState.get(agent, %{}).context
+      compacted = current_context(server)
       messages = Jido.AI.Context.to_messages(compacted)
 
       assistant = Enum.find(messages, &(&1[:role] == :assistant))
@@ -1817,446 +1478,315 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       refute Enum.any?(messages, &(&1[:content] == "spoofed durable user entry"))
       refute Enum.any?(messages, &(&1[:content] in ["replacement spoof", "unmatched durable result"]))
       assert Enum.any?(compacted.entries, &(get_in(&1.refs, [:skill_name]) == "insights"))
+      assert {:ok, handle} = request(server, mock, :react, "Continue")
+      assert {:ok, "Compacted"} = Request.await(handle)
+      [wire] = MockLLM.report(mock).requests
+      assert Enum.any?(wire.body["messages"], &(&1["role"] == "tool" and &1["content"] =~ "follow these"))
+      refute inspect(wire.body) =~ "replacement spoof"
+      assert_script_done(mock)
     end
 
-    test "context.modify deduplicates duplicate op_id" do
-      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
-
-      replacement_a =
-        Jido.AI.Context.new(system_prompt: "A")
-        |> Jido.AI.Context.append_messages([%{role: :user, content: "A"}])
-
-      replacement_b =
-        Jido.AI.Context.new(system_prompt: "B")
-        |> Jido.AI.Context.append_messages([%{role: :user, content: "B"}])
-
-      modify = fn context ->
-        instruction(ReAct.context_modify_action(), %{
-          op_id: "op_dup",
-          operation: %{type: :replace, reason: :manual, result_context: context}
-        })
-      end
-
-      {agent, []} = ReAct.cmd(agent, [modify.(replacement_a)], %{})
-      {agent, []} = ReAct.cmd(agent, [modify.(replacement_b)], %{})
-
-      state = StratState.get(agent, %{})
-      assert state.context == replacement_a
-
-      core_thread = ThreadAgent.get(agent)
-      assert length(Thread.filter_by_kind(core_thread, :ai_context_operation)) == 1
+    test "duplicate context operation IDs preserve the first result and one Thread record", %{jido: jido} do
+      mock = mock([%{reply: {:text, "Done"}}])
+      server = start_reasoning(jido, :react, tools: [], system_prompt: "Original prompt")
+      first = Context.new(system_prompt: "A") |> Context.append_user("A")
+      second = Context.new(system_prompt: "B") |> Context.append_user("B")
+      assert {:ok, _} = replace_context(server, first, op_id: "op_dup")
+      before = Server.agent(server).state
+      assert {:ok, _} = replace_context(server, second, op_id: "op_dup")
+      assert Server.agent(server).state == before
+      assert current_context(server).entries == first.entries
+      assert length(context_operations(server)) == 1
+      assert {:ok, handle} = request(server, mock, :react, "Continue")
+      assert {:ok, "Done"} = Request.await(handle)
+      [wire] = MockLLM.report(mock).requests
+      assert Enum.map(wire.body["messages"], & &1["content"]) == ["A", "A", "Continue"]
+      assert_script_done(mock)
     end
 
-    test "context.modify switch projects lane-specific context by context_ref" do
-      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
-
-      alpha_context =
-        Jido.AI.Context.new(system_prompt: "Alpha")
-        |> Jido.AI.Context.append_messages([%{role: :user, content: "alpha"}])
-
-      beta_context =
-        Jido.AI.Context.new(system_prompt: "Beta")
-        |> Jido.AI.Context.append_messages([%{role: :user, content: "beta"}])
-
-      replace = fn ref, id, context ->
-        instruction(ReAct.context_modify_action(), %{
-          op_id: id,
-          context_ref: ref,
-          operation: %{type: :replace, reason: :manual, result_context: context}
-        })
-      end
-
-      switch = fn ref, id ->
-        instruction(ReAct.context_modify_action(), %{
-          op_id: id,
-          context_ref: ref,
-          operation: %{type: :switch, reason: :manual}
-        })
-      end
-
-      {agent, []} = ReAct.cmd(agent, [replace.("alpha", "op_alpha_replace", alpha_context)], %{})
-      {agent, []} = ReAct.cmd(agent, [replace.("beta", "op_beta_replace", beta_context)], %{})
-      {agent, []} = ReAct.cmd(agent, [switch.("alpha", "op_alpha_switch")], %{})
-
-      state = StratState.get(agent, %{})
-      assert state.active_context_ref == "alpha"
-      assert state.context == alpha_context
-
-      core_thread = ThreadAgent.get(agent)
-      assert length(Thread.filter_by_kind(core_thread, :ai_context_operation)) == 3
+    test "lane switches restore the selected history and prompt for real model requests", %{jido: jido} do
+      mock = mock([%{reply: {:text, "Alpha answer"}}, %{reply: {:text, "Beta answer"}}])
+      server = start_reasoning(jido, :react, tools: [], system_prompt: "Original prompt")
+      alpha = Context.new(system_prompt: "Alpha") |> Context.append_user("alpha")
+      beta = Context.new(system_prompt: "Beta") |> Context.append_user("beta")
+      assert {:ok, _} = replace_context(server, alpha, context_ref: "alpha", op_id: "alpha")
+      assert {:ok, _} = replace_context(server, beta, context_ref: "beta", op_id: "beta")
+      assert {:ok, _} = Session.modify_context(server, %{type: :switch}, context_ref: "alpha", op_id: "switch-alpha")
+      assert context_lane(server).active_context_ref == "alpha"
+      assert current_context(server).entries == alpha.entries
+      assert length(context_operations(server)) == 3
+      assert {:ok, first} = request(server, mock, :react, "Alpha query")
+      assert {:ok, "Alpha answer"} = Request.await(first)
+      assert {:ok, _} = Session.modify_context(server, %{type: :switch}, context_ref: "beta", op_id: "switch-beta")
+      assert current_context(server).entries == beta.entries
+      assert {:ok, next} = request(server, mock, :react, "Beta query")
+      assert {:ok, "Beta answer"} = Request.await(next)
+      [a, b] = MockLLM.report(mock).requests
+      assert Enum.map(a.body["messages"], & &1["content"]) == ["Alpha", "alpha", "Alpha query"]
+      assert Enum.map(b.body["messages"], & &1["content"]) == ["Beta", "beta", "Beta query"]
+      assert {:ok, _} = Session.modify_context(server, %{type: :switch}, context_ref: "alpha", op_id: "back")
+      assert Enum.map(current_context(server).entries, & &1.content) == ["Alpha answer", "Alpha query", "alpha"]
+      assert_script_done(mock)
     end
 
-    test "context.modify switch to a fresh lane does not inherit previous lane history" do
-      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
-
-      {agent, [_spawn]} =
-        ReAct.cmd(
-          agent,
-          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_switch_fresh_lane"})],
-          %{}
-        )
-
-      events = [
-        runtime_event(:llm_completed, "req_switch_fresh_lane", 2, %{
-          turn_type: :final_answer,
-          text: "A1",
-          thinking_content: nil,
-          tool_calls: [],
-          usage: %{}
-        }),
-        runtime_event(:request_completed, "req_switch_fresh_lane", 3, %{
-          result: "A1",
-          termination_reason: :final_answer,
-          usage: %{}
-        })
-      ]
-
-      {agent, []} =
-        Enum.reduce(events, {agent, []}, fn event, {acc, _} ->
-          ReAct.cmd(
-            acc,
-            [instruction(:ai_react_worker_event, %{request_id: "req_switch_fresh_lane", event: event})],
-            %{}
-          )
-        end)
-
-      {agent, []} =
-        ReAct.cmd(
-          agent,
-          [
-            instruction(ReAct.context_modify_action(), %{
-              op_id: "op_switch_alpha",
-              context_ref: "alpha",
-              operation: %{type: :switch, reason: :manual}
-            })
-          ],
-          %{}
-        )
-
-      state = StratState.get(agent, %{})
-      assert state.active_context_ref == "alpha"
-      assert state.context.system_prompt == "Original prompt"
-
-      projected_messages =
-        state.context
-        |> Jido.AI.Context.to_messages()
-        |> Enum.reject(&(&1.role == :system))
-
-      assert projected_messages == []
+    test "a fresh lane has no previous messages and switching back retains the old lane", %{jido: jido} do
+      mock = mock([%{reply: {:text, "A1"}}, %{reply: {:text, "A2"}}])
+      server = start_reasoning(jido, :react, tools: [], system_prompt: "Original prompt")
+      assert {:ok, first} = request(server, mock, :react, "Q1")
+      assert {:ok, "A1"} = Request.await(first)
+      assert {:ok, _} = Session.modify_context(server, %{type: :switch}, context_ref: "fresh", op_id: "fresh")
+      assert current_context(server).entries == []
+      assert current_context(server).system_prompt == "Original prompt"
+      assert {:ok, next} = request(server, mock, :react, "Q2")
+      assert {:ok, "A2"} = Request.await(next)
+      [_, wire] = MockLLM.report(mock).requests
+      assert Enum.map(wire.body["messages"], & &1["content"]) == ["Original prompt", "Q2"]
+      assert {:ok, _} = Session.modify_context(server, %{type: :switch}, context_ref: "default", op_id: "back")
+      assert Enum.map(current_context(server).entries, & &1.content) == ["A1", "Q1"]
+      assert_script_done(mock)
     end
 
-    test "core thread appends ai_message entries for user assistant and tool turns" do
-      agent = create_agent(tools: [TestCalculator], system_prompt: "Original prompt")
+    test "real tool turns append user assistant and tool messages to the core Thread", %{jido: jido} do
+      mock = mock([calculation(), %{reply: {:text, "5"}}])
+      server = start_reasoning(jido, :react, tools: [TestCalculator])
+      assert {:ok, handle} = request(server, mock, :react, "calculate")
+      assert {:ok, "5"} = Request.await(handle)
+      entries = thread_messages(server)
+      assert Enum.map(entries, & &1.payload.role) == [:user, :assistant, :tool, :assistant]
+      assert Enum.all?(entries, &(&1.payload.context_ref == "default"))
+      assert Enum.all?(entries, &(&1.refs.request_id == handle.id and &1.refs.run_id == record(server, handle).run_id))
+      assert Enum.at(entries, 2).payload.tool_call_id == "calc"
 
-      {agent, [_spawn]} =
-        ReAct.cmd(
-          agent,
-          [instruction(ReAct.start_action(), %{query: "calculate", request_id: "req_ai_message"})],
-          %{}
-        )
-
-      events = [
-        runtime_event(:llm_completed, "req_ai_message", 2, %{
-          turn_type: :tool_calls,
-          text: "",
-          thinking_content: nil,
-          tool_calls: [%{id: "tc_1", name: "calculator", arguments: %{operation: "add", a: 1, b: 2}}],
-          usage: %{}
-        }),
-        runtime_event(:tool_completed, "req_ai_message", 3, %{
-          tool_call_id: "tc_1",
-          tool_name: "calculator",
-          result: {:ok, %{result: "projected result"}, []}
-        }),
-        runtime_event(:request_completed, "req_ai_message", 4, %{
-          result: "3",
-          termination_reason: :final_answer,
-          usage: %{}
-        })
-      ]
-
-      {agent, []} =
-        Enum.reduce(events, {agent, []}, fn event, {acc, _} ->
-          ReAct.cmd(acc, [instruction(:ai_react_worker_event, %{request_id: "req_ai_message", event: event})], %{})
-        end)
-
-      core_thread = ThreadAgent.get(agent)
-      ai_messages = Thread.filter_by_kind(core_thread, :ai_message)
-
-      assert Enum.map(ai_messages, fn entry -> entry.payload.role end) == [:user, :assistant, :tool]
-      assert Enum.all?(ai_messages, fn entry -> entry.payload.context_ref == "default" end)
-      assert List.last(ai_messages).payload.content =~ "projected result"
-    end
-
-    test "start action normalization preserves extra_refs" do
-      normalized =
-        Jido.Agent.Strategy.normalize_instruction(
-          ReAct,
-          instruction(ReAct.start_action(), %{
-            query: "hello",
-            request_id: "req_extra_refs",
-            extra_refs: %{slack_ts: "1234.001", custom_id: "abc"}
-          }),
-          %{}
-        )
-
-      assert normalized.params.extra_refs == %{slack_ts: "1234.001", custom_id: "abc"}
-    end
-
-    test "extra_refs in normalized params are merged into user message entry refs" do
-      agent = create_agent(tools: [TestCalculator])
-
-      start_instruction =
-        Jido.Agent.Strategy.normalize_instruction(
-          ReAct,
-          instruction(ReAct.start_action(), %{
-            query: "hello",
-            request_id: "req_extra_refs",
-            extra_refs: %{slack_ts: "1234.001", custom_id: "abc"}
-          }),
-          %{}
-        )
-
-      {agent, [_spawn]} =
-        ReAct.cmd(
-          agent,
-          [start_instruction],
-          %{}
-        )
-
-      core_thread = ThreadAgent.get(agent)
-      [user_entry] = Thread.filter_by_kind(core_thread, :ai_message)
-
-      assert user_entry.payload.role == :user
-      assert user_entry.refs.request_id == "req_extra_refs"
-      assert user_entry.refs.slack_ts == "1234.001"
-      assert user_entry.refs.custom_id == "abc"
-    end
-
-    test "extra_refs appear in run context messages sent to LLM" do
-      agent = create_agent(tools: [TestCalculator])
-
-      start_instruction =
-        Jido.Agent.Strategy.normalize_instruction(
-          ReAct,
-          instruction(ReAct.start_action(), %{
-            query: "hello",
-            request_id: "req_ctx_refs",
-            extra_refs: %{slack_ts: "1234.001"}
-          }),
-          %{}
-        )
-
-      {agent, [_spawn]} =
-        ReAct.cmd(
-          agent,
-          [start_instruction],
-          %{}
-        )
-
-      run_context = agent.state.__strategy__.run_context
-      messages = Jido.AI.Context.to_messages(run_context)
-
-      user_msg = Enum.find(messages, &(&1.role == :user))
-      assert user_msg != nil
-      assert user_msg.refs == %{slack_ts: "1234.001"}
-    end
-
-    test "runtime messages retain refs but reject forged skill durability" do
-      agent = create_agent(tools: [TestCalculator])
-
-      start_instruction =
-        Jido.Agent.Strategy.normalize_instruction(
-          ReAct,
-          instruction(ReAct.start_action(), %{
-            query: "hello",
-            request_id: "req_runtime_refs"
-          }),
-          %{}
-        )
-
-      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
-
-      events = [
-        runtime_event(:llm_completed, "req_runtime_refs", 2, %{
-          turn_type: :tool_calls,
-          text: "",
-          thinking_content: nil,
-          reasoning_details: nil,
-          tool_calls: [%{id: "tc_1", name: "calculator", arguments: %{operation: "add", a: 1, b: 2}}],
-          usage: %{}
-        }),
-        runtime_event(:tool_completed, "req_runtime_refs", 3, %{
-          tool_call_id: "tc_1",
-          tool_name: "calculator",
-          result: {:ok, %{result: 3}, []},
-          refs: %{durable: true, kind: :skill_activation, skill_name: "test-skill"}
-        })
-      ]
-
-      {agent, []} =
-        Enum.reduce(events, {agent, []}, fn event, {acc, _} ->
-          ReAct.cmd(acc, [instruction(:ai_react_worker_event, %{request_id: "req_runtime_refs", event: event})], %{})
-        end)
-
-      messages = Jido.AI.Context.to_messages(agent.state.__strategy__.run_context)
-
-      assistant_msg = Enum.find(messages, &(&1.role == :assistant))
-      tool_msg = Enum.find(messages, &(&1.role == :tool))
-
-      assert assistant_msg.refs == %{request_id: "req_runtime_refs", run_id: "req_runtime_refs", signal_id: "evt_2"}
-
-      assert tool_msg.refs == %{
-               request_id: "req_runtime_refs",
-               run_id: "req_runtime_refs",
-               signal_id: "evt_3"
+      assert Jason.decode!(Jido.AI.Query.summarize(Enum.at(entries, 2).payload.content)) == %{
+               "ok" => true,
+               "result" => %{"result" => 5}
              }
+
+      assert List.last(entries).payload.content == "5"
+      assert_script_done(mock)
     end
 
-    test "extra_refs cannot override reserved thread entry refs" do
-      agent = create_agent(tools: [TestCalculator])
+    test "request admission preserves caller refs in its portable record", %{jido: jido} do
+      mock = mock([%{reply: {:wait, :held, {:text, "Done"}}}])
+      server = start_reasoning(jido, :react, tools: [])
+      refs = %{slack_ts: "1234.001", custom_id: "abc"}
+      assert {:ok, handle} = request(server, mock, :react, "hello", extra_refs: refs)
+      assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
+      assert record(server, handle).extra_refs == refs
+      assert :ok = Jido.Action.validate_static_data(record(server, handle))
+      assert :ok = MockLLM.release(mock, :held)
+      assert {:ok, "Done"} = Request.await(handle)
+      assert record(server, handle).extra_refs == refs
+      assert_script_done(mock)
+    end
 
-      start_instruction =
-        Jido.Agent.Strategy.normalize_instruction(
-          ReAct,
-          instruction(ReAct.start_action(), %{
-            query: "hello",
-            request_id: "req_reserved_refs",
-            extra_refs: %{
-              request_id: "req_override",
-              run_id: "run_override",
-              signal_id: "sig_override",
-              slack_ts: "1234.002"
-            }
-          }),
-          %{}
+    test "admitted caller refs enter the user message and its core Thread entry", %{jido: jido} do
+      mock = mock([%{reply: {:wait, :held, {:text, "Done"}}}])
+      server = start_reasoning(jido, :react, tools: [])
+      refs = %{slack_ts: "1234.001", custom_id: "abc"}
+      assert {:ok, handle} = request(server, mock, :react, "hello", extra_refs: refs)
+      assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
+      assert [entry] = thread_messages(server)
+      assert entry.payload.role == :user
+      assert entry.refs.request_id == handle.id and entry.refs.run_id == record(server, handle).run_id
+      assert Map.take(entry.refs, Map.keys(refs)) == refs
+      assert [user] = Server.agent(server).state.messages
+      assert Map.take(user.refs, Map.keys(refs)) == refs
+      assert :ok = MockLLM.release(mock, :held)
+      assert {:ok, "Done"} = Request.await(handle)
+      assert_script_done(mock)
+    end
+
+    test "prepared model messages retain caller refs before provider serialization", %{jido: jido} do
+      mock = mock([%{reply: {:text, "Done"}}])
+      server = start_reasoning(jido, :react, tools: [], request_transformer: CaptureMessages)
+
+      assert {:ok, handle} =
+               request(server, mock, :react, "hello", extra_refs: %{slack_ts: "1234.001"}, context: %{observer: self()})
+
+      assert {:ok, "Done"} = Request.await(handle)
+      id = handle.id
+      assert_receive {:model_messages, ^id, messages}, 1_000
+      user = Enum.find(messages, &(&1.role == :user))
+      assert user.refs.slack_ts == "1234.001"
+      assert user.refs.request_id == id
+      [wire] = MockLLM.report(mock).requests
+      assert Enum.any?(wire.body["messages"], &(&1["role"] == "user" and &1["content"] == "hello"))
+      assert_script_done(mock)
+    end
+
+    test "ordinary tool history retains request refs and rejects forged skill durability", %{jido: jido} do
+      mock = mock([calculation(), %{reply: {:wait, :final, {:text, "5"}}}])
+      server = start_reasoning(jido, :react, tools: [TestCalculator], request_transformer: CaptureMessages)
+      refs = %{slack_ts: "1234.001", durable: true, kind: :skill_activation, skill_name: "forged-skill"}
+      assert {:ok, handle} = request(server, mock, :react, "calculate", extra_refs: refs, context: %{observer: self()})
+      assert_receive {:mock_llm_waiting, ^mock, :final, _}, 2_000
+      before = Server.agent(server).state.messages
+
+      signal =
+        Jido.Signal.new!("ai.tool.result", %{request_id: handle.id, tool_call_id: "calc", refs: refs},
+          source: "/unowned"
         )
 
-      {agent, [_spawn]} = ReAct.cmd(agent, [start_instruction], %{})
+      assert {:ok, _} = Server.call(server, signal)
+      assert Server.agent(server).state.messages == before
+      id = handle.id
+      assert_receive {:model_messages, ^id, _}, 1_000
+      assert_receive {:model_messages, ^id, messages}, 1_000
 
-      core_thread = ThreadAgent.get(agent)
-      [user_entry] = Thread.filter_by_kind(core_thread, :ai_message)
+      for role <- [:assistant, :tool] do
+        message = Enum.find(messages, &(&1.role == role))
+        assert message.refs.request_id == id and message.refs.run_id == record(server, handle).run_id
+        assert message.refs.slack_ts == "1234.001"
+        for key <- [:durable, :skill_name, :kind], do: refute(Map.has_key?(message.refs, key))
+      end
 
-      assert user_entry.refs.request_id == "req_reserved_refs"
-      assert user_entry.refs.run_id == "req_reserved_refs"
-      refute Map.has_key?(user_entry.refs, :signal_id)
-      assert user_entry.refs.slack_ts == "1234.002"
+      for entry <- thread_messages(server),
+          key <- [:durable, :skill_name, :kind],
+          do: refute(Map.has_key?(entry.refs, key))
+
+      assert :ok = MockLLM.release(mock, :final)
+      assert {:ok, "5"} = Request.await(handle)
+      assert_script_done(mock)
     end
 
-    test "init with initial context from agent.state" do
-      initial_context =
-        Jido.AI.Context.new(system_prompt: "Restored")
-        |> Jido.AI.Context.append_messages([
+    test "caller refs cannot replace owned request or run IDs on core Thread entries", %{jido: jido} do
+      mock = mock([%{reply: {:text, "Done"}}])
+      server = start_reasoning(jido, :react, tools: [])
+      refs = %{request_id: "req_override", run_id: "run_override", signal_id: "sig_override", slack_ts: "1234.002"}
+      assert {:ok, handle} = request(server, mock, :react, "hello", extra_refs: refs)
+      assert {:ok, "Done"} = Request.await(handle)
+      assert [user, assistant] = thread_messages(server)
+      assert user.payload.role == :user and assistant.payload.role == :assistant
+
+      for entry <- [user, assistant] do
+        assert entry.refs.request_id == handle.id and entry.refs.run_id == record(server, handle).run_id
+        refute Map.has_key?(entry.refs, :signal_id)
+        assert entry.refs.slack_ts == "1234.002"
+      end
+
+      assert hd(Server.agent(server).state.messages).refs.request_id == "req_override"
+      assert_script_done(mock)
+    end
+
+    test "initial Context import preserves history and its saved prompt", %{jido: jido} do
+      context =
+        Context.new(id: "saved-context", system_prompt: "Restored")
+        |> Context.append_messages([
           %{role: :user, content: "Previous question"},
           %{role: :assistant, content: "Previous answer"}
         ])
 
-      agent =
-        %Jido.Agent{
-          id: "test-agent",
-          name: "test",
-          state: %{context: initial_context}
-        }
-        |> then(fn agent ->
-          ctx = %{strategy_opts: [tools: [TestCalculator]]}
-          {agent, []} = ReAct.init(agent, ctx)
-          agent
-        end)
+      source = definition(:react, tools: [TestCalculator], model: MockLLM.model(), system_prompt: "Configured")
+      assert {:ok, agent} = Jido.AI.Agent.from_initial_state(source, %{context: context}, id: "restored-agent")
+      restored = Jido.AI.get_strategy_context(agent)
+      assert restored.entries == context.entries and restored.system_prompt == "Restored"
+      assert restored.id == "restored-agent:assistant"
+      refute Map.has_key?(agent.state, :context)
+      mock = mock([%{reply: {:text, "Continued"}}])
+      server = start_agent(jido, agent)
+      assert {:ok, handle} = request(server, mock, :react, "Next question")
+      assert {:ok, "Continued"} = Request.await(handle)
+      [wire] = MockLLM.report(mock).requests
 
-      state = StratState.get(agent, %{})
-      assert state.context == initial_context
-
-      messages = Jido.AI.Context.to_messages(state.context)
-      non_system = Enum.reject(messages, &(&1.role == :system))
-
-      assert non_system == [
-               %{role: :user, content: "Previous question"},
-               %{role: :assistant, content: "Previous answer"}
+      assert Enum.map(wire.body["messages"], & &1["content"]) == [
+               "Restored",
+               "Previous question",
+               "Previous answer",
+               "Next question"
              ]
+
+      assert_script_done(mock)
     end
 
-    test "init with initial context without system_prompt gets config prompt" do
-      initial_context =
-        Jido.AI.Context.new()
-        |> Jido.AI.Context.append_messages([
+    test "initial Context import fills a nil prompt from the profile", %{jido: jido} do
+      context =
+        Context.new()
+        |> Context.append_messages([
           %{role: :user, content: "Previous question"},
           %{role: :assistant, content: "Previous answer"}
         ])
 
-      assert initial_context.system_prompt == nil
+      source = definition(:react, tools: [TestCalculator], model: MockLLM.model(), system_prompt: "Config prompt")
+      assert {:ok, agent} = Jido.AI.Agent.from_initial_state(source, %{context: context})
+      restored = Jido.AI.get_strategy_context(agent)
+      assert restored.entries == context.entries and restored.system_prompt == "Config prompt"
+      mock = mock([%{reply: {:text, "Continued"}}])
+      server = start_agent(jido, agent)
+      assert {:ok, handle} = request(server, mock, :react, "Next question")
+      assert {:ok, "Continued"} = Request.await(handle)
+      [wire] = MockLLM.report(mock).requests
 
-      agent =
-        %Jido.Agent{
-          id: "test-agent",
-          name: "test",
-          state: %{context: initial_context}
-        }
-        |> then(fn agent ->
-          ctx = %{strategy_opts: [tools: [TestCalculator], system_prompt: "Config prompt"]}
-          {agent, []} = ReAct.init(agent, ctx)
-          agent
-        end)
-
-      state = StratState.get(agent, %{})
-      assert state.context.system_prompt == "Config prompt"
-
-      messages = Jido.AI.Context.to_messages(state.context)
-      non_system = Enum.reject(messages, &(&1.role == :system))
-
-      assert non_system == [
-               %{role: :user, content: "Previous question"},
-               %{role: :assistant, content: "Previous answer"}
+      assert Enum.map(wire.body["messages"], & &1["content"]) == [
+               "Config prompt",
+               "Previous question",
+               "Previous answer",
+               "Next question"
              ]
+
+      assert_script_done(mock)
     end
 
-    test "init rejects legacy :thread context payloads" do
-      legacy_context =
-        Jido.AI.Context.new(system_prompt: "Legacy key")
-        |> Jido.AI.Context.append_messages([%{role: :user, content: "legacy"}])
-
-      agent = %Jido.Agent{id: "test-agent", name: "test", state: %{thread: legacy_context}}
-      ctx = %{strategy_opts: [tools: [TestCalculator]]}
-
-      assert_raise ArgumentError,
-                   ~r/initial_state\[:thread\] is no longer supported for AI context/,
-                   fn ->
-                     ReAct.init(agent, ctx)
-                   end
+    test "initial state import rejects an AI Context under the legacy Thread key" do
+      source = definition(:react, tools: [])
+      context = Context.new(system_prompt: "Legacy key") |> Context.append_user("legacy")
+      assert {:error, error} = Jido.AI.Agent.from_initial_state(source, %{thread: context})
+      assert Exception.message(error) =~ "initial_state[:thread] is no longer supported for AI context"
+      assert source.state == nil
     end
 
-    test "init ignores non-context :thread state from core thread plugins" do
-      agent = %Jido.Agent{id: "test-agent", name: "test", state: %{thread: %{id: "thread_1", rev: 2}}}
+    test "initial state import keeps a declared non-AI Thread value separate from conversation history", %{jido: jido} do
+      source = definition(:react, tools: [], model: MockLLM.model())
+      source = %{source | schema: %{source.schema | fields: Keyword.put(source.schema.fields, :thread, Zoi.map())}}
+      thread = %{id: "thread_1", rev: 2}
+      assert {:ok, agent} = Jido.AI.Agent.from_initial_state(source, %{thread: thread})
+      assert agent.state.thread == thread
+      assert %Context{entries: []} = context = Jido.AI.get_strategy_context(agent)
+      assert context.id != "thread_1"
+      mock = mock([%{reply: {:text, "Done"}}])
+      server = start_agent(jido, agent)
+      assert {:ok, handle} = request(server, mock, :react, "Hello")
+      assert {:ok, "Done"} = Request.await(handle)
+      assert Server.agent(server).state.thread == thread
+      [wire] = MockLLM.report(mock).requests
 
-      {agent, []} = ReAct.init(agent, %{strategy_opts: [tools: [TestCalculator]]})
-      state = StratState.get(agent, %{})
+      assert Enum.reject(wire.body["messages"], &(&1["role"] == "system")) == [
+               %{"role" => "user", "content" => "Hello"}
+             ]
 
-      assert %Jido.AI.Context{} = state.context
-      assert state.context.id != "thread_1"
+      assert_script_done(mock)
     end
 
-    test "runtime_adapter flag remains true even when opt-out is requested" do
-      agent = create_agent(tools: [TestCalculator], runtime_adapter: false)
-      state = StratState.get(agent, %{})
-      assert state.config.runtime_adapter == true
+    test "the retired runtime adapter flag cannot bypass native Session execution", %{jido: jido} do
+      mock = mock([%{reply: {:wait, :held, {:text, "Done"}}}])
+      server = start_reasoning(jido, :react, tools: [], runtime_adapter: false)
+      assert {:ok, handle} = request(server, mock, :react, "Work")
+      assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
+      assert {:ok, view} = Session.snapshot(server)
+      assert Process.alive?(view.live.worker_pid) and Process.alive?(owner(server))
+      assert view.request.status == :pending
+      assert view.details.phase == :awaiting_llm
+      assert :ok = MockLLM.release(mock, :held)
+      assert {:ok, "Done"} = Request.await(handle)
+      assert record(server, handle).meta.model_calls == 1
+      assert_script_done(mock)
     end
 
-    test "busy start emits request error directive" do
-      agent = create_agent(tools: [TestCalculator])
+    test "rejection metadata identifies only the refused request", %{jido: jido} do
+      mock = mock([%{reply: {:wait, :held, {:text, "First"}}}])
+      server = start_reasoning(jido, :react, tools: [])
+      assert {:ok, first} = request(server, mock, :react)
+      assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
+      assert {:error, :busy} = request(server, mock, :react, "Second", request_id: "second")
 
-      state =
-        agent
-        |> StratState.get(%{})
-        |> Map.put(:status, :awaiting_llm)
-        |> Map.put(:active_request_id, "req_busy")
+      assert_receive {:jido_ai_request_event,
+                      %{request_id: "second", kind: :request_failed, method: :react, data: %{error: :busy}}}
 
-      agent = StratState.put(agent, state)
-
-      {_agent, directives} =
-        ReAct.cmd(agent, [instruction(ReAct.start_action(), %{query: "second", request_id: "req_new"})], %{})
-
-      assert [%Directive.EmitRequestError{} = directive] = directives
-      assert directive.request_id == "req_new"
-      assert directive.reason == :busy
+      assert record(server, first).status == :pending
+      refute Map.has_key?(Server.agent(server).state.requests, "second")
+      assert :ok = MockLLM.release(mock, :held)
+      assert {:ok, "First"} = Request.await(first)
+      assert_script_done(mock)
     end
   end
 end

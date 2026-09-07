@@ -72,7 +72,7 @@ defmodule Jido.AI.Directive.ToolExec do
   end
 end
 
-defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
+defmodule Jido.AI.Directive.ToolExec.Execution do
   @moduledoc """
   Spawns an async task to execute a Jido.Action and sends the result back
   to the agent as a `ai.tool.result` signal.
@@ -99,7 +99,6 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
   alias Jido.AI.Observe
   alias Jido.AI.Signal
   alias Jido.AI.Turn
-  alias Jido.Tracing.Context, as: TraceContext
 
   def exec(directive, _input_signal, state) do
     %{
@@ -121,14 +120,14 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
     agent_id = metadata[:agent_id] || context[:agent_id]
     strategy = metadata[:strategy] || context[:strategy]
 
-    agent_pid = self()
+    agent_pid = Map.fetch!(state, :agent_server)
     task_supervisor = Jido.AI.Directive.Helpers.get_task_supervisor(state)
 
     # Get tools from state (agent's registered actions from skill or strategy)
     tools = get_tools_from_state(state)
 
     # Capture parent trace context before spawning
-    parent_trace_ctx = TraceContext.get()
+    parent_trace_ctx = Process.get({:jido, :trace_context})
 
     case Task.Supervisor.start_child(task_supervisor, fn ->
            # Restore trace context in child task

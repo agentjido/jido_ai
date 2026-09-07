@@ -1,0 +1,57 @@
+{
+  "baseline_head": "fc5bc1434ddb69493fe8a68443f03bc6a198c5a2",
+  "file": "test/jido_ai/react/runtime_runner_test.exs",
+  "original_cases": 58,
+  "current_cases": 59,
+  "original_names_retained": true,
+  "removed": [],
+  "merged": [],
+  "added_skips": [],
+  "native_http_cases": [
+    "streams multimodal user content to ReqLLM",
+    "emits ordered event envelopes for a final-answer run",
+    "retains generated images in stream deltas and the final result",
+    "replays generated images and thinking as flat content on the next tool round",
+    "after_tool_call callback transforms the canonical tool result",
+    "optional before_tool_call callback can rewrite tool arguments",
+    "tool guardrail validates arguments after before_tool_call rewrites them",
+    "validates structured output before request completion",
+    "repairs invalid structured output with tools removed from repair call",
+    "structured output does not transform a repair request when parsing succeeds",
+    "structured output repair propagates request_transformer errors",
+    "structured output transforms every repair attempt",
+    "structured output transformer receives and overrides the exact repair request",
+    "structured output repair rejects invalid transformed messages before the provider call"
+  ],
+  "new_http_cases": [
+    "configured request credentials reach both real HTTP calls"
+  ],
+  "required_open_cases": [
+    "propagates usage from streaming meta chunks into request completion",
+    "structured output repair runs llm_opts through the configured request_transformer"
+  ],
+  "resolved_failure_count": 13,
+  "new_failure_count": 0,
+  "root_result": {
+    "passed": 1948,
+    "executed": 2397,
+    "failed": 449,
+    "existing_excluded": 1
+  },
+  "evidence": "runner-test-transfer.md",
+  "acceptance_result": {
+    "passed": 1139,
+    "failed": 0,
+    "excluded": 0,
+    "seconds": 149.1,
+    "included_tags": [
+      "integration",
+      "pending_dsl"
+    ]
+  },
+  "production_compile": {
+    "files": 229,
+    "warnings_as_errors": true,
+    "passed": true
+  }
+}

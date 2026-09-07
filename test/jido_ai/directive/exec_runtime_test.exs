@@ -4,7 +4,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
 
   alias Jido.AI.Directive.{LLMEmbed, LLMGenerate, LLMStream, ToolExec}
   alias Jido.AI.TestSupport.DirectiveExec, as: DirectiveSupport
-  alias Jido.AgentServer.DirectiveExec
+  alias Jido.AI.Directive.Execution, as: DirectiveExec
 
   defmodule DummyAction do
   end
@@ -340,7 +340,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
       assert {:async, nil, ^state} = DirectiveExec.exec(directive, nil, state)
 
       assert DirectiveSupport.assert_signal_cast("ai.llm.delta").data.chunk_type == :content
-      refute_receive {:"$gen_cast", {:signal, %Jido.Signal{type: "ai.usage"}}}, 100
+      refute_receive {:"$gen_cast", {:signal, _admission_token, %Jido.Signal{type: "ai.usage"}}}, 100
 
       response_signal = DirectiveSupport.assert_signal_cast("ai.llm.response")
       assert %Jido.AI.Turn{text: "no usage"} = assert_ok_result(response_signal.data.result)

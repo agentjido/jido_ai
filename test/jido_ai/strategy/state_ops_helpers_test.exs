@@ -1,453 +1,192 @@
 defmodule Jido.AI.Reasoning.StateOpsHelpersTest do
-  @moduledoc """
-  Unit tests for Helpers.
-  """
-
   use ExUnit.Case, async: true
+  alias Jido.AI.Effects
+  alias Jido.AI.Test.StateMigration.Agent, as: TestAgent
+  alias Jido.Agent.Directive
 
-  alias Jido.Agent.StateOp
-  alias Jido.AI.Reasoning.Helpers
+  # The old constructor cases are mapped in docs/v3-spike/state-test-transfer.md.
+  defp apply_state(agent, next, extra \\ []) do
+    Effects.apply_result(agent, {:ok, :changed, [Effects.state(next) | extra]}, %{
+      allow: [Effects.State, Directive.Emit]
+    })
+  end
 
-  doctest Helpers
+  test "complete state updates preserve unrelated fields and leave the source immutable" do
+    agent = TestAgent.new!(state: %{data: %{keep: "value"}})
+    next = %{agent.state | count: 1, data: Map.merge(agent.state.data, %{status: :running, iteration: 1})}
+    assert {changed, [], %{allowed_count: 1}, {:ok, :changed, _}} = apply_state(agent, next)
+    assert changed.state.count == 1
+    assert changed.state.data == %{keep: "value", status: :running, iteration: 1}
+    assert changed.state.label == "initial"
+    assert agent.state.count == 0 and agent.state.data == %{keep: "value"}
+    assert changed.state.requests == agent.state.requests
+  end
 
-  describe "update_strategy_state/1" do
-    test "creates SetState operation with given attributes" do
-      op = Helpers.update_strategy_state(%{status: :running, iteration: 1})
+  test "nested edits preserve siblings and explicit merges replace only selected values" do
+    agent = TestAgent.new!(state: %{data: %{config: %{model: "old", tools: [], limits: %{tokens: 20, calls: 3}}}})
 
-      assert %StateOp.SetState{} = op
-      assert op.attrs == %{status: :running, iteration: 1}
+    next =
+      agent.state
+      |> put_in([:data, :config, :model], "openai:gpt-4")
+      |> update_in([:data, :config, :limits], &Map.merge(&1, %{tokens: 40}))
+
+    assert {changed, [], _, {:ok, :changed, _}} = apply_state(agent, next)
+    assert changed.state.data.config == %{model: "openai:gpt-4", tools: [], limits: %{tokens: 40, calls: 3}}
+    assert agent.state.data.config.limits.tokens == 20
+  end
+
+  test "a new nested path is explicit and retains unrelated Agent fields" do
+    agent = TestAgent.new!()
+
+    next =
+      put_in(
+        agent.state,
+        [Access.key(:data, %{}), Access.key(:config, %{}), Access.key(:tools, [])],
+        [Jido.AI.Test.StateMigration.Double]
+      )
+
+    assert {changed, [], _, {:ok, :changed, _}} = apply_state(agent, next)
+    assert changed.state.data == %{config: %{tools: [Jido.AI.Test.StateMigration.Double]}}
+    assert changed.state.label == "initial" and changed.state.count == 0
+    assert agent.state.data == %{}
+  end
+
+  for {label, before, after_value} <- [
+        {"prepend", [%{role: :assistant, content: "Hi"}],
+         [%{role: :user, content: "Hello"}, %{role: :assistant, content: "Hi"}]},
+        {"append", [%{role: :user, content: "Hello"}],
+         [%{role: :user, content: "Hello"}, %{role: :assistant, content: "Hi"}]},
+        {"replace", [%{role: :user, content: "Old"}], [%{role: :user, content: "Hello"}]},
+        {"empty", [], [%{role: :user, content: "Hello"}]}
+      ] do
+    test "candidate lists keep #{label} order without a hidden merge" do
+      before = unquote(Macro.escape(before))
+      expected = unquote(Macro.escape(after_value))
+      agent = TestAgent.new!(state: %{data: %{conversation: before, keep: true}})
+      next = put_in(agent.state, [:data, :conversation], expected)
+      assert {changed, [], _, {:ok, :changed, _}} = apply_state(agent, next)
+      assert changed.state.data == %{conversation: expected, keep: true}
+      assert agent.state.data.conversation == before
     end
   end
 
-  describe "set_strategy_field/2" do
-    test "creates SetPath operation for a single field" do
-      op = Helpers.set_strategy_field(:status, :running)
+  test "deletion removes selected temporary keys and keeps unrelated data" do
+    agent = TestAgent.new!(state: %{data: %{temp: 1, cache: 2, ephemeral: 3, keep: "this"}})
+    next = %{agent.state | data: Map.drop(agent.state.data, [:temp, :cache, :ephemeral])}
+    assert {changed, [], _, {:ok, :changed, _}} = apply_state(agent, next)
+    assert changed.state.data == %{keep: "this"}
+    assert agent.state.data == %{temp: 1, cache: 2, ephemeral: 3, keep: "this"}
+  end
 
-      assert %StateOp.SetPath{} = op
-      assert op.path == [:status]
-      assert op.value == :running
+  test "nested deletion removes one pending ID and an absent key is harmless" do
+    agent = TestAgent.new!(state: %{data: %{pending: %{"one" => %{name: "first"}, "two" => %{name: "second"}}}})
+    next = update_in(agent.state, [:data, :pending], &Map.drop(&1, ["one", "absent"]))
+    assert {changed, [], _, {:ok, :changed, _}} = apply_state(agent, next)
+    assert changed.state.data.pending == %{"two" => %{name: "second"}}
+    assert map_size(agent.state.data.pending) == 2
+  end
+
+  test "an explicit domain reset removes old values and retains Plugin state" do
+    agent = TestAgent.new!(state: %{count: 5, data: %{old: "data", more: "stuff"}})
+
+    reset = %{
+      status: :idle,
+      iteration: 0,
+      conversation: [],
+      pending_tool_calls: [],
+      final_answer: nil,
+      current_llm_call_id: nil,
+      termination_reason: nil
+    }
+
+    assert {changed, [], _, {:ok, :changed, _}} = apply_state(agent, %{agent.state | count: 0, data: reset})
+    assert changed.state.data == reset and changed.state.count == 0
+    refute Map.has_key?(changed.state.data, :old)
+    refute Map.has_key?(changed.state.data, :more)
+    assert changed.state.requests == agent.state.requests
+  end
+
+  test "ordered map changes form one complete state candidate" do
+    agent = TestAgent.new!()
+
+    next =
+      agent.state
+      |> put_in([:data, :status], :running)
+      |> put_in([:data, :count], 5)
+      |> put_in([:data, :status], :completed)
+
+    assert {changed, [], _, {:ok, :changed, _}} = apply_state(agent, next)
+    assert changed.state.data == %{status: :completed, count: 5}
+    assert agent.state.data == %{}
+  end
+
+  test "disjoint state proposals and pending directives assemble without dispatch" do
+    agent = TestAgent.new!()
+    signal = Jido.Signal.new!("state.done", %{}, source: "/test")
+    emit = %Directive.Emit{signal: signal, dispatch: {:pid, target: self()}}
+
+    result =
+      {:ok, :done, [Effects.state(%{agent.state | count: 2}), Effects.state(%{agent.state | label: "changed"}), emit]}
+
+    assert {changed, [^emit], %{allowed_count: 3}, {:ok, :done, _}} =
+             Effects.apply_result(agent, result, %{mode: :allow_all})
+
+    assert changed.state.count == 2 and changed.state.label == "changed"
+    assert agent.state.count == 0
+    refute_receive {:signal, _}, 20
+  end
+
+  test "conflicting proposals reject the entire candidate and its directives" do
+    agent = TestAgent.new!()
+    emit = %Directive.Emit{signal: Jido.Signal.new!("state.done", %{}, source: "/test")}
+    result = {:ok, :done, [Effects.state(%{agent.state | count: 1}), emit, Effects.state(%{agent.state | count: 2})]}
+
+    assert {^agent, [], _, {:error, {:tool_state_conflict, [:count]}, []}} =
+             Effects.apply_result(agent, result, %{mode: :allow_all})
+  end
+
+  test "empty effects and an unchanged candidate preserve the Agent" do
+    agent = TestAgent.new!()
+    assert {^agent, [], %{received_count: 0}, {:ok, :done, []}} = Effects.apply_result(agent, {:ok, :done, []}, nil)
+    assert {^agent, [], _, {:ok, :changed, _}} = apply_state(agent, agent.state)
+  end
+
+  test "a complete proposal cannot replace Plugin-owned request records" do
+    agent = TestAgent.new!()
+    next = %{agent.state | requests: %{"forged" => %{status: :completed}}}
+    assert {^agent, [], _, {:error, _, []}} = apply_state(agent, next)
+  end
+
+  test "schema errors reject state and all pending work" do
+    agent = TestAgent.new!()
+    emit = %Directive.Emit{signal: Jido.Signal.new!("state.done", %{}, source: "/test")}
+    assert {^agent, [], _, {:error, _, []}} = apply_state(agent, %{agent.state | count: "not an integer"}, [emit])
+  end
+
+  test "unportable data cannot enter a state candidate" do
+    agent = TestAgent.new!()
+
+    for value <- [self(), make_ref(), fn -> :live end] do
+      assert {^agent, [], _, {:error, _, []}} = apply_state(agent, %{agent.state | data: %{resource: value}})
     end
   end
 
-  describe "set_iteration_status/1" do
-    test "creates SetPath operation for status" do
-      op = Helpers.set_iteration_status(:awaiting_llm)
-
-      assert %StateOp.SetPath{} = op
-      assert op.path == [:status]
-      assert op.value == :awaiting_llm
-    end
-  end
-
-  describe "set_iteration/1" do
-    test "creates SetPath operation for iteration counter" do
-      op = Helpers.set_iteration(5)
-
-      assert %StateOp.SetPath{} = op
-      assert op.path == [:iteration]
-      assert op.value == 5
-    end
-
-    test "accepts zero as valid iteration" do
-      op = Helpers.set_iteration(0)
-
-      assert %StateOp.SetPath{} = op
-      assert op.value == 0
-    end
-  end
-
-  describe "append_conversation/1" do
-    test "creates SetState operation for conversation list" do
-      messages = [%{role: :user, content: "Hello"}]
-      op = Helpers.append_conversation(messages)
-
-      assert %StateOp.SetState{} = op
-      assert op.attrs == %{conversation: messages}
-    end
-  end
-
-  describe "prepend_conversation/2" do
-    test "creates SetState operation with message prepended" do
-      message = %{role: :user, content: "Hello"}
-      existing = [%{role: :assistant, content: "Hi"}]
-      op = Helpers.prepend_conversation(message, existing)
-
-      assert %StateOp.SetState{} = op
-      assert op.attrs.conversation == [message | existing]
-    end
-
-    test "works with empty existing conversation" do
-      message = %{role: :user, content: "Hello"}
-      op = Helpers.prepend_conversation(message, [])
-
-      assert %StateOp.SetState{} = op
-      assert op.attrs.conversation == [message]
-    end
-  end
-
-  describe "set_conversation/1" do
-    test "creates SetState operation for entire conversation" do
-      messages = [
-        %{role: :user, content: "Hello"},
-        %{role: :assistant, content: "Hi"}
-      ]
-
-      op = Helpers.set_conversation(messages)
-
-      assert %StateOp.SetState{} = op
-      assert op.attrs == %{conversation: messages}
-    end
-  end
-
-  describe "set_pending_tools/1" do
-    test "creates SetState operation for pending tools" do
-      tools = [%{id: "call_1", name: "search", arguments: %{query: "test"}}]
-      op = Helpers.set_pending_tools(tools)
-
-      assert %StateOp.SetState{} = op
-      assert op.attrs == %{pending_tool_calls: tools}
-    end
-  end
-
-  describe "add_pending_tool/1" do
-    test "creates SetState operation for single tool" do
-      tool = %{id: "call_1", name: "search", arguments: %{query: "test"}}
-      op = Helpers.add_pending_tool(tool)
-
-      assert %StateOp.SetState{} = op
-      assert op.attrs.pending_tool_calls == [tool]
-    end
-  end
-
-  describe "clear_pending_tools/0" do
-    test "creates SetState operation to clear tools" do
-      op = Helpers.clear_pending_tools()
-
-      assert %StateOp.SetState{} = op
-      assert op.attrs == %{pending_tool_calls: []}
-    end
-  end
-
-  describe "remove_pending_tool/1" do
-    test "creates DeletePath operation for tool ID" do
-      op = Helpers.remove_pending_tool("call_1")
-
-      assert %StateOp.DeletePath{} = op
-      assert op.path == [:pending_tool_calls, "call_1"]
-    end
-  end
-
-  describe "set_call_id/1" do
-    test "creates SetPath operation for call ID" do
-      op = Helpers.set_call_id("call_123")
-
-      assert %StateOp.SetPath{} = op
-      assert op.path == [:current_llm_call_id]
-      assert op.value == "call_123"
-    end
-  end
-
-  describe "clear_call_id/0" do
-    test "creates DeletePath operation for call ID" do
-      op = Helpers.clear_call_id()
-
-      assert %StateOp.DeletePath{} = op
-      assert op.path == [:current_llm_call_id]
-    end
-  end
-
-  describe "set_final_answer/1" do
-    test "creates SetPath operation for final answer" do
-      op = Helpers.set_final_answer("42")
-
-      assert %StateOp.SetPath{} = op
-      assert op.path == [:final_answer]
-      assert op.value == "42"
-    end
-  end
-
-  describe "set_termination_reason/1" do
-    test "creates SetPath operation for termination reason" do
-      op = Helpers.set_termination_reason(:final_answer)
-
-      assert %StateOp.SetPath{} = op
-      assert op.path == [:termination_reason]
-      assert op.value == :final_answer
-    end
-  end
-
-  describe "set_streaming_text/1" do
-    test "creates SetPath operation for streaming text" do
-      op = Helpers.set_streaming_text("Hello")
-
-      assert %StateOp.SetPath{} = op
-      assert op.path == [:streaming_text]
-      assert op.value == "Hello"
-    end
-  end
-
-  describe "append_streaming_text/1" do
-    test "creates SetPath operation to append streaming text" do
-      op = Helpers.append_streaming_text(" world")
-
-      assert %StateOp.SetPath{} = op
-      assert op.path == [:streaming_text]
-      assert op.value == " world"
-    end
-  end
-
-  describe "set_usage/1" do
-    test "creates SetState operation for usage metadata" do
-      usage = %{input_tokens: 10, output_tokens: 20}
-      op = Helpers.set_usage(usage)
-
-      assert %StateOp.SetState{} = op
-      assert op.attrs == %{usage: usage}
-    end
-  end
-
-  describe "delete_temp_keys/0" do
-    test "creates DeleteKeys operation for temp keys" do
-      op = Helpers.delete_temp_keys()
-
-      assert %StateOp.DeleteKeys{} = op
-      assert op.keys == [:temp, :cache, :ephemeral]
-    end
-  end
-
-  describe "delete_keys/1" do
-    test "creates DeleteKeys operation for specified keys" do
-      op = Helpers.delete_keys([:temp1, :temp2])
-
-      assert %StateOp.DeleteKeys{} = op
-      assert op.keys == [:temp1, :temp2]
-    end
-  end
-
-  describe "reset_strategy_state/0" do
-    test "creates ReplaceState operation with initial values" do
-      op = Helpers.reset_strategy_state()
-
-      assert %StateOp.ReplaceState{} = op
-      assert op.state.status == :idle
-      assert op.state.iteration == 0
-      assert op.state.conversation == []
-      assert op.state.pending_tool_calls == []
-      assert op.state.final_answer == nil
-      assert op.state.current_llm_call_id == nil
-      assert op.state.termination_reason == nil
-    end
-  end
-
-  describe "compose/1" do
-    test "returns list of state operations unchanged" do
-      ops = [
-        Helpers.set_iteration_status(:running),
-        Helpers.set_iteration(1)
-      ]
-
-      result = Helpers.compose(ops)
-
-      assert result == ops
-      assert length(result) == 2
-    end
-
-    test "handles empty list" do
-      result = Helpers.compose([])
-
-      assert result == []
-    end
-  end
-
-  describe "update_config/1" do
-    test "creates SetState operation for config" do
-      config = %{tools: [], model: "test"}
-      op = Helpers.update_config(config)
-
-      assert %StateOp.SetState{} = op
-      assert op.attrs == %{config: config}
-    end
-
-    test "creates SetState operation with nested config" do
-      config = %{
-        tools: [SomeAction],
-        actions_by_name: %{"action" => SomeAction},
-        reqllm_tools: [%{name: "action"}]
-      }
-
-      op = Helpers.update_config(config)
-
-      assert %StateOp.SetState{} = op
-      assert op.attrs.config.tools == [SomeAction]
-      assert op.attrs.config.actions_by_name == %{"action" => SomeAction}
-    end
-  end
-
-  describe "set_config_field/2" do
-    test "creates SetPath operation for nested config field" do
-      op = Helpers.set_config_field(:tools, [SomeAction])
-
-      assert %StateOp.SetPath{} = op
-      assert op.path == [:config, :tools]
-      assert op.value == [SomeAction]
-    end
-
-    test "creates SetPath operation for model field" do
-      op = Helpers.set_config_field(:model, "openai:gpt-4")
-
-      assert %StateOp.SetPath{} = op
-      assert op.path == [:config, :model]
-      assert op.value == "openai:gpt-4"
-    end
-  end
-
-  describe "update_config_fields/1" do
-    test "creates multiple SetPath operations" do
-      fields = %{tools: [], model: "test"}
-      ops = Helpers.update_config_fields(fields)
-
-      assert length(ops) == 2
-
-      assert Enum.all?(ops, fn op -> %StateOp.SetPath{} = op end)
-
-      tools_op = Enum.find(ops, fn op -> op.path == [:config, :tools] end)
-      assert tools_op.value == []
-
-      model_op = Enum.find(ops, fn op -> op.path == [:config, :model] end)
-      assert model_op.value == "test"
-    end
-
-    test "handles empty map" do
-      ops = Helpers.update_config_fields(%{})
-      assert ops == []
-    end
-
-    test "creates SetPath operations in field order" do
-      fields = %{model: "gpt-4", tools: [], max_tokens: 4096}
-      ops = Helpers.update_config_fields(fields)
-
-      assert length(ops) == 3
-
-      # Verify all paths are present
-      paths = Enum.map(ops, & &1.path)
-      assert [:config, :model] in paths
-      assert [:config, :tools] in paths
-      assert [:config, :max_tokens] in paths
-    end
-  end
-
-  describe "update_tools_config/3" do
-    test "creates three SetPath operations for tools config" do
-      tools = [SomeAction]
-      actions_by_name = %{"action" => SomeAction}
-      reqllm_tools = [%{name: "action"}]
-
-      ops = Helpers.update_tools_config(tools, actions_by_name, reqllm_tools)
-
-      assert length(ops) == 3
-
-      assert Enum.all?(ops, fn op -> %StateOp.SetPath{} = op end)
-
-      tools_op = Enum.find(ops, fn op -> op.path == [:config, :tools] end)
-      assert tools_op.value == [SomeAction]
-
-      actions_op = Enum.find(ops, fn op -> op.path == [:config, :actions_by_name] end)
-      assert actions_op.value == %{"action" => SomeAction}
-
-      reqllm_op = Enum.find(ops, fn op -> op.path == [:config, :reqllm_tools] end)
-      assert reqllm_op.value == [%{name: "action"}]
-    end
-
-    test "handles empty tools list" do
-      ops = Helpers.update_tools_config([], %{}, [])
-
-      assert length(ops) == 3
-
-      tools_op = Enum.find(ops, fn op -> op.path == [:config, :tools] end)
-      assert tools_op.value == []
-
-      actions_op = Enum.find(ops, fn op -> op.path == [:config, :actions_by_name] end)
-      assert actions_op.value == %{}
-
-      reqllm_op = Enum.find(ops, fn op -> op.path == [:config, :reqllm_tools] end)
-      assert reqllm_op.value == []
-    end
-
-    test "creates operations in consistent order" do
-      tools = [Action1, Action2]
-      actions_by_name = %{"action1" => Action1, "action2" => Action2}
-      reqllm_tools = [%{name: "action1"}, %{name: "action2"}]
-
-      ops = Helpers.update_tools_config(tools, actions_by_name, reqllm_tools)
-
-      # Verify order: tools, actions_by_name, reqllm_tools
-      assert hd(ops).path == [:config, :tools]
-      assert Enum.at(ops, 1).path == [:config, :actions_by_name]
-      assert Enum.at(ops, 2).path == [:config, :reqllm_tools]
-    end
-  end
-
-  describe "apply_to_state/2" do
-    test "applies SetState operation" do
-      ops = [Helpers.update_strategy_state(%{status: :running})]
-      result = Helpers.apply_to_state(%{iteration: 1}, ops)
-
-      assert result.status == :running
-      assert result.iteration == 1
-    end
-
-    test "applies SetPath operation for nested key" do
-      ops = [Helpers.set_config_field(:tools, [SomeAction])]
-      result = Helpers.apply_to_state(%{}, ops)
-
-      assert result.config.tools == [SomeAction]
-    end
-
-    test "applies multiple SetPath operations" do
-      ops = Helpers.update_tools_config([SomeAction], %{"action" => SomeAction}, [%{name: "action"}])
-      result = Helpers.apply_to_state(%{other: "value"}, ops)
-
-      assert result.config.tools == [SomeAction]
-      assert result.config.actions_by_name == %{"action" => SomeAction}
-      assert result.config.reqllm_tools == [%{name: "action"}]
-      assert result.other == "value"
-    end
-
-    test "applies DeleteKeys operation" do
-      ops = [Helpers.delete_keys([:temp, :cache])]
-      result = Helpers.apply_to_state(%{temp: "data", cache: "data", keep: "this"}, ops)
-
-      assert result == %{keep: "this"}
-    end
-
-    test "applies ReplaceState operation" do
-      ops = [Helpers.reset_strategy_state()]
-      result = Helpers.apply_to_state(%{old: "data", more: "stuff"}, ops)
-
-      assert result.status == :idle
-      assert result.iteration == 0
-      refute Map.has_key?(result, :old)
-      refute Map.has_key?(result, :more)
-    end
-
-    test "applies operations in order" do
-      ops = [
-        Helpers.set_strategy_field(:status, :running),
-        Helpers.set_strategy_field(:count, 5)
-      ]
-
-      result = Helpers.apply_to_state(%{}, ops)
-
-      assert result.status == :running
-      assert result.count == 5
-    end
-
-    test "deep merges nested maps with SetState" do
-      ops = [Helpers.update_strategy_state(%{config: %{model: "gpt-4"}})]
-      result = Helpers.apply_to_state(%{config: %{tools: []}}, ops)
-
-      assert result.config.tools == []
-      assert result.config.model == "gpt-4"
+  for {label, value} <- [
+        {"zero", 0},
+        {"counter", 5},
+        {"status", :awaiting_llm},
+        {"answer", "42"},
+        {"false", false},
+        {"cleared", nil},
+        {"tools", [%{id: "call_1", name: "search"}]},
+        {"usage", %{input_tokens: 10, output_tokens: 20}}
+      ] do
+    test "candidate values retain the #{label} type and value" do
+      value = unquote(Macro.escape(value))
+      agent = TestAgent.new!()
+      assert {changed, [], _, {:ok, :changed, _}} = apply_state(agent, %{agent.state | data: %{value: value}})
+      assert changed.state.data.value === value
+      assert :ok = Jido.Action.validate_static_data(changed.state)
     end
   end
 end

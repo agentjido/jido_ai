@@ -94,7 +94,7 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.CLIAdapterTest do
     end
 
     test "await propagates status errors" do
-      expect(Jido.AgentServer, :status, fn _pid -> {:error, :not_found} end)
+      expect(Jido.AI.CLI.Adapter, :status, fn _pid -> {:error, :not_found} end)
       assert {:error, :not_found} = GoTAdapter.await(self(), 100, %{})
     end
 
@@ -106,7 +106,7 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.CLIAdapterTest do
           raw_state: %{last_result: "GoT answer"}
         )
 
-      expect(Jido.AgentServer, :status, fn _pid -> {:ok, status} end)
+      expect(Jido.AI.CLI.Adapter, :status, fn _pid -> {:ok, status} end)
 
       assert {:ok, %{answer: "GoT answer", meta: meta}} = GoTAdapter.await(self(), 100, %{})
       assert meta.status == :success

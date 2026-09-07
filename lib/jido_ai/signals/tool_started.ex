@@ -3,17 +3,30 @@ defmodule Jido.AI.Signal.ToolStarted do
   Signal emitted when a tool execution starts.
   """
 
-  use Jido.AI.Signal.Definition,
+  use Jido.Signal,
     type: "ai.tool.started",
     default_source: "/ai/tool",
-    schema: [
-      call_id: [type: :string, required: true, doc: "Tool call ID from the LLM"],
-      tool_name: [type: :string, required: true, doc: "Name of the tool being executed"],
-      arguments: [
-        type: :any,
-        required: false,
-        doc: "Arguments passed to the tool (may be redacted for sensitive data)"
-      ],
-      metadata: [type: :map, default: %{}, doc: "Optional request/run/origin metadata for correlation"]
-    ]
+    schema:
+      Zoi.object(
+        %{
+          call_id: Zoi.string(),
+          tool_name: Zoi.string(),
+          arguments: Zoi.any() |> Zoi.optional(),
+          metadata:
+            Zoi.any()
+            |> Zoi.refine({Jido.AI.Signal.Definition, :map_value, []})
+            |> Zoi.default(%{})
+        },
+        unrecognized_keys: :error
+      )
+
+  defoverridable validate_data: 1
+
+  def validate_data(data) do
+    Jido.AI.Signal.Definition.validate_data(data, schema())
+  end
+
+  def extension_policy, do: %{}
+  def to_json, do: Jido.AI.Signal.Definition.metadata(__MODULE__)
+  def __signal_metadata__, do: to_json()
 end

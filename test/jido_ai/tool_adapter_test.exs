@@ -8,7 +8,9 @@ defmodule Jido.AI.ToolAdapterTest do
     use Jido.Action,
       name: "empty_action",
       description: "An action with no parameters",
-      schema: []
+      schema: Zoi.object(%{})
+
+    def run(params, _context), do: {:ok, params}
   end
 
   # Test action with parameters
@@ -16,10 +18,16 @@ defmodule Jido.AI.ToolAdapterTest do
     use Jido.Action,
       name: "param_action",
       description: "An action with parameters",
-      schema: [
-        query: [type: :string, required: true, doc: "Search query"],
-        limit: [type: :integer, default: 10, doc: "Max results"]
-      ]
+      schema:
+        Zoi.object(
+          %{
+            query: Zoi.string(description: "Search query"),
+            limit: Zoi.integer(description: "Max results") |> Zoi.default(10)
+          },
+          unrecognized_keys: :error
+        )
+
+    def run(params, _context), do: {:ok, params}
   end
 
   # Test action with explicit strict?/0 callback
@@ -27,11 +35,11 @@ defmodule Jido.AI.ToolAdapterTest do
     use Jido.Action,
       name: "strict_action",
       description: "An action that explicitly opts into strict mode",
-      schema: [
-        value: [type: :string, required: true, doc: "A value"]
-      ]
+      schema: Zoi.object(%{value: Zoi.string(description: "A value")}, unrecognized_keys: :error)
 
     def strict?, do: true
+
+    def run(params, _context), do: {:ok, params}
   end
 
   # Test action with nested object schema
@@ -39,45 +47,53 @@ defmodule Jido.AI.ToolAdapterTest do
     use Jido.Action,
       name: "nested_action",
       description: "An action with nested objects",
-      schema: [
-        name: [type: :string, required: true, doc: "Name"],
-        config: [type: :map, required: true, doc: "Configuration object"],
-        items: [type: {:list, :map}, required: true, doc: "List of objects"]
-      ]
+      schema:
+        Zoi.object(
+          %{
+            name: Zoi.string(description: "Name"),
+            config: Zoi.object(%{}, unrecognized_keys: :error),
+            items: Zoi.list(Zoi.object(%{}, unrecognized_keys: :error))
+          },
+          unrecognized_keys: :error
+        )
+
+    def run(params, _context), do: {:ok, params}
   end
 
   defmodule OpenParamsAction do
     use Jido.Action,
       name: "open_params_action",
       description: "An action with card-specific parameters",
-      schema: %{
-        "type" => "object",
-        "properties" => %{
-          "id" => %{"type" => "string"},
-          "params" => %{"type" => "object", "additionalProperties" => true}
-        },
-        "required" => ["id", "params"],
-        "additionalProperties" => false
-      }
+      schema:
+        Zoi.object(
+          %{
+            id: Zoi.string(),
+            params: Zoi.object(%{}, unrecognized_keys: :strip)
+          },
+          unrecognized_keys: :error
+        )
 
     def strict?, do: false
+
+    def run(params, _context), do: {:ok, params}
   end
 
   defmodule StrictOpenParamsAction do
     use Jido.Action,
       name: "strict_open_params_action",
       description: "A strict action with card-specific parameters",
-      schema: %{
-        "type" => "object",
-        "properties" => %{
-          "id" => %{"type" => "string"},
-          "params" => %{"type" => "object", "additionalProperties" => true}
-        },
-        "required" => ["id", "params"],
-        "additionalProperties" => false
-      }
+      schema:
+        Zoi.object(
+          %{
+            id: Zoi.string(),
+            params: Zoi.object(%{}, unrecognized_keys: :strip)
+          },
+          unrecognized_keys: :error
+        )
 
     def strict?, do: true
+
+    def run(params, _context), do: {:ok, params}
   end
 
   describe "from_action/2" do
@@ -298,7 +314,9 @@ defmodule Jido.AI.ToolAdapterTest do
       use Jido.Action,
         name: "param_action",
         description: "Same name as ParamAction",
-        schema: []
+        schema: Zoi.object(%{})
+
+      def run(params, _context), do: {:ok, params}
     end
 
     test "from_actions raises on duplicate tool names" do
@@ -312,14 +330,18 @@ defmodule Jido.AI.ToolAdapterTest do
         use Jido.Action,
           name: "action",
           description: "First action",
-          schema: []
+          schema: Zoi.object(%{})
+
+        def run(params, _context), do: {:ok, params}
       end
 
       defmodule BAction do
         use Jido.Action,
           name: "action",
           description: "Second action with same name",
-          schema: []
+          schema: Zoi.object(%{})
+
+        def run(params, _context), do: {:ok, params}
       end
 
       assert_raise ArgumentError, ~r/duplicate tool names/i, fn ->

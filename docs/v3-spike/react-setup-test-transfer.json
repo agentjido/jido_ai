@@ -1,0 +1,405 @@
+{
+  "source_commit": "fc5bc1434ddb69493fe8a68443f03bc6a198c5a2",
+  "source_file": "test/jido_ai/strategy/react_test.exs",
+  "old_case_count": 78,
+  "current_case_count": 78,
+  "native_setup_count": 24,
+  "required_unported_count": 0,
+  "cases": [
+    {
+      "old": "raises for unsupported request_policy values",
+      "new": "definition rejects unsupported request policy",
+      "disposition": "native_setup"
+    },
+    {
+      "old": "raises for invalid request_transformer values",
+      "new": "definition rejects an unloaded request transformer",
+      "disposition": "native_setup"
+    },
+    {
+      "old": "treats false system_prompt as no prompt for direct strategy callers",
+      "new": "explicit nil instructions preserve the old direct no-prompt behavior",
+      "disposition": "native_setup"
+    },
+    {
+      "old": "raises for non-binary system_prompt values",
+      "new": "definition rejects a non-text system prompt",
+      "disposition": "native_setup"
+    },
+    {
+      "old": "routes delegated worker signals and compatibility observability signals",
+      "new": "native routes bind ReAct and ignore compatibility observations",
+      "disposition": "native_setup"
+    },
+    {
+      "old": "start lazily spawns worker and stores deferred start payload",
+      "new": "start commits one request before its owned model worker runs",
+      "disposition": "native_setup"
+    },
+    {
+      "old": "start payload context includes state snapshot key",
+      "new": "a real tool receives the Agent state snapshot and ignores a forged state binding",
+      "disposition": "native_lifecycle"
+    },
+    {
+      "old": "start propagates streaming option into runtime config",
+      "new": "start uses buffered HTTP when streaming is disabled",
+      "disposition": "native_setup"
+    },
+    {
+      "old": "start propagates max_tokens option into runtime config",
+      "new": "start sends the configured token limit over HTTP",
+      "disposition": "native_setup"
+    },
+    {
+      "old": "start preserves configured max_iterations when request omits override",
+      "new": "prepared request keeps the declared iteration limit",
+      "disposition": "native_setup"
+    },
+    {
+      "old": "start applies request-scoped max_iterations override to runtime config",
+      "new": "prepared request uses its iteration override",
+      "disposition": "native_setup"
+    },
+    {
+      "old": "start ignores invalid request-scoped max_iterations override",
+      "new": "invalid iteration override keeps the declared limit",
+      "disposition": "native_setup"
+    },
+    {
+      "old": "start propagates stream_timeout_ms option into runtime config",
+      "new": "prepared request keeps its declared idle timeout",
+      "disposition": "native_setup"
+    },
+    {
+      "old": "start applies request-scoped stream_timeout_ms override to runtime config",
+      "new": "prepared request uses its idle timeout override",
+      "disposition": "native_setup"
+    },
+    {
+      "old": "start merges base and run req_http_options into runtime config",
+      "new": "prepared request merges declared and request HTTP options",
+      "disposition": "native_setup"
+    },
+    {
+      "old": "start merges base and run llm_opts into runtime config",
+      "new": "prepared request merges declared and request generation options",
+      "disposition": "native_setup"
+    },
+    {
+      "old": "start applies request-scoped allowed_tools filter to runtime config",
+      "new": "prepared request applies the allowed tool filter",
+      "disposition": "native_setup"
+    },
+    {
+      "old": "start applies request-scoped tools override to runtime config",
+      "new": "prepared request uses the request tool catalog",
+      "disposition": "native_setup"
+    },
+    {
+      "old": "start applies request-scoped request_transformer override to runtime config",
+      "new": "request transformer override runs before the model control",
+      "disposition": "native_setup"
+    },
+    {
+      "old": "start installs agent module and tool context in worker context",
+      "new": "a real tool receives the host module identity and admitted context defaults",
+      "disposition": "native_lifecycle"
+    },
+    {
+      "old": "start applies request-scoped stream timeout override to runtime config",
+      "new": "request idle timeout overrides the legacy receive timeout alias",
+      "disposition": "native_setup"
+    },
+    {
+      "old": "start rejects unknown allowed_tools with request error directive",
+      "new": "unknown allowed tools fail admission before model work",
+      "disposition": "native_setup"
+    },
+    {
+      "old": "start accepts string-key llm_opts maps and normalizes ReqLLM options",
+      "new": "prepared request normalizes string generation option names",
+      "disposition": "native_setup"
+    },
+    {
+      "old": "start maps existing-atom string llm_opts keys for provider options",
+      "new": "prepared request retains an existing atom option name",
+      "disposition": "native_setup"
+    },
+    {
+      "old": "start drops non-existing string llm_opts keys and filters nil keys",
+      "new": "prepared request drops unknown option names without atom creation",
+      "disposition": "native_setup"
+    },
+    {
+      "old": "start normalizes provider_options maps in llm_opts using provider schema keys",
+      "new": "prepared request normalizes provider option keys by schema",
+      "disposition": "native_setup"
+    },
+    {
+      "old": "child started flushes deferred start to worker pid",
+      "new": "the owned worker receives the prompt exactly once",
+      "disposition": "native_lifecycle"
+    },
+    {
+      "old": "worker runtime event updates state and emits lifecycle signals",
+      "new": "owned runtime events update inspection and publish one request lifecycle",
+      "disposition": "native_lifecycle"
+    },
+    {
+      "old": "steer queues input for an active run",
+      "new": "steer queues request input and preserves its source and refs on consumption",
+      "disposition": "native_lifecycle"
+    },
+    {
+      "old": "queued input is dropped if the request fails before runtime drain",
+      "new": "provider failure discards undrained input before the next request",
+      "disposition": "native_lifecycle"
+    },
+    {
+      "old": "inject rejects while idle",
+      "new": "idle injection rejects without starting work or changing history",
+      "disposition": "native_lifecycle"
+    },
+    {
+      "old": "steer rejects request_id mismatches without mutating the queue",
+      "new": "stale steering rejects without adding an input or model call",
+      "disposition": "native_lifecycle"
+    },
+    {
+      "old": "steer rejects blank content without mutating the queue",
+      "new": "blank steering rejects without adding an input or model call",
+      "disposition": "native_lifecycle"
+    },
+    {
+      "old": "input_injected runtime events update run context and append a user thread entry",
+      "new": "consumed injection commits one user message before the next model call",
+      "disposition": "native_lifecycle"
+    },
+    {
+      "old": "request_completed event marks request terminal and keeps checkpoint token",
+      "new": "native checkpoints and standalone tokens keep terminal result and usage",
+      "disposition": "native_terminal"
+    },
+    {
+      "old": "llm_completed events merge nested provider usage without crashing",
+      "new": "request usage sums real model calls and collection keeps nested provider metadata",
+      "disposition": "native_terminal"
+    },
+    {
+      "old": "request_completed with empty usage preserves accumulated LLM usage",
+      "new": "empty final model usage and empty terminal event usage preserve earlier accounting",
+      "disposition": "native_terminal"
+    },
+    {
+      "old": "completed request history is reused for the next turn",
+      "new": "the next request reuses committed history and opaque reasoning details",
+      "disposition": "native_lifecycle"
+    },
+    {
+      "old": "snapshot exposes conversation projected from thread state",
+      "new": "inspection projects the committed message history",
+      "disposition": "native_lifecycle"
+    },
+    {
+      "old": "snapshot formats pending tool calls with string keys",
+      "new": "inspection normalizes string-key provider calls while a real tool runs",
+      "disposition": "native_inspection"
+    },
+    {
+      "old": "snapshot exposes completed tool results after final answer",
+      "new": "completed tool inspection keeps one result per call after replay and the final answer",
+      "disposition": "native_inspection"
+    },
+    {
+      "old": "request completion clears ephemeral req_http_options",
+      "new": "request HTTP and generation overrides end before the next request",
+      "disposition": "native_lifecycle"
+    },
+    {
+      "old": "terminal checkpoint after request completion does not reopen active request",
+      "new": "terminal checkpoint restore and token collection do not reopen completed work",
+      "disposition": "native_terminal"
+    },
+    {
+      "old": "cancel forwards worker cancel signal for active request",
+      "new": "cancellation keeps its reason and closes the provider connection",
+      "disposition": "native_lifecycle"
+    },
+    {
+      "old": "worker crash while active request marks request failed",
+      "new": "a worker crash fails its request and permits a later request",
+      "disposition": "native_lifecycle"
+    },
+    {
+      "old": "propagates runtime ordering metadata to LLMDelta signals",
+      "new": "streamed deltas preserve request run call and sequence IDs",
+      "disposition": "native_lifecycle"
+    },
+    {
+      "old": "passes complete content parts without appending them to text state",
+      "new": "complete content parts reach both streams and the stored multimodal result",
+      "disposition": "native_lifecycle"
+    },
+    {
+      "old": "uses runtime event model for LLM delta telemetry",
+      "new": "delta telemetry uses the effective runtime model",
+      "disposition": "native_lifecycle"
+    },
+    {
+      "old": "stores request trace up to 2000 events then marks truncated",
+      "new": "the trace keeps its first 2000 events and records overflow through completion",
+      "disposition": "native_lifecycle"
+    },
+    {
+      "old": "request_failed with {:incomplete_response, :incomplete} preserves structured error",
+      "new": "blank provider failure and the exact incomplete tuple retain their error values",
+      "disposition": "native_terminal"
+    },
+    {
+      "old": "register_tool adds tool to config and list_tools/1",
+      "new": "tool registration updates the live catalog and the next provider request",
+      "disposition": "native_lifecycle"
+    },
+    {
+      "old": "unregister_tool removes tool from config",
+      "new": "tool removal updates the live catalog and the next provider request",
+      "disposition": "native_lifecycle"
+    },
+    {
+      "old": "set_tool_context replaces base tool context",
+      "new": "context replacement removes old defaults before real tool execution",
+      "disposition": "native_lifecycle"
+    },
+    {
+      "old": "set_system_prompt replaces base system prompt",
+      "new": "prompt replacement reaches the next provider request exactly once",
+      "disposition": "native_lifecycle"
+    },
+    {
+      "old": "context.modify replace updates base conversation context",
+      "new": "context replacement updates committed history and the next model prompt",
+      "disposition": "native_context"
+    },
+    {
+      "old": "context.modify replace with nil system_prompt preserves existing config prompt",
+      "new": "a promptless context replacement preserves the configured model prompt",
+      "disposition": "native_context"
+    },
+    {
+      "old": "context.modify replace while active run is deferred and applied after request completion",
+      "new": "deferred context applies once after completion and before the next request",
+      "disposition": "native_context"
+    },
+    {
+      "old": "request_failed preserves raw error in snapshot result",
+      "new": "request inspection preserves a raw error map after real model work",
+      "disposition": "native_terminal"
+    },
+    {
+      "old": "context.modify replace while active run is deferred and applied after request failure",
+      "new": "deferred context applies once after provider failure and before the next request",
+      "disposition": "native_context"
+    },
+    {
+      "old": "context.modify replace while active run is deferred and applied after worker crash terminalization",
+      "new": "deferred context applies once after a worker crash during tool execution",
+      "disposition": "native_context"
+    },
+    {
+      "old": "context.modify replace with invalid params is a no-op",
+      "new": "invalid legacy context input is a no-op and native context input returns an error",
+      "disposition": "native_context"
+    },
+    {
+      "old": "context.modify replace applies immediately while idle and appends core thread operation event",
+      "new": "idle compaction records its operation metadata in the core Thread",
+      "disposition": "native_context"
+    },
+    {
+      "old": "compaction preserves durable skill tool output and its assistant tool call",
+      "new": "compaction keeps only the trusted matched skill pair in history and model input",
+      "disposition": "native_context"
+    },
+    {
+      "old": "context.modify deduplicates duplicate op_id",
+      "new": "duplicate context operation IDs preserve the first result and one Thread record",
+      "disposition": "native_context"
+    },
+    {
+      "old": "context.modify switch projects lane-specific context by context_ref",
+      "new": "lane switches restore the selected history and prompt for real model requests",
+      "disposition": "native_context"
+    },
+    {
+      "old": "context.modify switch to a fresh lane does not inherit previous lane history",
+      "new": "a fresh lane has no previous messages and switching back retains the old lane",
+      "disposition": "native_context"
+    },
+    {
+      "old": "core thread appends ai_message entries for user assistant and tool turns",
+      "new": "real tool turns append user assistant and tool messages to the core Thread",
+      "disposition": "native_context"
+    },
+    {
+      "old": "start action normalization preserves extra_refs",
+      "new": "request admission preserves caller refs in its portable record",
+      "disposition": "native_context"
+    },
+    {
+      "old": "extra_refs in normalized params are merged into user message entry refs",
+      "new": "admitted caller refs enter the user message and its core Thread entry",
+      "disposition": "native_context"
+    },
+    {
+      "old": "extra_refs appear in run context messages sent to LLM",
+      "new": "prepared model messages retain caller refs before provider serialization",
+      "disposition": "native_context"
+    },
+    {
+      "old": "runtime messages retain refs but reject forged skill durability",
+      "new": "ordinary tool history retains request refs and rejects forged skill durability",
+      "disposition": "native_context"
+    },
+    {
+      "old": "extra_refs cannot override reserved thread entry refs",
+      "new": "caller refs cannot replace owned request or run IDs on core Thread entries",
+      "disposition": "native_context"
+    },
+    {
+      "old": "init with initial context from agent.state",
+      "new": "initial Context import preserves history and its saved prompt",
+      "disposition": "native_initial_state"
+    },
+    {
+      "old": "init with initial context without system_prompt gets config prompt",
+      "new": "initial Context import fills a nil prompt from the profile",
+      "disposition": "native_initial_state"
+    },
+    {
+      "old": "init rejects legacy :thread context payloads",
+      "new": "initial state import rejects an AI Context under the legacy Thread key",
+      "disposition": "native_initial_state"
+    },
+    {
+      "old": "init ignores non-context :thread state from core thread plugins",
+      "new": "initial state import keeps a declared non-AI Thread value separate from conversation history",
+      "disposition": "native_initial_state"
+    },
+    {
+      "old": "runtime_adapter flag remains true even when opt-out is requested",
+      "new": "the retired runtime adapter flag cannot bypass native Session execution",
+      "disposition": "native_context"
+    },
+    {
+      "old": "busy start emits request error directive",
+      "new": "rejection metadata identifies only the refused request",
+      "disposition": "native_lifecycle"
+    }
+  ],
+  "native_lifecycle_count": 24,
+  "native_context_count": 18,
+  "native_inspection_count": 2,
+  "native_initial_state_count": 4,
+  "native_terminal_count": 6
+}

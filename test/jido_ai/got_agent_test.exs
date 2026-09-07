@@ -7,7 +7,7 @@ defmodule Jido.AI.GoTAgentTest do
   defmodule TestGoTAgent do
     use Jido.AI.GoTAgent,
       name: "test_got_agent",
-      model: "test:model",
+      model: "openai:gpt-4o-mini",
       max_nodes: 24,
       max_depth: 7,
       aggregation_strategy: :weighted
@@ -26,7 +26,7 @@ defmodule Jido.AI.GoTAgentTest do
     test "passes custom GoT options to strategy" do
       opts = TestGoTAgent.strategy_opts()
 
-      assert opts[:model] == "test:model"
+      assert opts[:model] == "openai:gpt-4o-mini"
       assert opts[:max_nodes] == 24
       assert opts[:max_depth] == 7
       assert opts[:aggregation_strategy] == :weighted
@@ -44,7 +44,7 @@ defmodule Jido.AI.GoTAgentTest do
 
   describe "request lifecycle hooks" do
     test "on_before_cmd tracks prompt and request_id on got_start" do
-      agent = TestGoTAgent.new()
+      agent = TestGoTAgent.new!()
 
       {:ok, updated_agent, {:got_start, params}} =
         TestGoTAgent.on_before_cmd(agent, {:got_start, %{prompt: "Compare city weather risks"}})
@@ -57,7 +57,7 @@ defmodule Jido.AI.GoTAgentTest do
     end
 
     test "on_before_cmd marks request as failed on got_request_error" do
-      agent = TestGoTAgent.new()
+      agent = TestGoTAgent.new!()
       agent = Request.start_request(agent, "req_1", "query")
 
       {:ok, agent, _action} =
@@ -72,7 +72,7 @@ defmodule Jido.AI.GoTAgentTest do
 
     test "on_after_cmd completes request when strategy snapshot is done" do
       agent =
-        TestGoTAgent.new()
+        TestGoTAgent.new!()
         |> Request.start_request("req_done", "query")
         |> with_completed_strategy("final synthesis")
 
@@ -88,7 +88,7 @@ defmodule Jido.AI.GoTAgentTest do
 
     test "on_after_cmd finalizes pending request for delegated worker events" do
       agent =
-        TestGoTAgent.new()
+        TestGoTAgent.new!()
         |> Request.start_request("req_worker", "query")
         |> with_completed_strategy("worker synthesis")
 
@@ -107,7 +107,7 @@ defmodule Jido.AI.GoTAgentTest do
     end
 
     test "on_after_cmd passes through got_request_error action unchanged" do
-      agent = TestGoTAgent.new()
+      agent = TestGoTAgent.new!()
 
       {:ok, updated_agent, directives} =
         TestGoTAgent.on_after_cmd(agent, {:got_request_error, %{request_id: "req_1"}}, [:noop])

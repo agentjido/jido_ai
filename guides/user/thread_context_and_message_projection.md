@@ -134,7 +134,9 @@ Do not use this when:
 
 `Jido.AI.Thread` has been removed. Use `Jido.AI.Context` directly.
 If you previously restored state with `initial_state: %{thread: ...}`,
-switch to `initial_state: %{context: ...}`.
+use `Jido.AI.Agent.from_initial_state(MyAgent, %{context: context})` before
+starting the Server. Declare any unrelated application `:thread` field in the
+v3 Agent schema. See the [import example](../../examples/v3/profiles/14_11_initial_state.md).
 
 ## Next
 

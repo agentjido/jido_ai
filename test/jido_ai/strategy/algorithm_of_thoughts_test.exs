@@ -1,184 +1,172 @@
 defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.StrategyTest do
-  use ExUnit.Case, async: true
+  use Jido.AI.Test.ReasoningCase, async: false
+  alias Jido.AI.Reasoning.AlgorithmOfThoughts, as: Method
 
-  alias Jido.Agent.Strategy.State, as: StratState
-  alias Jido.AI.Directive
-  alias Jido.AI.Reasoning.AlgorithmOfThoughts.Strategy, as: AlgorithmOfThoughts
-
-  defp create_agent(opts \\ []) do
-    %Jido.Agent{id: "test-agent", name: "test", state: %{}}
-    |> then(fn agent ->
-      ctx = %{strategy_opts: opts}
-      {agent, []} = AlgorithmOfThoughts.init(agent, ctx)
-      agent
-    end)
+  # See docs/v3-spike/aot-test-transfer.md for the old case map.
+  test "initializes the native profile and default generation settings", %{jido: jido} do
+    assert {:ok, profile} = Configuration.profile(definition(Method.method()))
+    assert Jido.AI.resolve_model(profile.models.answer.model) == Jido.AI.resolve_model(:fast)
+    assert %{profile: :standard, search_style: :dfs, require_explicit_answer: true} = profile.reasoning.options
+    mock = mock([%{reply: {:text, "answer: 24"}}])
+    server = start_reasoning(jido, Method.method())
+    assert {:ok, %{details: %{phase: :idle}, request: nil}} = Session.snapshot(server)
+    assert {:ok, handle} = request(server, mock, Method.method())
+    assert {:ok, %{answer: "24"}} = Request.await(handle)
+    assert [wire] = MockLLM.report(mock).requests
+    assert wire.body["temperature"] == 0.0 and wire.body["max_tokens"] == 2048
+    assert_script_done(mock)
   end
 
-  describe "init/2" do
-    test "initializes machine state and config" do
-      agent = create_agent()
-      state = StratState.get(agent, %{})
+  test "custom AoT profile search style and generation reach the provider", %{jido: jido} do
+    mock = mock([%{reply: {:text, "answer: 24"}}])
 
-      assert state[:status] == :idle
-      assert state[:config].model == Jido.AI.resolve_model(:fast)
-      assert state[:config].profile == :standard
-      assert state[:config].search_style == :dfs
-      assert state[:config].temperature == 0.0
-      assert state[:config].max_tokens == 2048
-      assert state[:config].require_explicit_answer == true
-    end
+    server =
+      start_reasoning(jido, Method.method(),
+        reasoning_options: %{profile: :short, search_style: :bfs},
+        max_tokens: 4096,
+        temperature: 0.1
+      )
 
-    test "accepts custom AoT options" do
-      agent = create_agent(profile: :short, search_style: :bfs, max_tokens: 4096, temperature: 0.1)
-      state = StratState.get(agent, %{})
-
-      assert state[:config].profile == :short
-      assert state[:config].search_style == :bfs
-      assert state[:config].max_tokens == 4096
-      assert state[:config].temperature == 0.1
-    end
+    assert {:ok, handle} = request(server, mock, Method.method())
+    assert {:ok, %{answer: "24"}} = Request.await(handle)
+    assert [wire] = MockLLM.report(mock).requests
+    assert wire.body["temperature"] == 0.1 and wire.body["max_tokens"] == 4096
+    assert hd(wire.body["messages"])["content"] == Method.default_system_prompt(:short, :bfs)
+    assert_script_done(mock)
   end
 
-  describe "action_spec/1" do
-    test "returns specs for strategy actions" do
-      assert AlgorithmOfThoughts.action_spec(:aot_start).name == "aot.start"
-      assert AlgorithmOfThoughts.action_spec(:aot_llm_result).name == "aot.llm_result"
-      assert AlgorithmOfThoughts.action_spec(:aot_llm_partial).name == "aot.llm_partial"
-      assert AlgorithmOfThoughts.action_spec(:aot_request_error).name == "aot.request_error"
-      assert is_nil(AlgorithmOfThoughts.action_spec(:unknown))
-    end
+  test "native Actions validate admission and cancellation inputs" do
+    assert Jido.AI.Session.Start.name() == "ai_session_start"
+    assert Jido.AI.Session.Cancel.name() == "ai_session_cancel"
+    assert {:ok, _} = Zoi.parse(Jido.AI.Session.Start.schema(), %{query: "Solve", request_id: "one"})
+    assert {:error, _} = Zoi.parse(Jido.AI.Session.Start.schema(), %{query: "Solve"})
+    assert {:ok, _} = Zoi.parse(Jido.AI.Session.Cancel.schema(), %{request_id: "one", reason: :changed_plan})
   end
 
-  describe "signal_routes/1" do
-    test "routes expected AoT signals" do
-      routes = Map.new(AlgorithmOfThoughts.signal_routes(%{}))
+  test "AoT query routes select the method and model observations stay read only", %{jido: jido} do
+    server = start_reasoning(jido, Method.method())
+    before = Server.agent(server)
+    signal = Jido.Signal.new!("ai.aot.query", %{query: "Solve"}, source: "/test")
+    assert %{id: :assistant, mode: :session} = Jido.AI.Authoring.request_binding(before, signal)
+    assert Jido.AI.Authoring.request_method(before, signal) == Method.method()
 
-      assert routes["ai.aot.query"] == {:strategy_cmd, :aot_start}
-      assert routes["ai.llm.response"] == {:strategy_cmd, :aot_llm_result}
-      assert routes["ai.llm.delta"] == {:strategy_cmd, :aot_llm_partial}
-      assert routes["ai.request.error"] == {:strategy_cmd, :aot_request_error}
+    for type <- ["ai.llm.response", "ai.llm.delta"] do
+      assert {:ok, after_agent} = Server.call(server, %{signal | type: type})
+      assert after_agent.state == before.state
     end
+
+    assert {:ok, %{request: nil}} = Session.snapshot(server)
   end
 
-  describe "cmd/3" do
-    test "start instruction emits LLMStream directive" do
-      agent = create_agent()
-
-      instruction = %Jido.Instruction{action: :aot_start, params: %{prompt: "Solve this"}}
-      {agent, directives} = AlgorithmOfThoughts.cmd(agent, [instruction], %{})
-
-      state = StratState.get(agent, %{})
-      assert state[:status] == :exploring
-      assert state[:prompt] == "Solve this"
-      assert length(directives) == 1
-      assert [%Directive.LLMStream{} = llm_stream] = directives
-      assert llm_stream.id == state[:current_call_id]
-      assert String.starts_with?(llm_stream.id, "aot_")
-    end
-
-    test "busy second start emits request error directive with request id correlation" do
-      agent = create_agent()
-
-      {agent, _first_directives} =
-        AlgorithmOfThoughts.cmd(
-          agent,
-          [%Jido.Instruction{action: :aot_start, params: %{prompt: "first", request_id: "req_aot_1"}}],
-          %{}
-        )
-
-      {_agent, second_directives} =
-        AlgorithmOfThoughts.cmd(
-          agent,
-          [%Jido.Instruction{action: :aot_start, params: %{prompt: "second", request_id: "req_aot_2"}}],
-          %{}
-        )
-
-      assert [%Directive.EmitRequestError{} = directive] = second_directives
-      assert directive.request_id == "req_aot_2"
-      assert directive.reason == :busy
-    end
-
-    test "request_error instruction stores lifecycle rejection metadata" do
-      agent = create_agent()
-
-      request_error =
-        %Jido.Instruction{
-          action: :aot_request_error,
-          params: %{request_id: "req_aot_busy", reason: :busy, message: "Agent is busy"}
-        }
-
-      {agent, []} = AlgorithmOfThoughts.cmd(agent, [request_error], %{})
-      state = StratState.get(agent, %{})
-
-      assert state[:last_request_error] == %{
-               request_id: "req_aot_busy",
-               reason: :busy,
-               message: "Agent is busy"
-             }
-    end
-
-    test "llm result instruction transitions to completed with parsed output" do
-      agent = create_agent()
-
-      {agent, _} =
-        AlgorithmOfThoughts.cmd(agent, [%Jido.Instruction{action: :aot_start, params: %{prompt: "Solve"}}], %{})
-
-      call_id = StratState.get(agent, %{})[:current_call_id]
-
-      response = """
-      Trying a promising first operation:
-      1. 8 - 6 : (4, 4, 2)
-      - 4 + 2 : (6, 4) 24 = 6 * 4 -> found it!
-      Backtracking the solution:
-      Step 1: 8 - 6 = 2
-      Step 2: 4 + 2 = 6
-      Step 3: 6 * 4 = 24
-      answer: (4 + (8 - 6)) * 4 = 24
-      """
-
-      instruction =
-        %Jido.Instruction{
-          action: :aot_llm_result,
-          params: %{call_id: call_id, result: {:ok, %{text: response, usage: %{input_tokens: 4, output_tokens: 9}}}}
-        }
-
-      {agent, []} = AlgorithmOfThoughts.cmd(agent, [instruction], %{})
-
-      state = StratState.get(agent, %{})
-      assert state[:status] == :completed
-      assert state[:result][:answer] == "(4 + (8 - 6)) * 4 = 24"
-      assert state[:result][:usage][:total_tokens] == 13
-    end
+  test "start owns a streaming call with a correlated request and prompt", %{jido: jido} do
+    mock = mock([%{reply: {:stream, [%{content: "Trying"}, {:wait, :held}, %{content: "\nanswer: 24"}], "stop"}}])
+    server = start_reasoning(jido, Method.method(), streaming: true)
+    assert {:ok, handle} = request(server, mock, Method.method(), "Solve this")
+    assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
+    assert {:ok, view} = Session.snapshot(server)
+    assert view.request.query == "Solve this" and view.request.status == :pending
+    assert is_binary(view.details.current_llm_call_id)
+    assert Process.alive?(view.live.worker_pid)
+    assert_receive {:jido_ai_request_event, %{kind: :llm_delta} = delta}, 1_000
+    assert delta.llm_call_id == view.details.current_llm_call_id
+    assert delta.request_id == handle.id and delta.method == :algorithm_of_thoughts
+    assert :ok = MockLLM.release(mock, :held)
+    assert {:ok, %{answer: "24"}} = Request.await(handle)
+    assert record(server, handle).meta.model_calls == 1
+    assert_script_done(mock)
   end
 
-  describe "snapshot/2" do
-    test "returns idle snapshot for new agent" do
-      agent = create_agent()
-      snapshot = AlgorithmOfThoughts.snapshot(agent, %{})
-
-      assert snapshot.status == :idle
-      assert snapshot.done? == false
-    end
-
-    test "returns running snapshot after start" do
-      agent = create_agent(profile: :long)
-
-      {agent, _} =
-        AlgorithmOfThoughts.cmd(agent, [%Jido.Instruction{action: :aot_start, params: %{prompt: "Test"}}], %{})
-
-      snapshot = AlgorithmOfThoughts.snapshot(agent, %{})
-      assert snapshot.status == :running
-      assert snapshot.done? == false
-      assert snapshot.details[:profile] == :long
-    end
+  test "a busy second start returns its own request ID", %{jido: jido} do
+    mock = mock([%{reply: {:wait, :held, {:text, "answer: 24"}}}])
+    server = start_reasoning(jido, Method.method())
+    assert {:ok, first} = request(server, mock, Method.method(), "first", request_id: "req_aot_1")
+    assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
+    assert {:error, :busy} = request(server, mock, Method.method(), "second", request_id: "req_aot_2")
+    assert_receive {:jido_ai_request_event, %{kind: :request_failed, request_id: "req_aot_2", data: %{error: :busy}}}
+    assert record(server, first).status == :pending
+    assert :ok = MockLLM.release(mock, :held)
+    assert {:ok, %{answer: "24"}} = Request.await(first)
+    assert_script_done(mock)
   end
 
-  describe "action helpers" do
-    test "returns expected action atoms" do
-      assert AlgorithmOfThoughts.start_action() == :aot_start
-      assert AlgorithmOfThoughts.llm_result_action() == :aot_llm_result
-      assert AlgorithmOfThoughts.llm_partial_action() == :aot_llm_partial
-      assert AlgorithmOfThoughts.request_error_action() == :aot_request_error
+  test "rejection metadata does not overwrite the active AoT request", %{jido: jido} do
+    mock = mock([%{reply: {:wait, :held, {:text, "answer: 24"}}}])
+    server = start_reasoning(jido, Method.method())
+    assert {:ok, first} = request(server, mock, Method.method())
+    assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
+    assert {:error, :busy} = request(server, mock, Method.method(), "second", request_id: "busy_aot")
+
+    assert_receive {:jido_ai_request_event,
+                    %{request_id: "busy_aot", method: :algorithm_of_thoughts, data: %{error: :busy}}}
+
+    assert Map.keys(Server.agent(server).state.requests) == [first.id]
+    assert length(MockLLM.report(mock).requests) == 1
+    assert :ok = MockLLM.release(mock, :held)
+    assert {:ok, %{answer: "24"}} = Request.await(first)
+    assert_script_done(mock)
+  end
+
+  test "model completion stores the parsed puzzle result and usage", %{jido: jido} do
+    text = """
+    Trying a promising first operation:
+    1. 8 - 6 : (4, 4, 2)
+    - 4 + 2 : (6, 4) 24 = 6 * 4 -> found it!
+    Backtracking the solution:
+    Step 1: 8 - 6 = 2
+    Step 2: 4 + 2 = 6
+    Step 3: 6 * 4 = 24
+    answer: (4 + (8 - 6)) * 4 = 24
+    """
+
+    mock = mock([%{reply: response(text, %{prompt_tokens: 4, completion_tokens: 9, total_tokens: 13})}])
+    server = start_reasoning(jido, Method.method())
+    assert {:ok, handle} = request(server, mock, Method.method())
+    assert {:ok, result} = Request.await(handle)
+    assert result.answer == "(4 + (8 - 6)) * 4 = 24"
+    assert result.usage.total_tokens == 13
+    assert result.first_operations_considered == 1 and result.backtracking_steps == 3
+    assert result.raw_response == text and result.found_solution?
+    assert record(server, handle).status == :completed
+    assert Method.get_result(Server.agent(server)) == result
+    assert_script_done(mock)
+  end
+
+  test "snapshot of a new AoT Agent has no result or live request", %{jido: jido} do
+    server = start_reasoning(jido, Method.method())
+    assert {:ok, view} = Session.snapshot(server)
+    assert view.details.phase == :idle and view.request == nil and view.live == nil
+    assert Method.get_result(view.agent) == nil
+    refute view.agent.state.completed
+  end
+
+  test "snapshot of running work keeps the selected long profile", %{jido: jido} do
+    mock = mock([%{reply: {:wait, :held, {:text, "answer: 24"}}}])
+    server = start_reasoning(jido, Method.method(), reasoning_options: %{profile: :long})
+    assert {:ok, handle} = request(server, mock, Method.method(), "Test")
+    assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
+    assert {:ok, view} = Session.snapshot(server)
+    assert view.details.phase == :awaiting_llm and view.request.status == :pending
+    assert {:ok, profile} = Configuration.profile(view.agent)
+    assert profile.reasoning.options.profile == :long
+    refute view.agent.state.completed
+
+    assert hd(hd(MockLLM.report(mock).requests).body["messages"])["content"] ==
+             Method.default_system_prompt(:long, :dfs)
+
+    assert :ok = MockLLM.release(mock, :held)
+    assert {:ok, %{answer: "24"}} = Request.await(handle)
+    assert_script_done(mock)
+  end
+
+  test "public method selection replaces private Strategy action atoms" do
+    assert Method.method() == :algorithm_of_thoughts
+    agent = definition(Method.method())
+    assert {:ok, router} = Jido.Signal.Router.new(agent.routes)
+
+    for type <- ["ai.aot.query", "ai.aot.cancel"] do
+      assert {:ok, _} = Jido.Signal.Router.route(router, Jido.Signal.new!(type, %{}, source: "/test"))
     end
+
+    assert {:error, _} = Jido.Signal.Router.route(router, Jido.Signal.new!("ai.aot.unknown", %{}, source: "/test"))
   end
 end

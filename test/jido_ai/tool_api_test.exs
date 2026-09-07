@@ -72,7 +72,7 @@ defmodule Jido.AI.ToolApiTest do
 
   describe "list_tools/1 with agent struct" do
     test "returns list of tool modules" do
-      agent = TestAgent.new()
+      agent = TestAgent.new!()
       tools = AI.list_tools(agent)
 
       assert is_list(tools)
@@ -83,16 +83,10 @@ defmodule Jido.AI.ToolApiTest do
 
     test "returns empty list for agent without tools" do
       # Test with a manually constructed agent state
-      agent = TestAgent.new()
+      agent = TestAgent.new!()
       # Manually clear tools from strategy state for testing
-      state = Jido.Agent.Strategy.State.get(agent, %{})
-      config = state[:config] || %{}
-      new_config = Map.put(config, :tools, [])
-
-      new_state =
-        Map.put(state, :config, new_config)
-
-      agent = Jido.Agent.Strategy.State.put(agent, new_state)
+      {:ok, agent} = Jido.AI.unregister_tool_direct(agent, "calculator")
+      {:ok, agent} = Jido.AI.unregister_tool_direct(agent, "search")
       tools = AI.list_tools(agent)
 
       assert tools == []
@@ -101,13 +95,13 @@ defmodule Jido.AI.ToolApiTest do
 
   describe "has_tool?/2 with agent struct" do
     test "returns true for registered tool" do
-      agent = TestAgent.new()
+      agent = TestAgent.new!()
       assert AI.has_tool?(agent, "calculator") == true
       assert AI.has_tool?(agent, "search") == true
     end
 
     test "returns false for unregistered tool" do
-      agent = TestAgent.new()
+      agent = TestAgent.new!()
       assert AI.has_tool?(agent, "nonexistent") == false
       assert AI.has_tool?(agent, "weather") == false
     end
@@ -115,7 +109,7 @@ defmodule Jido.AI.ToolApiTest do
 
   describe "ReAct.list_tools/1 direct access" do
     test "returns tool modules from agent" do
-      agent = TestAgent.new()
+      agent = TestAgent.new!()
       tools = ReAct.list_tools(agent)
 
       assert Calculator in tools

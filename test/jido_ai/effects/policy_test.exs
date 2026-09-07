@@ -3,12 +3,13 @@ defmodule Jido.AI.Effects.PolicyTest do
 
   alias Jido.AI.Effects.Policy
   alias Jido.Agent.Directive
-  alias Jido.Agent.StateOp
+  alias Jido.AI.Effects.State
+  alias Jido.Plugin.Scheduler.Schedule
 
-  test "default policy allows state ops and safe directives but denies spawn directives" do
+  test "default policy allows complete state and safe directives but denies spawn directives" do
     policy = Policy.default()
 
-    assert Policy.allowed?(policy, %StateOp.SetState{attrs: %{flag: true}})
+    assert Policy.allowed?(policy, %State{state: %{flag: true}})
     assert Policy.allowed?(policy, %Directive.Emit{signal: %{type: "ai.test"}})
     refute Policy.allowed?(policy, %Directive.SpawnAgent{agent: __MODULE__, tag: :child})
   end
@@ -21,7 +22,11 @@ defmodule Jido.AI.Effects.PolicyTest do
         constraints: %{emit: %{allowed_dispatches: ["pid", :pubsub]}}
       })
 
-    assert Policy.allowed?(policy, %Directive.Emit{signal: %{type: "ai.test"}, dispatch: {:pid, target: self()}})
+    assert Policy.allowed?(policy, %Directive.Emit{
+             signal: %{type: "ai.test"},
+             dispatch: {:pid, target: self()}
+           })
+
     assert Policy.allowed?(policy, %Directive.Emit{signal: %{type: "ai.test"}, dispatch: :pubsub})
     refute Policy.allowed?(policy, %Directive.Emit{signal: %{type: "ai.test"}, dispatch: :bus})
   end
@@ -94,7 +99,11 @@ defmodule Jido.AI.Effects.PolicyTest do
   test "intersect preserves narrowing when strategy sets an empty dispatch list" do
     policy =
       Policy.intersect(
-        %{mode: :allow_list, allow: [Directive.Emit], constraints: %{emit: %{allowed_dispatches: [:pid, :pubsub]}}},
+        %{
+          mode: :allow_list,
+          allow: [Directive.Emit],
+          constraints: %{emit: %{allowed_dispatches: [:pid, :pubsub]}}
+        },
         %{constraints: %{emit: %{allowed_dispatches: []}}}
       )
 
@@ -106,11 +115,18 @@ defmodule Jido.AI.Effects.PolicyTest do
     policy =
       Policy.new(%{
         mode: :allow_list,
-        allow: [Directive.Schedule],
+        allow: [Schedule],
         constraints: %{schedule: %{max_delay_ms: 100}}
       })
 
-    assert Policy.allowed?(policy, %Directive.Schedule{delay_ms: 100, message: :tick})
-    refute Policy.allowed?(policy, %Directive.Schedule{delay_ms: 101, message: :tick})
+    assert Policy.allowed?(policy, %Schedule{
+             delay_ms: 100,
+             signal: Jido.Signal.new!("ai.tick", %{}, %{source: "/effects/test"})
+           })
+
+    refute Policy.allowed?(policy, %Schedule{
+             delay_ms: 101,
+             signal: Jido.Signal.new!("ai.tick", %{}, %{source: "/effects/test"})
+           })
   end
 end

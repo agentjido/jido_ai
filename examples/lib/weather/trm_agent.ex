@@ -13,6 +13,7 @@ defmodule Jido.AI.Examples.Weather.TRMAgent do
   alias Jido.AI.Examples.Weather.LiveContext
 
   use Jido.AI.TRMAgent,
+    request_transformer: LiveContext,
     name: "weather_trm_agent",
     description: "Recursive weather plan improver",
     # Keep CLI-friendly defaults so `mix jido_ai --agent ...` finishes within default timeout.
@@ -34,15 +35,4 @@ defmodule Jido.AI.Examples.Weather.TRMAgent do
       opts
     )
   end
-
-  @impl true
-  def on_before_cmd(agent, {:trm_start, %{prompt: prompt} = params}) do
-    case LiveContext.enrich_prompt(prompt) do
-      {:ok, enriched_prompt} -> super(agent, {:trm_start, %{params | prompt: enriched_prompt}})
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  @impl true
-  def on_before_cmd(agent, action), do: super(agent, action)
 end

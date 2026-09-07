@@ -1,137 +1,54 @@
 defmodule Jido.AI.Plugins.Reasoning.AdaptiveTest do
   use ExUnit.Case, async: true
+  alias Jido.AI.Plugins.Reasoning.Adaptive, as: Capability
 
-  alias Jido.AI.Plugins.Reasoning.Adaptive
+  defmodule Overwrite do
+    use Jido.Action, name: "overwrite_adaptive_defaults"
 
-  describe "plugin_spec/1" do
-    test "returns valid plugin spec" do
-      spec = Adaptive.plugin_spec(%{})
-
-      assert spec.module == Adaptive
-      assert spec.name == "reasoning_adaptive"
-      assert spec.state_key == :reasoning_adaptive
-      assert spec.category == "ai"
-      assert is_list(spec.actions)
-      assert spec.actions == [Jido.AI.Actions.Reasoning.RunStrategy]
-    end
-
-    test "includes config in plugin spec" do
-      config = %{default_model: :capable, timeout: 15_000}
-      spec = Adaptive.plugin_spec(config)
-
-      assert spec.config == config
+    def run(_, context) do
+      next = put_in(context.agent_state.reasoning_adaptive.timeout, 1)
+      {:ok, next}
     end
   end
 
-  describe "mount/2" do
-    test "initializes state with defaults" do
-      {:ok, state} = Adaptive.mount(%Jido.Agent{}, %{})
+  test "core creates owned defaults for the fixed method" do
+    definition = definition([])
+    agent = Jido.Agent.instantiate!(definition)
 
-      assert state.strategy == :adaptive
-      assert state.default_model == :reasoning
-      assert state.timeout == 30_000
-      assert state.options == %{}
-    end
+    assert agent.state.reasoning_adaptive == %{
+             strategy: :adaptive,
+             default_model: :reasoning,
+             timeout: 30_000,
+             options: %{}
+           }
 
-    test "merges custom config into initial state, including Adaptive options" do
-      {:ok, state} =
-        Adaptive.mount(%Jido.Agent{}, %{
-          default_model: :fast,
-          timeout: 5_000,
-          options: %{
-            default_strategy: :react,
-            available_strategies: [:cod, :cot, :react, :tot, :got, :trm, :aot],
-            complexity_thresholds: %{simple: 0.25, complex: 0.8}
-          }
-        })
-
-      assert state.strategy == :adaptive
-      assert state.default_model == :fast
-      assert state.timeout == 5_000
-
-      assert state.options == %{
-               default_strategy: :react,
-               available_strategies: [:cod, :cot, :react, :tot, :got, :trm, :aot],
-               complexity_thresholds: %{simple: 0.25, complex: 0.8}
-             }
-    end
-
-    test "mounted state validates against plugin schema" do
-      {:ok, state} = Adaptive.mount(%Jido.Agent{}, %{})
-
-      assert {:ok, _parsed_state} = Zoi.parse(Adaptive.schema(), state)
-    end
+    assert agent.state.result == nil
   end
 
-  describe "schema/0" do
-    test "applies default values for Adaptive plugin state" do
-      assert {:ok, state} = Zoi.parse(Adaptive.schema(), %{})
-
-      assert state.strategy == :adaptive
-      assert state.default_model == :reasoning
-      assert state.timeout == 30_000
-      assert state.options == %{}
-    end
+  test "configured defaults survive an empty restored state and reject another method" do
+    config = [default_model: :fast, timeout: 800, options: %{system_prompt: "Use facts"}]
+    {:reasoning_adaptive, schema} = Capability.state_spec(config)
+    assert {:ok, state} = Zoi.parse(schema, %{})
+    assert state.default_model == :fast and state.timeout == 800
+    assert state.options == %{system_prompt: "Use facts"}
+    assert {:error, _} = Zoi.parse(schema, %{state | strategy: :invalid})
+    assert {:error, _} = Zoi.parse(schema, %{state | timeout: 0})
   end
 
-  describe "actions" do
-    test "returns RunStrategy action" do
-      actions = Adaptive.actions()
-
-      assert actions == [Jido.AI.Actions.Reasoning.RunStrategy]
-    end
+  test "an ordinary Action cannot replace the owned defaults" do
+    agent = definition([]) |> Jido.Agent.instantiate!()
+    signal = Jido.Signal.new!("defaults.replace", %{}, source: "/test")
+    assert {:error, error} = Jido.Agent.cmd(agent, signal)
+    assert inspect(error) =~ "Plugin"
+    assert agent.state.reasoning_adaptive.timeout == 30_000
   end
 
-  describe "signal routing" do
-    test "routes reasoning.adaptive.run to RunStrategy" do
-      routes = Adaptive.signal_routes(%{})
-      route_map = Map.new(routes)
-
-      assert route_map["reasoning.adaptive.run"] == Jido.AI.Actions.Reasoning.RunStrategy
-    end
-  end
-
-  describe "handle_signal/2" do
-    test "forces strategy :adaptive and preserves Adaptive options" do
-      signal =
-        Jido.Signal.new!(
-          "reasoning.adaptive.run",
-          %{
-            prompt: "Pick the best approach and provide a weather-safe plan.",
-            strategy: :cot,
-            timeout: 45_000,
-            options: %{
-              default_strategy: :react,
-              available_strategies: [:cod, :cot, :react, :tot, :got, :trm, :aot],
-              complexity_thresholds: %{simple: 0.25, complex: 0.8}
-            }
-          },
-          source: "/test"
-        )
-
-      assert {:ok, {:override, {Jido.AI.Actions.Reasoning.RunStrategy, params}}} =
-               Adaptive.handle_signal(signal, %{})
-
-      assert params.strategy == :adaptive
-      assert params.prompt == "Pick the best approach and provide a weather-safe plan."
-      assert params.timeout == 45_000
-
-      assert params.options == %{
-               default_strategy: :react,
-               available_strategies: [:cod, :cot, :react, :tot, :got, :trm, :aot],
-               complexity_thresholds: %{simple: 0.25, complex: 0.8}
-             }
-    end
-
-    test "normalizes non-map payload data and still injects strategy" do
-      signal =
-        Jido.Signal.new!("reasoning.adaptive.run", %{prompt: "placeholder"}, source: "/test")
-        |> Map.put(:data, :not_a_map)
-
-      assert {:ok, {:override, {Jido.AI.Actions.Reasoning.RunStrategy, params}}} =
-               Adaptive.handle_signal(signal, %{})
-
-      assert params == %{strategy: :adaptive}
-    end
+  defp definition(config) do
+    Jido.Agent.new!(%{
+      name: "adaptive_capability_contract",
+      schema: Zoi.object(%{result: Zoi.any() |> Zoi.default(nil)}),
+      plugins: [{Capability, config}],
+      routes: [{"defaults.replace", Overwrite}]
+    })
   end
 end

@@ -8,35 +8,49 @@ defmodule Jido.AI.Signal.LLMResponse do
 
   alias Jido.AI.Turn
 
-  use Jido.AI.Signal.Definition,
+  use Jido.Signal,
     type: "ai.llm.response",
     default_source: "/ai/llm",
-    schema: [
-      call_id: [type: :string, required: true, doc: "Correlation ID for the LLM call"],
-      result: [
-        type: :any,
-        required: true,
-        doc:
-          "Canonical: {:ok, result, effects} | {:error, reason, effects} (legacy 2-tuples are normalized at boundaries)"
-      ],
-      usage: [type: :map, doc: "Token usage: %{input_tokens: N, output_tokens: M}"],
-      model: [type: :string, doc: "Actual model used for the request"],
-      duration_ms: [type: :integer, doc: "Request duration in milliseconds"],
-      thinking_content: [type: :string, doc: "Extended thinking content (for reasoning models)"],
-      metadata: [type: :map, default: %{}, doc: "Optional request/run/origin metadata for correlation"]
-    ]
+    schema:
+      Zoi.object(
+        %{
+          call_id: Zoi.string(),
+          result: Zoi.any(),
+          usage: Zoi.any() |> Zoi.refine({Jido.AI.Signal.Definition, :map_value, []}) |> Zoi.optional(),
+          model: Zoi.string() |> Zoi.optional(),
+          duration_ms: Zoi.integer() |> Zoi.optional(),
+          thinking_content: Zoi.string() |> Zoi.optional(),
+          metadata:
+            Zoi.any()
+            |> Zoi.refine({Jido.AI.Signal.Definition, :map_value, []})
+            |> Zoi.default(%{})
+        },
+        unrecognized_keys: :error
+      )
+
+  defoverridable validate_data: 1
+
+  def validate_data(data) do
+    Jido.AI.Signal.Definition.validate_data(data, schema())
+  end
+
+  def extension_policy, do: %{}
+  def to_json, do: Jido.AI.Signal.Definition.metadata(__MODULE__)
+  def __signal_metadata__, do: to_json()
 
   @doc """
   Extracts tool calls from an LLMResponse signal.
   """
   @spec extract_tool_calls(Jido.Signal.t()) :: [map()]
-  def extract_tool_calls(%{type: "ai.llm.response", data: %{result: {:ok, result}}}) when is_map(result) do
+  def extract_tool_calls(%{type: "ai.llm.response", data: %{result: {:ok, result}}})
+      when is_map(result) do
     result
     |> Turn.from_result_map()
     |> Map.get(:tool_calls, [])
   end
 
-  def extract_tool_calls(%{type: "ai.llm.response", data: %{result: {:ok, result, _effects}}}) when is_map(result) do
+  def extract_tool_calls(%{type: "ai.llm.response", data: %{result: {:ok, result, _effects}}})
+      when is_map(result) do
     result
     |> Turn.from_result_map()
     |> Map.get(:tool_calls, [])
@@ -48,13 +62,15 @@ defmodule Jido.AI.Signal.LLMResponse do
   Checks if an LLMResponse signal contains tool calls.
   """
   @spec tool_call?(Jido.Signal.t()) :: boolean()
-  def tool_call?(%{type: "ai.llm.response", data: %{result: {:ok, result}}}) when is_map(result) do
+  def tool_call?(%{type: "ai.llm.response", data: %{result: {:ok, result}}})
+      when is_map(result) do
     result
     |> Turn.from_result_map()
     |> Turn.needs_tools?()
   end
 
-  def tool_call?(%{type: "ai.llm.response", data: %{result: {:ok, result, _effects}}}) when is_map(result) do
+  def tool_call?(%{type: "ai.llm.response", data: %{result: {:ok, result, _effects}}})
+      when is_map(result) do
     result
     |> Turn.from_result_map()
     |> Turn.needs_tools?()
@@ -82,12 +98,17 @@ defmodule Jido.AI.Signal.LLMResponse do
 
     signal_data = if turn.usage, do: Map.put(signal_data, :usage, turn.usage), else: signal_data
     signal_data = if turn.model, do: Map.put(signal_data, :model, turn.model), else: signal_data
-    signal_data = if duration_ms, do: Map.put(signal_data, :duration_ms, duration_ms), else: signal_data
 
     signal_data =
-      if turn.thinking_content, do: Map.put(signal_data, :thinking_content, turn.thinking_content), else: signal_data
+      if duration_ms, do: Map.put(signal_data, :duration_ms, duration_ms), else: signal_data
 
-    signal_data = if metadata == %{}, do: signal_data, else: Map.put(signal_data, :metadata, metadata)
+    signal_data =
+      if turn.thinking_content,
+        do: Map.put(signal_data, :thinking_content, turn.thinking_content),
+        else: signal_data
+
+    signal_data =
+      if metadata == %{}, do: signal_data, else: Map.put(signal_data, :metadata, metadata)
 
     new(signal_data)
   end

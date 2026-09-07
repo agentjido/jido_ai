@@ -4,6 +4,11 @@ defmodule Jido.AI.Actions.Retrieval.RecallMemoryTest do
   alias Jido.AI.Actions.Retrieval.RecallMemory
   alias Jido.AI.Retrieval.Store
 
+  setup do
+    start_supervised!({Store, []})
+    :ok
+  end
+
   @moduletag :unit
   @moduletag :capture_log
 
@@ -19,9 +24,17 @@ defmodule Jido.AI.Actions.Retrieval.RecallMemoryTest do
     test "recalls top_k memories and returns count" do
       namespace = unique_namespace("recall")
 
-      Store.upsert(namespace, %{id: "m1", text: "Seattle weather has light rain this week", metadata: %{kind: :wx}})
+      Store.upsert(namespace, %{
+        id: "m1",
+        text: "Seattle weather has light rain this week",
+        metadata: %{kind: :wx}
+      })
 
-      Store.upsert(namespace, %{id: "m2", text: "Postgres migration runbook for release train", metadata: %{kind: :ops}})
+      Store.upsert(namespace, %{
+        id: "m2",
+        text: "Postgres migration runbook for release train",
+        metadata: %{kind: :ops}
+      })
 
       assert {:ok, %{retrieval: retrieval}} =
                RecallMemory.run(%{namespace: namespace, query: "seattle rain", top_k: 1}, %{})

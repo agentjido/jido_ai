@@ -3,6 +3,11 @@ defmodule Jido.AI.Quota.StoreTest do
 
   alias Jido.AI.Quota.Store
 
+  setup do
+    start_supervised!({Store, []})
+    :ok
+  end
+
   @moduletag :unit
 
   defp unique_scope(prefix) do
@@ -44,17 +49,17 @@ defmodule Jido.AI.Quota.StoreTest do
     end)
   end
 
-  test "add_usage migrates legacy map rows without crashing" do
+  test "add_usage retains imported legacy map counters without loss" do
     scope = unique_scope("quota_legacy")
     Store.ensure_table!()
     now = System.system_time(:millisecond)
 
-    :ets.insert(:jido_ai_quota_store, {scope, %{window_started_at_ms: now, requests: 2, total_tokens: 9}})
+    :ok = Store.import_rows([{scope, %{window_started_at_ms: now, requests: 2, total_tokens: 9}}])
 
     usage = Store.add_usage(scope, 3, 60_000)
     assert usage.requests == 3
     assert usage.total_tokens == 12
 
-    assert [{^scope, _started_at, 3, 12}] = :ets.lookup(:jido_ai_quota_store, scope)
+    assert %{requests: 3, total_tokens: 12} = Store.get(scope)
   end
 end

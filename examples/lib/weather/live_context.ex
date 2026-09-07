@@ -17,6 +17,31 @@ defmodule Jido.AI.Examples.Weather.LiveContext do
     "Portland"
   ]
 
+  @behaviour Jido.AI.Reasoning.ReAct.RequestTransformer
+
+  @impl true
+  def transform_request(request, _state, _config, context) do
+    # The transformed messages stay in the request history. Reuse their weather
+    # context on later model calls instead of repeating the HTTP request.
+    marker = "LIVE_WEATHER_REQUEST: #{context.request_id}"
+
+    if Enum.any?(request.messages, &weather_context?(&1, marker)) do
+      {:ok, %{}}
+    else
+      with {:ok, enriched} <- enrich_prompt(context.query) do
+        {:ok, %{messages: request.messages ++ [%{role: :user, content: enriched <> "\n" <> marker}]}}
+      end
+    end
+  end
+
+  defp weather_context?(%{content: content}, marker) when is_binary(content),
+    do: String.contains?(content, marker)
+
+  defp weather_context?(%{content: content}, marker) when is_list(content),
+    do: Enum.any?(content, fn part -> weather_context?(%{content: Map.get(part, :text)}, marker) end)
+
+  defp weather_context?(_, _), do: false
+
   @spec enrich_prompt(String.t()) :: {:ok, String.t()} | {:error, String.t()}
   def enrich_prompt(prompt) when is_binary(prompt) do
     location = infer_location(prompt)

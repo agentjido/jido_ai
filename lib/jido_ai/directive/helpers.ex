@@ -47,14 +47,9 @@ defmodule Jido.AI.Directive.Helpers do
             raise """
             Task supervisor not found in agent state.
 
-            In Jido 2.0, each agent instance requires its own task supervisor.
-            Ensure your agent is started with Jido.AI which will automatically
-            create and store a per-instance supervisor in the agent state.
-
-            Example:
-                use Jido.AI.Agent,
-                  name: "my_agent",
-                  tools: [MyApp.Tool1, MyApp.Tool2]
+            Supply :task_supervisor in the compatibility execution context.
+            Native v3 AI requests use Session work ownership and do not store
+            a task supervisor in Agent state.
             """
 
           supervisor when is_pid(supervisor) ->

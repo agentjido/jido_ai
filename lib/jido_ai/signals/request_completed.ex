@@ -3,12 +3,26 @@ defmodule Jido.AI.Signal.RequestCompleted do
   Signal for request lifecycle completion.
   """
 
-  use Jido.AI.Signal.Definition,
+  use Jido.Signal,
     type: "ai.request.completed",
     default_source: "/ai/request",
-    schema: [
-      request_id: [type: :string, required: true, doc: "Request correlation ID"],
-      result: [type: :any, required: true, doc: "Final result payload"],
-      run_id: [type: :string, doc: "Request-scoped run ID"]
-    ]
+    schema:
+      Zoi.object(
+        %{
+          request_id: Zoi.string(),
+          result: Zoi.any(),
+          run_id: Zoi.string() |> Zoi.optional()
+        },
+        unrecognized_keys: :error
+      )
+
+  defoverridable validate_data: 1
+
+  def validate_data(data) do
+    Jido.AI.Signal.Definition.validate_data(data, schema())
+  end
+
+  def extension_policy, do: %{}
+  def to_json, do: Jido.AI.Signal.Definition.metadata(__MODULE__)
+  def __signal_metadata__, do: to_json()
 end

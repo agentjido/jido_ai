@@ -380,17 +380,16 @@ defmodule Jido.AI.Actions.Skill.LoadResourceTest do
       context = Map.put(integration.tool_context, :agent_id, "tool-provider-agent")
       assert {:ok, _loaded} = LoadSkill.run(%{name: "about-jaicool"}, context)
 
-      assert {:ok, payload} =
-               Jido.Action.Tool.execute_action(
+      assert {:ok, result} =
+               Jido.Exec.run(
                  LoadResource,
                  %{"name" => "about-jaicool", "resource_id" => resource_id},
                  context
                )
 
-      assert {:ok, result} = Jason.decode(payload)
-      assert result["skill"] == "about-jaicool"
-      assert result["resource_id"] == resource_id
-      assert result["content"] == "About JAICool"
+      assert result[:skill] == "about-jaicool"
+      assert result[:resource_id] == resource_id
+      assert result[:content] == "About JAICool"
       assert_receive {:provider_resource_id, ^resource_id}
     end
 
@@ -401,29 +400,27 @@ defmodule Jido.AI.Actions.Skill.LoadResourceTest do
       File.write!(Path.join(tmp_dir, "legacy.txt"), "Legacy text")
       context = %{agent_id: "tool-filesystem-agent"}
 
-      assert {:ok, relative_payload} =
-               Jido.Action.Tool.execute_action(
+      assert {:ok, relative_result} =
+               Jido.Exec.run(
                  LoadResource,
                  %{"name" => "tool-filesystem", "relative_path" => "references/guide.md"},
                  context
                )
 
-      assert {:ok, relative_result} = Jason.decode(relative_payload)
-      assert relative_result["skill"] == "tool-filesystem"
-      assert relative_result["path"] == "references/guide.md"
-      assert relative_result["content"] == "Guide text"
+      assert relative_result[:skill] == "tool-filesystem"
+      assert relative_result[:path] == "references/guide.md"
+      assert relative_result[:content] == "Guide text"
 
-      assert {:ok, path_payload} =
-               Jido.Action.Tool.execute_action(
+      assert {:ok, path_result} =
+               Jido.Exec.run(
                  LoadResource,
                  %{"name" => "tool-filesystem", "path" => "legacy.txt"},
                  context
                )
 
-      assert {:ok, path_result} = Jason.decode(path_payload)
-      assert path_result["skill"] == "tool-filesystem"
-      assert path_result["path"] == "legacy.txt"
-      assert path_result["content"] == "Legacy text"
+      assert path_result[:skill] == "tool-filesystem"
+      assert path_result[:path] == "legacy.txt"
+      assert path_result[:content] == "Legacy text"
     end
 
     test "surfaces provider listing failures through load_skill" do

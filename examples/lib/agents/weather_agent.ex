@@ -54,7 +54,7 @@ defmodule Jido.AI.Examples.WeatherAgent do
     tool_retry_backoff_ms: 200,
     observability: %{
       emit_telemetry?: true,
-      emit_lifecycle_signals?: true,
+      emit_signals?: true,
       redact_tool_args?: true,
       emit_llm_deltas?: true
     },

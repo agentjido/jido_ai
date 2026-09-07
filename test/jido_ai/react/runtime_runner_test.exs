@@ -1,5 +1,5 @@
 defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
-  use ExUnit.Case, async: false
+  use Jido.AI.Test.ReasoningCase, async: false
   use Mimic
 
   alias Jido.Agent.Strategy.State, as: StratState
@@ -131,14 +131,12 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       description: "completes after fast tool",
       schema: Zoi.object(%{})
 
-    def run(_params, _context) do
+    def run(_params, context) do
       Process.sleep(40)
 
       {:ok, %{marker: :slow},
        [
-         %Jido.Agent.StateOp.SetState{
-           attrs: %{react_order_marker: :slow}
-         }
+         Jido.AI.Effects.state(Map.merge(context[:agent_state] || context[:state] || %{}, %{react_order_marker: :slow}))
        ]}
     end
   end
@@ -161,12 +159,10 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       description: "completes before slow tool",
       schema: Zoi.object(%{})
 
-    def run(_params, _context) do
+    def run(_params, context) do
       {:ok, %{marker: :fast},
        [
-         %Jido.Agent.StateOp.SetState{
-           attrs: %{react_order_marker: :fast}
-         }
+         Jido.AI.Effects.state(Map.merge(context[:agent_state] || context[:state] || %{}, %{react_order_marker: :fast}))
        ]}
     end
   end
@@ -191,9 +187,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
          has_state: is_map(context[:state])
        },
        [
-         %Jido.Agent.StateOp.SetState{
-           attrs: %{sums: seen ++ [step]}
-         }
+         Jido.AI.Effects.state(Map.merge(context[:agent_state] || context[:state] || %{}, %{sums: seen ++ [step]}))
        ]}
     end
   end
@@ -204,14 +198,12 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       description: "returns codes and stores them in the runtime state snapshot",
       schema: Zoi.object(%{})
 
-    def run(_params, _context) do
+    def run(_params, context) do
       seen_codes = ["8409.91.01", "8409.99.99"]
 
       {:ok, %{seen_codes: seen_codes},
        [
-         %Jido.Agent.StateOp.SetState{
-           attrs: %{seen_codes: seen_codes}
-         }
+         Jido.AI.Effects.state(Map.merge(context[:agent_state] || context[:state] || %{}, %{seen_codes: seen_codes}))
        ]}
     end
   end
@@ -248,7 +240,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     end
   end
 
-  defmodule RepairCredentialTransformer do
+  defmodule LegacyRepairCredentialTransformer do
     def transform_request(
           %{messages: messages, llm_opts: llm_opts, tools: tools, model: _model} = request,
           _state,
@@ -264,10 +256,30 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     end
   end
 
+  defmodule RepairCredentialTransformer do
+    def transform_request(
+          %{messages: messages, llm_opts: llm_opts, tools: tools, model: _model} = request,
+          _state,
+          _config,
+          runtime_context
+        )
+        when is_list(messages) and is_list(llm_opts) and is_map(tools) do
+      if test_pid = runtime_context[:test_pid] do
+        send(test_pid, {:repair_transformer_request, request})
+      end
+
+      {:ok,
+       %{
+         llm_opts: [
+           api_key: "native-repair-key"
+         ]
+       }}
+    end
+  end
+
   defmodule RepairFailureTransformer do
-    def transform_request(request, _state, _config, runtime_context) do
-      call = Process.get({__MODULE__, :calls}, 0) + 1
-      Process.put({__MODULE__, :calls}, call)
+    def transform_request(request, state, _config, runtime_context) do
+      call = if state.status == :completed, do: 2, else: 1
       send(runtime_context.test_pid, {:repair_failure_transformer_request, call, request})
 
       case call do
@@ -278,14 +290,12 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   end
 
   defmodule RepairMessageTransformer do
-    def transform_request(request, _state, config, runtime_context) do
-      case Process.get({__MODULE__, :calls}, 0) + 1 do
-        1 ->
-          Process.put({__MODULE__, :calls}, 1)
+    def transform_request(request, state, config, runtime_context) do
+      case state.status do
+        :running ->
           {:ok, %{}}
 
-        call ->
-          Process.put({__MODULE__, :calls}, call)
+        :completed ->
           send(runtime_context.test_pid, {:repair_message_transformer_request, request})
 
           {:ok,
@@ -302,14 +312,12 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   end
 
   defmodule InvalidRepairMessageTransformer do
-    def transform_request(_request, _state, _config, _runtime_context) do
-      case Process.get({__MODULE__, :calls}, 0) + 1 do
-        1 ->
-          Process.put({__MODULE__, :calls}, 1)
+    def transform_request(_request, state, _config, _runtime_context) do
+      case state.status do
+        :running ->
           {:ok, %{}}
 
-        call ->
-          Process.put({__MODULE__, :calls}, call)
+        :completed ->
           {:ok, %{messages: :invalid}}
       end
     end
@@ -363,281 +371,139 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     :ok
   end
 
-  test "streams multimodal user content to ReqLLM" do
-    parent = self()
-
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, messages, _opts ->
-      send(parent, {:messages, messages})
-
-      {:ok,
-       responses_stream_response(
-         [ReqLLM.StreamChunk.text("I can see it")],
-         %{finish_reason: :stop},
-         model
-       )}
-    end)
-
+  test "streams multimodal user content to ReqLLM", %{jido: jido} do
+    mock = mock([%{reply: {:stream, [%{content: "I can see it"}]}}])
     image = ContentPart.image_url("data:image/png;base64,AQID")
     query = [ContentPart.text("Describe this"), image]
-    config = Config.new(%{model: :capable, tools: %{}})
+    events = ReAct.stream(query, mock_config(mock), runtime_opts(jido)) |> Enum.to_list()
+    assert hd(events).data.query == query
+    assert [%{body: %{"messages" => [message]}}] = MockLLM.report(mock).requests
 
-    events = ReAct.stream(query, config, request_id: "req_multimodal", run_id: "run_multimodal") |> Enum.to_list()
+    assert message == %{
+             "role" => "user",
+             "content" => [
+               %{"type" => "text", "text" => "Describe this"},
+               %{"type" => "image_url", "image_url" => %{"url" => "data:image/png;base64,AQID"}}
+             ]
+           }
 
-    assert_receive {:messages, messages}
-    assert Enum.any?(events, &(&1.kind == :request_started and &1.data.query =~ "[Image]"))
-    assert [%{role: :user, content: [text, ^image]}] = messages
-    assert text.text == "Describe this"
+    assert ReAct.collect_stream(events).result == "I can see it"
+    assert_script_done(mock)
   end
 
-  test "emits ordered event envelopes for a final-answer run" do
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
-      {:ok,
-       responses_stream_response(
-         [ReqLLM.StreamChunk.text("Hello world")],
-         %{finish_reason: :stop, usage: %{input_tokens: 3, output_tokens: 2}},
-         model
-       )}
-    end)
-
-    config = Config.new(%{model: :capable, tools: %{}})
+  test "emits ordered event envelopes for a final-answer run", %{jido: jido} do
+    usage = %{prompt_tokens: 3, completion_tokens: 2, total_tokens: 5}
+    mock = mock([%{reply: {:stream, [%{content: "Hello world"}], "stop", usage}}])
 
     events =
-      ReAct.stream("Say hello", config, request_id: "req_evt", run_id: "run_evt")
+      ReAct.stream("Say hello", mock_config(mock), runtime_opts(jido, request_id: "req_evt", run_id: "run_evt"))
       |> Enum.to_list()
 
     assert length(events) >= 6
     assert Enum.all?(events, &match?(%Jido.AI.Runtime.Event{}, &1))
+    assert Enum.all?(events, &(&1.request_id == "req_evt" and &1.run_id == "run_evt"))
+    assert Enum.map(events, & &1.seq) == Enum.to_list(1..length(events))
+    assert hd(events).kind == :request_started
+    assert is_binary(hd(events).id) and is_integer(hd(events).at_ms)
 
-    seqs = Enum.map(events, & &1.seq)
-    assert seqs == Enum.sort(seqs)
-    assert seqs == Enum.uniq(seqs)
+    for kind <- [:llm_started, :llm_delta, :llm_completed, :request_completed] do
+      assert Enum.any?(events, &(&1.kind == kind))
+    end
 
-    first = hd(events)
-    assert first.kind == :request_started
-    assert Map.has_key?(first, :id)
-    assert Map.has_key?(first, :at_ms)
-    assert first.request_id == "req_evt"
-    assert first.run_id == "run_evt"
+    assert List.last(events).kind == :checkpoint
+    assert List.last(events).data.reason == :terminal
 
-    assert Enum.any?(events, &(&1.kind == :llm_started))
-    assert Enum.any?(events, &(&1.kind == :llm_delta))
-    assert Enum.any?(events, &(&1.kind == :llm_completed))
-    assert Enum.any?(events, &(&1.kind == :request_completed))
-    assert Enum.any?(events, &(&1.kind == :checkpoint and &1.data.reason == :terminal))
+    for kind <- [:llm_completed, :request_completed] do
+      assert Jido.AI.Usage.token_counts(Enum.find(events, &(&1.kind == kind)).data.usage) ==
+               %{input_tokens: 3, output_tokens: 2, total_tokens: 5}
+    end
 
-    llm_completed = Enum.find(events, &(&1.kind == :llm_completed))
-    assert Map.take(llm_completed.data.usage, [:input_tokens, :output_tokens]) == %{input_tokens: 3, output_tokens: 2}
-
-    request_completed = Enum.find(events, &(&1.kind == :request_completed))
-
-    assert Map.take(request_completed.data.usage, [:input_tokens, :output_tokens]) == %{
-             input_tokens: 3,
-             output_tokens: 2
-           }
+    assert_script_done(mock)
   end
 
-  test "retains generated images in stream deltas and the final result" do
+  test "retains generated images in stream deltas and the final result", %{jido: jido} do
     image = ContentPart.image(<<1, 2, 3>>, "image/png")
-    chunk = content_part_chunk(image)
+    delta = %{images: [%{type: "image_url", image_url: %{url: "data:image/png;base64,AQID"}}]}
+    mock = mock([%{reply: {:stream, [delta]}}])
+    events = ReAct.stream("Draw an image", mock_config(mock), runtime_opts(jido)) |> Enum.to_list()
 
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
-      {:ok, responses_stream_response([chunk], %{finish_reason: :stop}, model)}
-    end)
+    assert %{chunk_type: :content_part, delta: ^image, model: "openai:gpt-4o-mini"} =
+             Enum.find(events, &(&1.kind == :llm_delta)).data
 
-    Mimic.stub(ReqLLM.StreamResponse, :process_stream, fn stream_response, opts ->
-      Enum.each(stream_response.stream, opts[:on_chunk])
-
-      {:ok,
-       %{
-         message: %{content: [image], metadata: %{}},
-         finish_reason: :stop,
-         usage: %{},
-         model: stream_response.model
-       }}
-    end)
-
-    config = Config.new(%{model: :capable, tools: %{}})
-    events = ReAct.stream("Draw an image", config) |> Enum.to_list()
-
-    delta = Enum.find(events, &(&1.kind == :llm_delta))
-    assert delta.data.chunk_type == :content_part
-    assert delta.data.delta == image
-
-    llm_completed = Enum.find(events, &(&1.kind == :llm_completed))
-    assert llm_completed.data.content_parts == [image]
-
-    request_completed = Enum.find(events, &(&1.kind == :request_completed))
-    assert request_completed.data.result == [image]
+    assert Enum.find(events, &(&1.kind == :llm_completed)).data.content_parts == [image]
+    assert Enum.find(events, &(&1.kind == :request_completed)).data.result == [image]
     assert ReAct.collect_stream(events).result == [image]
+    assert_script_done(mock)
   end
 
-  test "replays generated images and thinking as flat content on the next tool round" do
-    parent = self()
-    image = ContentPart.image_url("https://example.com/generated.png")
+  test "replays generated images and thinking as flat content on the next tool round", %{jido: jido} do
+    image = %{type: "image_url", image_url: %{url: "data:image/png;base64,AQID"}}
 
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, messages, _opts ->
-      count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
-      :persistent_term.put({__MODULE__, :llm_call_count}, count)
+    deltas = [
+      %{reasoning_content: "Synthetic image thought"},
+      %{images: [image]},
+      %{
+        tool_calls: [
+          %{
+            index: 0,
+            id: "tc_image",
+            type: "function",
+            function: %{name: "calculator", arguments: Jason.encode!(%{a: 2, b: 3})}
+          }
+        ]
+      }
+    ]
 
-      case count do
-        1 ->
-          {:ok,
-           responses_stream_response(
-             [ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 2, "b" => 3}, %{id: "tc_image"})],
-             %{finish_reason: :tool_calls},
-             model
-           )}
-
-        2 ->
-          send(parent, {:second_round_messages, messages})
-
-          {:ok,
-           responses_stream_response(
-             [ReqLLM.StreamChunk.text("Done")],
-             %{finish_reason: :stop},
-             model
-           )}
-      end
-    end)
-
-    Mimic.stub(ReqLLM.StreamResponse, :process_stream, fn stream_response, opts ->
-      {:ok, response} = process_stream_response(stream_response, opts)
-
-      if :persistent_term.get({__MODULE__, :llm_call_count}, 0) == 1 do
-        {:ok,
-         put_in(response, [:message, :content], [
-           %{type: :thinking, thinking: "I made an image before using the tool."},
-           image
-         ])}
-      else
-        {:ok, response}
-      end
-    end)
-
-    config =
-      Config.new(%{
-        model: :capable,
-        tools: %{CalculatorTool.name() => CalculatorTool},
-        tool_max_retries: 0
-      })
-
-    events = ReAct.stream("Make an image, then calculate", config) |> Enum.to_list()
-
-    assert_receive {:second_round_messages, messages}
-
-    assistant_message =
-      Enum.find(messages, fn
-        %{role: :assistant, tool_calls: [_ | _]} -> true
-        _message -> false
-      end)
-
-    assert assistant_message.content == [
-             %{type: :thinking, thinking: "I made an image before using the tool."},
-             image
-           ]
-
-    assert Enum.find(events, &(&1.kind == :request_completed)).data.result == "Done"
-  end
-
-  test "after_tool_call callback transforms the canonical tool result" do
-    parent = self()
-    :persistent_term.erase({__MODULE__, :llm_call_count})
-
-    Mimic.stub(ReqLLM.StreamResponse, :process_stream, &process_stream_response/2)
-
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, messages, _opts ->
-      count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
-      :persistent_term.put({__MODULE__, :llm_call_count}, count)
-
-      case count do
-        1 ->
-          {:ok,
-           responses_stream_response(
-             [ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 2, "b" => 3}, %{id: "tc_projected"})],
-             %{finish_reason: :tool_calls},
-             model
-           )}
-
-        2 ->
-          send(parent, {:projected_messages, messages})
-
-          {:ok,
-           responses_stream_response(
-             [ReqLLM.StreamChunk.text("Done")],
-             %{finish_reason: :stop},
-             model
-           )}
-      end
-    end)
-
-    config =
-      Config.new(%{
-        model: :capable,
-        tools: %{CalculatorTool.name() => CalculatorTool},
-        tool_max_retries: 0
-      })
+    mock = mock([%{reply: {:stream, deltas, "tool_calls"}}, %{reply: {:text, "Done"}}])
 
     events =
-      ReAct.stream("Calculate 2 + 3", config, context: %{test_pid: self(), agent_module: InterceptorAgent})
+      ReAct.stream("Make an image, then calculate", mock_config(mock, tools: [CalculatorTool]), runtime_opts(jido))
+      |> Enum.to_list()
+
+    [_, second] = MockLLM.report(mock).requests
+    assistant = Enum.find(second.body["messages"], &(&1["role"] == "assistant"))
+    assert assistant["reasoning_content"] == "Synthetic image thought"
+    assert [%{"type" => "image_url", "image_url" => %{"url" => "data:image/png;base64,AQID"}}] = assistant["content"]
+    assert [%{"id" => "tc_image"}] = assistant["tool_calls"]
+    assert tool_wire_result(second) == %{"ok" => true, "result" => %{"result" => 5}}
+    assert ReAct.collect_stream(events).result == "Done"
+    assert_script_done(mock)
+  end
+
+  test "after_tool_call callback transforms the canonical tool result", %{jido: jido} do
+    mock = mock(calculator_round("tc_projected"))
+
+    events =
+      ReAct.stream(
+        "Calculate 2 + 3",
+        mock_config(mock, tools: [CalculatorTool]),
+        runtime_opts(jido, context: %{agent_module: InterceptorAgent})
+      )
       |> Enum.to_list()
 
     assert_receive {:after_tool_call, {:ok, %{result: 5}, []},
-                    %{id: "tc_projected", name: "calculator", action_module: CalculatorTool}}
+                    %{id: "tc_projected", name: "calculator", action_module: CalculatorTool}},
+                   1_000
 
-    assert_receive {:projected_messages, messages}
+    [_, second] = MockLLM.report(mock).requests
+    assert tool_wire_result(second) == %{"ok" => true, "result" => %{"result" => "projected calculator result"}}
 
-    assert Enum.any?(messages, fn
-             %{role: :tool, content: content} when is_binary(content) ->
-               content =~ "projected calculator result"
+    assert {:ok, %{result: "projected calculator result"}, []} =
+             Enum.find(events, &(&1.kind == :tool_completed)).data.result
 
-             _ ->
-               false
-           end)
-
-    tool_completed = Enum.find(events, &(&1.kind == :tool_completed))
-    assert {:ok, %{result: "projected calculator result"}, []} = tool_completed.data.result
+    assert ReAct.collect_stream(events).result == "Done"
+    assert_script_done(mock)
   end
 
-  test "optional before_tool_call callback can rewrite tool arguments" do
-    parent = self()
-    :persistent_term.erase({__MODULE__, :before_tool_call_llm_count})
-
-    Mimic.stub(ReqLLM.StreamResponse, :process_stream, &process_stream_response/2)
-
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, messages, _opts ->
-      count = :persistent_term.get({__MODULE__, :before_tool_call_llm_count}, 0) + 1
-      :persistent_term.put({__MODULE__, :before_tool_call_llm_count}, count)
-
-      case count do
-        1 ->
-          {:ok,
-           responses_stream_response(
-             [ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 2, "b" => 3}, %{id: "tc_rewrite"})],
-             %{finish_reason: :tool_calls},
-             model
-           )}
-
-        2 ->
-          send(parent, {:rewritten_messages, messages})
-
-          {:ok,
-           responses_stream_response(
-             [ReqLLM.StreamChunk.text("Done")],
-             %{finish_reason: :stop},
-             model
-           )}
-      end
-    end)
-
-    config =
-      Config.new(%{
-        model: :capable,
-        tools: %{CalculatorTool.name() => CalculatorTool},
-        tool_max_retries: 0
-      })
+  test "optional before_tool_call callback can rewrite tool arguments", %{jido: jido} do
+    mock = mock(calculator_round("tc_rewrite"))
 
     events =
-      ReAct.stream("Calculate 2 + 3", config, context: %{test_pid: self(), agent_module: BeforeOnlyAgent})
+      ReAct.stream(
+        "Calculate 2 + 3",
+        mock_config(mock, tools: [CalculatorTool]),
+        runtime_opts(jido, context: %{agent_module: BeforeOnlyAgent})
+      )
       |> Enum.to_list()
 
     assert_receive {:before_tool_call,
@@ -646,81 +512,38 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
                       name: "calculator",
                       arguments: %{"a" => 2, "b" => 3},
                       action_module: CalculatorTool
-                    }}
+                    }},
+                   1_000
 
-    assert_receive {:rewritten_messages, messages}
-
-    assert Enum.any?(messages, fn
-             %{role: :tool, content: content} when is_binary(content) -> content =~ "10"
-             _ -> false
-           end)
-
-    tool_started = Enum.find(events, &(&1.kind == :tool_started))
-    assert tool_started.data.arguments == %{"a" => 2, "b" => 8}
-
-    tool_completed = Enum.find(events, &(&1.kind == :tool_completed))
-    assert {:ok, %{result: 10}, []} = tool_completed.data.result
+    [_, second] = MockLLM.report(mock).requests
+    assert tool_wire_result(second) == %{"ok" => true, "result" => %{"result" => 10}}
+    assert Enum.find(events, &(&1.kind == :tool_started)).data.arguments == %{"a" => 2, "b" => 8}
+    assert {:ok, %{result: 10}, []} = Enum.find(events, &(&1.kind == :tool_completed)).data.result
+    assert_script_done(mock)
   end
 
-  test "tool guardrail validates arguments after before_tool_call rewrites them" do
+  test "tool guardrail validates arguments after before_tool_call rewrites them", %{jido: jido} do
     parent = self()
-    :persistent_term.erase({__MODULE__, :guardrail_after_interceptor_llm_count})
 
-    Mimic.stub(ReqLLM.StreamResponse, :process_stream, &process_stream_response/2)
-
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
-      count = :persistent_term.get({__MODULE__, :guardrail_after_interceptor_llm_count}, 0) + 1
-      :persistent_term.put({__MODULE__, :guardrail_after_interceptor_llm_count}, count)
-
-      case count do
-        1 ->
-          {:ok,
-           responses_stream_response(
-             [ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 2, "b" => 3}, %{id: "tc_guardrail_rewrite"})],
-             %{finish_reason: :tool_calls},
-             model
-           )}
-
-        2 ->
-          {:ok,
-           responses_stream_response(
-             [ReqLLM.StreamChunk.text("Done")],
-             %{finish_reason: :stop},
-             model
-           )}
-      end
-    end)
-
-    guardrail = fn %{arguments: arguments} ->
-      send(parent, {:guardrail_arguments, arguments})
-
-      if arguments["b"] == 8 do
-        :ok
-      else
-        {:error, :arguments_not_intercepted}
-      end
+    guardrail = fn %{arguments: arguments, validated_arguments: validated} ->
+      send(parent, {:guardrail_arguments, arguments, validated})
+      if arguments["b"] == 8, do: :ok, else: {:error, :arguments_not_intercepted}
     end
 
-    config =
-      Config.new(%{
-        model: :capable,
-        tools: %{CalculatorTool.name() => CalculatorTool},
-        tool_max_retries: 0
-      })
+    mock = mock(calculator_round("tc_guardrail_rewrite"))
 
     events =
-      ReAct.stream("Calculate 2 + 3", config,
-        context: %{
-          test_pid: self(),
-          agent_module: BeforeOnlyAgent,
-          __tool_guardrail_callback__: guardrail
-        }
+      ReAct.stream(
+        "Calculate 2 + 3",
+        mock_config(mock, tools: [CalculatorTool]),
+        runtime_opts(jido, context: %{agent_module: BeforeOnlyAgent, __tool_guardrail_callback__: guardrail})
       )
       |> Enum.to_list()
 
-    assert_receive {:guardrail_arguments, %{"a" => 2, "b" => 8}}
-    assert Enum.any?(events, &(&1.kind == :request_completed))
+    assert_receive {:guardrail_arguments, %{"a" => 2, "b" => 8}, %{a: 2, b: 8}}, 1_000
+    assert ReAct.collect_stream(events).result == "Done"
     refute Enum.any?(events, &(&1.kind == :request_failed))
+    assert_script_done(mock)
   end
 
   test "tool interceptor skips unknown tools and preserves existing unknown-tool result" do
@@ -818,82 +641,42 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert collected.usage == %{input_tokens: 3, output_tokens: 1}
   end
 
-  test "validates structured output before request completion" do
-    schema = ticket_schema()
-
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, messages, _opts ->
-      assert [%{role: :system, content: prompt} | _] = messages
-      assert prompt =~ "Structured output:"
-      assert prompt =~ "category"
-
-      {:ok,
-       responses_stream_response(
-         [ReqLLM.StreamChunk.text(~s({"category":"billing","confidence":0.93,"summary":"Invoice issue"}))],
-         %{finish_reason: :stop, usage: %{input_tokens: 3, output_tokens: 8}},
-         model
-       )}
-    end)
-
-    config = Config.new(%{model: :capable, tools: %{}, output: [schema: schema]})
+  test "validates structured output before request completion", %{jido: jido} do
+    mock = mock([%{reply: {:text, Jason.encode!(ticket())}}])
 
     events =
-      ReAct.stream("Classify this ticket", config, request_id: "req_output", run_id: "run_output")
+      ReAct.stream(
+        "Classify this ticket",
+        mock_config(mock, output: [schema: ticket_schema()]),
+        runtime_opts(jido, request_id: "req_output", run_id: "run_output")
+      )
       |> Enum.to_list()
 
-    completed = Enum.find(events, &(&1.kind == :request_completed))
+    assert ReAct.collect_stream(events).result == %{category: :billing, confidence: 0.88, summary: "Billing issue"}
+    [wire] = MockLLM.report(mock).requests
 
-    assert completed.data.result == %{
-             category: :billing,
-             confidence: 0.93,
-             summary: "Invoice issue"
-           }
+    assert Enum.any?(wire.body["messages"], fn msg ->
+             msg["role"] == "system" and msg["content"] =~ "Structured output:" and msg["content"] =~ "category"
+           end)
 
     assert Enum.any?(events, &(&1.kind == :output_started))
     assert Enum.any?(events, &(&1.kind == :output_validated))
+    assert_script_done(mock)
   end
 
-  test "repairs invalid structured output with tools removed from repair call" do
-    schema = ticket_schema()
-
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
-      {:ok,
-       responses_stream_response(
-         [ReqLLM.StreamChunk.text("This is a billing issue with high confidence.")],
-         %{finish_reason: :stop, usage: %{input_tokens: 3, output_tokens: 8}},
-         model
-       )}
-    end)
-
-    Mimic.expect(ReqLLM.Generation, :generate_object, fn _model, messages, ^schema, opts ->
-      assert Keyword.get(opts, :tools) == nil
-      assert Keyword.get(opts, :tool_choice) == nil
-      assert Enum.any?(messages, &String.contains?(to_string(&1.content), "billing issue"))
-
-      {:ok,
-       %ReqLLM.Response{
-         id: "repair-output",
-         model: "test",
-         context: nil,
-         object: %{"category" => "billing", "confidence" => 0.88, "summary" => "Billing issue"}
-       }}
-    end)
-
-    config = Config.new(%{model: :capable, tools: %{CalculatorTool.name() => CalculatorTool}, output: [schema: schema]})
-
-    events =
-      ReAct.stream("Classify this ticket", config, request_id: "req_repair", run_id: "run_repair")
-      |> Enum.to_list()
-
-    completed = Enum.find(events, &(&1.kind == :request_completed))
-
-    assert completed.data.result == %{
-             category: :billing,
-             confidence: 0.88,
-             summary: "Billing issue"
-           }
-
+  test "repairs invalid structured output with tools removed from repair call", %{jido: jido} do
+    mock = mock([%{reply: {:text, "This is a billing issue with high confidence."}}, %{reply: {:object, ticket()}}])
+    config = mock_config(mock, tools: [CalculatorTool], output: [schema: ticket_schema()])
+    events = ReAct.stream("Classify this ticket", config, runtime_opts(jido)) |> Enum.to_list()
+    assert ReAct.collect_stream(events).result == %{category: :billing, confidence: 0.88, summary: "Billing issue"}
+    [_, repair] = MockLLM.report(mock).requests
+    refute Map.has_key?(repair.body, "tools")
+    refute Map.has_key?(repair.body, "tool_choice")
+    assert repair.body["stream"] in [nil, false]
+    assert Enum.any?(repair.body["messages"], &(is_binary(&1["content"]) and &1["content"] =~ "billing issue"))
     assert Enum.any?(events, &(&1.kind == :output_repair))
     assert Enum.any?(events, &(&1.kind == :output_validated and &1.data.status == :validated))
+    assert_script_done(mock)
   end
 
   test "structured output repair runs llm_opts through the configured request_transformer" do
@@ -926,7 +709,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
         model: :capable,
         tools: %{},
         output: [schema: schema],
-        request_transformer: RepairCredentialTransformer
+        request_transformer: LegacyRepairCredentialTransformer
       })
 
     events =
@@ -952,249 +735,153 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     end
   end
 
-  test "structured output does not transform a repair request when parsing succeeds" do
-    schema = ticket_schema()
+  test "configured request credentials reach both real HTTP calls", %{jido: jido} do
+    mock = mock([%{reply: {:text, "Not structured"}}, %{reply: {:object, ticket()}}])
+    config = mock_config(mock, output: [schema: ticket_schema()], request_transformer: RepairCredentialTransformer)
+    events = ReAct.stream("Classify this ticket", config, runtime_opts(jido)) |> Enum.to_list()
+    assert ReAct.collect_stream(events).result.category == :billing
+    assert_receive {:repair_transformer_request, first}
+    assert_receive {:repair_transformer_request, second}
+    refute_receive {:repair_transformer_request, _}
 
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
-      {:ok,
-       responses_stream_response(
-         [ReqLLM.StreamChunk.text(~s({"category":"billing","confidence":0.93,"summary":"Invoice issue"}))],
-         %{finish_reason: :stop, usage: %{input_tokens: 3, output_tokens: 8}},
-         model
-       )}
-    end)
+    for request <- [first, second] do
+      assert %{messages: messages, llm_opts: opts, tools: tools, model: _} = request
+      assert is_list(messages) and is_list(opts) and is_map(tools)
+    end
 
-    config =
-      Config.new(%{
-        model: :capable,
-        tools: %{},
-        output: [schema: schema],
-        request_transformer: RepairCredentialTransformer
-      })
+    for request <- MockLLM.report(mock).requests do
+      assert request.headers["authorization"] == "Bearer native-repair-key"
+    end
 
-    events =
-      ReAct.stream("Classify this ticket", config, context: %{test_pid: self()})
-      |> Enum.to_list()
-
-    assert Enum.any?(events, &(&1.kind == :request_completed))
-    assert_receive {:repair_transformer_request, _turn_request}
-    refute_receive {:repair_transformer_request, _repair_request}
+    assert_script_done(mock)
   end
 
-  test "structured output repair propagates request_transformer errors" do
-    schema = ticket_schema()
-    parent = self()
+  test "structured output does not transform a repair request when parsing succeeds", %{jido: jido} do
+    mock = mock([%{reply: {:text, Jason.encode!(ticket())}}])
+    config = mock_config(mock, output: [schema: ticket_schema()], request_transformer: RepairCredentialTransformer)
+    events = ReAct.stream("Classify this ticket", config, runtime_opts(jido)) |> Enum.to_list()
+    assert ReAct.collect_stream(events).result.category == :billing
+    assert_receive {:repair_transformer_request, _}
+    refute_receive {:repair_transformer_request, _}
+    assert length(MockLLM.report(mock).requests) == 1
+    assert_script_done(mock)
+  end
 
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
-      {:ok,
-       responses_stream_response(
-         [ReqLLM.StreamChunk.text("This is not structured output.")],
-         %{finish_reason: :stop, usage: %{input_tokens: 3, output_tokens: 8}},
-         model
-       )}
-    end)
-
-    Mimic.stub(ReqLLM.Generation, :generate_object, fn _model, _messages, ^schema, _opts ->
-      send(parent, :unexpected_repair_request)
-
-      {:ok,
-       %ReqLLM.Response{
-         id: "unexpected-repair-output",
-         model: "test",
-         context: nil,
-         object: %{"category" => "billing", "confidence" => 0.88, "summary" => "Billing issue"}
-       }}
-    end)
-
-    config =
-      Config.new(%{
-        model: :capable,
-        tools: %{},
-        output: [schema: schema],
-        request_transformer: RepairFailureTransformer
-      })
-
-    events =
-      ReAct.stream("Classify this ticket", config, context: %{test_pid: self()})
-      |> Enum.to_list()
-
-    assert_receive {:repair_failure_transformer_request, 1, _turn_request}
-    assert_receive {:repair_failure_transformer_request, 2, _repair_request}
-    refute_receive :unexpected_repair_request
-
+  test "structured output repair propagates request_transformer errors", %{jido: jido} do
+    mock = mock([%{reply: {:text, "This is not structured output."}}])
+    config = mock_config(mock, output: [schema: ticket_schema()], request_transformer: RepairFailureTransformer)
+    events = ReAct.stream("Classify this ticket", config, runtime_opts(jido)) |> Enum.to_list()
+    assert_receive {:repair_failure_transformer_request, 1, _}
+    assert_receive {:repair_failure_transformer_request, 2, _}
     failed = Enum.find(events, &(&1.kind == :request_failed))
     assert failed.data.error_type == :request_transform
     assert failed.data.error == {:request_transformer, :repair_credentials_unavailable}
     assert Enum.any?(events, &(&1.kind == :output_failed))
     refute Enum.any?(events, &(&1.kind == :request_completed))
+    assert length(MockLLM.report(mock).requests) == 1
+    assert_script_done(mock)
   end
 
-  test "structured output transforms every repair attempt" do
-    schema = ticket_schema()
-
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
-      {:ok,
-       responses_stream_response(
-         [ReqLLM.StreamChunk.text("This is not structured output.")],
-         %{finish_reason: :stop, usage: %{input_tokens: 3, output_tokens: 8}},
-         model
-       )}
-    end)
-
-    Mimic.expect(ReqLLM.Generation, :generate_object, 2, fn _model, _messages, ^schema, _opts ->
-      attempt = Process.get({__MODULE__, :repair_attempt}, 0) + 1
-      Process.put({__MODULE__, :repair_attempt}, attempt)
-
-      case attempt do
-        1 ->
-          {:error, :temporary_repair_failure}
-
-        2 ->
-          {:ok,
-           %ReqLLM.Response{
-             id: "repair-output",
-             model: "test",
-             context: nil,
-             object: %{"category" => "billing", "confidence" => 0.88, "summary" => "Billing issue"}
-           }}
-      end
-    end)
+  test "structured output transforms every repair attempt", %{jido: jido} do
+    mock =
+      mock([
+        %{reply: {:text, "This is not structured output."}},
+        %{reply: {:error, 503, "temporary repair failure"}},
+        %{reply: {:object, ticket()}}
+      ])
 
     config =
-      Config.new(%{
-        model: :capable,
-        tools: %{},
-        output: [schema: schema, retries: 2],
-        request_transformer: RepairCredentialTransformer
-      })
+      mock_config(mock, output: [schema: ticket_schema(), retries: 2], request_transformer: RepairCredentialTransformer)
 
-    events =
-      ReAct.stream("Classify this ticket", config, context: %{test_pid: self()})
-      |> Enum.to_list()
-
-    assert Enum.any?(events, &(&1.kind == :request_completed))
-    assert_receive {:repair_transformer_request, _turn_request}
-    assert_receive {:repair_transformer_request, _first_repair_request}
-    assert_receive {:repair_transformer_request, _second_repair_request}
-    refute_receive {:repair_transformer_request, _request}
+    events = ReAct.stream("Classify this ticket", config, runtime_opts(jido)) |> Enum.to_list()
+    assert ReAct.collect_stream(events).result.category == :billing
+    assert_receive {:repair_transformer_request, _}
+    assert_receive {:repair_transformer_request, _}
+    assert_receive {:repair_transformer_request, _}
+    refute_receive {:repair_transformer_request, _}
+    assert Enum.count(events, &(&1.kind == :output_repair)) == 2
+    assert length(MockLLM.report(mock).requests) == 3
+    assert_script_done(mock)
   end
 
-  test "structured output transformer receives and overrides the exact repair request" do
-    schema = ticket_schema()
-
-    transformed_messages = [
-      %{role: :system, content: "Apply the tenant repair policy."},
-      %{role: :user, content: "Return the normalized ticket object."}
-    ]
-
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
-      {:ok,
-       responses_stream_response(
-         [ReqLLM.StreamChunk.text("This is a billing issue with high confidence.")],
-         %{finish_reason: :stop, usage: %{input_tokens: 3, output_tokens: 8}},
-         model
-       )}
-    end)
-
-    Mimic.expect(ReqLLM.Generation, :generate_object, fn model, messages, ^schema, opts ->
-      assert model == "openai:gpt-4.1"
-      assert messages == transformed_messages
-      assert Keyword.get(opts, :stream) == false
-      refute Keyword.has_key?(opts, :tools)
-      refute Keyword.has_key?(opts, :tool_choice)
-
-      {:ok,
-       %ReqLLM.Response{
-         id: "repair-output",
-         model: "test",
-         context: nil,
-         object: %{"category" => "billing", "confidence" => 0.88, "summary" => "Billing issue"}
-       }}
-    end)
+  test "structured output transformer receives and overrides the exact repair request", %{jido: jido} do
+    mock = mock([%{reply: {:text, "This is a billing issue with high confidence."}}, %{reply: {:object, ticket()}}])
 
     config =
-      Config.new(%{
-        model: :capable,
-        tools: %{CalculatorTool.name() => CalculatorTool},
-        output: [schema: schema],
+      mock_config(mock,
+        tools: [CalculatorTool],
+        output: [schema: ticket_schema()],
         request_transformer: RepairMessageTransformer
-      })
+      )
 
-    events =
-      ReAct.stream("Classify this ticket", config, context: %{test_pid: self()})
-      |> Enum.to_list()
-
-    assert Enum.any?(events, &(&1.kind == :request_completed))
+    events = ReAct.stream("Classify this ticket", config, runtime_opts(jido)) |> Enum.to_list()
+    assert ReAct.collect_stream(events).result.category == :billing
     assert_receive {:repair_message_transformer_request, repair_request}
-
     assert repair_request.tools == %{}
-    assert Keyword.get(repair_request.llm_opts, :stream) == false
+    assert repair_request.llm_opts[:stream] == false
     refute Keyword.has_key?(repair_request.llm_opts, :tools)
     refute Keyword.has_key?(repair_request.llm_opts, :tool_choice)
 
     assert Enum.any?(repair_request.messages, fn message ->
-             message.role == :user and
-               message.content =~ "Classify this ticket" and
+             message.role == :user and message.content =~ "Classify this ticket" and
                message.content =~ "This is a billing issue with high confidence."
            end)
+
+    [_, wire] = MockLLM.report(mock).requests
+    assert wire.body["model"] == "gpt-4.1"
+
+    assert wire.path == "/v1/responses"
+
+    assert wire.body["input"] == [
+             %{
+               "role" => "system",
+               "content" => [%{"type" => "input_text", "text" => "Apply the tenant repair policy."}]
+             },
+             %{
+               "role" => "user",
+               "content" => [%{"type" => "input_text", "text" => "Return the normalized ticket object."}]
+             }
+           ]
+
+    assert [%{"name" => "structured_output", "type" => "function", "parameters" => parameters}] = wire.body["tools"]
+    assert Enum.sort(Map.keys(parameters["properties"])) == ["category", "confidence", "summary"]
+    assert wire.body["tool_choice"] == %{"name" => "structured_output", "type" => "function"}
+    assert wire.body["stream"] in [nil, false]
+    assert_script_done(mock)
   end
 
-  test "structured output repair rejects invalid transformed messages before the provider call" do
-    schema = ticket_schema()
-    parent = self()
-
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
-      {:ok,
-       responses_stream_response(
-         [ReqLLM.StreamChunk.text("This is not structured output.")],
-         %{finish_reason: :stop, usage: %{input_tokens: 3, output_tokens: 8}},
-         model
-       )}
-    end)
-
-    Mimic.stub(ReqLLM.Generation, :generate_object, fn _model, _messages, ^schema, _opts ->
-      send(parent, :unexpected_repair_request)
-      {:error, :unexpected_repair_request}
-    end)
-
-    config =
-      Config.new(%{
-        model: :capable,
-        tools: %{},
-        output: [schema: schema],
-        request_transformer: InvalidRepairMessageTransformer
-      })
-
-    events = ReAct.stream("Classify this ticket", config) |> Enum.to_list()
-
-    refute_receive :unexpected_repair_request
+  test "structured output repair rejects invalid transformed messages before the provider call", %{jido: jido} do
+    mock = mock([%{reply: {:text, "This is not structured output."}}])
+    config = mock_config(mock, output: [schema: ticket_schema()], request_transformer: InvalidRepairMessageTransformer)
+    events = ReAct.stream("Classify this ticket", config, runtime_opts(jido)) |> Enum.to_list()
     failed = Enum.find(events, &(&1.kind == :request_failed))
     assert failed.data.error_type == :request_transform
     assert failed.data.error == :invalid_request_messages
     assert Enum.any?(events, &(&1.kind == :output_failed))
+    assert length(MockLLM.report(mock).requests) == 1
+    assert_script_done(mock)
   end
 
-  test "passes inline model specs through to ReqLLM requests" do
-    inline_model = %{provider: :openai, id: "gpt-4o-mini", base_url: "http://localhost:4000/v1"}
+  test "passes inline model specs through to ReqLLM requests", %{jido: jido} do
+    mock = mock([%{reply: {:text, "Hello from inline model"}}])
+    options = MockLLM.options(mock)
 
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
-      assert model == inline_model
+    inline_model = %{
+      provider: :openai,
+      id: "gpt-4o-mini",
+      base_url: options[:base_url],
+      extra: %{wire: %{protocol: "openai_chat"}}
+    }
 
-      {:ok,
-       responses_stream_response(
-         [ReqLLM.StreamChunk.text("Hello from inline model")],
-         %{finish_reason: :stop, usage: %{input_tokens: 3, output_tokens: 2}},
-         model
-       )}
-    end)
+    config = mock_config(mock, model: inline_model, llm_opts: Keyword.delete(options, :base_url))
+    events = ReAct.stream("Say hello", config, runtime_opts(jido)) |> Enum.to_list()
+    assert ReAct.collect_stream(events).result == "Hello from inline model"
 
-    config = Config.new(%{model: inline_model, tools: %{}})
+    assert [%{path: "/v1/chat/completions", body: %{"model" => "gpt-4o-mini", "stream" => true}}] =
+             MockLLM.report(mock).requests
 
-    events =
-      ReAct.stream("Say hello", config, request_id: "req_inline_model", run_id: "run_inline_model")
-      |> Enum.to_list()
-
-    assert Enum.any?(events, &(&1.kind == :request_completed))
+    assert Enum.find(events, &(&1.kind == :llm_completed)).data.model == "openai:gpt-4o-mini"
+    assert_script_done(mock)
   end
 
   test "drains pending input after a final answer before completing the request" do
@@ -1344,41 +1031,25 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert assistant_contents(AIContext.to_messages(failed_state.context)) == []
   end
 
-  test "uses non-streaming generation when streaming is disabled" do
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
-      flunk("stream_text should not be called when ReAct streaming is disabled")
-    end)
+  test "uses non-streaming generation when streaming is disabled", %{jido: jido} do
+    mock = mock([%{reply: response("Hello from generate", %{prompt_tokens: 3, completion_tokens: 2, total_tokens: 5})}])
+    events = ReAct.stream("Say hello", mock_config(mock, streaming: false), runtime_opts(jido)) |> Enum.to_list()
 
-    Mimic.stub(ReqLLM.Generation, :generate_text, fn _model, _messages, _opts ->
-      {:ok,
-       %{
-         message: %{content: "Hello from generate", tool_calls: nil},
-         finish_reason: :stop,
-         usage: %{input_tokens: 3, output_tokens: 2}
-       }}
-    end)
+    for kind <- [:request_started, :llm_started, :llm_completed, :request_completed],
+        do: assert(Enum.any?(events, &(&1.kind == kind)))
 
-    config = Config.new(%{model: :capable, tools: %{}, streaming: false})
-
-    events =
-      ReAct.stream("Say hello", config, request_id: "req_non_stream", run_id: "run_non_stream")
-      |> Enum.to_list()
-
-    assert Enum.any?(events, &(&1.kind == :request_started))
-    assert Enum.any?(events, &(&1.kind == :llm_started))
     refute Enum.any?(events, &(&1.kind == :llm_delta))
-    assert Enum.any?(events, &(&1.kind == :llm_completed))
-    assert Enum.any?(events, &(&1.kind == :request_completed))
     assert Enum.any?(events, &(&1.kind == :checkpoint and &1.data.reason == :terminal))
+    llm = Enum.find(events, &(&1.kind == :llm_completed)).data
+    assert llm.text == "Hello from generate" and llm.turn_type == :final_answer
+    completed = Enum.find(events, &(&1.kind == :request_completed)).data
+    assert completed.result == "Hello from generate"
 
-    llm_completed = Enum.find(events, &(&1.kind == :llm_completed))
-    assert llm_completed.data.text == "Hello from generate"
-    assert llm_completed.data.turn_type == :final_answer
-    assert llm_completed.data.usage == %{input_tokens: 3, output_tokens: 2}
+    for usage <- [llm.usage, completed.usage],
+        do: assert(Map.take(usage, [:input_tokens, :output_tokens]) == %{input_tokens: 3, output_tokens: 2})
 
-    request_completed = Enum.find(events, &(&1.kind == :request_completed))
-    assert request_completed.data.result == "Hello from generate"
-    assert request_completed.data.usage == %{input_tokens: 3, output_tokens: 2}
+    assert [%{path: "/v1/chat/completions", body: %{"stream" => false}}] = MockLLM.report(mock).requests
+    assert_script_done(mock)
   end
 
   test "passes req_http_options to streaming requests" do
@@ -1528,39 +1199,33 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert Enum.any?(events, &(&1.kind == :request_completed))
   end
 
-  test "request_transformer model override is reflected in runtime turn events" do
-    parent = self()
-
-    Mimic.stub(ReqLLM.Generation, :generate_text, fn model, _messages, _opts ->
-      send(parent, {:generate_model, model})
-
-      {:ok,
-       %{
-         message: %{content: "Runtime model answer", tool_calls: nil},
-         finish_reason: :stop,
-         usage: %{input_tokens: 3, output_tokens: 2},
-         model: "openai:gpt-4.1"
-       }}
-    end)
+  test "request_transformer model override is reflected in runtime turn events", %{jido: jido} do
+    mock = mock([%{reply: {:anthropic, {:text, "Runtime model answer"}}}])
 
     config =
-      Config.new(%{
+      mock_config(mock,
         model: "openai:gpt-4.1",
-        tools: %{},
         streaming: false,
+        llm_opts: MockLLM.options(mock, :anthropic),
         request_transformer: RuntimeAnthropicModelTransformer
-      })
+      )
 
-    events = ReAct.stream("Say hello", config) |> Enum.to_list()
+    events = ReAct.stream("Say hello", config, runtime_opts(jido)) |> Enum.to_list()
 
-    assert_receive {:generate_model, "anthropic:claude-sonnet-4-5"}, 200
+    for kind <- [:llm_started, :llm_completed],
+        do: assert(Enum.find(events, &(&1.kind == kind)).data.model == "anthropic:claude-sonnet-4-5")
 
-    llm_started = Enum.find(events, &(&1.kind == :llm_started))
-    llm_completed = Enum.find(events, &(&1.kind == :llm_completed))
+    assert Enum.find(events, &(&1.kind == :llm_completed)).data.text == "Runtime model answer"
 
-    assert llm_started.data.model == "anthropic:claude-sonnet-4-5"
-    assert llm_completed.data.model == "anthropic:claude-sonnet-4-5"
-    assert llm_completed.data.text == "Runtime model answer"
+    assert [
+             %{
+               path: "/v1/messages",
+               body: %{"model" => "claude-sonnet-4-5-20250929"},
+               headers: %{"x-api-key" => "local-example-key"}
+             }
+           ] = MockLLM.report(mock).requests
+
+    assert_script_done(mock)
   end
 
   test "request_transformer OpenAI model override enables websocket session setup" do
@@ -1887,10 +1552,8 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert request_completed.data.result == "Hello"
   end
 
-  test "preserves reasoning_details across tool turns" do
-    parent = self()
-
-    reasoning_details = [
+  test "preserves reasoning_details across tool turns", %{jido: jido} do
+    details = [
       %ReqLLM.Message.ReasoningDetails{
         text: "Need calculator result before answering",
         signature: "rsig_123",
@@ -1898,60 +1561,30 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
         provider: :openai,
         format: "responses/v1",
         index: 0,
-        provider_data: %{token: "opaque-token"}
+        provider_data: %{"token" => "opaque-token"}
       }
     ]
 
-    Mimic.stub(ReqLLM.StreamResponse, :process_stream, &process_stream_response/2)
+    wire_details = Enum.map(details, &ReqLLM.Message.ReasoningDetails.to_openai_compatible/1)
 
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, messages, _opts ->
-      count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
-      :persistent_term.put({__MODULE__, :llm_call_count}, count)
+    call = %{
+      tool_calls: [
+        %{index: 0, id: "tc_reasoning", type: "function", function: %{name: "calculator", arguments: ~s({"a":2,"b":3})}}
+      ],
+      reasoning_details: wire_details
+    }
 
-      case count do
-        1 ->
-          {:ok,
-           %{
-             stream: [ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 2, "b" => 3}, %{id: "tc_reasoning"})],
-             finish_reason: :tool_calls,
-             reasoning_details: reasoning_details,
-             usage: %{input_tokens: 4, output_tokens: 2}
-           }}
-
-        2 ->
-          assistant_message =
-            Enum.find(messages, fn
-              %{role: role, tool_calls: tool_calls} when role in [:assistant, "assistant"] ->
-                is_list(tool_calls) and tool_calls != []
-
-              _ ->
-                false
-            end)
-
-          send(parent, {:assistant_reasoning_details, Map.get(assistant_message, :reasoning_details)})
-
-          {:ok,
-           %{
-             stream: [ReqLLM.StreamChunk.text("Result is 5")],
-             finish_reason: :stop,
-             usage: %{input_tokens: 3, output_tokens: 2}
-           }}
-      end
-    end)
-
-    config =
-      Config.new(%{
-        model: :capable,
-        tools: %{CalculatorTool.name() => CalculatorTool},
-        tool_max_retries: 0,
-        tool_retry_backoff_ms: 0
-      })
-
-    events = ReAct.stream("Calculate 2 + 3", config) |> Enum.to_list()
-    request_completed = Enum.find(events, &(&1.kind == :request_completed))
-
-    assert_receive {:assistant_reasoning_details, ^reasoning_details}, 200
-    assert request_completed.data.result == "Result is 5"
+    mock = mock([%{reply: {:stream, [call], "tool_calls"}}, %{reply: {:text, "Result is 5"}}])
+    config = mock_config(mock, tools: %{CalculatorTool.name() => CalculatorTool})
+    events = ReAct.stream("Calculate 2 + 3", config, runtime_opts(jido)) |> Enum.to_list()
+    assert ReAct.collect_stream(events).result == "Result is 5"
+    first = Enum.find(events, &(&1.kind == :llm_completed))
+    assert first.data.reasoning_details == details
+    [_, followup] = MockLLM.report(mock).requests
+    [assistant] = Enum.filter(followup.body["messages"], &(&1["role"] == "assistant"))
+    assert assistant["reasoning_details"] == wire_details
+    assert tool_wire_result(followup) == %{"ok" => true, "result" => %{"result" => 5}}
+    assert_script_done(mock)
   end
 
   test "retries tool execution and reports attempts in tool_completed" do
@@ -2725,11 +2358,38 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert state.react_worker_status == :ready
   end
 
+  defp mock_config(mock, overrides \\ []) do
+    [
+      model: MockLLM.model(),
+      llm_opts: MockLLM.options(mock),
+      token_secret: "runner-native-test-secret",
+      tool_max_retries: 0
+    ]
+    |> Keyword.merge(overrides)
+    |> Config.new()
+  end
+
+  defp runtime_opts(jido, options \\ []) do
+    context = Map.merge(%{jido: jido, observer: self(), test_pid: self()}, Keyword.get(options, :context, %{}))
+    Keyword.put(options, :context, context)
+  end
+
+  defp calculator_round(id) do
+    [%{reply: {:tools, [%{id: id, name: "calculator", arguments: %{a: 2, b: 3}}]}}, %{reply: {:text, "Done"}}]
+  end
+
+  defp tool_wire_result(request) do
+    [message] = Enum.filter(request.body["messages"], &(&1["role"] == "tool"))
+    Jason.decode!(message["content"])
+  end
+
   defp create_strategy_agent(opts) do
     %Jido.Agent{
       id: "react_strategy_test_agent",
       name: "react_strategy_test_agent",
-      state: %{}
+      state: %{},
+      schema: Zoi.object(%{}),
+      module: Jido.Agent
     }
     |> then(fn agent ->
       {agent, []} = ReActStrategy.init(agent, %{strategy_opts: opts})
@@ -2738,7 +2398,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   end
 
   defp strategy_instruction(action, params) do
-    %Jido.Instruction{action: action, params: params}
+    %Jido.Instruction{target: action, params: params}
   end
 
   defp stub_parallel_order_run do
@@ -2800,6 +2460,8 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     end)
   end
 
+  defp ticket, do: %{category: "billing", confidence: 0.88, summary: "Billing issue"}
+
   defp ticket_schema do
     Zoi.object(%{
       category: Zoi.enum([:billing, :technical, :account]),
@@ -2833,12 +2495,6 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       model: model,
       context: Keyword.get(opts, :context, ReqLLM.Context.new([]))
     }
-  end
-
-  defp content_part_chunk(content_part) do
-    ReqLLM.StreamChunk.meta(%{})
-    |> Map.put(:type, :content_part)
-    |> Map.put(:content_part, content_part)
   end
 
   defp exited_pid do

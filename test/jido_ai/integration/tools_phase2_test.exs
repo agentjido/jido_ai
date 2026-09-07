@@ -24,11 +24,12 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
     use Jido.Action,
       name: "calculator",
       description: "Performs arithmetic calculations",
-      schema: [
-        operation: [type: :string, required: true, doc: "The operation to perform"],
-        a: [type: :integer, required: true, doc: "First operand"],
-        b: [type: :integer, required: true, doc: "Second operand"]
-      ]
+      schema:
+        Zoi.object(%{
+          operation: Zoi.string(description: "The operation to perform"),
+          a: Zoi.integer(description: "First operand"),
+          b: Zoi.integer(description: "Second operand")
+        })
 
     @impl true
     def run(params, _context) do
@@ -47,9 +48,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
     use Jido.Action,
       name: "context_aware",
       description: "An action that uses context",
-      schema: [
-        key: [type: :string, required: true, doc: "Context key to read"]
-      ]
+      schema: Zoi.object(%{key: Zoi.string(description: "Context key to read")})
 
     @impl true
     def run(params, context) do
@@ -62,9 +61,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
     use Jido.Action,
       name: "failing_action",
       description: "An action that always fails",
-      schema: [
-        message: [type: :string, required: true, doc: "Error message"]
-      ]
+      schema: Zoi.object(%{message: Zoi.string(description: "Error message")})
 
     @impl true
     def run(params, _context) do
@@ -76,9 +73,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
     use Jido.Action,
       name: "echo",
       description: "Echoes back the input message",
-      schema: [
-        message: [type: :string, required: true, doc: "Message to echo"]
-      ]
+      schema: Zoi.object(%{message: Zoi.string(description: "Message to echo")})
 
     @impl true
     def run(params, _context) do
@@ -90,9 +85,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
     use Jido.Action,
       name: "uppercase",
       description: "Converts text to uppercase",
-      schema: [
-        text: [type: :string, required: true, doc: "Text to convert"]
-      ]
+      schema: Zoi.object(%{text: Zoi.string(description: "Text to convert")})
 
     @impl true
     def run(params, _context) do
@@ -104,9 +97,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
     use Jido.Action,
       name: "context_reader",
       description: "Reads values from context",
-      schema: [
-        key: [type: :string, required: true, doc: "Key to read from context"]
-      ]
+      schema: Zoi.object(%{key: Zoi.string(description: "Key to read from context")})
 
     @impl true
     def run(params, context) do
@@ -119,9 +110,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
     use Jido.Action,
       name: "slow_action",
       description: "A slow action for testing timeouts",
-      schema: [
-        delay: [type: :integer, required: true, doc: "Delay in milliseconds"]
-      ]
+      schema: Zoi.object(%{delay: Zoi.integer(description: "Delay in milliseconds")})
 
     @impl true
     def run(params, _context) do
@@ -134,7 +123,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
     use Jido.Action,
       name: "calculator",
       description: "Version 1",
-      schema: []
+      schema: Zoi.object(%{})
 
     @impl true
     def run(_params, _context), do: {:ok, %{version: 1}}
@@ -144,7 +133,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
     use Jido.Action,
       name: "calculator",
       description: "Version 2",
-      schema: []
+      schema: Zoi.object(%{})
 
     @impl true
     def run(_params, _context), do: {:ok, %{version: 2}}

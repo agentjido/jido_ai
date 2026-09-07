@@ -15,6 +15,7 @@ defmodule Jido.AI.Examples.Weather.AdaptiveAgent do
   alias Jido.AI.Examples.Weather.LiveContext
 
   use Jido.AI.AdaptiveAgent,
+    request_transformer: LiveContext,
     name: "weather_adaptive_agent",
     description: "Adaptive weather assistant across all reasoning modes",
     tools: [
@@ -42,15 +43,4 @@ defmodule Jido.AI.Examples.Weather.AdaptiveAgent do
       opts
     )
   end
-
-  @impl true
-  def on_before_cmd(agent, {:adaptive_start, %{prompt: prompt} = params}) do
-    case LiveContext.enrich_prompt(prompt) do
-      {:ok, enriched_prompt} -> super(agent, {:adaptive_start, %{params | prompt: enriched_prompt}})
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  @impl true
-  def on_before_cmd(agent, action), do: super(agent, action)
 end

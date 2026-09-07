@@ -188,6 +188,7 @@ If you persist the conversation history (e.g. from `snapshot.details.conversatio
 you can restore it on restart so the agent resumes where it left off.
 
 ```elixir
+{:ok, snapshot} = Jido.AI.Session.snapshot(server)
 saved_messages = snapshot.details.conversation
 
 # Split out one leading system message (if present) so it does not become
@@ -202,16 +203,20 @@ saved_messages = snapshot.details.conversation
       {nil, saved_messages}
   end
 
-# At start time — pass the saved context via initial_state:
+# Import the saved conversation before Server startup:
 context =
   Jido.AI.Context.new(system_prompt: saved_system_prompt)
   |> Jido.AI.Context.append_messages(conversation_messages)
 
-Jido.AgentServer.start_link(agent: MyAgent, initial_state: %{context: context})
+{:ok, agent} = Jido.AI.Agent.from_initial_state(MyAgent, %{context: context})
+{:ok, server} = Jido.start_agent(MyJido, agent)
 ```
 
-When restoring with `initial_state: %{context: context}`, a nil
-`context.system_prompt` is backfilled from the agent's configured prompt.
+A nil `context.system_prompt` uses the Agent's configured prompt. A saved prompt
+overrides it. Use `profile: :review` to select another AI profile. This imports
+conversation data; it does not resume an old worker or convert a full v2 Agent
+checkpoint. Use native checkpoint restore for state saved after the v3 import.
+See the [initial-state examples](../../examples/v3/profiles/14_11_initial_state.md).
 
 ## Note: Retrieval And ReAct
 

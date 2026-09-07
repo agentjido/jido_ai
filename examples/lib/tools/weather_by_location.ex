@@ -10,33 +10,30 @@ defmodule Jido.AI.Examples.Tools.Weather.ByLocation do
   alias Jido.Action.Error
 
   use Jido.Action,
+    schema:
+      Zoi.object(%{
+        location: Zoi.string(description: "Location as 'lat,lng' coordinates, zipcode, or 'city,state'"),
+        periods:
+          Zoi.integer(description: "Number of forecast periods to return")
+          |> Zoi.default(7)
+          |> Zoi.optional(),
+        format:
+          Zoi.enum([:detailed, :summary, :text], description: "Output format for forecast data")
+          |> Zoi.default(:summary)
+          |> Zoi.optional(),
+        include_location_info:
+          Zoi.boolean(description: "Include location and grid information in response")
+          |> Zoi.default(false)
+          |> Zoi.optional()
+      }),
     name: "weather_by_location",
-    description: "Get weather forecast for any location using NWS API",
-    category: "Weather",
-    tags: ["weather", "forecast", "location", "nws"],
-    vsn: "1.0.0",
-    schema: [
-      location: [
-        type: :string,
-        required: true,
-        doc: "Location as 'lat,lng' coordinates, zipcode, or 'city,state'"
-      ],
-      periods: [
-        type: :integer,
-        default: 7,
-        doc: "Number of forecast periods to return"
-      ],
-      format: [
-        type: {:in, [:detailed, :summary, :text]},
-        default: :summary,
-        doc: "Output format for forecast data"
-      ],
-      include_location_info: [
-        type: :boolean,
-        default: false,
-        doc: "Include location and grid information in response"
-      ]
-    ]
+    description: "Get weather forecast for any location using NWS API"
+
+  def category, do: "Weather"
+
+  def tags, do: ["weather", "forecast", "location", "nws"]
+
+  def vsn, do: "1.0.0"
 
   @coordinates_regex ~r/^\s*-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?\s*$/
 

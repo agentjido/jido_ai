@@ -37,7 +37,7 @@ defmodule Jido.AI.Directive.EmitToolError do
   end
 end
 
-defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.EmitToolError do
+defmodule Jido.AI.Directive.EmitToolError.Execution do
   @moduledoc """
   Immediately emits a tool error result signal without spawning a task.
 
@@ -55,7 +55,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.EmitToolError do
       error: error
     } = directive
 
-    agent_pid = self()
+    agent_pid = Map.fetch!(state, :agent_server)
     metadata = Map.get(directive, :metadata, %{})
 
     normalized_error =

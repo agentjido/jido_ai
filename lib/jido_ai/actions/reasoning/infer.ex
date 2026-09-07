@@ -34,9 +34,6 @@ defmodule Jido.AI.Actions.Reasoning.Infer do
     # Dialyzer has incomplete PLT information about req_llm dependencies
     name: "reasoning_infer",
     description: "Draw logical inferences from given premises",
-    category: "ai",
-    tags: ["reasoning", "inference", "logic"],
-    vsn: "1.0.0",
     schema:
       Zoi.object(%{
         model:
@@ -51,6 +48,10 @@ defmodule Jido.AI.Actions.Reasoning.Infer do
           |> Zoi.default(0.3),
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
+
+  def category, do: "ai"
+  def tags, do: ["reasoning", "inference", "logic"]
+  def vsn, do: "1.0.0"
 
   alias Jido.AI.Actions.Helpers
   alias Jido.AI.Turn

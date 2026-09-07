@@ -8,7 +8,7 @@ defmodule Jido.AI.Test.ReActScript do
 
   alias Jido.AI.Turn
 
-  @table :jido_ai_react_scripts
+  @registry_key {__MODULE__, :scripts}
   @option_key :jido_ai_react_script
 
   defstruct [:id, :user, turns: []]
@@ -56,16 +56,16 @@ defmodule Jido.AI.Test.ReActScript do
   @doc false
   @spec register(t()) :: t()
   def register(%__MODULE__{} = script) do
-    table = table()
-    key = registry_key(owner_key(), script.user)
-    :ets.insert(table, {key, script})
+    scripts = Process.get(@registry_key, %{})
+    Process.put(@registry_key, Map.put(scripts, script.user, script))
     script
   end
 
   @doc false
   @spec clear_current_owner() :: :ok
   def clear_current_owner do
-    clear_owner(owner_key())
+    Process.delete(@registry_key)
+    :ok
   end
 
   @doc false
@@ -86,6 +86,125 @@ defmodule Jido.AI.Test.ReActScript do
 
   def next_response(_llm_opts, _messages), do: :not_scripted
 
+  @doc false
+  def bind_options(query, options), do: bind_messages([%{role: :user, content: query}], options)
+
+  @doc false
+  def bind_messages(messages, options) when is_list(options) do
+    if not Keyword.keyword?(options) or Keyword.has_key?(options, @option_key) do
+      options
+    else
+      case resolve_registered_script(messages) do
+        {:ok, script, _source} -> Keyword.put(options, @option_key, script)
+        :not_scripted -> options
+      end
+    end
+  end
+
+  def bind_messages(messages, options) when is_map(options) and not is_struct(options) do
+    if Map.has_key?(options, @option_key) or Map.has_key?(options, Atom.to_string(@option_key)) do
+      options
+    else
+      case resolve_registered_script(messages) do
+        {:ok, script, _source} -> Map.put(options, @option_key, script)
+        :not_scripted -> options
+      end
+    end
+  end
+
+  def bind_messages(messages, nil) do
+    case resolve_registered_script(messages) do
+      {:ok, script, _source} -> [{@option_key, script}]
+      :not_scripted -> nil
+    end
+  end
+
+  def bind_messages(_messages, options), do: options
+
+  @doc false
+  def request(kind, messages, options, request_fun) do
+    messages =
+      case messages do
+        %ReqLLM.Context{messages: values} -> values
+        values -> values
+      end
+
+    case next_response(options, messages) do
+      :not_scripted ->
+        :not_scripted
+
+      {:error, _} = error ->
+        error
+
+      {:ok, response} when kind in [:text, :stream] ->
+        # The same HTTP/SSE server serves package helpers and acceptance cases.
+        # A stream keeps its server until the model task exits.
+        reply = http_reply(response, kind)
+        {:ok, server} = Jido.AI.Test.MockLLM.start_link(script: [%{reply: reply}], owner: self())
+        options = options |> Keyword.delete(@option_key) |> Keyword.merge(Jido.AI.Test.MockLLM.options(server))
+
+        try do
+          request_fun.(Jido.AI.Test.MockLLM.model(), options)
+        after
+          if kind != :stream and Process.alive?(server), do: GenServer.stop(server)
+        end
+
+      {:ok, _} ->
+        {:error, %{type: :invalid_react_test_script, message: "ReAct scripts support text and stream requests"}}
+    end
+  end
+
+  defp http_reply(response, :text) do
+    {:raw,
+     %{
+       id: "scripted-response",
+       object: "chat.completion",
+       created: 1,
+       model: "gpt-4o-mini",
+       choices: [%{index: 0, message: http_message(response.message), finish_reason: to_string(response.finish_reason)}],
+       usage: http_usage(response.usage)
+     }}
+  end
+
+  defp http_reply(response, :stream) do
+    delta = http_message(response.message) |> Map.delete(:role)
+
+    delta =
+      if delta[:tool_calls],
+        do:
+          Map.update!(delta, :tool_calls, fn calls ->
+            Enum.with_index(calls, fn call, index -> Map.put(call, :index, index) end)
+          end),
+        else: delta
+
+    {:stream, [delta], to_string(response.finish_reason), http_usage(response.usage)}
+  end
+
+  defp http_message(message) do
+    base = %{role: "assistant", content: message.content}
+
+    case message.tool_calls do
+      nil ->
+        base
+
+      calls ->
+        Map.put(
+          base,
+          :tool_calls,
+          Enum.map(calls, fn call ->
+            %{id: call.id, type: "function", function: %{name: call.name, arguments: Jason.encode!(call.arguments)}}
+          end)
+        )
+    end
+  end
+
+  defp http_usage(usage),
+    do: %{
+      prompt_tokens: Map.get(usage, :input_tokens, 0),
+      completion_tokens: Map.get(usage, :output_tokens, 0),
+      total_tokens: Map.get(usage, :total_tokens, Map.get(usage, :input_tokens, 0) + Map.get(usage, :output_tokens, 0))
+    }
+
   defp resolve_script(llm_opts, messages) do
     case Keyword.fetch(llm_opts, @option_key) do
       {:ok, %__MODULE__{} = script} ->
@@ -104,13 +223,21 @@ defmodule Jido.AI.Test.ReActScript do
   end
 
   defp resolve_registered_script(messages) do
-    with table when table != :undefined <- :ets.whereis(@table),
-         user when user != "" <- latest_user_text(messages),
-         [{_key, %__MODULE__{} = script}] <- :ets.lookup(table, registry_key(owner_key(), user)) do
-      {:ok, script, :registry}
-    else
-      _ -> :not_scripted
-    end
+    user = latest_user_text(messages)
+    owners = [self() | Process.get(:"$callers", [])] |> Enum.filter(&is_pid/1) |> Enum.uniq()
+
+    Enum.find_value(owners, :not_scripted, fn owner ->
+      case Process.info(owner, :dictionary) do
+        {:dictionary, dictionary} ->
+          case (List.keyfind(dictionary, @registry_key, 0, {@registry_key, %{}}) |> elem(1))[user] do
+            %__MODULE__{} = script -> {:ok, script, {:registry, owner}}
+            _ -> nil
+          end
+
+        nil ->
+          nil
+      end
+    end)
   end
 
   defp build_next_response(%__MODULE__{} = script, source, messages) do
@@ -194,8 +321,8 @@ defmodule Jido.AI.Test.ReActScript do
     }
   end
 
-  defp maybe_unregister(%__MODULE__{} = script, :registry) do
-    :ets.delete(table(), registry_key(owner_key(), script.user))
+  defp maybe_unregister(%__MODULE__{} = script, {:registry, owner}) when owner == self() do
+    Process.put(@registry_key, Map.delete(Process.get(@registry_key, %{}), script.user))
     :ok
   end
 
@@ -322,35 +449,4 @@ defmodule Jido.AI.Test.ReActScript do
   defp normalize_content(content) when is_list(content), do: Turn.extract_from_content(content)
   defp normalize_content(nil), do: ""
   defp normalize_content(content), do: to_string(content)
-
-  defp table do
-    case :ets.whereis(@table) do
-      :undefined ->
-        try do
-          :ets.new(@table, [:named_table, :public, :set, read_concurrency: true, write_concurrency: true])
-        rescue
-          ArgumentError -> @table
-        end
-
-      _tid ->
-        @table
-    end
-  end
-
-  defp clear_owner(owner) do
-    case :ets.whereis(@table) do
-      :undefined ->
-        :ok
-
-      table ->
-        table
-        |> :ets.match_object({{:react_script, owner, :_}, :_})
-        |> Enum.each(fn {key, _script} -> :ets.delete(table, key) end)
-    end
-
-    :ok
-  end
-
-  defp registry_key(owner, user), do: {:react_script, owner, user}
-  defp owner_key, do: Process.group_leader()
 end

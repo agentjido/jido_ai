@@ -20,7 +20,7 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
   defmodule ContextLifecycleAgent do
     use Jido.AI.Agent,
       name: "context_lifecycle_agent",
-      model: "test:model",
+      model: "openai:gpt-4o-mini",
       system_prompt: "Initial prompt",
       tools: [EchoTool]
   end

@@ -1,43 +1,16 @@
 defmodule Jido.AI.Plugins.TaskSupervisor do
   @moduledoc """
-  Plugin that creates and manages a per-instance Task.Supervisor for Jido.AI agents.
+  Compatibility helper for callers that own a task supervisor.
 
-  In Jido 2.0, each agent instance requires its own task supervisor to properly
-  scope async operations (like LLM streaming and tool execution) to the agent's
-  lifecycle.
-
-  This plugin is automatically added to Jido.AI agents to handle supervisor creation
-  and cleanup.
-
-  ## Supervisor Storage
-
-  The supervisor PID is stored in `agent.state.__task_supervisor_skill__` (the plugin's
-  internal state) and is accessed by directives via `Directive.Helpers.get_task_supervisor/1`.
-
-  ## Lifecycle
-
-  - **mount**: Creates a new anonymous Task.Supervisor
-  - **Automatic cleanup**: The linked supervisor terminates when the agent stops
-
-  ## Usage
-
-  This plugin is automatically included when using `Jido.AI.Agent`. Manual
-  inclusion is not typically needed.
-
-  ## Implementation Notes
-
-  This plugin has no actions - it only provides lifecycle hooks for supervisor
-  management. The supervisor PID is stored in the plugin's state under the internal
-  key `__task_supervisor_skill__`.
+  Native AI requests use the core-owned Session runtime. The public AI Agent
+  does not insert this Plugin. `mount/2` remains an explicit caller-owned helper;
+  its returned PID must not be saved in v3 Agent state. A native Agent can use
+  the Plugin child specification when it needs a separate task supervisor.
   """
 
-  use Jido.Plugin,
-    name: "ai_task_supervisor",
-    description: "Manages per-instance task supervisor for async operations",
-    category: "ai",
-    tags: ["supervisor", "async", "lifecycle"],
-    state_key: :__task_supervisor_skill__,
-    actions: []
+  use Jido.Plugin
+
+  def child_spec(_init), do: Supervisor.child_spec({Task.Supervisor, []}, id: __MODULE__)
 
   require Logger
 
@@ -46,7 +19,6 @@ defmodule Jido.AI.Plugins.TaskSupervisor do
 
   Creates and stores the Task.Supervisor PID.
   """
-  @impl Jido.Plugin
   def mount(_agent, _config) do
     case start_supervisor() do
       {:ok, supervisor_pid} ->
@@ -59,7 +31,6 @@ defmodule Jido.AI.Plugins.TaskSupervisor do
   end
 
   @doc false
-  @impl Jido.Plugin
   @spec on_checkpoint(term(), map()) :: :drop
   def on_checkpoint(_plugin_state, _context), do: :drop
 

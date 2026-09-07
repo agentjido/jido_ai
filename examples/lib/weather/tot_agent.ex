@@ -13,6 +13,7 @@ defmodule Jido.AI.Examples.Weather.ToTAgent do
   alias Jido.AI.Examples.Weather.LiveContext
 
   use Jido.AI.ToTAgent,
+    request_transformer: LiveContext,
     name: "weather_tot_agent",
     description: "Weather scenario planner using Tree-of-Thoughts",
     branching_factor: 3,
@@ -57,15 +58,4 @@ defmodule Jido.AI.Examples.Weather.ToTAgent do
 
   defp format_score(score) when is_number(score), do: :erlang.float_to_binary(score * 1.0, decimals: 2)
   defp format_score(_), do: "n/a"
-
-  @impl true
-  def on_before_cmd(agent, {:tot_start, %{prompt: prompt} = params}) do
-    case LiveContext.enrich_prompt(prompt) do
-      {:ok, enriched_prompt} -> super(agent, {:tot_start, %{params | prompt: enriched_prompt}})
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  @impl true
-  def on_before_cmd(agent, action), do: super(agent, action)
 end

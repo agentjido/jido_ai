@@ -2,13 +2,20 @@ defmodule Jido.AI.Examples.Tools.Browser.ReadPage do
   @moduledoc "Read a web page and return extracted content using a compatibility-safe fallback order."
 
   use Jido.Action,
+    schema:
+      Zoi.object(%{
+        url: Zoi.string(description: "URL to read"),
+        format:
+          Zoi.enum([:html, :text, :markdown], description: "Preferred output format")
+          |> Zoi.default(:html)
+          |> Zoi.optional(),
+        max_chars:
+          Zoi.integer(description: "Maximum number of characters to return")
+          |> Zoi.default(20000)
+          |> Zoi.optional()
+      }),
     name: "read_page",
-    description: "Read a web page URL and return extracted content",
-    schema: [
-      url: [type: :string, required: true, doc: "URL to read"],
-      format: [type: {:in, [:html, :text, :markdown]}, default: :html, doc: "Preferred output format"],
-      max_chars: [type: :integer, default: 20_000, doc: "Maximum number of characters to return"]
-    ]
+    description: "Read a web page URL and return extracted content"
 
   @impl true
   def run(%{url: url} = params, _context) do
@@ -75,12 +82,16 @@ defmodule Jido.AI.Examples.Tools.Browser.SearchWeb do
   @moduledoc "Search the web using Brave Search and return ranked result snippets."
 
   use Jido.Action,
+    schema:
+      Zoi.object(%{
+        query: Zoi.string(description: "Search query"),
+        max_results:
+          Zoi.integer(description: "Maximum number of results to return")
+          |> Zoi.default(5)
+          |> Zoi.optional()
+      }),
     name: "search_web",
-    description: "Search the web via Brave Search API",
-    schema: [
-      query: [type: :string, required: true, doc: "Search query"],
-      max_results: [type: :integer, default: 5, doc: "Maximum number of results to return"]
-    ]
+    description: "Search the web via Brave Search API"
 
   @brave_endpoint "https://api.search.brave.com/res/v1/web/search"
 
@@ -136,14 +147,24 @@ defmodule Jido.AI.Examples.Tools.Browser.SnapshotUrl do
   @moduledoc "Capture a structural page snapshot (title/content/headings/links/forms) for a URL."
 
   use Jido.Action,
+    schema:
+      Zoi.object(%{
+        url: Zoi.string(description: "URL to snapshot"),
+        include_links:
+          Zoi.boolean(description: "Include links in snapshot")
+          |> Zoi.default(true)
+          |> Zoi.optional(),
+        include_forms:
+          Zoi.boolean(description: "Include forms in snapshot")
+          |> Zoi.default(true)
+          |> Zoi.optional(),
+        include_headings:
+          Zoi.boolean(description: "Include headings in snapshot")
+          |> Zoi.default(true)
+          |> Zoi.optional()
+      }),
     name: "snapshot_url",
-    description: "Capture a page snapshot for links/forms/headings",
-    schema: [
-      url: [type: :string, required: true, doc: "URL to snapshot"],
-      include_links: [type: :boolean, default: true, doc: "Include links in snapshot"],
-      include_forms: [type: :boolean, default: true, doc: "Include forms in snapshot"],
-      include_headings: [type: :boolean, default: true, doc: "Include headings in snapshot"]
-    ]
+    description: "Capture a page snapshot for links/forms/headings"
 
   @impl true
   def run(%{url: url} = params, _context) do

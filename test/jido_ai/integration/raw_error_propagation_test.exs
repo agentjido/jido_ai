@@ -21,7 +21,7 @@ defmodule Jido.AI.Integration.RawErrorPropagationTest do
     {agent, _directives} =
       ReAct.cmd(
         agent,
-        [%Jido.Instruction{action: ReAct.start_action(), params: %{query: "Q", request_id: "req_fail"}}],
+        [%Jido.Instruction{target: ReAct.start_action(), params: %{query: "Q", request_id: "req_fail"}}],
         %{}
       )
 
@@ -44,7 +44,12 @@ defmodule Jido.AI.Integration.RawErrorPropagationTest do
     {agent, _directives} =
       ReAct.cmd(
         agent,
-        [%Jido.Instruction{action: :ai_react_worker_event, params: %{request_id: "req_fail", event: failed_event}}],
+        [
+          %Jido.Instruction{
+            target: :ai_react_worker_event,
+            params: %{request_id: "req_fail", event: failed_event}
+          }
+        ],
         %{}
       )
 

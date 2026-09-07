@@ -9,7 +9,13 @@ defmodule Jido.AITest do
   doctest Jido.AI
 
   defp create_react_agent(opts) do
-    %Jido.Agent{id: "jido-ai-test-agent", name: "jido-ai-test-agent", state: %{}}
+    %Jido.Agent{
+      id: "jido-ai-test-agent",
+      name: "jido-ai-test-agent",
+      state: %{},
+      schema: Zoi.object(%{}),
+      module: Jido.Agent
+    }
     |> then(fn agent ->
       {agent, []} = ReAct.init(agent, %{strategy_opts: Keyword.merge([tools: []], opts)})
       agent

@@ -3,12 +3,26 @@ defmodule Jido.AI.Signal.RequestError do
   Signal for request rejection.
   """
 
-  use Jido.AI.Signal.Definition,
+  use Jido.Signal,
     type: "ai.request.error",
     default_source: "/ai/strategy",
-    schema: [
-      request_id: [type: :string, required: true, doc: "Correlation ID for the request"],
-      reason: [type: :atom, required: true, doc: "Error reason atom"],
-      message: [type: :string, required: true, doc: "Human-readable error message"]
-    ]
+    schema:
+      Zoi.object(
+        %{
+          request_id: Zoi.string(),
+          reason: Zoi.atom(),
+          message: Zoi.string()
+        },
+        unrecognized_keys: :error
+      )
+
+  defoverridable validate_data: 1
+
+  def validate_data(data) do
+    Jido.AI.Signal.Definition.validate_data(data, schema())
+  end
+
+  def extension_policy, do: %{}
+  def to_json, do: Jido.AI.Signal.Definition.metadata(__MODULE__)
+  def __signal_metadata__, do: to_json()
 end

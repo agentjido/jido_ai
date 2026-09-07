@@ -14,10 +14,10 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapter do
   @default_max_iterations 10
   @default_max_tokens 4_096
   @default_tools [
-    Jido.Tools.Arithmetic.Add,
-    Jido.Tools.Arithmetic.Subtract,
-    Jido.Tools.Arithmetic.Multiply,
-    Jido.Tools.Arithmetic.Divide
+    Jido.AI.Tools.Arithmetic.Add,
+    Jido.AI.Tools.Arithmetic.Subtract,
+    Jido.AI.Tools.Arithmetic.Multiply,
+    Jido.AI.Tools.Arithmetic.Divide
   ]
 
   @impl true
@@ -120,7 +120,7 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapter do
     if now >= deadline do
       {:error, :timeout}
     else
-      case Jido.AgentServer.status(pid) do
+      case Jido.AI.CLI.Adapter.status(pid) do
         {:ok, status} ->
           if status.snapshot.done? do
             # Prefer snapshot.result (general contract), fallback to raw_state.last_answer

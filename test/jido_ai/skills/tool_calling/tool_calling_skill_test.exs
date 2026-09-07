@@ -25,7 +25,11 @@ defmodule Jido.AI.Plugins.Reasoning.ChainOfThoughtTest do
 
   describe "mount/2" do
     test "initializes state with defaults" do
-      {:ok, state} = ChainOfThought.mount(%Jido.Agent{}, %{})
+      {:ok, state} =
+        ChainOfThought.mount(
+          %Jido.Agent{id: "fixture", name: "fixture", module: Jido.Agent, schema: Zoi.object(%{})},
+          %{}
+        )
 
       assert state.strategy == :cot
       assert state.default_model == :reasoning
@@ -35,7 +39,10 @@ defmodule Jido.AI.Plugins.Reasoning.ChainOfThoughtTest do
 
     test "merges custom config into initial state" do
       {:ok, state} =
-        ChainOfThought.mount(%Jido.Agent{}, %{default_model: :fast, timeout: 5000, options: %{llm_timeout_ms: 2000}})
+        ChainOfThought.mount(
+          %Jido.Agent{id: "fixture", name: "fixture", module: Jido.Agent, schema: Zoi.object(%{})},
+          %{default_model: :fast, timeout: 5000, options: %{llm_timeout_ms: 2000}}
+        )
 
       assert state.strategy == :cot
       assert state.default_model == :fast
@@ -44,7 +51,11 @@ defmodule Jido.AI.Plugins.Reasoning.ChainOfThoughtTest do
     end
 
     test "mounted state validates against plugin schema" do
-      {:ok, state} = ChainOfThought.mount(%Jido.Agent{}, %{})
+      {:ok, state} =
+        ChainOfThought.mount(
+          %Jido.Agent{id: "fixture", name: "fixture", module: Jido.Agent, schema: Zoi.object(%{})},
+          %{}
+        )
 
       assert {:ok, _parsed_state} = Zoi.parse(ChainOfThought.schema(), state)
     end

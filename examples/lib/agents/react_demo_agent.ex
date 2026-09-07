@@ -19,10 +19,10 @@ defmodule Jido.AI.Examples.ReActDemoAgent do
     name: "react_demo_agent",
     description: "Demo agent with arithmetic and weather tools",
     tools: [
-      Jido.Tools.Arithmetic.Add,
-      Jido.Tools.Arithmetic.Subtract,
-      Jido.Tools.Arithmetic.Multiply,
-      Jido.Tools.Arithmetic.Divide,
+      Jido.AI.Tools.Arithmetic.Add,
+      Jido.AI.Tools.Arithmetic.Subtract,
+      Jido.AI.Tools.Arithmetic.Multiply,
+      Jido.AI.Tools.Arithmetic.Divide,
       Jido.Tools.Weather
     ],
     max_iterations: 10

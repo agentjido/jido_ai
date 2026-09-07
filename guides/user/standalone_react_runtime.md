@@ -392,6 +392,42 @@ Every event is a `Jido.AI.Reasoning.ReAct.Event` struct:
 - Observability flags (`emit_signals?`, `emit_telemetry?`, `redact_tool_args?`) default: `true`
 - Trace flags (`capture_deltas?`, `capture_thinking?`, `capture_messages?`) default: `true`
 
+`capture_deltas?` controls delta events and the captured text and thinking
+fields. `capture_thinking?` and `capture_messages?` are accepted legacy options;
+they do not independently filter thinking or message data. Complete model
+responses and execution history remain available when delta capture is off.
+
+`redact_tool_args?` hides sensitive keys in `tool_started` event arguments.
+It does not filter model-completion tool calls or checkpoint execution data.
+
+### Caller-supplied input queue on v3
+
+Pass a live `Jido.AI.PendingInputServer` as the flat `pending_input_server`
+Config option. The native Session uses that queue directly. At completion,
+failure or cancellation it seals the queue. The caller still owns its process
+and undrained items. Internally created queues are stopped at cleanup.
+
+A checkpoint stores consumed history, not the queue or pending input. Bind a
+new queue in Config when resume must accept new input. The old queue stays
+sealed. Input acceptance does not prove consumption or durable delivery.
+See the [v3 input example](../../examples/v3/profiles/14_07_standalone_input.md)
+for limits, closure, failure and resume checks.
+
+### Append a query on native v3
+
+Pass `query: "Follow-up question"` to `continue/3`, or to `stream_from_state/3`
+with an initial State or native checkpoint. Content-part lists are also accepted.
+New native terminal tokens retain conversation and committed domain state.
+The appended work keeps request/run identity, usage and remaining limits.
+Pending tools finish before the model receives the appended query.
+
+Native checkpoint data version 2 separates reasoning iteration from model-call
+count. Output repair can increase calls without increasing reasoning iteration.
+Earlier native checkpoint version 1 still resumes. The token envelope remains
+`rt2` with payload version 2. This does not convert all released v2 State or
+failed/cancelled continuations. See the
+[query append example](../../examples/v3/profiles/14_08_query_append.md).
+
 ## Failure Mode: Config Fingerprint Mismatch On Resume
 
 Symptom:
@@ -439,3 +475,28 @@ Fix:
 - [Tool Calling With Actions](tool_calling_with_actions.md)
 - [Request Lifecycle And Concurrency](request_lifecycle_and_concurrency.md)
 - [Strategy Selection Playbook](strategy_selection_playbook.md)
+
+## Explicit State conversion on the v3 spike
+
+Use `Jido.AI.Reasoning.ReAct.State.migrate(saved, config, evidence)` for saved
+standalone State without native continuation data. First decode an old signed
+token with its matching Config and secret. Supply the saved phase, separate
+reasoning/model/tool counters, reconciled domain state and remaining time.
+These fields are required because old State does not fully store them.
+
+The returned State uses the normal native stream and token APIs. Conversion
+executes no work and leaves the original value intact. Complete tool results
+are retained; unresolved or partly executed tools need reconciliation. New input
+uses the retained budget and current Config. See the
+[State migration example](../../examples/v3/profiles/14_09_state_migration.md)
+for the full contract and remaining Agent persistence scope.
+
+## Reasoning position on native v3
+
+`State.iteration` is the reasoning position. Native request, model-start and checkpoint
+events and request metadata expose the same value as `reasoning_iteration`.
+Stream chunks keep their existing fields. Event `iteration`
+counts started model operations, including repair calls. Repair can therefore
+increase the event counter while State stays on the same reasoning step.
+Failure and cancellation retain the last established position. See the
+[failure-position examples](../../examples/v3/profiles/14_10_failure_position.md).

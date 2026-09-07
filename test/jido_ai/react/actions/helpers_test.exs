@@ -7,7 +7,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.HelpersTest do
     use Jido.Action,
       name: "tool_a",
       description: "Tool A",
-      schema: []
+      schema: Zoi.object(%{})
 
     @impl true
     def run(_params, _context), do: {:ok, :ok}
@@ -17,7 +17,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.HelpersTest do
     use Jido.Action,
       name: "tool_b",
       description: "Tool B",
-      schema: []
+      schema: Zoi.object(%{})
 
     @impl true
     def run(_params, _context), do: {:ok, :ok}
