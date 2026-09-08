@@ -678,6 +678,9 @@ defmodule Jido.AI.DSL do
 
   @behaviour Jido.Agent.Extension
 
+  @impl Jido.Agent.Extension
+  def route_target_options, do: [:ai]
+
   @doc false
   def normalize_model_entity(%E.Model{first: model, second: nil} = entity),
     do: {:ok, %{entity | role: :default, model: model}}

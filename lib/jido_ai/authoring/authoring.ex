@@ -177,12 +177,31 @@ defmodule Jido.AI.Authoring do
     with {:ok, flow} <- fetch(flows, id), do: {:ok, %{route | target: flow}}
   end
 
-  defp route(%{target: {{:jido_agent_extension, :ai, id}, defaults}} = route, flows)
+  defp route(
+         %{
+           target:
+             {%Jido.Agent.Extension.RouteTarget{
+                extension: Jido.AI.DSL,
+                option: :ai,
+                value: id
+              }, defaults}
+         } = route,
+         flows
+       )
        when is_map(defaults) do
     route(%{route | target: {%Ref{id: id}, defaults}}, flows)
   end
 
-  defp route(%{target: {:jido_agent_extension, :ai, id}} = route, flows) do
+  defp route(
+         %{
+           target: %Jido.Agent.Extension.RouteTarget{
+             extension: Jido.AI.DSL,
+             option: :ai,
+             value: id
+           }
+         } = route,
+         flows
+       ) do
     route(%{route | target: %Ref{id: id}}, flows)
   end
 

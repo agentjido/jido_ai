@@ -21,7 +21,7 @@ defmodule Jido.AI.Authoring.AuthoringValidationTest do
     end
 
     routes do
-      route "support.ask", ai: :support
+      route "support.ask", ai: :support, defaults: %{channel: "web"}
     end
   end
 
@@ -49,7 +49,7 @@ defmodule Jido.AI.Authoring.AuthoringValidationTest do
     assert Authoring.request_binding(agent, signal) == %{
              id: :support,
              mode: :session,
-             input: %{profile_id: :support, query: "help"}
+             input: %{channel: "web", profile_id: :support, query: "help"}
            }
 
     assert Authoring.request_method(agent, signal) == :react
