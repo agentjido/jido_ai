@@ -4,7 +4,7 @@ defmodule Jido.AI.Plugins.PlanningTest do
 
   test "core state creation and empty restore use the declared Planning defaults" do
     config = [default_model: "openai:gpt-4o", default_max_tokens: 700, default_temperature: 0.2]
-    {:planning, schema} = Planning.state_spec(config)
+    {:planning, schema} = Planning.Agent.state_spec(config)
     assert {:ok, state} = Zoi.parse(schema, %{})
     assert state.default_model == "openai:gpt-4o"
     assert state.default_max_tokens == 700 and state.default_temperature == 0.2

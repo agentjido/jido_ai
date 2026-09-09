@@ -1,7 +1,7 @@
 # History review 08: public request streams and keepalives
 
 Execution update, 2026-09-07:
-[02_18](../../../examples/v3/profiles/02_18_admission.md) now checks rejection
+[02_18](../../../examples/02_requests/02_18_admission/README.md) now checks rejection
 events through live core Agents. Canonical method identity follows the declared
 route, including custom paths and conflicting method/profile claims in input.
 Raw errors and request IDs survive. Busy rejection closes only the new stream;
@@ -196,7 +196,7 @@ recheck GoT traversal, valid state, guide snippets and current type checks.
 
 ## Native request inspection evidence: 2026-09-07
 
-[02_22](../../../examples/v3/profiles/02_22_request_inspection.md) adds 14 real
+[02_22](../../../examples/02_requests/02_22_request_inspection/README.md) adds 14 real
 integration cases. The linked history rows gain partial evidence for raw
 failure inspection, per-call thinking, completed tool results, correlated
 trace prefixes and portable recovery. A durable lost completion reply retains

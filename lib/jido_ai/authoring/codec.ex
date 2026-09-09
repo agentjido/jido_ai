@@ -26,8 +26,8 @@ defmodule Jido.AI.Authoring.Codec do
   @doc "Decodes source profiles and lowers them into a neutral core Agent."
   def decode(agent, document, registry) do
     with :ok <- Data.check_document(document),
-         :ok <- Jido.Agent.Codec.object(document, ~w(type version profiles)),
-         :ok <- Jido.Agent.Codec.version(document, "jido.ai.profiles"),
+         :ok <- Data.object(document, ~w(type version profiles)),
+         :ok <- Data.version(document, "jido.ai.profiles"),
          {:ok, registry} <- Registry.new(registry),
          {:ok, profiles} <- Data.decode(document["profiles"], registry),
          do: Jido.AI.Authoring.lower(agent, profiles)

@@ -82,8 +82,7 @@ defmodule Jido.AI.Signal do
 
   defp payloads(%{kind: :request_started} = event),
     do: [
-      {Signal.RequestStarted,
-       request_data(event) |> Map.put(:query, Map.get(event.data, :query, ""))}
+      {Signal.RequestStarted, request_data(event) |> Map.put(:query, Map.get(event.data, :query, ""))}
     ]
 
   defp payloads(%{kind: :request_completed} = event),

@@ -91,6 +91,45 @@ defmodule Mix.Tasks.JidoAi.ContractTest do
     end
   end
 
+  describe "prepare_invocation/1" do
+    test "rejects unknown and malformed options" do
+      assert {:error, "text", message} =
+               JidoAiTask.prepare_invocation(["--unknown-option", "hello"])
+
+      assert message =~ "Invalid options"
+      assert message =~ "--unknown-option"
+
+      assert {:error, "text", message} =
+               JidoAiTask.prepare_invocation(["--timeout", "soon", "hello"])
+
+      assert message =~ "--timeout"
+    end
+
+    test "keeps JSON error framing for missing agent and tool modules" do
+      assert {:error, "json", agent_error} =
+               JidoAiTask.prepare_invocation([
+                 "--format",
+                 "json",
+                 "--agent",
+                 "Jido.AI.MissingAgent",
+                 "hello"
+               ])
+
+      assert agent_error =~ "Module Jido.AI.MissingAgent not found or not loaded"
+
+      assert {:error, "json", tool_error} =
+               JidoAiTask.prepare_invocation([
+                 "--format",
+                 "json",
+                 "--tools",
+                 "Jido.AI.MissingTool",
+                 "hello"
+               ])
+
+      assert tool_error =~ "Module Jido.AI.MissingTool not found or not loaded"
+    end
+  end
+
   describe "format_error/1" do
     test "formats standard and fallback errors" do
       assert JidoAiTask.format_error(:timeout) == "Timeout waiting for agent completion"

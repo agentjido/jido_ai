@@ -91,34 +91,43 @@ defmodule Mix.Tasks.JidoAi do
     Mix.Task.rerun("app.start")
     load_dotenv()
 
-    {opts, args, _invalid} =
-      OptionParser.parse(argv, option_parser_config())
+    case prepare_invocation(argv) do
+      {:ok, args, config} ->
+        if config.quiet do
+          Logger.configure(level: :warning)
+        end
 
-    config = build_config(opts)
+        if config.trace do
+          attach_trace_handlers()
+        end
 
-    case validate_format(config.format) do
-      :ok ->
-        :ok
-
-      {:error, reason} ->
-        output_fatal_error(%{config | format: "text"}, reason)
-    end
-
-    if config.quiet do
-      Logger.configure(level: :warning)
-    end
-
-    if config.trace do
-      attach_trace_handlers()
-    end
-
-    case validate_invocation(args, config) do
-      :ok ->
         start_jido_instance(JidoAi.CliJido)
         run_non_interactive(args, config)
 
-      {:error, reason} ->
-        output_fatal_error(config, reason)
+      {:error, format, reason} ->
+        output_fatal_error(%{format: format}, reason)
+    end
+  end
+
+  @doc false
+  @spec prepare_invocation([String.t()]) ::
+          {:ok, [String.t()], map()} | {:error, String.t(), term()}
+  def prepare_invocation(argv) do
+    {opts, args, invalid} = OptionParser.parse(argv, option_parser_config())
+    output_format = if opts[:format] == "json", do: "json", else: "text"
+
+    cond do
+      invalid != [] ->
+        {:error, output_format, "Invalid options: #{format_invalid_options(invalid)}"}
+
+      true ->
+        with {:ok, config} <- build_config_result(opts),
+             :ok <- validate_format(config.format),
+             :ok <- validate_invocation(args, config) do
+          {:ok, args, config}
+        else
+          {:error, reason} -> {:error, output_format, reason}
+        end
     end
   end
 
@@ -135,19 +144,30 @@ defmodule Mix.Tasks.JidoAi do
   @doc false
   @spec build_config(keyword()) :: map()
   def build_config(opts) do
-    %{
-      type: opts[:type],
-      user_agent_module: parse_module(opts[:agent]),
-      model: opts[:model],
-      tools: parse_tools(opts[:tools]),
-      system_prompt: opts[:system],
-      max_iterations: opts[:max_iterations],
-      format: opts[:format] || "text",
-      quiet: opts[:quiet] || false,
-      timeout: opts[:timeout] || 60_000,
-      stdin: opts[:stdin] || false,
-      trace: opts[:trace] || false
-    }
+    case build_config_result(opts) do
+      {:ok, config} -> config
+      {:error, reason} -> raise ArgumentError, format_error(reason)
+    end
+  end
+
+  defp build_config_result(opts) do
+    with {:ok, user_agent_module} <- parse_module(opts[:agent]),
+         {:ok, tools} <- parse_tools(opts[:tools]) do
+      {:ok,
+       %{
+         type: opts[:type],
+         user_agent_module: user_agent_module,
+         model: opts[:model],
+         tools: tools,
+         system_prompt: opts[:system],
+         max_iterations: opts[:max_iterations],
+         format: opts[:format] || "text",
+         quiet: opts[:quiet] || false,
+         timeout: opts[:timeout] || 60_000,
+         stdin: opts[:stdin] || false,
+         trace: opts[:trace] || false
+       }}
+    end
   end
 
   @doc false
@@ -359,25 +379,43 @@ defmodule Mix.Tasks.JidoAi do
   def format_error(reason) when is_binary(reason), do: reason
   def format_error(reason), do: inspect(reason)
 
-  defp parse_module(nil), do: nil
+  defp parse_module(nil), do: {:ok, nil}
 
   defp parse_module(module_string) do
-    module = Module.concat([module_string])
+    try do
+      module = Module.concat([module_string])
 
-    ensure_module_loaded!(module, module_string)
-    module
+      ensure_module_loaded!(module, module_string)
+      {:ok, module}
+    rescue
+      exception -> {:error, Exception.message(exception)}
+    end
   end
 
-  defp parse_tools(nil), do: nil
+  defp parse_tools(nil), do: {:ok, nil}
 
   defp parse_tools(tools_string) do
-    tools_string
-    |> String.split(",", trim: true)
-    |> Enum.map(&String.trim/1)
-    |> Enum.map(fn mod_string ->
-      module = Module.concat([mod_string])
-      ensure_module_loaded!(module, mod_string)
-      module
+    try do
+      tools =
+        tools_string
+        |> String.split(",", trim: true)
+        |> Enum.map(&String.trim/1)
+        |> Enum.map(fn mod_string ->
+          module = Module.concat([mod_string])
+          ensure_module_loaded!(module, mod_string)
+          module
+        end)
+
+      {:ok, tools}
+    rescue
+      exception -> {:error, Exception.message(exception)}
+    end
+  end
+
+  defp format_invalid_options(invalid) do
+    Enum.map_join(invalid, ", ", fn
+      {option, nil} -> option
+      {option, value} -> "#{option}=#{inspect(value)}"
     end)
   end
 

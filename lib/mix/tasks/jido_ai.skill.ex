@@ -231,13 +231,18 @@ defmodule Mix.Tasks.JidoAi.Skill do
       Mix.shell().info("")
     end
 
-    strict_failures =
-      Enum.count(results, fn {_path, result} ->
-        match?({:error, _, _}, result) or result_warning_count(result) > 0
-      end)
+    warning_failures =
+      Enum.count(results, fn {_path, result} -> result_warning_count(result) > 0 end)
 
-    if opts[:strict] && strict_failures > 0 do
-      Mix.raise("Validation failed for #{strict_failures} skill(s)")
+    cond do
+      errors != [] ->
+        Mix.raise("Validation failed for #{length(errors)} skill(s)")
+
+      opts[:strict] && warning_failures > 0 ->
+        Mix.raise("Validation failed for #{warning_failures} skill(s)")
+
+      true ->
+        :ok
     end
   end
 

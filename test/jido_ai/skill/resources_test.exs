@@ -71,6 +71,21 @@ defmodule Jido.AI.Skill.ResourcesTest do
       assert :max_resources in listing.truncation_reasons
     end
 
+    test "bounds directory entry enumeration before it can exceed policy memory", %{
+      tmp_dir: tmp_dir
+    } do
+      for name <- ["a.txt", "b.txt", "c.txt", "d.txt"] do
+        File.write!(Path.join(tmp_dir, name), name)
+      end
+
+      assert {:ok, listing} =
+               Resources.list_all(tmp_dir, max_resources: 1, max_directories: 1)
+
+      assert listing.resources == []
+      refute listing.complete
+      assert :directory_listing_limit in listing.truncation_reasons
+    end
+
     test "marks skipped deep directories as incomplete", %{tmp_dir: tmp_dir} do
       File.write!(Path.join(tmp_dir, "root.txt"), "root")
       File.mkdir_p!(Path.join(tmp_dir, "nested"))
@@ -129,6 +144,20 @@ defmodule Jido.AI.Skill.ResourcesTest do
       assert {:ok, %ResourcePolicy{binary: :allow}} = ResourcePolicy.new(binary: :allow)
       assert {:error, {:invalid_resource_policy, :binary}} = ResourcePolicy.new(binary: :unknown)
     end
+
+    test "returns an empty listing for a missing root and lists one conventional group", %{
+      tmp_dir: tmp_dir
+    } do
+      assert {:ok, %{resources: [], complete: true}} =
+               Resources.list_all(Path.join(tmp_dir, "missing"))
+
+      File.mkdir_p!(Path.join(tmp_dir, "assets"))
+      File.write!(Path.join(tmp_dir, "assets/icon.txt"), "icon")
+
+      assert [%{relative_path: "assets/icon.txt"}] = Resources.list_by_type(tmp_dir, :assets)
+      assert {:ok, %{resources: [], complete: true}} = Resources.empty_listing(max_resources: 2)
+      assert {:error, {:invalid_resource_policy, :max_resources}} = Resources.empty_listing(max_resources: 0)
+    end
   end
 
   describe "load_resource/2" do
@@ -165,6 +194,101 @@ defmodule Jido.AI.Skill.ResourcesTest do
 
       assert {:error, :binary_resource} =
                Resources.validate_loaded_text(%{content: <<0>>, size: 1}, ResourcePolicy.default())
+    end
+
+    test "covers common malformed, MIME, and binary attachment cases" do
+      reject = ResourcePolicy.default()
+      allow = %{reject | binary: :allow}
+
+      assert Resources.context_policy_key() == :__jido_ai_skill_resource_policy__
+      assert Resources.default_policy() == reject
+      assert {:ok, ^reject} = Resources.policy_from_context(%{})
+
+      assert {:ok, %ResourcePolicy{max_text_bytes: 3}} =
+               Resources.policy_from_context(%{
+                 "__jido_ai_skill_resource_policy__" => %{max_text_bytes: 3}
+               })
+
+      assert :ok = Resources.enforce_text_bounds("abc", 3, reject)
+      assert {:error, :malformed_resource} = Resources.validate_loaded_resource(%{}, reject)
+
+      assert {:error, :resource_size_mismatch} =
+               Resources.validate_loaded_resource(%{content: "abc", size: 2}, reject)
+
+      assert {:error, :invalid_resource_mime_type} =
+               Resources.validate_loaded_resource(%{content: "abc", size: 3, mime_type: 12}, reject)
+
+      assert {:error, :invalid_resource_mime_type} =
+               Resources.validate_loaded_resource(%{content: "abc", size: 3, mime_type: "invalid"}, reject)
+
+      assert {:error, :binary_resource} =
+               Resources.validate_loaded_resource(%{content: <<255>>, size: 1}, reject)
+
+      assert {:error, :invalid_resource_filename} =
+               Resources.validate_loaded_resource(
+                 %{content: <<255>>, size: 1, mime_type: "application/octet-stream"},
+                 allow
+               )
+
+      assert {:error, :invalid_resource_mime_type} =
+               Resources.validate_loaded_resource(%{content: <<255>>, size: 1, filename: "data.bin"}, allow)
+
+      assert {:ok, %{kind: :file, mime_type: "application/octet-stream"}} =
+               Resources.validate_loaded_resource(
+                 %{
+                   content: <<255>>,
+                   size: 1,
+                   filename: "data.bin",
+                   mime_type: "application/octet-stream"
+                 },
+                 allow
+               )
+
+      assert {:error, :resource_mime_mismatch} =
+               Resources.validate_loaded_resource(
+                 %{content: <<255>>, size: 1, filename: "data.bin", mime_type: "text/plain"},
+                 allow
+               )
+    end
+
+    test "detects known attachment signatures and rejects mismatched metadata" do
+      policy = %{ResourcePolicy.default() | binary: :allow}
+
+      fixtures = [
+        {<<137, "PNG", 13, 10, 26, 10, 0>>, "image.png", "image/png", :image},
+        {<<255, 216, 255, 0>>, "image.jpg", "image/jpeg", :image},
+        {<<"GIF87a", 0>>, "image.gif", "image/gif", :image},
+        {<<"GIF89a", 0>>, "image.gif", "image/gif", :image},
+        {<<"RIFF", 0, 0, 0, 0, "WEBP", 0>>, "image.webp", "image/webp", :image},
+        {<<"%PDF-1.7">>, "document.pdf", "application/pdf", :file}
+      ]
+
+      for {content, filename, mime_type, kind} <- fixtures do
+        assert {:ok, %{kind: ^kind, mime_type: ^mime_type}} =
+                 Resources.validate_loaded_resource(
+                   %{
+                     content: content,
+                     size: byte_size(content),
+                     filename: filename,
+                     mime_type: String.upcase(mime_type)
+                   },
+                   policy
+                 )
+      end
+
+      png = <<137, "PNG", 13, 10, 26, 10, 0>>
+
+      assert {:error, :resource_mime_mismatch} =
+               Resources.validate_loaded_resource(
+                 %{content: png, size: byte_size(png), filename: "image.png", mime_type: "image/jpeg"},
+                 policy
+               )
+
+      assert {:error, :resource_mime_mismatch} =
+               Resources.validate_loaded_resource(
+                 %{content: "plain", size: 5, filename: "image.png"},
+                 policy
+               )
     end
   end
 
@@ -227,6 +351,30 @@ defmodule Jido.AI.Skill.ResourcesTest do
 
       assert {:error, :path_traversal} = Resources.load_text(tmp_dir, "linked.txt")
     end
+
+    test "load and compatibility text helpers return normalized resources", %{tmp_dir: tmp_dir} do
+      File.write!(Path.join(tmp_dir, "note.txt"), "note")
+      File.write!(Path.join(tmp_dir, "empty.txt"), "")
+      File.write!(Path.join(tmp_dir, "binary.bin"), <<255>>)
+
+      assert {:ok, "note"} = Resources.load_resource_text(tmp_dir, "note.txt")
+      assert {:error, :not_found} = Resources.load_resource_text(tmp_dir, "missing.txt")
+      assert {:ok, %{kind: :text, content: "note", filename: "note.txt"}} = Resources.load(tmp_dir, "note.txt")
+      assert {:ok, ""} = Resources.load_resource(tmp_dir, "empty.txt")
+
+      assert {:ok, %{kind: :file, mime_type: "application/octet-stream"}} =
+               Resources.load(tmp_dir, "binary.bin", binary: :allow)
+
+      assert {:error, :binary_resource} = Resources.load(tmp_dir, "binary.bin")
+    end
+
+    test "directories and dangling symlinks are not loadable resources", %{tmp_dir: tmp_dir} do
+      File.mkdir_p!(Path.join(tmp_dir, "directory"))
+      File.ln_s!(Path.join(tmp_dir, "missing-target"), Path.join(tmp_dir, "dangling"))
+
+      assert {:error, :not_found} = Resources.load_text(tmp_dir, "directory")
+      assert {:error, :path_traversal} = Resources.load_text(tmp_dir, "dangling")
+    end
   end
 
   describe "exists?/2" do
@@ -255,6 +403,10 @@ defmodule Jido.AI.Skill.ResourcesTest do
     test "blocks absolute path injection" do
       assert Resources.resolve_path("/base", "/etc/passwd") ==
                {:error, :path_traversal}
+    end
+
+    test "resolves paths when the skill root is the filesystem root" do
+      assert {:ok, "/tmp"} = Resources.resolve_path("/", "tmp")
     end
 
     test "blocks symlink escapes", %{tmp_dir: tmp_dir} do
@@ -299,6 +451,31 @@ defmodule Jido.AI.Skill.ResourcesTest do
       matches = Resources.search(skill_root, "references/**/*.md")
 
       assert Enum.map(matches, & &1.relative_path) == ["references/inside.md"]
+    end
+
+    test "supports star, recursive star, and question patterns and invalid patterns", %{tmp_dir: tmp_dir} do
+      File.mkdir_p!(Path.join(tmp_dir, "nested"))
+      File.write!(Path.join(tmp_dir, "a.txt"), "a")
+      File.write!(Path.join(tmp_dir, "b.md"), "b")
+      File.write!(Path.join(tmp_dir, "nested/c.txt"), "c")
+
+      assert Enum.map(Resources.search(tmp_dir, "?.txt"), & &1.relative_path) == ["a.txt"]
+      assert Enum.map(Resources.search(tmp_dir, "**/*.txt"), & &1.relative_path) == ["a.txt", "nested/c.txt"]
+      assert Resources.search(tmp_dir, "[") == []
+    end
+  end
+
+  describe "resource_info/2" do
+    test "returns portable metadata and hides unsafe lookup errors", %{tmp_dir: tmp_dir} do
+      File.write!(Path.join(tmp_dir, "info.txt"), "info")
+
+      assert {:ok, info} = Resources.resource_info(tmp_dir, "info.txt")
+      assert info.name == "info.txt"
+      assert info.relative_path == "info.txt"
+      assert info.size == 4
+      assert %DateTime{} = info.modified
+
+      assert {:error, :not_found} = Resources.resource_info(tmp_dir, "missing.txt")
     end
   end
 end

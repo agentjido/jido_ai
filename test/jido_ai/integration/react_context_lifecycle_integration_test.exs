@@ -2,11 +2,10 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
   use ExUnit.Case, async: false
   use Mimic
 
-  alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Context
-  alias Jido.AI.TestSupport.StreamResponseFactory
   alias Jido.Thread
-  alias Jido.Thread.Agent, as: ThreadAgent
+  alias Jido.AI.Context.Operations
+  alias Jido.AI.TestSupport.StreamResponseFactory
 
   defmodule EchoTool do
     use Jido.Action,
@@ -84,9 +83,9 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
     assert assistant_contents(second_messages) == ["A1"]
 
     # Inspect the materialized ReAct context before reset.
-    state_before_reset = strategy_state(pid)
+    state_before_reset = strategy_context(pid)
 
-    assert non_system_messages(state_before_reset.context) == [
+    assert non_system_messages(state_before_reset) == [
              %{role: :user, content: "Q1"},
              %{role: :assistant, content: "A1"},
              %{role: :user, content: "Q2"},
@@ -116,10 +115,10 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
     assert {:ok, _agent} = Jido.AgentServer.call(pid, reset_signal, 5_000)
 
     # After reset, materialized strategy context is replaced immediately.
-    state_after_reset = strategy_state(pid)
-    assert state_after_reset.context.system_prompt == "Reset prompt"
-    assert state_after_reset.config.system_prompt == "Reset prompt"
-    assert non_system_messages(state_after_reset.context) == [%{role: :user, content: "Reset seed"}]
+    state_after_reset = strategy_context(pid)
+    assert state_after_reset.system_prompt == "Reset prompt"
+    assert Jido.AI.get_strategy_config(fetch_agent(pid)).system_prompt == "Reset prompt"
+    assert non_system_messages(state_after_reset) == [%{role: :user, content: "Reset seed"}]
 
     # Turn 3 should project only from reset context, not from pre-reset turns.
     assert {:ok, "A3"} = ContextLifecycleAgent.ask_sync(pid, "Q3", timeout: 5_000)
@@ -130,28 +129,25 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
     refute "Q2" in user_contents(third_messages)
 
     # Materialized strategy context now reflects post-reset conversation only.
-    state_final = strategy_state(pid)
+    state_final = strategy_context(pid)
 
-    assert non_system_messages(state_final.context) == [
+    assert non_system_messages(state_final) == [
              %{role: :user, content: "Reset seed"},
              %{role: :user, content: "Q3"},
              %{role: :assistant, content: "A3"}
            ]
 
-    core_thread =
-      pid
-      |> fetch_agent()
-      |> ThreadAgent.get()
+    session_thread = session_thread(pid)
 
-    # Core thread is append-only: reset is represented as a context operation entry.
-    [context_op] = Thread.filter_by_kind(core_thread, :ai_context_operation)
+    # The Agent-owned log is append-only: reset is a context operation entry.
+    [context_op] = Thread.filter_by_kind(session_thread, :ai_context_operation)
     assert context_op.payload.op_id == "op_reset_demo"
     assert context_op.payload.context_ref == "default"
     assert context_op.payload.operation.type == :replace
     assert context_op.payload.operation.reason == :manual
 
-    # Core thread still preserves full audit history of all user/assistant turns.
-    ai_messages = Thread.filter_by_kind(core_thread, :ai_message)
+    # The session thread still preserves the full audit history of all turns.
+    ai_messages = Thread.filter_by_kind(session_thread, :ai_message)
 
     assert Enum.count(ai_messages, &(entry_role(&1) == :user)) == 3
     assert Enum.count(ai_messages, &(entry_role(&1) == :assistant)) == 3
@@ -161,15 +157,16 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
     refute Enum.any?(ai_messages, &(entry_content(&1) == "Reset seed"))
   end
 
-  defp strategy_state(pid) do
-    pid
-    |> fetch_agent()
-    |> StratState.get(%{})
+  defp strategy_context(pid), do: pid |> fetch_agent() |> Jido.AI.get_strategy_context()
+
+  defp session_thread(pid) do
+    lanes = fetch_agent(pid).state[Operations.key()]
+    [lane] = Map.values(lanes)
+    lane.session.thread
   end
 
   defp fetch_agent(pid) do
-    {:ok, server_state} = Jido.AgentServer.state(pid)
-    server_state.agent
+    Jido.AgentServer.agent(pid)
   end
 
   defp non_system_messages(%Context{} = context) do
@@ -190,11 +187,17 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
     |> Enum.map(&message_content/1)
   end
 
+  defp user_contents(%ReqLLM.Context{} = context),
+    do: context |> ReqLLM.Context.to_list() |> user_contents()
+
   defp assistant_contents(messages) when is_list(messages) do
     messages
     |> Enum.filter(&(message_role(&1) == :assistant))
     |> Enum.map(&message_content/1)
   end
+
+  defp assistant_contents(%ReqLLM.Context{} = context),
+    do: context |> ReqLLM.Context.to_list() |> assistant_contents()
 
   defp message_role(message) when is_map(message) do
     case Map.get(message, :role, Map.get(message, "role")) do
@@ -205,6 +208,16 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
       "system" -> :system
       _ -> :unknown
     end
+  end
+
+  defp message_content(%{content: parts}) when is_list(parts) do
+    parts
+    |> Enum.flat_map(fn
+      %ReqLLM.Message.ContentPart{text: text} when is_binary(text) -> [text]
+      %{text: text} when is_binary(text) -> [text]
+      _ -> []
+    end)
+    |> Enum.join("")
   end
 
   defp message_content(message) when is_map(message) do

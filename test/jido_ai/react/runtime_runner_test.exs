@@ -546,6 +546,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert_script_done(mock)
   end
 
+  @tag :legacy_v2
   test "tool interceptor skips unknown tools and preserves existing unknown-tool result" do
     :persistent_term.erase({__MODULE__, :unknown_tool_llm_count})
     Mimic.stub(ReqLLM.StreamResponse, :process_stream, &process_stream_response/2)
@@ -679,6 +680,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert_script_done(mock)
   end
 
+  @tag :legacy_v2
   test "structured output repair runs llm_opts through the configured request_transformer" do
     schema = ticket_schema()
 
@@ -884,6 +886,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert_script_done(mock)
   end
 
+  @tag :legacy_v2
   test "drains pending input after a final answer before completing the request" do
     {:ok, pending_input_server} =
       PendingInputServer.start_link(owner: self(), request_id: "req_pending_after_final")
@@ -1075,6 +1078,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert Enum.any?(events, &(&1.kind == :request_completed))
   end
 
+  @tag :legacy_v2
   test "passes req_http_options to non-streaming requests" do
     req_http_options = [plug: {Req.Test, []}]
     llm_opts = [thinking: %{type: :enabled, budget_tokens: 2_048}, reasoning_effort: :low]
@@ -1228,6 +1232,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert_script_done(mock)
   end
 
+  @tag :legacy_v2
   test "request_transformer OpenAI model override enables websocket session setup" do
     parent = self()
     session = exited_pid()
@@ -1301,6 +1306,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert Enum.any?(events, &(&1.kind == :request_completed))
   end
 
+  @tag :legacy_v2
   test "passes previous_response_id between streaming tool rounds for OpenAI Responses models" do
     Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, opts ->
       count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
@@ -1370,6 +1376,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert request_completed.data.result == "Result is 5"
   end
 
+  @tag :legacy_v2
   test "keeps tool-call argument fragment streams alive across idle timeout" do
     Mimic.stub(ReqLLM.StreamResponse, :process_stream, &process_stream_response/2)
 
@@ -1494,6 +1501,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert request_completed.data.result == String.duplicate("x", 200)
   end
 
+  @tag :legacy_v2
   test "halts inactive streams after stream_timeout_ms" do
     parent = self()
 
@@ -1527,6 +1535,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert_receive :idle_stream_cancelled, 200
   end
 
+  @tag :legacy_v2
   test "successful stream cleanup ignores dead cancel process exits" do
     {:ok, dead_pid} = Agent.start_link(fn -> :ok end)
     dead_ref = Process.monitor(dead_pid)
@@ -1587,6 +1596,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert_script_done(mock)
   end
 
+  @tag :legacy_v2
   test "retries tool execution and reports attempts in tool_completed" do
     Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
       count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
@@ -1823,6 +1833,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert request_failed.data.error_type == :tool_guardrail
   end
 
+  @tag :legacy_v2
   test "emits tool_completed events in original tool call order for parallel tools" do
     stub_parallel_order_run()
 
@@ -1844,6 +1855,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert tool_completed_ids == ["tc_slow", "tc_fast"]
   end
 
+  @tag :legacy_v2
   test "strategy applies tool effects in deterministic call order" do
     stub_parallel_order_run()
     request_id = "req_strategy_ordering"
@@ -1893,6 +1905,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert agent.state.react_order_marker == :fast
   end
 
+  @tag :legacy_v2
   test "keeps telemetry ids out of standalone tool action context" do
     test_pid = self()
     handler_id = "react-tool-execute-stop-id-#{System.unique_integer([:positive])}"
@@ -2083,6 +2096,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert is_binary(collected.final_token)
   end
 
+  @tag :legacy_v2
   test "request_transformer can narrow tools and add llm opts from runtime state" do
     parent = self()
 
@@ -2150,6 +2164,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert request_completed.data.result == "Selected code 8409.91.01"
   end
 
+  @tag :legacy_v2
   test "halting event consumption cancels active runner task" do
     parent = self()
 
@@ -2316,6 +2331,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     end
   end
 
+  @tag :legacy_v2
   test "strategy consumes runtime runner event stream to terminal state" do
     Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
       {:ok,
@@ -2554,11 +2570,15 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
 
   defp invoke_stream_specific_callback(_chunk, _callbacks), do: :ok
 
+  defp user_contents(%ReqLLM.Context{} = context), do: context |> ReqLLM.Context.to_list() |> user_contents()
+
   defp user_contents(messages) when is_list(messages) do
     messages
     |> Enum.filter(&(message_role(&1) == :user))
     |> Enum.map(&message_content/1)
   end
+
+  defp assistant_contents(%ReqLLM.Context{} = context), do: context |> ReqLLM.Context.to_list() |> assistant_contents()
 
   defp assistant_contents(messages) when is_list(messages) do
     messages
@@ -2578,7 +2598,9 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   end
 
   defp message_content(message) when is_map(message) do
-    Map.get(message, :content, Map.get(message, "content"))
+    message
+    |> Map.get(:content, Map.get(message, "content"))
+    |> Jido.AI.Turn.extract_text()
   end
 
   defp maybe_invoke_chunk_callback(_chunk, callback) when not is_function(callback, 1), do: :ok

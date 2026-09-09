@@ -2,6 +2,8 @@ defmodule Jido.AI.Authoring do
   @moduledoc "Lowers validated AI profiles into an ordinary Jido Agent definition."
   alias Jido.AI.{Profile, Runtime}
 
+  @state_size_key :jido_ai_max_state_size
+
   defmodule Ref do
     @moduledoc "A static route reference to one declared AI profile."
     defstruct [:id]
@@ -9,6 +11,45 @@ defmodule Jido.AI.Authoring do
 
   @doc "Makes an AI route reference in source attributes passed to lower/2."
   def ai(id), do: %Ref{id: id}
+
+  @doc false
+  def state_size_key, do: @state_size_key
+
+  @doc false
+  def state_size_limit(%{metadata: metadata}) when is_map(metadata),
+    do: Map.get(metadata, @state_size_key)
+
+  def state_size_limit(_), do: nil
+
+  @doc false
+  def with_state_size_limit(config, nil), do: {:ok, config}
+
+  def with_state_size_limit(%{metadata: metadata, schema: schema} = config, limit)
+      when is_map(metadata) and is_integer(limit) and limit > 0 do
+    {:ok,
+     %{
+       config
+       | metadata: Map.put(metadata, @state_size_key, limit),
+         schema: Zoi.refine(schema, {__MODULE__, :validate_state_size, [limit]})
+     }}
+  end
+
+  def with_state_size_limit(_, _),
+    do: Profile.error("max_state_size", "Expected a positive integer")
+
+  @doc false
+  def validate_state_size(state, limit, _context) do
+    if :erlang.external_size(state) <= limit,
+      do: :ok,
+      else: {:error, "Agent state exceeds max_state_size"}
+  end
+
+  @doc false
+  def state_size_error?(%{message: "Agent state exceeds max_state_size"}), do: true
+
+  def state_size_error?(%{details: %{errors: errors}}), do: state_size_error?(errors)
+  def state_size_error?(errors) when is_list(errors), do: Enum.any?(errors, &state_size_error?/1)
+  def state_size_error?(_), do: false
 
   @doc false
   def request_binding(%Jido.Agent{routes: routes}, %Jido.Signal{data: data} = signal) when is_map(data) do
@@ -41,7 +82,7 @@ defmodule Jido.AI.Authoring do
 
   @doc "Lowers profiles on a neutral Agent or static attribute map, then applies core validation."
   def lower(%Jido.Agent{id: nil, state: nil} = agent, profiles) do
-    attrs = agent |> Jido.Agent.to_map() |> Map.drop([:id, :state])
+    attrs = agent |> Map.from_struct() |> Map.drop([:id, :state])
     with {:ok, attrs} <- lower_config(attrs, profiles), do: Jido.Agent.new(attrs)
   end
 
@@ -53,7 +94,7 @@ defmodule Jido.AI.Authoring do
          {:ok, base} <- Jido.Agent.new(Map.delete(attrs, :routes)),
          %Jido.Agent{id: nil, state: nil} <- base,
          config =
-           base |> Jido.Agent.to_map() |> Map.drop([:id, :state]) |> Map.put(:routes, routes),
+           base |> Map.from_struct() |> Map.drop([:id, :state]) |> Map.put(:routes, routes),
          {:ok, config} <- lower_config(config, profiles) do
       Jido.Agent.new(config)
     else
@@ -64,12 +105,16 @@ defmodule Jido.AI.Authoring do
 
   @doc false
   def lower_config(config, values) do
-    Code.ensure_compiled!(Runtime.Plugin)
+    ensure_plugin_compiled!(Runtime.Plugin)
+    Code.ensure_compiled!(Runtime.PreparationPlugin)
     Code.ensure_compiled!(Jido.AI.Configuration.Apply)
     Code.ensure_compiled!(Jido.AI.Context.Operations.Apply)
-    Code.ensure_compiled!(Jido.AI.Context.Operations.Plugin)
+    ensure_plugin_compiled!(Jido.AI.Context.Operations.Plugin)
+    ensure_plugin_compiled!(Jido.AI.Session.Plugin)
+    Code.ensure_compiled!(Jido.AI.Session.PreparationPlugin)
 
-    with {:ok, pairs} <- Profile.traverse(values, &Profile.source/1),
+    with {:ok, config} <- configured_state_size(config),
+         {:ok, pairs} <- Profile.traverse(values, &Profile.source/1),
          profiles = Enum.map(pairs, &elem(&1, 0)),
          true <- length(profiles) == length(Enum.uniq_by(profiles, & &1.id)),
          :ok <- fields(config.schema, profiles),
@@ -78,7 +123,9 @@ defmodule Jido.AI.Authoring do
              config.plugins,
              &(plugin_module(&1) in [
                  Runtime.Plugin,
+                 Runtime.PreparationPlugin,
                  Jido.AI.Session.Plugin,
+                 Jido.AI.Session.PreparationPlugin,
                  Jido.AI.Context.Operations.Plugin
                ])
            ),
@@ -96,6 +143,7 @@ defmodule Jido.AI.Authoring do
              &{&1.id, &1.memory.history}
            ),
          {:ok, internal_routes} <- Jido.AI.Session.routes(sessions),
+         internal_routes = prefer_explicit_observation_routes(internal_routes, routes),
          {:ok, config_routes} <-
            Jido.Agent.Authoring.routes(
              if(profiles == [],
@@ -110,13 +158,25 @@ defmodule Jido.AI.Authoring do
       plugins =
         if profiles == [],
           do: config.plugins,
-          else: config.plugins ++ [{Runtime.Plugin, [profiles: Map.new(profiles, &{&1.id, &1})]}]
+          else:
+            config.plugins ++
+              [
+                {Runtime.Plugin, [profiles: Map.new(profiles, &{&1.id, &1})]},
+                {Runtime.PreparationPlugin, []}
+              ]
 
       skill_sources = Map.new(Enum.filter(sessions, &(&1.skills != nil)), &{&1.id, &1.skills})
       session_opts = if map_size(skill_sources) == 0, do: [], else: [skills: skill_sources]
 
       plugins =
-        if sessions == [], do: plugins, else: plugins ++ [{Jido.AI.Session.Plugin, session_opts}]
+        if sessions == [],
+          do: plugins,
+          else:
+            plugins ++
+              [
+                {Jido.AI.Session.Plugin, session_opts},
+                {Jido.AI.Session.PreparationPlugin, []}
+              ]
 
       plugins =
         if map_size(histories) == 0,
@@ -128,6 +188,25 @@ defmodule Jido.AI.Authoring do
       true -> Profile.error("plugins", "The AI binding Plugin is managed by the lowerer")
       false -> Profile.error("profiles", "Duplicate profile ID")
       error -> error
+    end
+  end
+
+  defp configured_state_size(config),
+    do: with_state_size_limit(config, state_size_limit(config))
+
+  defp ensure_plugin_compiled!(module) do
+    Code.ensure_compiled!(module)
+
+    case module.__jido_plugin__() do
+      %Jido.Plugin.Manifest{} = manifest ->
+        manifest
+        |> Map.take([:agent, :agent_server, :persistence, :topology])
+        |> Map.values()
+        |> Enum.reject(&is_nil/1)
+        |> Enum.each(&Code.ensure_compiled!/1)
+
+      _ ->
+        :ok
     end
   end
 
@@ -220,6 +299,21 @@ defmodule Jido.AI.Authoring do
     if keys == Enum.uniq(keys),
       do: :ok,
       else: Profile.error("routes", "Conflicting route bindings")
+  end
+
+  defp prefer_explicit_observation_routes(internal, explicit) do
+    {:ok, explicit} = Jido.Agent.Authoring.routes(explicit)
+    {:ok, router} = Jido.Signal.Router.new(explicit)
+
+    Enum.reject(internal, fn route ->
+      Jido.AI.Session.observation_type?(route.path) and
+        explicitly_routed?(router, route.path)
+    end)
+  end
+
+  defp explicitly_routed?(router, type) do
+    signal = Jido.Signal.new!(type, %{}, source: "/jido/ai/authoring")
+    match?({:ok, [_ | _]}, Jido.Signal.Router.route(router, signal))
   end
 
   defp flow(%{requests: %{mode: :session}} = profile),

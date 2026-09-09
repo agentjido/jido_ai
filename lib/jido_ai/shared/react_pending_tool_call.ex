@@ -15,8 +15,7 @@ defmodule Jido.AI.Reasoning.ReAct.PendingToolCall do
               status: Zoi.atom(description: "Execution status") |> Zoi.default(:pending),
               result: Zoi.any(description: "Raw tool execution result") |> Zoi.optional(),
               attempts: Zoi.integer(description: "Execution attempts") |> Zoi.default(0),
-              duration_ms:
-                Zoi.integer(description: "Execution duration in milliseconds") |> Zoi.nullish()
+              duration_ms: Zoi.integer(description: "Execution duration in milliseconds") |> Zoi.nullish()
             },
             coerce: true
           )
@@ -43,9 +42,7 @@ defmodule Jido.AI.Reasoning.ReAct.PendingToolCall do
         name: to_string(Map.get(tool_call, :name, Map.get(tool_call, "name", ""))),
         arguments: Map.get(tool_call, :arguments, Map.get(tool_call, "arguments", %{})) || %{}
       }
-      |> maybe_put_action_module(
-        Map.get(tool_call, :action_module, Map.get(tool_call, "action_module"))
-      )
+      |> maybe_put_action_module(Map.get(tool_call, :action_module, Map.get(tool_call, "action_module")))
 
     case Zoi.parse(@schema, attrs) do
       {:ok, call} -> call

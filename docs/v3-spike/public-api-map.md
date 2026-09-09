@@ -38,7 +38,7 @@ listed in the inventory. Keep tagged errors and each public result shape.
 | `register_tool/2,3`, `unregister_tool/2,3`, `set_system_prompt/2,3` | `API/tool-contracts`: live calls return the supported tagged Agent result. Validate a real loadable tool, actual next-turn schema/prompt and unknown server/error handling. Preserve documented validation and timeout options. |
 | `register_tool_direct/2,3`, `unregister_tool_direct/2`, `set_system_prompt_direct/2` | Direct registration/removal return tagged Agent results; direct prompt update returns an Agent. Prove no Server self-call when invoked during real work. Preserve supported behavior through complete candidate-state assembly. |
 | `list_tools/1`, `has_tool?/2` | Struct input returns a plain list/boolean. Server input returns a tagged result. Test both, plus a change during active work and the catalog boundary before the next tool round. |
-| `get_strategy_config/1`, `get_strategy_context/1`, `update_context_entries/2` | The configuration getter reads the effective profile. The v2 context helpers used active private `run_context`; v3 reads and changes declared committed history. Active work keeps its admitted history. The [02_21 cases](../../examples/v3/profiles/02_21_context_views.md) cover idle, active, absent and reconstructed history. Full old-state conversion remains required. |
+| `get_strategy_config/1`, `get_strategy_context/1`, `update_context_entries/2` | The configuration getter reads the effective profile. The v2 context helpers used active private `run_context`; v3 reads and changes declared committed history. Active work keeps its admitted history. The [02_21 cases](../../examples/02_requests/02_21_context_views/README.md) cover idle, active, absent and reconstructed history. Full old-state conversion remains required. |
 | `steer/2,3`, `inject/2,3` | These delegate to ReAct control. Preserve queued/rejected results and expected request IDs through the real request owner. A successful control call is not proof that the model consumed the input. |
 
 The existing anchors include [facade tests](../../test/jido_ai/jido_ai_core_test.exs),
@@ -74,7 +74,7 @@ define the retained surface; any broader common wrapper is a named v3 change.
 Agent templates. The new DSL can share one request implementation while
 compatibility wrappers retain the supported method names.
 
-The [02_03 public Agent example](../../examples/v3/profiles/02_03_public_agent.md)
+The [02_03 public Agent example](../../examples/02_requests/02_03_public_agent/README.md)
 now tests the actual generated helpers on v3. It retains the documented handle,
 stream map, steering result and cancellation reason shapes. Core `new/1` now
 returns a tagged result; `new!/1` supplies the direct Agent value. Convenience
@@ -82,15 +82,15 @@ state has a pure compatibility projection, with typed output in `last_result`.
 Remaining advanced options, command hooks, strategy macros and the full facade remain open.
 This is partial execution evidence, not completion of this API map.
 
-The [02_12 callback example](../../examples/v3/profiles/02_12_tool_callbacks.md)
+The [02_12 callback example](../../examples/02_requests/02_12_tool_callbacks/README.md)
 now ports the optional Agent tool callbacks through core Exec. It proves the
 long-key alias workflow, before-validation order, real retries, final errors,
 parallel batch/result order, effect policy and trusted runtime context. Native
 DSL, source data, Builder and source JSON use an explicit callback module.
-The [09_05 example](../../examples/v3/profiles/09_05_tot_api.md) now extends
+The [09_05 example](../../examples/09_reasoning/09_05_tot_api/README.md) now extends
 this evidence to ToT. Standalone AI helpers and pending-work replay remain open.
 
-The [02_13 example](../../examples/v3/profiles/02_13_tool_limits.md) ports the
+The [02_13 example](../../examples/02_requests/02_13_tool_limits/README.md) ports the
 transient `context.__tool_guardrail_callback__` through core Exec. Prepared
 arguments keep their original shape, with validated arguments in an added
 field. A rejection or interruption stops the whole batch. The same example
@@ -100,7 +100,7 @@ Exec is covered; legacy `Turn.execute_module` and Directive entry points still
 need their port. Core timeouts retain their explicit non-retryable result.
 Legacy error-map retry inputs still need a compatibility case.
 
-The [02_14 activity example](../../examples/v3/profiles/02_14_stream_activity.md)
+The [02_14 activity example](../../examples/02_requests/02_14_stream_activity/README.md)
 ports public `stream_timeout_ms`, `stream_receive_timeout_ms` and
 `tool_heartbeat_ms` options. Public ask, sync and stream helpers use one
 request conversion. Canonical keepalives preserve both runtime and enumerable
@@ -109,7 +109,7 @@ The example proves request overrides, sequence order, deadline and timer cleanup
 and current interruption after owner failure. Standalone Start/Continue/Collect,
 token compatibility and durable sink/sequence recovery remain open.
 
-The [02_15 early-activity example](../../examples/v3/profiles/02_15_early_tool_activity.md)
+The [02_15 early-activity example](../../examples/02_requests/02_15_early_tool_activity/README.md)
 adds named `:tool_call` deltas before complete argument input. It verifies real
 document I/O only after admission, empty and unnamed fragments, blocked/unknown
 tools, cancellation and disconnected input. Native and public Agents now share
@@ -117,7 +117,7 @@ the existing `emit_llm_deltas?` capture flag, with complete results and internal
 activity retained when capture is off. This proves the public request envelope;
 live `ai.llm.delta` Signal projection and other reasoning methods remain open.
 
-The [02_11 completion example](../../examples/v3/profiles/02_11_completion.md)
+The [02_11 completion example](../../examples/02_requests/02_11_completion/README.md)
 adds observed failure commits, state-limit handling and real storage failures.
 Await success proves the answer commit, before post-commit Directive dispatch.
 `completion_uncommitted` reports an owner-observed failure with a pending stored
@@ -125,7 +125,7 @@ record; `completion_uncertain` does not claim a known storage outcome. A stopped
 Agent PID still returns `agent_server_unavailable`. Full durable sink delivery
 and state conversion remain open.
 
-The [02_05 example](../../examples/v3/profiles/02_05_request_transform.md) adds
+The [02_05 example](../../examples/02_requests/02_05_request_transform/README.md) adds
 request transformers and configured repair callbacks through the public macro
 and native DSL. It also executes direct `Output.repair/5` overrides and callback
 references decoded from source JSON. Full standalone ReAct, token compatibility,
@@ -224,7 +224,7 @@ pending. No runtime tests or production edits were performed for this check.
 
 ## Effect API execution checkpoint
 
-The [02_10 example](../../examples/v3/profiles/02_10_tool_effects.md) and the
+The [02_10 example](../../examples/02_requests/02_10_tool_effects/README.md) and the
 retained Policy/Applier tests now exercise `API/effect-policy` on v3. The Effects
 module names and tuple arities remain. StateOp construction becomes
 `Jido.AI.Effects.state(complete_state)`. Core Plugin protection and state
@@ -239,7 +239,7 @@ The implementation record contains current suite results and remaining gates.
 
 ## Typed Signal and Turn execution checkpoint
 
-The [02_16 example](../../examples/v3/profiles/02_16_typed_signals.md) retains
+The [02_16 example](../../examples/02_requests/02_16_typed_signals/README.md) retains
 the ten public Signal modules on static core schemas and compiles the shared
 `Jido.AI.Turn` conversion/execution helpers. Constructor metadata, error classes,
 timestamps, duplicate-key rules and protected type/data options have explicit
@@ -253,7 +253,7 @@ option is accepted but does not configure core Exec; suppression-only tests
 are not evidence of full logging precedence. All legacy option shapes, direct
 long-tool budgets, other methods and the full root package remain required.
 
-The [02_17 example](../../examples/v3/profiles/02_17_signal_delivery.md) adds
+The [02_17 example](../../examples/02_requests/02_17_signal_delivery/README.md) adds
 automatic request Signal delivery through the owning Agent. The existing
 observation map accepts `emit_signals?`. `Session.delivery_status/2` reads a
 bounded transient report; `Request.await` still confirms the answer commit.
@@ -264,7 +264,7 @@ implied by a successful dispatch receipt.
 
 ## CoT and CoD execution checkpoint
 
-The [09_01 example](../../examples/v3/profiles/09_01_linear.md) runs native
+The [09_01 example](../../examples/09_reasoning/09_01_linear/README.md) runs native
 CoT/CoD profiles and the public `CoTAgent`/`CoDAgent` request helpers on v3.
 Prompt attributes, defaults, invalid inputs, `strategy_opts/0`, think/draft
 helpers, usage reset, method identity, rich results and printable state fields
@@ -272,7 +272,7 @@ have transport and Agent evidence. Output validation, structured repair,
 controls, cancellation, limits and recovery use the common implementation.
 
 The namespace prompt/parser/call-ID helpers compile from `shared`. The later
-[09_02 example](../../examples/v3/profiles/09_02_method_api.md) adds `method/0`
+[09_02 example](../../examples/09_reasoning/09_02_method_api/README.md) adds `method/0`
 for profile selection and namespace result getters with optional request IDs.
 The old Strategy names remain loadable read-only getter adapters. Their core
 execution callbacks map to normal Agent/Flow/Session APIs. `strategy_module/0`
@@ -288,7 +288,7 @@ inventory and its original source paths.
 
 ## AoT execution checkpoint
 
-The [09_03 example](../../examples/v3/profiles/09_03_aot.md) ports the AoT
+The [09_03 example](../../examples/09_reasoning/09_03_aot/README.md) ports the AoT
 profile, public explore helpers, namespace helpers and Machine/Result data
 APIs through the existing Flow. The structured result survives direct Flow,
 ordinary Agent and Session paths. Native options, profile prompt variants,
@@ -305,7 +305,7 @@ open. The pinned inventory is unchanged.
 
 ## Native ToT checkpoint
 
-The [09_04 example](../../examples/v3/profiles/09_04_tot.md) selects ToT through
+The [09_04 example](../../examples/09_reasoning/09_04_tot/README.md) selects ToT through
 a native AI profile and proves its shared Flow. Machine and Result retain their
 namespace and data APIs; 18 retained tests pass. String status values remain
 part of the result contract. The finite transition implementation no longer
@@ -317,7 +317,7 @@ result and media input remain explicit gaps.
 
 ## Public ToT checkpoint
 
-The [09_05 example](../../examples/v3/profiles/09_05_tot_api.md) runs the actual
+The [09_05 example](../../examples/09_reasoning/09_05_tot_api/README.md) runs the actual
 public macro, explore helpers, generation options and retained tree getters.
 It maps the old Strategy to four deprecated inspection functions. Use namespace
 `method/0` for selection; Agent routes, core Flow and the shared request API
@@ -339,7 +339,7 @@ standalone, CLI/capability and root package checks remain required.
 
 ## Native GoT checkpoint
 
-The [09_06 example](../../examples/v3/profiles/09_06_got.md) executes native
+The [09_06 example](../../examples/09_reasoning/09_06_got/README.md) executes native
 GoT profiles and retains the Machine data API on v3. The 41 original Machine
 tests pass unchanged. Additional examples verify legacy telemetry, nested usage
 totals and the PR 314 graph traversal change. Native request success is still
@@ -353,7 +353,7 @@ aggregation-mode option and implementing distinct voting/weighted execution.
 
 ## Public GoT checkpoint
 
-The [09_07 example](../../examples/v3/profiles/09_07_got_api.md) now ports
+The [09_07 example](../../examples/09_reasoning/09_07_got_api/README.md) now ports
 `GoTAgent`, namespace result/graph inspection and the five old Strategy getters.
 The wrapper and common Agent both run the existing GoT profile. Helpers retain
 successful text and failed error-pair inspection; printable `last_result` does
@@ -373,7 +373,7 @@ inventory is unchanged.
 
 ## Native TRM checkpoint
 
-The [09_08 example](../../examples/v3/profiles/09_08_trm.md) ports the native
+The [09_08 example](../../examples/09_reasoning/09_08_trm/README.md) ports the native
 TRM profile and shared Flow. Machine, ACT, Reasoning, Supervision and Helpers
 retain their names; their 204 existing tests pass on v3 dependencies. The
 Machine now uses finite transitions and the shared nested usage merge. Native
@@ -388,7 +388,7 @@ remains unchanged.
 
 ## Public TRM checkpoint
 
-The [09_09 example](../../examples/v3/profiles/09_09_trm_api.md) now ports
+The [09_09 example](../../examples/09_reasoning/09_09_trm_api/README.md) now ports
 TRMAgent, its reason/sync/await helpers, declared settings, and six retained-data
 getters through the common Agent/Flow/Session. The namespace retains call-ID
 and prompt helpers; Strategy supplies deprecated getter/prompt delegates only.
@@ -405,7 +405,7 @@ The source inventory stays pinned to the original release-history target.
 
 ## Native Adaptive checkpoint
 
-The [09_10 example](../../examples/v3/profiles/09_10_adaptive.md) executes
+The [09_10 example](../../examples/09_reasoning/09_10_adaptive/README.md) executes
 all seven method choices through a shared native profile. The old analysis
 algorithm now lives in one shared selector; its Strategy helper delegates to
 that module. Sixteen transferred analysis tests preserve the existing rules.
@@ -421,7 +421,7 @@ that field and the public mapping remains open. The source inventory is pinned.
 
 ## Public Adaptive checkpoint
 
-The [09_11 example](../../examples/v3/profiles/09_11_adaptive_api.md) ports
+The [09_11 example](../../examples/09_reasoning/09_11_adaptive_api/README.md) ports
 AdaptiveAgent ask/sync/await, declared settings and binary guards. Its namespace
 keeps analysis and gains request-ID forms of the two old Strategy getters. The
 Strategy name stays loadable for deprecated analysis/getter delegates only.
@@ -437,7 +437,7 @@ required. The baseline API inventory remains unchanged.
 
 ## Selected method control refinement
 
-The [09_12 refinement](../../examples/v3/profiles/09_12_method_controls.md)
+The [09_12 refinement](../../examples/09_reasoning/09_12_method_controls/README.md)
 replaces Adaptive's combined default budget with per-method counts. The public
 wrapper and common Agent resolve omitted counts after selection. Explicit Agent
 and request limits retain precedence. Typed repair uses the selected iteration
@@ -446,7 +446,7 @@ now coexist on one Agent without a separate runtime.
 
 ## Active Adaptive selection
 
-The [09_13 cases](../../examples/v3/profiles/09_13_active_selection.md) restore
+The [09_13 cases](../../examples/09_reasoning/09_13_active_selection/README.md) restore
 active Adaptive selection and complexity getters. Public selected_strategy and
 canonical request metadata agree before the first model call. Input rejection
 keeps selection absent. Older records remain available by ID. Owner recovery
@@ -458,7 +458,7 @@ inspection, state/command conversion and the package gates remain required.
 The [production Action](../../lib/jido_ai/operations/run_strategy.ex) keeps
 `run/2`, its input schema and the result envelope. Category, tags and contract
 version remain explicit catalog accessors. The
-[09_14 example](../../examples/v3/profiles/09_14_callable_reasoning.md) proves
+[09_14 example](../../examples/09_reasoning/09_14_callable_reasoning/README.md) proves
 seven methods, structured results, caller defaults, cancellation and usage.
 `context.jido` can select an existing host. Omission uses a standalone core Agent;
 the Action no longer creates an implicit `Jido.AI.InternalReasoningRunner`.
@@ -478,7 +478,7 @@ They retain their public Signal namespaces, callable Action catalog and static
 metadata. Sources moved to `lib/jido_ai/authoring/plugins/reasoning`; immutable
 baseline inventory paths and hashes have not changed.
 
-[16_01's API table](../../examples/v3/profiles/16_01_reasoning_capabilities.md)
+[16_01's API table](../../examples/16_capabilities/16_01_reasoning/README.md)
 records the callback changes. `state_spec/1` replaces mount state initialization.
 Preparation plus the explicit `RunCapability` route Action replaces the v2
 Signal override/result-transform hooks. `signal_routes/1` remains a source-map
@@ -497,7 +497,7 @@ to `authoring/plugins/planning.ex` and now uses v3 state and preparation callbac
 Its three Signal names and callable catalog remain. Explicit routes use an
 Action that projects the result into a declared domain field.
 
-[08_01's mapping](../../examples/v3/profiles/08_01_planning.md) lists the removed
+[08_01's mapping](../../examples/08_planning/08_01_planning/README.md) lists the removed
 v2 manifest/mount/Signal/result callbacks and their replacements. Direct calls
 retain their result maps; missing/empty input validation runs before provider
 work. Model resolution and provider calls use the shared helpers. The original
@@ -521,7 +521,7 @@ Chat Plugin catalog helpers remain. Map config becomes keyword config.
 `state_spec/1` and `prepare/2` replace v2 mount/override/result callbacks.
 `signal_routes/1` now returns the bound `Actions.Chat.RunCapability` route
 target; callers must declare those routes. The chosen domain field defaults
-to `:result`. [The example contract](../../examples/v3/profiles/16_02_chat.md)
+to `:result`. [The example contract](../../examples/16_capabilities/16_02_chat/README.md)
 records each result shape and the removed v2 callbacks.
 
 Helpers and Validation keep their names and public functions in `shared`.
@@ -539,7 +539,7 @@ map config and `mount/2`. Core `prepare/2` replaces `handle_signal/2`; Agent
 declarations replace generated `plugin_spec/1`. Neither Plugin adds routes.
 Eleven tests under the retained root paths now check native Command preparation.
 
-[Example 16_03](../../examples/v3/profiles/16_03_routing_policy.md) records the
+[Example 16_03](../../examples/16_capabilities/16_03_routing_policy/README.md) records the
 exact model and rejection rules. In particular, Policy now returns a structured
 error instead of changing the Signal to an error route. Consumers must handle
 that error. Native Turn and session requests share per-request primary model
@@ -566,7 +566,7 @@ put the public Action result in a declared domain field. Catalog functions and
 schemas remain. The old mount, Signal hook and manifest require the documented
 replacement. Missing Plugin namespace now resolves at the request boundary.
 
-[Example 07_01](../../examples/v3/profiles/07_01_memory.md) records exact result,
+[Example 07_01](../../examples/07_retrieval/07_01_memory/README.md) records exact result,
 ranking, context, lifetime and error rules. Root Store/Action tests now start
 the supervised owner; six Plugin tests use current Commands and admission.
 Unknown string keys cannot suppress valid memory fields or create atoms. A
@@ -575,7 +575,7 @@ inventory remains unchanged; full import, recovery and consumer gates stay open.
 
 ## Quota API evidence: 2026-09-07
 
-[13_01](../../examples/v3/profiles/13_01_quota.md) supplies 28 integration cases
+[13_01](../../examples/13_policy/13_01_quota/README.md) supplies 28 integration cases
 for `API/quota`, plus 15 retained Store/Action and updated Plugin tests. Original
 Store arities and Action result envelopes remain. Store readiness now requires
 explicit supervision. Keyword configuration and core Plugin callbacks replace
@@ -585,14 +585,14 @@ ledger/import APIs expose unknown work and preserve valid v2 aggregate rows.
 The profile records changed counter semantics, generation limits, zero-usage
 ambiguity and conversion steps. It also records a separate `API/tool-contracts`
 gap in raw RunStrategy JSON schema export. The later
-[09_16](../../examples/v3/profiles/09_16_reasoning_tool.md) example closes that
+[09_16](../../examples/09_reasoning/09_16_reasoning_tool/README.md) example closes that
 gap with the raw Action and unchanged direct input schema. The narrower core
 Flow remains a valid composition example.
 Default PluginStack, durable conversion, root package and full API gates remain.
 
 ## Default Plugin API evidence: 2026-09-07
 
-[16_04](../../examples/v3/profiles/16_04_plugin_stack.md) ports
+[16_04](../../examples/16_capabilities/16_04_plugin_stack/README.md) ports
 `PluginStack.default_plugins/1` to v3 declarations and integrates public macro
 options, optional routes and result fields. It retains map/keyword input,
 explicit configuration, ordinary static routes and module-attribute route
@@ -603,12 +603,12 @@ remain partial until their remaining state and consumer gates pass.
 
 ## Request API refinement: 2026-09-07
 
-[02_18](../../examples/v3/profiles/02_18_admission.md) retains raw admission
+[02_18](../../examples/02_requests/02_18_admission/README.md) retains raw admission
 errors and request correlation while correcting method identity. Standalone
 synthetic-event helpers retain their default method and now honor an explicit
 method. Duplicate IDs do not terminate the original request stream.
 
-[02_19](../../examples/v3/profiles/02_19_model_options.md) adds public `model`
+[02_19](../../examples/02_requests/02_19_model_options/README.md) adds public `model`
 forwarding through the native runtime binding. Existing `llm_opts` keyword/map
 forms use shared selected-model normalization; invalid outer containers reject
 before admission. HTTP callbacks remain runtime resources. The original model
@@ -618,13 +618,13 @@ conversion, root package and consumer checks remain required.
 
 ## Failed call metadata and Adaptive prompts: 2026-09-07
 
-[02_20](../../examples/v3/profiles/02_20_call_counts.md) retains known started
+[02_20](../../examples/02_requests/02_20_call_counts/README.md) retains known started
 model-operation counts after failure or cancellation. HTTP attempts and Quota
 charges remain separate. Recovery preserves committed data and leaves an
 uncommitted count unknown. Real provider, tool and repair work proves these
 boundaries; duplicate observations cannot change a completed record.
 
-[09_15](../../examples/v3/profiles/09_15_prompt_policy.md) resolves the shared
+[09_15](../../examples/09_reasoning/09_15_prompt_policy/README.md) resolves the shared
 ReAct default after Adaptive selection. Public empty prompt values use their
 default. Native empty instructions keep their current meaning. DSL, data,
 Builder, trusted source JSON, direct Flow and ordinary Turn agree. The change
@@ -637,7 +637,7 @@ and rollback checks remain required.
 
 ## Raw reasoning tool port: 2026-09-07
 
-[09_16](../../examples/v3/profiles/09_16_reasoning_tool.md) closes the raw
+[09_16](../../examples/09_reasoning/09_16_reasoning_tool/README.md) closes the raw
 RunStrategy model-tool schema gap. All seven methods execute through the
 existing Action, core Exec and private Agent/Session. Native and public Agent
 authoring work; DSL/data/Builder/source JSON agree. Shared Quota, cancellation,
@@ -656,7 +656,7 @@ and rollback remain open.
 
 ## Dynamic configuration and public facade: 2026-09-07
 
-[03_01](../../examples/v3/profiles/03_01_dynamic_catalog.md) ports direct and
+[03_01](../../examples/03_tools/03_01_dynamic_catalog/README.md) ports direct and
 live tool/prompt changes through portable `jido_ai_config` state owned by the
 existing Runtime Plugin. One validated catalog supplies provider schemas and
 lookup. Core configuration directives commit live changes. Ordinary Actions
@@ -677,7 +677,7 @@ rollback gates before treating the package as migrated.
 
 ## Public context and history refinement: 2026-09-07
 
-[02_21](../../examples/v3/profiles/02_21_context_views.md) adds nine integration
+[02_21](../../examples/02_requests/02_21_context_views/README.md) adds nine integration
 cases for the compiled public context helpers. Committed history retains
 thinking, timestamps, tool IDs, reasoning details and references through reads
 and real model requests. String-keyed entries use the same conversion. Invalid
@@ -702,7 +702,7 @@ consumer, minimum-runtime, migration and rollback checks remain required.
 
 ## Standalone authoring and token foundation: 2026-09-07
 
-[14_01](../../examples/v3/profiles/14_01_standalone_authoring.md) starts the
+[14_01](../../examples/14_resume/14_01_standalone_authoring/README.md) starts the
 standalone port with 12 integration cases. An existing ReAct Config lowers
 through the same Profile, ToolCatalog, Agent and Flow path. Tests execute real
 aliased tools, state effects, request transforms, typed repair, streaming,
@@ -735,7 +735,7 @@ and rollback checks remain open. No second executor or mock was added.
 
 ## Standalone runtime progress: 2026-09-07
 
-[14_02](../../examples/v3/profiles/14_02_standalone_runtime.md) adds 18 integration
+[14_02](../../examples/14_resume/14_02_standalone_runtime/README.md) adds 18 integration
 cases through the actual public ReAct API. The adapter owns a private v3 Agent
 and uses the shared Session/Flow for all model and tool work. The old private
 model/tool loop is removed. Lazy start, run identity, real tools, state effects,
@@ -757,7 +757,7 @@ remain open. Root Mix files still select v2. All history statuses remain pending
 
 ## Native checkpoint resume: 2026-09-07
 
-[14_03](../../examples/v3/profiles/14_03_checkpoint_resume.md) adds 17 integration cases through the actual public ReAct API.
+[14_03](../../examples/14_resume/14_03_checkpoint_resume/README.md) adds 17 integration cases through the actual public ReAct API.
 The common Flow now pauses after a model response or a complete tool round.
 The next stream pull releases it. Stopping at that boundary cancels the private
 Agent before the next operation. Resume rebuilds an Agent and Session from AI
@@ -786,7 +786,7 @@ statuses remain pending. Root Mix files still select v2.
 
 ## Standalone Action port: 2026-09-07
 
-[14_04](../../examples/v3/profiles/14_04_standalone_actions.md) adds 13 integration
+[14_04](../../examples/14_resume/14_04_standalone_actions/README.md) adds 13 integration
 cases for the actual Start, Continue, Collect and Cancel Actions. They execute
 through v3 Exec. A portable Flow connects Start and Collect, and an Agent route
 commits the aggregate result. The live stream stays in execution context.
@@ -811,7 +811,7 @@ select v2. Full validation is recorded in [implementation](implementation.md).
 
 ## Native worker lifetime and failure: 2026-09-07
 
-[14_05](../../examples/v3/profiles/14_05_worker_lifecycle.md) adds nine integration
+[14_05](../../examples/14_resume/14_05_worker_lifecycle/README.md) adds nine integration
 cases through the public ReAct and CoT Agents. Task loss stops held work,
 preserves observed usage and commits one failure. Later work succeeds, and late
 old task data cannot finish the next request. Session-owner loss interrupts
@@ -838,7 +838,7 @@ Root Mix files still select v2. All history statuses remain pending. See the
 
 ## Standalone trace and repeated-call contracts: 2026-09-07
 
-[14_06](../../examples/v3/profiles/14_06_trace_and_cycles.md) proves the flat
+[14_06](../../examples/14_resume/14_06_trace_and_cycles/README.md) proves the flat
 Config observation options through the shared native runtime. Stream text and
 thinking accumulate and reset per model call; checkpoints retain completed
 stream data. The thinking/message flags retain their legacy no-op behavior.
@@ -854,7 +854,7 @@ open; this is not a general State migration claim.
 
 ## Standalone input queue binding: 2026-09-07
 
-[14_07](../../examples/v3/profiles/14_07_standalone_input.md) ports the existing
+[14_07](../../examples/14_resume/14_07_standalone_input/README.md) ports the existing
 flat Config `pending_input_server` option. Native Session consumes that same
 queue; direct enqueue and public steering share it. Borrowed queues are sealed
 and remain owned by the caller. Internally created queues still stop at cleanup.
@@ -867,7 +867,7 @@ retains its acknowledgement. Query append and old State conversion remain open.
 
 ## Native query append and State counters: 2026-09-07
 
-[14_08](../../examples/v3/profiles/14_08_query_append.md) ports the `query:`
+[14_08](../../examples/14_resume/14_08_query_append/README.md) ports the `query:`
 option on `continue/3` and `stream_from_state/3` for initial State and native
 checkpoints. It retains conversation, identity, sequence, usage, domain state
 and remaining budgets. Saved tools finish before appended input reaches the
@@ -884,7 +884,7 @@ conversion remain open; this is not complete State compatibility.
 ## Standalone State conversion: 2026-09-07
 
 `ReAct.State.migrate/3` is an explicit new public data-conversion function.
-[14_09](../../examples/v3/profiles/14_09_state_migration.md) proves released
+[14_09](../../examples/14_resume/14_09_state_migration/README.md) proves released
 State-format-v3 maps and old `rt2` payloads can enter the native checkpoint path
 with caller-supplied phase, counts, domain and remaining time. It checks saved
 history, tool identity and pending work. Completed/failed/cancelled result replay
@@ -894,7 +894,7 @@ automatic failure counter projection, persistence or package acceptance.
 
 ## Reasoning position on terminal failure: 2026-09-07
 
-[14_10](../../examples/v3/profiles/14_10_failure_position.md) adds the explicit
+[14_10](../../examples/14_resume/14_10_failure_position/README.md) adds the explicit
 `reasoning_iteration` value to native request, model-start and checkpoint
 events and request metadata. Stream chunks keep their existing fields.
 `State.iteration` reads this reasoning position on failure/cancellation instead
@@ -908,7 +908,7 @@ remain open.
 
 ## Native parent inspection and trace prefixes: 2026-09-07
 
-[02_22](../../examples/v3/profiles/02_22_request_inspection.md) adds the common
+[02_22](../../examples/02_requests/02_22_request_inspection/README.md) adds the common
 `Session.snapshot/2` API and 14 integration examples. The envelope distinguishes
 the committed Agent/revision/request from a later live Session sample. It keeps
 request/run IDs, phase, model counts, reasoning position, usage, output,
@@ -940,11 +940,11 @@ open. The migration goal stays active.
 
 ## Native context operations: 2026-09-07
 
-[02_23](../../examples/v3/profiles/02_23_context_operations.md) adds 28 integration
+[02_23](../../examples/02_requests/02_23_context_operations/README.md) adds 28 integration
 cases and `Session.modify_context/3`. The common lowerer adds context routes
 and a pure state Plugin for profiles with history. It stores active lane refs,
-one deferred operation, the last 128 applied IDs and a core Thread value per
-profile. Request admission/history and terminal completion use the existing
+one deferred operation, the last 128 applied IDs and a portable `Jido.Session`
+with one `Jido.Thread` per profile. Request admission/history and terminal completion use the existing
 commit paths. No runtime owner, queue or executor was added.
 
 Replacement and switch apply while idle or in the terminal commit after active
@@ -975,7 +975,7 @@ runtime-floor/migration/rollback gates remain required. The goal stays active.
 
 ## Native skill runtime and resources: 2026-09-07
 
-[18_01](../../examples/v3/profiles/18_01_skill_runtime.md) adds 27 integration
+[18_01](../../examples/18_skills/18_01_skill_runtime/README.md) adds 27 integration
 cases for real `LoadSkill`/`LoadResource`, approved instruction history, context
 compaction, closed catalogues, fresh resource reads, image/PDF transport and
 owner cleanup/restore. A separate v3 command passes 293 retained skill/resource
@@ -998,7 +998,7 @@ root dependency files still use v2. History statuses remain pending.
 
 ## Automatic skill authoring: 2026-09-07
 
-[18_02](../../examples/v3/profiles/18_02_skill_authoring.md) adds 21 integration
+[18_02](../../examples/18_skills/18_02_skill_authoring/README.md) adds 21 integration
 cases. Public `agent_skills`, the native `skills` block, source data, Builder
 and JSON use one static source and the existing Session/Flow runtime. Live
 startup prepares the catalogue; compilation and static construction do not
@@ -1025,7 +1025,7 @@ remain open. See the [implementation record](implementation.md) for full checks.
 
 ## Persistent tool context: 2026-09-07
 
-[03_02](../../examples/v3/profiles/03_02_tool_context.md) adds the base context
+[03_02](../../examples/03_tools/03_02_tool_context/README.md) adds the base context
 replacement API to the existing Configuration Plugin. Public `tool_context`,
 native DSL and source data now store defaults in `Profile.tool_context`.
 `set_tool_context/3`, `set_tool_context_direct/3` and the retained
@@ -1059,10 +1059,10 @@ table does not mark the old root tests as passing.
 | --- | --- |
 | `start_action/0` and start instructions | Public Agent `ask` and native request routes; request admission is owned by Session. |
 | `register_tool_action/0`, `unregister_tool_action/0`, `set_system_prompt_action/0` | Public live/direct helpers and the existing Configuration Plugin. Legacy Signal names are retained. |
-| `set_tool_context_action/0` | `Jido.AI.set_tool_context/3`, its direct helper and `ai.react.set_tool_context`; [03_02](../../examples/v3/profiles/03_02_tool_context.md) supplies executable evidence. |
+| `set_tool_context_action/0` | `Jido.AI.set_tool_context/3`, its direct helper and `ai.react.set_tool_context`; [03_02](../../examples/03_tools/03_02_tool_context/README.md) supplies executable evidence. |
 | `cancel_action/0`, `steer_action/0`, `inject_action/0` | Native Request/Session ownership and the retained public control helpers. Active work uses one request/run identity. |
-| `context_modify_action/0` | `Session.modify_context/3` and the retained context Signal; [02_23](../../examples/v3/profiles/02_23_context_operations.md). |
-| `snapshot/2` and `list_tools/1` | `Session.snapshot/2` for a live request, and the public configuration/context/tool views for an Agent value; [02_22](../../examples/v3/profiles/02_22_request_inspection.md). |
+| `context_modify_action/0` | `Session.modify_context/3` and the retained context Signal; [02_23](../../examples/02_requests/02_23_context_operations/README.md). |
+| `snapshot/2` and `list_tools/1` | `Session.snapshot/2` for a live request, and the public configuration/context/tool views for an Agent value; [02_22](../../examples/02_requests/02_22_request_inspection/README.md). |
 | `init/2`, `cmd/3`, `signal_routes/1`, `action_spec/1` | Core definition/instantiation and command APIs, `Module.agent().routes`, and schemas on the routed Actions. Old Strategy state and instruction tuples require explicit caller changes. |
 | Legacy result/delta/runtime-event action identifiers | These were no-ops in the delegated v2 Strategy. Native events and request records supply their observation contract. Do not create a second event executor to preserve an identifier. |
 | Worker event/start/exit handlers | The existing core-owned Session runtime and worker lifecycle examples. No old child Strategy is required. |
@@ -1087,7 +1087,7 @@ These files accounted for 53 failures in the prior root run; all now pass.
 
 The transfer found and fixed missing complete image-part events. The shared
 model callback emits them; Session inspection only joins binary text. Two
-[linear integration cases](../../examples/v3/profiles/09_01_linear.md) check
+[linear integration cases](../../examples/09_reasoning/09_01_linear/README.md) check
 real SSE image bytes, ordered event identity and full stored results. This is
 partial HIST-04 evidence for PR 340, not closure of its replay/capture variants.
 The API inventory and source-review fields remain unchanged.
@@ -1136,7 +1136,7 @@ configured instructions; other declared fields retain normal validation.
 
 The [four-case source transfer](react-initial-state-test-transfer.md) preserves
 all 78 ReAct cases, with 72 passing at that checkpoint. Nine boundary cases and seven
-[14_11 examples](../../examples/v3/profiles/14_11_initial_state.md) cover required
+[14_11 examples](../../examples/14_resume/14_11_initial_state/README.md) cover required
 history fields, source/option validation, typed content and refs, whole tool
 exchanges, profile separation, native reconstruction and size limits. The v3
 Context projection uses Agent/profile identity. It does not restore a prior
@@ -1157,7 +1157,7 @@ through core `checkpoint/1` and `restore/2`; standalone ReAct retains signed
 tokens. The two formats are not interchangeable. Restoring a completed native
 Agent leaves it idle and retains result, usage, errors, tool history and trace.
 A later request keeps a separate record and does not replay a completed tool.
-Six [14_12 cases](../../examples/v3/profiles/14_12_terminal_state.md) prove this
+Six [14_12 cases](../../examples/14_resume/14_12_terminal_state/README.md) prove this
 through buffered and SSE provider calls.
 
 Use `Session.snapshot/2` for request inspection. Failed records have the raw

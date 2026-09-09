@@ -5,6 +5,7 @@ defmodule Jido.AI.ContextTest do
 
   alias Jido.AI.Context, as: AIContext
   alias Jido.AI.Context.Entry
+  alias Jido.Thread
   alias ReqLLM.Message.ContentPart
 
   # ============================================================================
@@ -945,9 +946,9 @@ defmodule Jido.AI.ContextTest do
              ] = AIContext.to_messages(coerced)
     end
 
-    test "rejects Jido.Thread structs" do
-      core_thread = Jido.Thread.new()
-      assert :error == AIContext.coerce(core_thread)
+    test "rejects interaction Thread structs" do
+      log = Thread.new()
+      assert :error == AIContext.coerce(log)
     end
   end
 

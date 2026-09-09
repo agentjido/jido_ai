@@ -76,6 +76,105 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.MachineTest do
       assert Enum.all?(entries, &is_map/1)
       assert Enum.map(entries, & &1.id) == ["t1", "t2", "t3"]
     end
+
+    test "rejects starts while busy and ignores stale or unknown events" do
+      for status <- ["generating", "evaluating", "expanding"] do
+        machine = %{Machine.new() | status: status, current_call_id: "current"}
+
+        assert {^machine, [{:request_error, "new", :busy, message}]} =
+                 Machine.update(machine, {:start, "prompt", "new"})
+
+        assert message =~ status
+      end
+
+      generating = %{Machine.new() | status: "generating", current_call_id: "current"}
+      assert {^generating, []} = Machine.update(generating, {:thoughts_generated, "stale", ["one"]})
+      assert {^generating, []} = Machine.update(generating, {:llm_result, "stale", {:error, :bad}})
+      assert {^generating, []} = Machine.update(generating, {:llm_partial, "stale", "text", :content})
+      assert {^generating, []} = Machine.update(generating, :unknown)
+
+      evaluating = %{Machine.new() | status: "evaluating", current_call_id: "current"}
+      assert {^evaluating, []} = Machine.update(evaluating, {:thoughts_evaluated, "stale", %{}})
+    end
+
+    test "accumulates content deltas and ignores non-content chunks" do
+      machine = %{Machine.new() | status: "generating", current_call_id: "call", streaming_text: "a"}
+
+      assert {%Machine{streaming_text: "ab"} = updated, []} =
+               Machine.update(machine, {:llm_partial, "call", "b", :content})
+
+      assert {^updated, []} = Machine.update(updated, {:llm_partial, "call", "ignored", :metadata})
+    end
+
+    test "turns direct generation and evaluation failures into terminal results" do
+      for result <- [{:error, :provider_down}, {:error, :provider_down, [:effect]}] do
+        machine = %{
+          Machine.new(emit_telemetry?: false)
+          | status: "generating",
+            current_call_id: "call",
+            started_at: nil
+        }
+
+        assert {%Machine{status: "error", termination_reason: :error, result: terminal}, []} =
+                 Machine.update(machine, {:llm_result, "call", result})
+
+        assert terminal.diagnostics.cause == :provider_down
+      end
+    end
+
+    test "accepts three-element successful result envelopes in both phases" do
+      generating = %{
+        Machine.new(emit_telemetry?: false)
+        | status: "generating",
+          current_call_id: "generation",
+          nodes: %{
+            "root" => %{id: "root", parent_id: nil, content: "Problem", score: nil, children: [], depth: 0}
+          },
+          root_id: "root",
+          current_node_id: "root"
+      }
+
+      assert {%Machine{status: "evaluating"} = evaluating, [{:evaluate_thoughts, eval_call, _}]} =
+               Machine.update(
+                 generating,
+                 {:llm_result, "generation", {:ok, %{text: ~s({"thoughts":["one"]})}, []}}
+               )
+
+      evaluating = %{evaluating | max_depth: 1, current_call_id: eval_call}
+
+      assert {%Machine{status: "completed", result: result}, []} =
+               Machine.update(
+                 evaluating,
+                 {:llm_result, eval_call, {:ok, %{text: ~s({"scores":{"t1":0.8}})}, []}}
+               )
+
+      assert result.best.content == "one"
+    end
+
+    test "fails empty generation and missing evaluation inputs" do
+      generating = %{
+        Machine.new(emit_telemetry?: false)
+        | status: "generating",
+          current_call_id: "generation"
+      }
+
+      assert {%Machine{status: "error", result: generation_error}, []} =
+               Machine.update(generating, {:thoughts_generated, "generation", []})
+
+      assert generation_error.diagnostics.cause == {:parse_failed, :generation, :empty_generation_parse}
+
+      evaluating = %{
+        Machine.new(emit_telemetry?: false)
+        | status: "evaluating",
+          current_call_id: "evaluation",
+          pending_thoughts: []
+      }
+
+      assert {%Machine{status: "error", result: evaluation_error}, []} =
+               Machine.update(evaluating, {:thoughts_evaluated, "evaluation", %{}})
+
+      assert evaluation_error.diagnostics.cause == {:parse_failed, :evaluation, :missing_pending_thoughts}
+    end
   end
 
   describe "deterministic stopping policy" do
@@ -183,6 +282,32 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.MachineTest do
       assert scores["t1"] == 0.7
       assert scores["t2"] == 0.4
     end
+
+    test "parsers handle non-text values, fences, mixed entries, and score fallbacks" do
+      assert Machine.parse_thoughts(nil) == {[], :none}
+      assert Machine.parse_scores(nil, ["one"]) == {%{"t1" => 0.5}, :default}
+
+      fenced = "```json\n{\"thoughts\":[{\"content\":\" Alpha \"},\" Beta \",null]}\n```"
+      assert Machine.parse_thoughts(fenced) == {["Alpha", "Beta"], :json}
+
+      thoughts = [
+        %{id: "one", content: "Alpha"},
+        %{"id" => "two", "content" => "Beta"},
+        %{content: "Gamma"},
+        %{"content" => "Delta"},
+        "Epsilon",
+        :invalid
+      ]
+
+      text = ~s({"scores":{"one":2,"2":"0.25","Gamma":-1,"4":"bad","5":0.7}})
+      assert {scores, :json} = Machine.parse_scores(text, thoughts)
+      assert scores["one"] == 1.0
+      assert scores["two"] == 0.25
+      assert scores["t3"] == 0.0
+      assert scores["t4"] == 0.5
+      assert scores["t5"] == 0.7
+      refute Map.has_key?(scores, "t6")
+    end
   end
 
   describe "parse retry behavior" do
@@ -240,6 +365,39 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.MachineTest do
       assert restored.max_duration_ms == 999
       assert restored.beam_width == 5
       assert restored.max_parse_retries == 2
+    end
+
+    test "normalizes every stored status form and ignores unknown keys" do
+      for status <- ["generating", "evaluating", "expanding", "completed", "error"] do
+        assert Machine.to_map(%{Machine.new() | status: status}).status == String.to_existing_atom(status)
+      end
+
+      assert Machine.to_map(%{Machine.new() | status: :idle}).status == :idle
+      assert Machine.from_map(%{status: :completed, unknown: true}).status == "completed"
+      assert Machine.from_map(%{status: "error"}).status == "error"
+      assert Machine.from_map(%{status: nil}).status == "idle"
+    end
+  end
+
+  describe "tree inspection helpers" do
+    test "finds children, paths, leaves, ids, prompts, and diagnostics" do
+      root = %{id: "root", parent_id: nil, content: "Problem", score: nil, children: ["child", "missing"], depth: 0}
+      child = %{id: "child", parent_id: "root", content: "Answer", score: 0.8, children: [], depth: 1}
+      machine = %{Machine.new() | nodes: %{"root" => root, "child" => child}, root_id: "root"}
+
+      assert Machine.get_node(machine, "child") == child
+      assert Machine.get_children(machine, "missing") == []
+      assert Machine.get_children(machine, "root") == [child]
+      assert Machine.get_path_to_node(machine, "missing") == []
+      assert Machine.get_path_to_node(machine, "child") == [root, child]
+      assert Machine.find_best_leaf(machine) == child
+      assert Machine.find_leaves(machine) == [child]
+      assert String.starts_with?(Machine.generate_node_id(), "tot_node_")
+      assert String.starts_with?(Machine.generate_call_id(), "tot_")
+      assert Machine.default_generation_prompt() =~ "thoughts"
+      assert Machine.default_evaluation_prompt() =~ "scores"
+      assert {:ok, ^machine} = Machine.before_transition(machine, "idle", "generating")
+      assert Machine.diagnostics(machine, "child").best_node_id == "child"
     end
   end
 

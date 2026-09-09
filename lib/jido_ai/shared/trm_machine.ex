@@ -579,8 +579,8 @@ defmodule Jido.AI.Reasoning.TRM.Machine do
   defp complete_with_best(machine, reason) do
     duration_ms = calculate_duration(machine)
 
-    # Use best answer, or current answer if no best yet
-    final_answer = machine.best_answer || machine.current_answer
+    # The latest improvement is the final output of the completed cycle.
+    final_answer = machine.current_answer || machine.best_answer
 
     emit_telemetry(machine, :complete, %{duration: duration_ms}, %{
       termination_reason: reason,

@@ -56,7 +56,7 @@ No core or dependency file changed.
 
 ## Integration and refinement
 
-The [02_22 examples](../../examples/v3/profiles/02_22_request_inspection.md) add
+The [02_22 examples](../../examples/02_requests/02_22_request_inspection/README.md) add
 named buffered and streaming Agent DSL definitions. Both use the one shared
 mock, execute real success/failure tools, replay an observed completion twice,
 finish the request, reject stale mutation, and start a later request. They check

@@ -1,6 +1,8 @@
 defmodule Jido.AI.Integration.RequestLifecycleParityTest do
   use ExUnit.Case, async: true
 
+  @moduletag :legacy_v2
+
   alias Jido.AI.Directive
   alias Jido.AI.Observe
   alias Jido.AI.Reasoning.AlgorithmOfThoughts.Strategy, as: AlgorithmOfThoughts

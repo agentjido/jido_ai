@@ -1,5 +1,7 @@
-defmodule Jido.AI.Plugins.Reasoning.ChainOfThoughtTest do
+defmodule Jido.AI.LegacyV2.Plugins.ToolCallingTest do
   use ExUnit.Case, async: true
+
+  @moduletag :legacy_v2
 
   alias Jido.AI.Plugins.Reasoning.ChainOfThought
 

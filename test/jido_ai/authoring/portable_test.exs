@@ -23,6 +23,19 @@ defmodule Jido.AI.Authoring.PortableTest do
     def route(_request, _context), do: {:ok, :answer}
   end
 
+  defmodule Schema do
+    def schema, do: Zoi.object(%{answer: Zoi.any() |> Zoi.default(nil)})
+  end
+
+  defmodule ToolFlow do
+    use Jido.Flow, name: "portable_tool_flow"
+
+    flow do
+      step("tool", action: Tool, params: %{})
+      output(result("tool"))
+    end
+  end
+
   defmodule MultiAgent do
     use Jido.AI.Agent, name: "portable_multi_agent"
 
@@ -146,5 +159,117 @@ defmodule Jido.AI.Authoring.PortableTest do
                MultiAgent,
                %{query: "hello"}
              )
+  end
+
+  test "inspection and preflight handle Agent values, defaults, tool sources, and invalid requests" do
+    assert {:ok, profile} =
+             Jido.AI.profile(
+               id: :support,
+               model: :capable,
+               tools: [ToolFlow.flow()],
+               tool_sources: [%{kind: :browser, name: :docs}],
+               result: [into: :answer]
+             )
+
+    assert {:ok, %{support: view}} = Jido.AI.inspect(profile)
+    assert view.instructions == :default
+    assert hd(view.tools).target == "portable_tool_flow"
+    assert [%{ref: ref}] = view.tool_sources
+    assert is_binary(ref)
+
+    assert {:ok, plan} = Jido.AI.preflight(profile, 42)
+    assert plan.instructions == :default
+
+    invalid_model = put_in(profile.models.default.model, :unknown_portable_model)
+    assert {:error, %Jido.AI.Error.Validation.Invalid{field: "model"}} = Jido.AI.preflight(invalid_model, %{})
+
+    agent = MultiAgent.new!()
+    assert {:ok, inspected} = Jido.AI.inspect(agent)
+    assert Map.keys(inspected) == [:first, :second]
+  end
+
+  test "Agent definitions export through map form with routes and Flow tools" do
+    definition = MultiAgent.definition()
+    registries = put_in(@registries.schemas, %{"agent_state" => definition.schema})
+
+    assert {:ok, document} = Jido.AI.export(MultiAgent, :map, registries: registries)
+    assert document["agent"]["name"] == "portable_multi_agent"
+    assert Enum.map(document["agent"]["routes"], & &1["type"]) == ["portable.first", "portable.second"]
+    assert {:ok, %Jido.Agent{}} = Jido.AI.import(document, registries: registries)
+
+    assert {:error, _} = Jido.AI.export(String, :map, registries: registries)
+
+    assert {:ok, flow_profile} =
+             Jido.AI.profile(
+               id: :support,
+               model: :capable,
+               tools: [ToolFlow.flow()],
+               result: [into: :answer]
+             )
+
+    flow_registries = Map.put(registries, :flows, %{"portable_flow" => ToolFlow.flow()})
+    assert {:ok, flow_document} = Jido.AI.export(flow_profile, :map, registries: flow_registries)
+    assert [%{"kind" => "flow", "ref" => "portable_flow"}] = flow_document["profile"]["tools"]
+  end
+
+  test "portable Agent import validates schema, profile, and route document shapes" do
+    profile = %{
+      "models" => %{"default" => "capable"},
+      "result" => %{"into" => "answer"}
+    }
+
+    agent = %{
+      "name" => "portable_import",
+      "description" => "Portable import",
+      "schema" => %{"ref" => "schema"},
+      "profiles" => %{"support" => profile},
+      "routes" => []
+    }
+
+    document = %{"version" => 1, "agent" => agent}
+    registries = %{@registries | schemas: %{"schema" => Schema}}
+
+    assert {:ok, %Jido.Agent{}} = Jido.AI.import(document, registries: registries)
+
+    atom_document = %{
+      version: 1,
+      agent: %{
+        name: "portable_atom_import",
+        description: "Atom keys",
+        schema: %{ref: "schema"},
+        profiles: %{support: profile},
+        routes: []
+      }
+    }
+
+    assert {:ok, %Jido.Agent{}} = Jido.AI.import(atom_document, registries: registries)
+
+    assert {:error, _} =
+             Jido.AI.import(put_in(document, ["agent", "profiles"], []), registries: registries)
+
+    assert {:error, _} =
+             Jido.AI.import(put_in(document, ["agent", "routes"], %{}), registries: registries)
+
+    assert {:error, _} =
+             Jido.AI.import(
+               put_in(document, ["agent", "routes"], [%{"type" => 1, "target" => %{}}]),
+               registries: registries
+             )
+
+    unknown = "unknown_portable_route_#{System.unique_integer([:positive])}"
+    assert_raise ArgumentError, fn -> String.to_existing_atom(unknown) end
+
+    assert {:error, _} =
+             Jido.AI.import(
+               put_in(document, ["agent", "routes"], [
+                 %{"type" => "portable.unknown", "target" => %{"ai" => unknown}}
+               ]),
+               registries: registries
+             )
+
+    assert_raise ArgumentError, fn -> String.to_existing_atom(unknown) end
+
+    assert {:error, _} = Jido.AI.import(document, registries: %{@registries | schemas: %{}})
+    assert {:error, _} = Jido.AI.import(document, registries: %{@registries | schemas: []})
   end
 end

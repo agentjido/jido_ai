@@ -77,6 +77,17 @@ defmodule Jido.AI.Actions.LLM.ChatTest do
       assert {:error, _reason} = Chat.run(%{prompt: ""}, %{})
     end
 
+    test "rejects invalid numeric request limits" do
+      for invalid <- [
+            %{max_tokens: 0},
+            %{temperature: -0.1},
+            %{temperature: 2.1},
+            %{timeout: 0}
+          ] do
+        assert {:error, _reason} = Chat.run(Map.put(invalid, :prompt, "hello"), %{})
+      end
+    end
+
     test "applies plugin defaults when fields are omitted" do
       context = %{
         provided_params: [:prompt],

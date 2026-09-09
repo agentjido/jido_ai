@@ -25,7 +25,7 @@ defmodule JidoAi.MixProject do
       # Test Coverage
       test_coverage: [
         tool: ExCoveralls,
-        summary: [threshold: 80]
+        summary: [threshold: 90]
       ],
 
       # Dialyzer
@@ -39,6 +39,7 @@ defmodule JidoAi.MixProject do
   def cli do
     [
       preferred_envs: [
+        examples: :test,
         coveralls: :test,
         "coveralls.detail": :test,
         "coveralls.post": :test,
@@ -54,8 +55,13 @@ defmodule JidoAi.MixProject do
     ]
   end
 
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(:test), do: ["lib", "test/support", "test/examples/support"] ++ example_paths()
+  defp elixirc_paths(:dev), do: ["lib"] ++ example_paths()
   defp elixirc_paths(_), do: ["lib"]
+
+  defp example_paths do
+    ["examples/support" | Path.wildcard("examples/[0-9][0-9]_*")]
+  end
 
   defp deps do
     [
@@ -89,6 +95,7 @@ defmodule JidoAi.MixProject do
     [
       setup: ["deps.get", "git_hooks.install"],
       test: "test --exclude flaky",
+      examples: "test test/examples --only example",
       "test.fast": "cmd env MIX_ENV=test mix test --exclude flaky --only stable_smoke",
       precommit: [
         "format --check-formatted",
@@ -135,6 +142,9 @@ defmodule JidoAi.MixProject do
     [
       main: "readme",
       formatters: ["html", "markdown"],
+      filter_modules: fn module, _metadata ->
+        not String.starts_with?(Atom.to_string(module), "Elixir.JidoAI.Examples.")
+      end,
       source_ref: "v#{@version}",
       extras: [
         "README.md",

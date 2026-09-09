@@ -287,6 +287,55 @@ defmodule JidoTest.AI.RequestTest do
       assert request.error == nil
     end
 
+    test "terminal helpers create missing records and inspect stream sinks" do
+      agent = %MockAgent{state: Request.init_state(%{})}
+
+      completed = Request.complete_request(agent, "missing-complete", nil, meta: %{source: :test})
+      assert completed.state.requests["missing-complete"].status == :completed
+      assert completed.state.requests["missing-complete"].meta == %{source: :test}
+      assert completed.state.last_answer == ""
+
+      failed = Request.fail_request(agent, "missing-fail", :failed)
+      assert failed.state.requests["missing-fail"].status == :failed
+      assert failed.state.requests["missing-fail"].error == :failed
+
+      streamed = Request.start_request(agent, "streamed", "query", stream_to: {:pid, self()})
+      assert Request.stream_sink(streamed, "streamed") == {:pid, self()}
+      assert Request.stream_sink(streamed, :invalid) == nil
+    end
+
+    test "sanitize_requests removes live sinks and marks active streams interrupted" do
+      state = %{
+        requests: %{
+          "pending" => %{status: :pending, stream_to: {:pid, self()}},
+          "already-interrupted" => %{status: :pending, stream_interrupted: true},
+          "complete" => %{status: :completed, stream_to: {:pid, self()}},
+          "plain" => :unchanged
+        }
+      }
+
+      sanitized = Request.sanitize_requests(state)
+      assert sanitized.requests["pending"].status == :failed
+      assert sanitized.requests["pending"].stream_interrupted
+      refute Map.has_key?(sanitized.requests["pending"], :stream_to)
+      assert sanitized.requests["already-interrupted"].status == :failed
+      assert sanitized.requests["complete"].status == :completed
+      refute Map.has_key?(sanitized.requests["complete"], :stream_to)
+      assert sanitized.requests["plain"] == :unchanged
+
+      assert Request.sanitize_requests(%{requests: :invalid}) == %{requests: :invalid}
+      assert Request.sanitize_requests(:invalid) == :invalid
+    end
+
+    test "exposes request schema fields and compatibility text forms" do
+      assert Map.keys(Request.schema_fields()) |> Enum.sort() ==
+               [:completed, :last_answer, :last_query, :last_request_id, :requests]
+
+      assert Request.compat_text(nil) == ""
+      assert Request.compat_text("answer") == "answer"
+      assert Request.compat_text(%{answer: 4}) == "%{answer: 4}"
+    end
+
     test "get_request/2 retrieves request by id" do
       agent = %MockAgent{state: Request.init_state(%{})}
       agent = Request.start_request(agent, "req-1", "query")
@@ -545,6 +594,43 @@ defmodule JidoTest.AI.RequestTest do
       assert {:error, :timeout} = Request.await(handle, timeout: 5)
     end
 
+    test "send_and_await/3 and await/2 normalize alternate terminal payloads" do
+      completed =
+        start_runtime_server(
+          request_id: "req_sync",
+          await_result: {:ok, %{status: :completed, result: "sync"}}
+        )
+
+      assert {:ok, "sync"} =
+               Request.send_and_await(completed, "query",
+                 request_id: "req_sync",
+                 signal_type: "ai.test.query",
+                 source: "/ai/test",
+                 timeout: 100
+               )
+
+      timeout = start_runtime_server(request_id: "req_status_timeout", await_result: {:ok, %{status: :timeout}})
+      assert {:error, :timeout} = Request.await(Handle.new("req_status_timeout", timeout, "query"), timeout: 100)
+
+      error = start_runtime_server(request_id: "req_error", await_result: {:ok, %{error: :bad}})
+      assert {:error, :bad} = Request.await(Handle.new("req_error", error, "query"), timeout: 100)
+
+      result = start_runtime_server(request_id: "req_result", await_result: {:ok, %{result: "fallback"}})
+      assert {:ok, "fallback"} = Request.await(Handle.new("req_result", result, "query"), timeout: 100)
+    end
+
+    test "await_many/2 shuts down requests that exceed the shared timeout" do
+      server =
+        start_runtime_server(
+          request_id: "req_too_slow",
+          await_result: {:ok, %{status: :completed, result: "late"}},
+          await_delay_ms: 100
+        )
+
+      assert [{:error, :timeout}] =
+               Request.await_many([Handle.new("req_too_slow", server, "query")], timeout: 1)
+    end
+
     test "await_many/2 preserves input order under concurrent completion" do
       slow_server =
         start_runtime_server(
@@ -566,6 +652,27 @@ defmodule JidoTest.AI.RequestTest do
       ]
 
       assert [{:ok, "slow"}, {:ok, "fast"}] = Request.await_many(requests, timeout: 150)
+    end
+
+    test "await_many/2 applies one timeout to the full request set" do
+      requests =
+        for index <- 1..(System.schedulers_online() + 1) do
+          server =
+            start_runtime_server(
+              request_id: "req_total_#{index}",
+              await_result: {:ok, %{status: :completed, result: index}},
+              await_delay_ms: 50
+            )
+
+          Handle.new("req_total_#{index}", server, "query")
+        end
+
+      started = System.monotonic_time(:millisecond)
+      results = Request.await_many(requests, timeout: 75)
+      elapsed = System.monotonic_time(:millisecond) - started
+
+      assert Enum.all?(results, &match?({:ok, _}, &1))
+      assert elapsed < 110
     end
   end
 

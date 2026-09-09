@@ -44,8 +44,7 @@ defmodule Jido.AI.Actions.Planning.Decompose do
           Zoi.any(description: "Model alias (e.g., :planning) or direct model spec string")
           |> Zoi.optional(),
         goal: Zoi.string(description: "The goal to decompose") |> Zoi.min(1),
-        max_depth:
-          Zoi.integer(description: "Maximum depth of decomposition (1-5)") |> Zoi.default(3),
+        max_depth: Zoi.integer(description: "Maximum depth of decomposition (1-5)") |> Zoi.default(3),
         context: Zoi.string(description: "Additional context about the goal") |> Zoi.optional(),
         max_tokens: Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(4096),
         temperature: Zoi.float(description: "Sampling temperature") |> Zoi.default(0.6),
@@ -170,8 +169,8 @@ defmodule Jido.AI.Actions.Planning.Decompose do
   end
 
   defp extract_sub_goals(text) do
-    # Extract sub-goals in format like "1.1. [Sub-goal]"
-    Regex.scan(~r/^\d+\.\d+\.\s+(.+?)$/m, text)
+    # Accept both the prompted bullet form and a plain numbered form.
+    Regex.scan(~r/^\s*(?:-\s+)?\d+\.\d+\.\s+(.+?)\s*$/m, text)
     |> Enum.map(fn [_, sub_goal] -> String.trim(sub_goal) end)
     |> Enum.filter(fn s -> String.length(s) > 0 end)
   end

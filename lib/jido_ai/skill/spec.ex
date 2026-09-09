@@ -15,6 +15,7 @@ defmodule Jido.AI.Skill.Spec do
   @max_name_length 64
   @max_description_length 1024
   @max_compatibility_length 500
+  @max_body_bytes 1_048_576
 
   @type t :: %__MODULE__{
           name: String.t(),
@@ -47,6 +48,10 @@ defmodule Jido.AI.Skill.Spec do
     tags: [],
     diagnostics: nil
   ]
+
+  @doc false
+  @spec max_body_bytes() :: pos_integer()
+  def max_body_bytes, do: @max_body_bytes
 
   @doc """
   Validates the strict manifest fields shared by filesystem and runtime specs.
@@ -171,10 +176,20 @@ defmodule Jido.AI.Skill.Spec do
     do: {:error, %Error.Validation.InvalidField{field: :source, reason: :must_be_nil, value: source}}
 
   defp validate_inline_body({:inline, body}) when is_binary(body) do
-    if String.valid?(body) do
-      :ok
-    else
-      {:error, %Error.Validation.InvalidField{field: :body_ref, reason: :invalid_utf8, value: :inline}}
+    cond do
+      byte_size(body) > @max_body_bytes ->
+        {:error,
+         %Error.Validation.InvalidField{
+           field: :body_ref,
+           reason: :too_large,
+           value: byte_size(body)
+         }}
+
+      String.valid?(body) ->
+        :ok
+
+      true ->
+        {:error, %Error.Validation.InvalidField{field: :body_ref, reason: :invalid_utf8, value: :inline}}
     end
   end
 

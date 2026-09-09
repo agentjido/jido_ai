@@ -44,7 +44,7 @@ completion` remains unchanged. It now passes through the native runner. All
 the prior pass. No old test was removed, merged or skipped. The full root
 comparison resolves that one case and introduces no new failing root case.
 
-[02_24](../../examples/v3/profiles/02_24_stream_usage.md) adds eight required
+[02_24](../../examples/02_requests/02_24_stream_usage/README.md) adds eight required
 HTTP/SSE cases. Four pass and four expose a ReqLLM defect. A passing decoded
 boundary case is not counted as proof of a failing provider-wire case.
 

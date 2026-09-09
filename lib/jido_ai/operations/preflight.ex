@@ -26,9 +26,7 @@ defmodule Jido.AI.Runtime.Preflight do
       remaining = deadline - System.monotonic_time(:millisecond)
 
       if remaining > 0 do
-        case Jido.Exec.run(Jido.AI.Runtime.ToolGuardrail, %{call: call}, context,
-               timeout: remaining
-             ) do
+        case Jido.Exec.run(Jido.AI.Runtime.ToolGuardrail, %{call: call}, context, timeout: remaining) do
           {:ok, _} -> :ok
           error -> error
         end

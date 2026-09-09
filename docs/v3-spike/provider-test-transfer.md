@@ -27,14 +27,14 @@ two JSON fragments. Objects use the requested schema tool when present.
 `MockLLM.options(server, :anthropic)` supplies the base URL that the SDK expects.
 The SDK adds `/v1/messages` itself.
 
-Two new [mock contract cases](../../examples/v3/test/mock_llm_test.exs) send six
+Two new [mock contract cases](../../test/examples/support/mock_llm_test.exs) send six
 real requests through ReqLLM. They check text, fragmented tools, objects,
 usage, and paths. All 18 mock contract cases pass. The same server still owns
 request capture, explicit waits, connection closure, and cleanup.
 
 ## Model changes within one request
 
-Four new [02_19 integration cases](../../examples/v3/profiles/02_19_model_options.md)
+Four new [02_19 integration cases](../../examples/02_requests/02_19_model_options/README.md)
 cover native Agent DSL and standalone APIs with streaming on and off. Each
 request goes OpenAI → Anthropic → OpenAI, with a real Action after each of
 the first two calls. Tests check all three paths, model labels, model-call

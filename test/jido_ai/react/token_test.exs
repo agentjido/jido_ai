@@ -152,6 +152,26 @@ defmodule Jido.AI.Reasoning.ReAct.TokenTest do
              })
   end
 
+  test "mark_cancelled replaces incompatible terminal data and keeps the reason" do
+    config = Config.new(%{model: :capable, tools: %{}, token_secret: "secret-a"})
+
+    state =
+      State.new("hello", nil, request_id: "req_cancel", run_id: "run_cancel")
+      |> State.put_status(:failed)
+      |> State.put_result("old result")
+      |> State.put_error(:old_error)
+      |> Map.put(:termination_reason, :failed)
+
+    token = Token.issue(state, config)
+
+    assert {:ok, cancelled_token} = Token.mark_cancelled(token, config, :user_cancelled)
+    assert {:ok, cancelled, _payload} = Token.decode_state(cancelled_token, config)
+    assert cancelled.status == :cancelled
+    assert cancelled.result == nil
+    assert cancelled.error == :user_cancelled
+    assert cancelled.termination_reason == :cancelled
+  end
+
   defp forge_token(payload, secret) do
     payload_bin = :erlang.term_to_binary(payload)
     signature = :crypto.mac(:hmac, :sha256, secret, payload_bin)

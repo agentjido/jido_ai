@@ -8,7 +8,7 @@ defmodule Jido.AI.Plugins.Policy do
   Native AI bindings and legacy AI request namespaces share this policy.
   Model/tool results and text deltas retain the existing normalization rules.
   """
-  use Jido.Plugin
+  use Jido.Plugin, agent: Jido.AI.Plugins.Policy.Agent
   alias Jido.AI.{Error, Validation}
   alias Jido.AI.Signal.Helpers, as: SignalHelpers
   alias Jido.Signal, as: BaseSignal
@@ -37,8 +37,8 @@ defmodule Jido.AI.Plugins.Policy do
     "ai.adaptive.query"
   ]
 
-  @impl Jido.Plugin
-  def state_spec(opts) do
+  @doc false
+  def agent_state_spec(opts) do
     Jido.AI.PluginConfig.validate!(opts, Map.keys(@defaults), "Policy")
 
     case Zoi.parse(schema(), Map.new(opts)) do
@@ -58,33 +58,41 @@ defmodule Jido.AI.Plugins.Policy do
     |> Zoi.default(defaults)
   end
 
-  @impl Jido.Plugin
-  def prepare(command, _opts) do
-    state = command.agent.state.policy
-    signal = command.signal
-    binding = Jido.AI.Authoring.request_binding(command.agent, signal)
+  @doc false
+  def prepare_agent(preparation) do
+    state = preparation.plugin_state
+    signal = preparation.effective_signal
 
     cond do
       signal.type == "ai.llm.delta" ->
-        {:ok, %{command | signal: sanitize_llm_delta(signal, state.max_delta_chars)}}
+        {:ok, %{preparation | effective_signal: sanitize_llm_delta(signal, state.max_delta_chars)}}
 
       signal.type in ["ai.llm.response", "ai.tool.result"] ->
-        {:ok, %{command | signal: normalize_result_signal(signal)}}
+        {:ok, %{preparation | effective_signal: normalize_result_signal(signal)}}
 
-      state.mode == :enforce and state.block_on_validation_error and violation?(signal, binding) ->
+      state.mode == :enforce and state.block_on_validation_error and violation?(signal) ->
         {:error, policy_error(signal)}
 
       true ->
-        {:ok, command}
+        {:ok, preparation}
     end
   end
 
-  defp violation?(_signal, %{input: input}) do
-    query = Map.get(input, :query, Map.get(input, "query"))
-    invalid_text?(query_text(query))
+  @doc false
+  def prepare_bound_command(command) do
+    with true <- Enum.any?(command.agent.plugins, &(plugin_module(&1) == __MODULE__)),
+         %{input: input} <- Jido.AI.Authoring.request_binding(command.agent, command.signal),
+         %{mode: mode, block_on_validation_error: block?} <- command.agent.state[state_key()],
+         true <- mode == :enforce and block?,
+         signal = %{command.signal | data: input},
+         true <- policy_violation?(signal) do
+      {:error, policy_error(signal)}
+    else
+      _ -> {:ok, command}
+    end
   end
 
-  defp violation?(signal, nil),
+  defp violation?(signal),
     do: enforceable_request_signal?(signal.type) and policy_violation?(signal)
 
   defp query_text(value) when is_binary(value), do: value
@@ -120,15 +128,14 @@ defmodule Jido.AI.Plugins.Policy do
   defp enforceable_request_signal?(_), do: false
 
   defp policy_violation?(%BaseSignal{data: data}) when is_map(data) do
-    prompt_or_query =
-      first_present([
-        Map.get(data, :prompt),
-        Map.get(data, "prompt"),
-        Map.get(data, :query),
-        Map.get(data, "query")
-      ])
-
-    invalid_text?(prompt_or_query)
+    [
+      Map.get(data, :prompt),
+      Map.get(data, "prompt"),
+      Map.get(data, :query),
+      Map.get(data, "query")
+    ]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.any?(&invalid_text?(query_text(&1)))
   end
 
   defp policy_violation?(_), do: false
@@ -165,5 +172,17 @@ defmodule Jido.AI.Plugins.Policy do
 
   defp put_signal_data(%BaseSignal{} = signal, data), do: %{signal | data: data}
 
-  defp first_present(values), do: Enum.find(values, &(not is_nil(&1)))
+  defp plugin_module({module, _opts}), do: module
+  defp plugin_module(module), do: module
+end
+
+defmodule Jido.AI.Plugins.Policy.Agent do
+  @moduledoc false
+  use Jido.Agent.Plugin
+
+  @impl Jido.Agent.Plugin
+  def state_spec(opts), do: Jido.AI.Plugins.Policy.agent_state_spec(opts)
+
+  @impl Jido.Agent.Plugin
+  def prepare(preparation, _opts), do: Jido.AI.Plugins.Policy.prepare_agent(preparation)
 end

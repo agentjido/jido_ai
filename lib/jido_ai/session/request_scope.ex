@@ -37,8 +37,7 @@ defmodule Jido.AI.Session.RequestScope do
     selected =
       if is_nil(resources[:tools]),
         do: {:ok, base},
-        else:
-          ToolCatalog.from_input(resources.tools, Map.get(context, :jido_ai_tool_defaults, %{}))
+        else: ToolCatalog.from_input(resources.tools, Map.get(context, :jido_ai_tool_defaults, %{}))
 
     with {:ok, selected} <- selected,
          index = Map.new(selected, &{&1.name, &1}),

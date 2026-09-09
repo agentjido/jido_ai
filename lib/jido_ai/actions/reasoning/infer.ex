@@ -65,7 +65,7 @@ defmodule Jido.AI.Actions.Reasoning.Infer do
   1. Identify relevant information in the premises
   2. Apply logical reasoning to reach a conclusion
   3. Provide your answer with supporting reasoning
-  4. Indicate your confidence level
+  4. End with `CONFIDENCE: <number from 0.0 to 1.0>`
 
   Be explicit about your reasoning chain and acknowledge any uncertainty or missing information.
   """
@@ -101,9 +101,7 @@ defmodule Jido.AI.Actions.Reasoning.Infer do
 
   # Private Functions
 
-  defp resolve_model(nil), do: {:ok, Jido.AI.resolve_model(:reasoning)}
-  defp resolve_model(model) when is_atom(model), do: {:ok, Jido.AI.resolve_model(model)}
-  defp resolve_model(model) when is_binary(model), do: {:ok, model}
+  defp resolve_model(model), do: Helpers.resolve_model(model, :reasoning)
 
   defp build_inference_messages(params) do
     user_prompt = build_inference_user_prompt(params)
@@ -163,11 +161,27 @@ defmodule Jido.AI.Actions.Reasoning.Infer do
   end
 
   defp format_result(response, model) do
+    text = Turn.extract_text(response)
+
     %{
-      result: Turn.extract_text(response),
-      reasoning: Turn.extract_text(response),
+      result: text,
+      reasoning: text,
+      confidence: extract_confidence(text),
       model: model,
       usage: Helpers.extract_usage(response)
     }
+  end
+
+  defp extract_confidence(text) do
+    case Regex.run(~r/\bCONFIDENCE:\s*([+-]?\d+(?:\.\d+)?)\b/i, text) do
+      [_, value] ->
+        case Float.parse(value) do
+          {confidence, ""} -> confidence |> max(0.0) |> min(1.0)
+          _ -> nil
+        end
+
+      _ ->
+        nil
+    end
   end
 end

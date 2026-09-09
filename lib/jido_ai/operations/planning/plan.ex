@@ -47,8 +47,7 @@ defmodule Jido.AI.Actions.Planning.Plan do
         resources:
           Zoi.list(Zoi.string(), description: "List of available resources")
           |> Zoi.optional(),
-        max_steps:
-          Zoi.integer(description: "Maximum number of steps in the plan") |> Zoi.default(10),
+        max_steps: Zoi.integer(description: "Maximum number of steps in the plan") |> Zoi.default(10),
         max_tokens: Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(4096),
         temperature: Zoi.float(description: "Sampling temperature") |> Zoi.default(0.7),
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()

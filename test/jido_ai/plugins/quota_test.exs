@@ -47,7 +47,7 @@ defmodule Jido.AI.Plugins.QuotaTest do
       usage_signal =
         Signal.new!("ai.usage", %{call_id: "c1", model: "test:model", total_tokens: 12}, source: "/test")
 
-      assert {:ok, _command} = Quota.admit(nil, command(usage_signal, state), [])
+      assert {:ok, _command} = Quota.AgentServer.admit(nil, command(usage_signal, state), [])
 
       status =
         Store.status(
@@ -71,7 +71,7 @@ defmodule Jido.AI.Plugins.QuotaTest do
           source: "/test"
         )
 
-      assert {:ok, _command} = Quota.admit(nil, command(usage_signal, state), [])
+      assert {:ok, _command} = Quota.AgentServer.admit(nil, command(usage_signal, state), [])
 
       status =
         Store.status(
@@ -86,6 +86,14 @@ defmodule Jido.AI.Plugins.QuotaTest do
     end
   end
 
+  test "rejects non-positive rolling windows" do
+    for window_ms <- [0, -1] do
+      assert_raise ArgumentError, ~r/Invalid Quota configuration/, fn ->
+        Quota.agent_state_spec(window_ms: window_ms)
+      end
+    end
+  end
+
   describe "structured budget rejection" do
     test "rejects over-budget signals with a correlated quota error" do
       state = quota_state(%{max_total_tokens: 10})
@@ -93,12 +101,12 @@ defmodule Jido.AI.Plugins.QuotaTest do
       usage_signal =
         Signal.new!("ai.usage", %{call_id: "c3", model: "test:model", total_tokens: 12}, source: "/test")
 
-      assert {:ok, _command} = Quota.admit(nil, command(usage_signal, state), [])
+      assert {:ok, _command} = Quota.AgentServer.admit(nil, command(usage_signal, state), [])
 
       request_signal =
         Signal.new!("chat.message", %{prompt: "hello", call_id: "req_123"}, source: "/test")
 
-      assert {:error, error} = Quota.admit(nil, command(request_signal, state), [])
+      assert {:error, error} = Quota.AgentServer.admit(nil, command(request_signal, state), [])
       assert error.details.request_id == "req_123"
       assert error.type == :quota_exceeded
       assert error.message == "quota exceeded for current window"
@@ -108,10 +116,10 @@ defmodule Jido.AI.Plugins.QuotaTest do
       state = quota_state(%{max_total_tokens: 10})
 
       usage_signal = Signal.new!("ai.usage", %{call_id: "c4", total_tokens: 12}, source: "/test")
-      assert {:ok, _command} = Quota.admit(nil, command(usage_signal, state), [])
+      assert {:ok, _command} = Quota.AgentServer.admit(nil, command(usage_signal, state), [])
 
       signal = Signal.new!("quota.status", %{scope: @scope}, source: "/test")
-      assert {:ok, _command} = Quota.admit(nil, command(signal, state), [])
+      assert {:ok, _command} = Quota.AgentServer.admit(nil, command(signal, state), [])
     end
   end
 end

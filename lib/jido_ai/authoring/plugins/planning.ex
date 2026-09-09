@@ -8,7 +8,7 @@ defmodule Jido.AI.Plugins.Planning do
   map. Direct Actions keep their result maps. The route Action stores that result
   in the declared domain field and returns the complete Agent state.
   """
-  use Jido.Plugin
+  use Jido.Plugin, agent: Jido.AI.Plugins.Planning.Agent
   alias Jido.AI.Actions.Planning.{Plan, Decompose, Prioritize}
 
   @routes %{
@@ -32,8 +32,8 @@ defmodule Jido.AI.Plugins.Planning do
 
   def schema, do: state_schema(@defaults) |> Zoi.default(@defaults)
 
-  @impl Jido.Plugin
-  def state_spec(opts) do
+  @doc false
+  def agent_state_spec(opts) do
     Jido.AI.PluginConfig.validate!(
       opts,
       [:default_model, :default_max_tokens, :default_temperature, :into],
@@ -51,27 +51,41 @@ defmodule Jido.AI.Plugins.Planning do
     end
   end
 
-  @impl Jido.Plugin
-  def prepare(command, opts) do
+  @doc false
+  def prepare_agent(preparation, opts) do
     binding =
-      if action = @routes[command.signal.type] do
+      if action = @routes[preparation.effective_signal.type] do
         %{
           action: action,
           key: :planning,
           into: Keyword.get(opts, :into, :result),
-          defaults: command.agent.state.planning
+          defaults: preparation.plugin_state
         }
       end
 
-    Jido.AI.Capability.bind(command, :jido_ai_planning_capability, binding)
+    Jido.AI.Capability.bind(preparation, :jido_ai_planning_capability, binding)
   end
 
   defp state_schema(defaults) do
     Zoi.object(%{
       default_model: Zoi.any() |> Zoi.default(defaults.default_model),
       default_max_tokens: Zoi.integer() |> Zoi.min(1) |> Zoi.default(defaults.default_max_tokens),
-      default_temperature:
-        Zoi.float() |> Zoi.min(0) |> Zoi.max(2) |> Zoi.default(defaults.default_temperature)
+      default_temperature: Zoi.float() |> Zoi.min(0) |> Zoi.max(2) |> Zoi.default(defaults.default_temperature)
     })
   end
+end
+
+defmodule Jido.AI.Plugins.Planning.Agent do
+  @moduledoc false
+  use Jido.Agent.Plugin
+
+  @impl Jido.Agent.Plugin
+  def state_spec(opts), do: Jido.AI.Plugins.Planning.agent_state_spec(opts)
+
+  @impl Jido.Agent.Plugin
+  def observes(opts), do: [Keyword.get(opts, :into, :result)]
+
+  @impl Jido.Agent.Plugin
+  def prepare(preparation, opts),
+    do: Jido.AI.Plugins.Planning.prepare_agent(preparation, opts)
 end

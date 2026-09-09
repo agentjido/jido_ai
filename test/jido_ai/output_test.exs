@@ -29,6 +29,14 @@ defmodule Jido.AI.OutputTest do
     def repair(_output, _raw, _reason, _context) do
       {:ok, %{"category" => "technical", "summary" => "Normalized"}}
     end
+
+    def repair_three(_output, _raw, _reason) do
+      {:ok, %{"category" => "account", "summary" => "Three arguments"}}
+    end
+
+    def raise_error(_output, _raw, _reason, _context) do
+      raise "repair callback failed"
+    end
   end
 
   test "agent macro accepts structured output config" do
@@ -176,5 +184,94 @@ defmodule Jido.AI.OutputTest do
 
     messages = [%{role: :user, content: "Policy-adjusted repair prompt"}]
     assert Output.repair_request("invalid answer", :invalid, %{messages: messages}).messages == messages
+  end
+
+  test "covers constructor identity, nil, coercion, and raising forms" do
+    assert {:ok, nil} = Output.new(nil)
+    assert {:ok, output} = Output.new(schema: @schema, retries: "2", on_validation_error: "repair")
+    assert {:ok, ^output} = Output.new(output)
+    assert Output.new!(output) == output
+    assert {:error, _} = Output.new(:invalid)
+    assert {:error, _} = Output.new(schema: @schema, retries: "two")
+    assert {:error, _} = Output.new(schema: @schema, retries: 1.5)
+    assert {:error, _} = Output.new(schema: @schema, repair_fun: {String, :missing})
+    assert {:error, _} = Output.new(schema: @schema, repair_fun: :invalid)
+    assert_raise ArgumentError, fn -> apply(Output, :new!, [:invalid]) end
+  end
+
+  test "validates imported schemas and rejects unsupported raw values" do
+    schema = %{type: :object, properties: %{answer: %{type: :string}}, required: [:answer]}
+    assert {:ok, output} = Output.new(schema: schema)
+    assert Output.json_schema(output) == schema
+    assert {:ok, %{"answer" => "yes"}} = Output.validate(output, %{"answer" => "yes"})
+    assert {:error, %Jido.AI.Error.Validation.Output{}} = Output.validate(output, %{"answer" => 42})
+    assert {:error, %Jido.AI.Error.Validation.Output{}} = Output.validate(output, :not_a_map)
+    assert {:error, %Jido.AI.Error.Validation.Output{}} = Output.parse(output, 42)
+    assert {:error, %Jido.AI.Error.Validation.Output{}} = Output.parse(output, "[1,2]")
+
+    assert {:ok, %{"answer" => "wrapped"}} =
+             Output.parse(output, %{"object" => %{"answer" => "wrapped"}})
+
+    refute Output.imported_schema?(%{type: :object})
+    refute Output.imported_schema?(:object)
+  end
+
+  test "applies no instructions for nil and joins an empty atom-keyed system prompt" do
+    messages = [%{role: :user, content: "hello"}]
+    assert Output.apply_instructions(messages, nil) == messages
+
+    assert {:ok, output} = Output.new(schema: @schema)
+    assert [%{role: :system, content: prompt}] = Output.apply_instructions([%{role: :system, content: ""}], output)
+    assert String.starts_with?(prompt, "Structured output:")
+  end
+
+  test "builds stable fingerprints and sanitized status metadata" do
+    assert Output.fingerprint(nil) == ""
+    assert {:ok, output} = Output.new(schema: @schema)
+    assert is_binary(Output.fingerprint(output))
+    assert byte_size(Output.fingerprint(output)) > 20
+    assert Output.raw_preview(String.duplicate("a", 600)) == String.duplicate("a", 500)
+
+    error = %Jido.AI.Error.Validation.Output{field: :output, details: %{token: "secret", reason: :bad}}
+
+    meta =
+      Output.meta(output, :invalid, %{token: "secret"},
+        attempt: 2,
+        error: error,
+        validation_error: :bad_shape
+      )
+
+    assert meta.attempt == 2
+    assert meta.error.token == "[REDACTED]"
+    assert meta.validation_error == ":bad_shape"
+
+    failed = Output.mark_failed(meta, RuntimeError.exception("failed"))
+    assert failed.status == :error
+    assert failed.error =~ "failed"
+    refute Map.has_key?(failed, :validation_error)
+  end
+
+  test "supports arity-three repair callbacks and contains callback exceptions" do
+    assert {:ok, output} = Output.new(schema: @schema, repair_fun: &RepairCallback.repair_three/3)
+
+    assert {:ok, %{category: :account, summary: "Three arguments"}} =
+             Output.repair(output, "invalid", :bad_shape, %{})
+
+    assert {:ok, raising} = Output.new(schema: @schema, repair_fun: &RepairCallback.raise_error/4)
+
+    assert {:error, %Jido.AI.Error.Validation.Output{details: %{reason: {:repair_exception, message}}}} =
+             Output.repair(raising, "invalid", :bad_shape, %{})
+
+    assert message == "repair callback failed"
+  end
+
+  test "default repair returns a structured error when no model is available" do
+    assert {:ok, output} = Output.new(schema: @schema)
+
+    assert {:error, %Jido.AI.Error.Validation.Output{details: %{reason: :missing_repair_model}}} =
+             Output.repair(output, "invalid", :bad_shape, %{})
+
+    assert {:error, %Jido.AI.Error.Validation.Output{details: %{reason: :missing_repair_model}}} =
+             Output.repair(output, "invalid", :bad_shape, %{}, repair_fun: :invalid)
   end
 end

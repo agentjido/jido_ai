@@ -5,12 +5,8 @@ defmodule Jido.AI.AgentTest do
   use ExUnit.Case, async: true
   import ExUnit.CaptureIO
 
-  alias Jido.Agent.Strategy.State, as: StratState
-  alias Jido.AI.Context, as: AIContext
-  alias Jido.AI.Request
   alias Jido.AI.Agent
-  alias Jido.AI.Runtime.Event
-  alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
+  alias Jido.AI.Session
   alias ReqLLM.Message.ContentPart
 
   # ============================================================================
@@ -327,7 +323,7 @@ defmodule Jido.AI.AgentTest do
       assert function_exported?(BasicAgent, :ask_stream, 3)
       assert function_exported?(BasicAgent, :steer, 3)
       assert function_exported?(BasicAgent, :inject, 3)
-      assert function_exported?(BasicAgent, :agent, 0)
+      assert function_exported?(BasicAgent, :definition, 0)
       assert function_exported?(BasicAgent, :new, 0)
     end
 
@@ -341,21 +337,18 @@ defmodule Jido.AI.AgentTest do
       assert agent.description == "A basic test agent"
     end
 
-    test "forwards default plugin exclusions to Jido.Agent" do
-      modules = Enum.map(AgentWithoutDefaultMemory.agent().plugins, &elem(&1, 0))
+    test "uses declared AI plugins when core defaults are disabled" do
+      modules = Enum.map(AgentWithoutDefaultMemory.definition().plugins, &elem(&1, 0))
 
-      refute Jido.Memory.Plugin in modules
-      refute Jido.Thread.Plugin in modules
-      refute Jido.Agent.Identity.Plugin in modules
       assert Jido.AI.Session.Plugin in modules
+      assert modules == Enum.uniq(modules)
     end
 
-    test "forwards default plugin replacements with config to Jido.Agent" do
-      modules = Enum.map(AgentWithReplacementMemory.agent().plugins, &elem(&1, 0))
+    test "adds an explicit configured plugin" do
+      modules = Enum.map(AgentWithReplacementMemory.definition().plugins, &elem(&1, 0))
       agent = AgentWithReplacementMemory.new!()
 
       assert ReplacementMemoryPlugin in modules
-      refute Jido.Memory.Plugin in modules
       assert agent.state[:__memory__].namespace == "agent:ai-replacement"
     end
 
@@ -458,7 +451,7 @@ defmodule Jido.AI.AgentTest do
     test "signal_routes option is forwarded to the base agent" do
       expected_routes = [{"custom.state.patch", TestSignalAction}]
 
-      routes = AgentWithSignalRoutes.agent().routes
+      routes = AgentWithSignalRoutes.definition().routes
 
       assert Enum.all?(expected_routes, fn {path, target} ->
                Enum.any?(routes, &(&1.path == path and &1.target == target))
@@ -467,14 +460,14 @@ defmodule Jido.AI.AgentTest do
 
     test "signal_routes option supports static params route format" do
       assert Enum.any?(
-               AgentWithSignalRouteStaticParams.agent().routes,
+               AgentWithSignalRouteStaticParams.definition().routes,
                &(&1.path == "custom.static" and &1.target == {TestSignalAction, %{mode: :patch}})
              )
     end
 
     test "signal_routes option supports module attributes" do
       assert Enum.any?(
-               AgentWithSignalRoutesFromAttribute.agent().routes,
+               AgentWithSignalRoutesFromAttribute.definition().routes,
                &(&1.path == "custom.attr.patch" and &1.target == TestSignalAction)
              )
     end
@@ -524,7 +517,7 @@ defmodule Jido.AI.AgentTest do
 
     test "tools list resolves module aliases" do
       agent = BasicAgent.new!()
-      tools = ReAct.list_tools(agent)
+      tools = Jido.AI.list_tools(agent)
 
       # Should be actual module atoms, not AST
       assert TestCalculator in tools
@@ -534,53 +527,41 @@ defmodule Jido.AI.AgentTest do
 
     test "agent_skills wires the catalog, loading tool, and scoped specs" do
       agent = AgentWithAgentSkills.new!()
-      state = StratState.get(agent, %{})
-      config = state[:config]
+      profile = Agent.profile(agent, :assistant)
 
-      assert Jido.AI.Actions.Skill.LoadSkill in ReAct.list_tools(agent)
-      assert Jido.AI.Actions.Skill.LoadResource in ReAct.list_tools(agent)
-      assert config.system_prompt =~ "Base instructions."
-      assert config.system_prompt =~ "**hex-release**"
-      refute config.system_prompt =~ "# Hex Release"
+      assert profile.instructions == "Base instructions."
+      assert profile.skills.paths == [".agents/skills"]
+      assert Jido.AI.list_tools(agent) == [TestCalculator]
 
-      specs = config.base_tool_context[Jido.AI.Actions.Skill.LoadSkill.context_skills_key()]
-      assert %Jido.AI.Skill.Spec{name: "hex-release"} = specs["hex-release"]
-      assert %Jido.AI.Skill.Diagnostics{} = config.skill_diagnostics
+      server = start_agent(agent)
+
+      assert {:ok, %{specs: specs, index: index, diagnostics: diagnostics}} =
+               Session.skill_catalog(server)
+
+      assert [%Jido.AI.Skill.Spec{name: "hex-release"}] = specs
+      assert index =~ "**hex-release**"
+      refute index =~ "# Hex Release"
+      assert %Jido.AI.Skill.Diagnostics{} = diagnostics
     end
 
     test "agent_skills accepts runtime specs and an MFA resource provider" do
-      start_supervised!(Jido.AI.Skill.Registry)
-
       agent = AgentWithRuntimeAgentSkills.new!()
-      state = StratState.get(agent, %{})
-      config = state.config
+      profile = Agent.profile(agent, :assistant)
 
-      assert Jido.AI.Actions.Skill.LoadSkill in ReAct.list_tools(agent)
-      assert Jido.AI.Actions.Skill.LoadResource in ReAct.list_tools(agent)
-      assert config.system_prompt =~ "Base instructions."
-      assert config.system_prompt =~ "**runtime-briefing**"
-      refute config.system_prompt =~ "Runtime briefing instructions."
+      assert profile.instructions == "Base instructions."
+      assert [spec] = profile.skills.specs
+      assert spec.name == "runtime-briefing"
+      assert spec.body_ref == {:inline, "Runtime briefing instructions."}
 
-      specs = config.base_tool_context[Jido.AI.Actions.Skill.LoadSkill.context_skills_key()]
-
-      assert %Jido.AI.Skill.Spec{body_ref: {:inline, "Runtime briefing instructions."}, source: nil} =
-               specs["runtime-briefing"]
-
-      assert config.base_tool_context[Jido.AI.Skill.ResourceProvider.context_provider_key()] ==
+      assert profile.skills.resource_provider ==
                {RuntimeAgentSkillProvider, :handle, ["!"]}
 
-      context = Map.put(config.base_tool_context, :agent_id, "runtime-agent-mfa")
+      server = start_agent(agent)
 
-      assert {:ok, loaded} = Jido.AI.Actions.Skill.LoadSkill.run(%{name: "runtime-briefing"}, context)
-      assert Enum.map(loaded.resources.resources, & &1.id) == ["briefing://runtime/1"]
-
-      assert {:ok, resource} =
-               Jido.AI.Actions.Skill.LoadResource.run(
-                 %{name: "runtime-briefing", resource_id: "briefing://runtime/1"},
-                 context
-               )
-
-      assert resource.content == "Briefing!"
+      assert {:ok, %{specs: [loaded], index: index}} = Session.skill_catalog(server)
+      assert loaded == spec
+      assert index =~ "**runtime-briefing**"
+      refute index =~ "Runtime briefing instructions."
     end
 
     @tag :tmp_dir
@@ -604,14 +585,18 @@ defmodule Jido.AI.AgentTest do
 
       File.write!(skill_file, "---\nname: runtime-skill\ndescription: Runtime version\n---\n\nNew body\n")
 
-      agent = module_name.new()
-      config = StratState.get(agent, %{}).config
-      specs = config.base_tool_context[Jido.AI.Actions.Skill.LoadSkill.context_skills_key()]
+      agent = module_name.new!()
+      profile = Agent.profile(agent, :assistant)
+      assert profile.instructions =~ "helpful AI assistant"
+      refute profile.instructions =~ "Runtime version"
 
-      assert config.system_prompt =~ "Runtime version"
-      refute config.system_prompt =~ "Compile-time version"
-      assert specs["runtime-skill"].body_ref == {:file, skill_file}
-      refute inspect(specs["runtime-skill"]) =~ "New body"
+      server = start_agent(agent)
+      assert {:ok, %{specs: [spec], index: index}} = Session.skill_catalog(server)
+
+      assert index =~ "Runtime version"
+      refute index =~ "Compile-time version"
+      assert spec.body_ref == {:file, skill_file}
+      refute inspect(spec) =~ "New body"
     end
 
     test "does not warn when consumer defines its own thinking_meta/1" do
@@ -671,97 +656,6 @@ defmodule Jido.AI.AgentTest do
     end
   end
 
-  describe "request lifecycle hooks" do
-    test "on_before_cmd marks request as failed on react_request_error" do
-      agent = BasicAgent.new!()
-      agent = Request.start_request(agent, "req_1", "query", stream_to: {:pid, self()})
-      tag = Request.Stream.message_tag()
-
-      {:ok, agent, _action} =
-        BasicAgent.on_before_cmd(
-          agent,
-          {:ai_react_request_error, %{request_id: "req_1", reason: :busy, message: "busy"}}
-        )
-
-      assert get_in(agent.state, [:requests, "req_1", :status]) == :failed
-      assert get_in(agent.state, [:requests, "req_1", :error]) == {:rejected, :busy, "busy"}
-
-      assert_receive {^tag,
-                      %Event{
-                        kind: :request_failed,
-                        request_id: "req_1",
-                        data: %{error: {:rejected, :busy, "busy"}, reason: :busy}
-                      }}
-    end
-
-    test "on_after_cmd cancel does not overwrite completed request" do
-      agent = BasicAgent.new!()
-      agent = Request.start_request(agent, "req_1", "query")
-      agent = Request.complete_request(agent, "req_1", "done")
-
-      {:ok, agent, _directives} =
-        BasicAgent.on_after_cmd(
-          agent,
-          {:ai_react_cancel, %{request_id: "req_1", reason: :user_cancelled}},
-          []
-        )
-
-      assert get_in(agent.state, [:requests, "req_1", :status]) == :completed
-      assert get_in(agent.state, [:requests, "req_1", :result]) == "done"
-      assert get_in(agent.state, [:requests, "req_1", :error]) == nil
-    end
-
-    test "on_after_cmd keeps last_answer string while request failure stores raw term" do
-      raw_error = %{type: :provider_error, status: 503, message: "try later"}
-
-      agent =
-        BasicAgent.new!()
-        |> Request.start_request("req_failed", "query")
-        |> with_failed_strategy(raw_error)
-
-      {:ok, updated_agent, directives} =
-        BasicAgent.on_after_cmd(
-          agent,
-          {:ai_react_worker_event, %{request_id: "req_failed", event: %{request_id: "req_failed"}}},
-          [:noop]
-        )
-
-      assert directives == [:noop]
-      assert get_in(updated_agent.state, [:requests, "req_failed", :status]) == :failed
-      assert get_in(updated_agent.state, [:requests, "req_failed", :error]) == {:failed, :provider_error, raw_error}
-      assert updated_agent.state.last_answer == inspect(raw_error)
-      assert updated_agent.state.completed == true
-    end
-
-    test "on_after_cmd stores enriched request meta from the ReAct snapshot" do
-      reasoning_details = [%{signature: "sig_123", provider: :openai}]
-      thinking_trace = [%{call_id: "call_1", iteration: 1, thinking: "Step by step..."}]
-
-      agent =
-        BasicAgent.new!()
-        |> Request.start_request("req_meta", "query")
-        |> with_completed_strategy("final answer", %{
-          usage: %{input_tokens: 7, output_tokens: 3, reasoning_tokens: 18},
-          thinking_trace: thinking_trace,
-          streaming_thinking: "Final reasoning",
-          run_context:
-            AIContext.new()
-            |> AIContext.append_user("query")
-            |> AIContext.append_assistant("final answer", nil, reasoning_details: reasoning_details)
-        })
-
-      {:ok, updated_agent, _directives} =
-        BasicAgent.on_after_cmd(agent, {:ai_react_start, %{request_id: "req_meta"}}, [])
-
-      request = get_in(updated_agent.state, [:requests, "req_meta"])
-      assert request.status == :completed
-      assert request.meta.usage.reasoning_tokens == 18
-      assert request.meta.reasoning_details == reasoning_details
-      assert request.meta.thinking_trace == thinking_trace
-      assert request.meta.last_thinking == "Final reasoning"
-    end
-  end
-
   # ============================================================================
   # tools_from_skills/1 Tests
   # ============================================================================
@@ -794,17 +688,10 @@ defmodule Jido.AI.AgentTest do
     end
   end
 
-  defp with_failed_strategy(agent, result) do
-    strategy_state = %{status: :error, result: result, termination_reason: :provider_error}
-    put_in(agent.state[:__strategy__], strategy_state)
-  end
-
-  defp with_completed_strategy(agent, result, overrides) do
-    strategy_state =
-      agent.state[:__strategy__]
-      |> Map.merge(%{status: :completed, result: result})
-      |> Map.merge(overrides)
-
-    put_in(agent.state[:__strategy__], strategy_state)
+  defp start_agent(agent) do
+    jido = :"agent_test_#{System.unique_integer([:positive])}"
+    start_supervised!({Jido, name: jido})
+    assert {:ok, server} = Jido.start_agent(jido, agent)
+    server
   end
 end

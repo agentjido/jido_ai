@@ -69,7 +69,7 @@ mark a message as durable skill history.
 
 ## Examples and refinement
 
-The [02_23 examples](../../examples/v3/profiles/02_23_context_operations.md) add
+The [02_23 examples](../../examples/02_requests/02_23_context_operations/README.md) add
 three cases: a public Agent and named native buffered/streamed Agents. Each
 uses the one shared mock, executes a real held tool, accepts steer and inject,
 checks six message roles and owned Thread refs, reconstructs portable state,

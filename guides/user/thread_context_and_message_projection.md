@@ -4,15 +4,20 @@ You need deterministic conversation state and explicit message projection to LLM
 
 After this guide, you can build and inspect history using `Jido.AI.Context`.
 
-## Core Thread vs ReAct Context
+## Agent History, Session, And Thread
 
-Two different data structures now coexist by design:
+Four values have separate jobs:
 
-- `agent.state[:__thread__]` (`Jido.Thread`): append-only, canonical event log.
-- `agent.state[:__strategy__].context` (`Jido.AI.Context`): materialized LLM projection view.
+- The Profile `memory.history` field stores the canonical portable message maps.
+- `agent.state.jido_ai_contexts[profile_id].session` stores a portable `Jido.Session`.
+- `session.thread` stores the append-only `Jido.Thread` entries for lane operations and audit data.
+- `Jido.AI.Context` is the materialized LLM projection returned by the public context getter.
 
-In ReAct, message and context lifecycle changes are represented as thread events,
-and the strategy context is projected from those events.
+`Jido.Thread` and `Jido.Session` are ordinary portable values. They have no
+process, Plugin, storage adapter, AgentServer, or execution behavior.
+
+See the checked [Thread and Session example](../../examples/02_requests/02_27_thread_session_values/README.md)
+for direct construction, selection, lifecycle, and encoding.
 
 ## Build Context
 
@@ -119,24 +124,30 @@ Fix:
 
 - Entries are stored reversed internally for append speed
 - `Context.to_messages/2` reorders to chronological output
-- `limit: nil` includes full thread
+- `limit: nil` includes the full context
 
 ## When To Use / Not Use
 
 Use this when:
 - you need explicit control over message windows
-- you need import/export-friendly thread format
+- you need an import/export-friendly context format
 
 Do not use this when:
 - strategy internals already manage conversation state for your use case
 
 ## Breaking Change
 
-`Jido.AI.Thread` has been removed. Use `Jido.AI.Context` directly.
+`Jido.AI.Thread` remains removed. Use `Jido.AI.Context` for model messages.
+The `jido_ai` package now provides `Jido.Thread` as a portable interaction log
+and `Jido.Session` as a portable envelope that owns one thread. These values do
+not restore the old core Thread Plugin or `Jido.Thread.Agent` helper.
+
+`Jido.Session` can span many requests. `Jido.AI.Session` is the separate live
+request API for admission, steering, cancellation, completion, and inspection.
 If you previously restored state with `initial_state: %{thread: ...}`,
 use `Jido.AI.Agent.from_initial_state(MyAgent, %{context: context})` before
 starting the Server. Declare any unrelated application `:thread` field in the
-v3 Agent schema. See the [import example](../../examples/v3/profiles/14_11_initial_state.md).
+v3 Agent schema. See the [import example](../../examples/14_resume/14_11_initial_state/README.md).
 
 ## Next
 

@@ -37,7 +37,7 @@ decoded Context maps and the final state size limit. The preparation function
 is shared with normal history replacement. The existing standalone migration
 now calls the shared tool-history validator with its original error mapping.
 
-The [14_11 examples](../../examples/v3/profiles/14_11_initial_state.md) add seven
+The [14_11 examples](../../examples/14_resume/14_11_initial_state/README.md) add seven
 cases across public and native buffered/streamed Agents and two selected-profile
 prompt variants. They prove actual HTTP inputs, image bytes, complete saved tool
 history, no replay and a later native reconstruction. The final rejection case

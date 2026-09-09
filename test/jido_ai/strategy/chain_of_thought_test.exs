@@ -54,9 +54,11 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
   end
 
   test "rejects a non-text prompt during definition validation" do
-    assert_raise Jido.AI.Error.Validation.Invalid, ~r/instructions: Expected text or nil/, fn ->
-      definition(:chain_of_thought, system_prompt: 123)
-    end
+    assert_raise Jido.AI.Error.Validation.Invalid,
+                 ~r/instructions: Expected text, an Action module, or nil/,
+                 fn ->
+                   definition(:chain_of_thought, system_prompt: 123)
+                 end
   end
 
   test "the start Action validates a query and request ID before admission" do

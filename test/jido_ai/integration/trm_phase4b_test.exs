@@ -16,6 +16,8 @@ defmodule Jido.AI.Integration.TRMPhase4BTest do
   """
   use ExUnit.Case, async: true
 
+  @moduletag :legacy_v2
+
   alias Jido.Agent
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Directive

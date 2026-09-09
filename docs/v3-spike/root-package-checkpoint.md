@@ -273,7 +273,7 @@ The failure comparison has 20 resolved entries and no additional failure.
 | Forced full production compile, warnings as errors | 229 files passed |
 | Selected formatting and whitespace checks | Passed |
 
-The four new [03_03 examples](../../examples/v3/profiles/03_03_numeric_inputs.md)
+The four new [03_03 examples](../../examples/03_tools/03_03_numeric_inputs/README.md)
 use the shared HTTP mock. Each tool form has a successful numeric round trip and
 a malformed second call that prevents the complete batch from starting. The
 tests check real tool inputs, correlated model JSON, stored results and terminal
@@ -377,7 +377,7 @@ pass. The failure comparison resolves exactly one previous case and has no
 new failing root case. The full production compile passes for 230 files with
 warnings as errors. No old root case was removed, combined or skipped.
 
-The [02_24 examples](../../examples/v3/profiles/02_24_stream_usage.md) add eight
+The [02_24 examples](../../examples/02_requests/02_24_stream_usage/README.md) add eight
 required integration cases. Native Agent DSL and standalone requests prove
 explicit zero and cumulative accounting across real tool rounds. Four new
 cases send complete usage fields as strings. ReqLLM 1.22 raises `:badarith`
@@ -526,7 +526,7 @@ they are configuration proof, not substitute provider responses.
 Shared fixes accept model option maps, defer provider lookup until model
 resolution, and merge declared, runtime and request HTTP options. One common
 preparation helper serves Session and direct Turn execution. The six new
-[02_26 examples](../../examples/v3/profiles/02_26_request_setup.md) prove actual
+[02_26 examples](../../examples/02_requests/02_26_request_setup/README.md) prove actual
 headers, buffered callbacks, model values, later defaults and portable state.
 All six pass. The full root result is 1,998/2,412 passed in 24.9 seconds, with
 414 failures and one existing exclusion. All four doctests pass. The comparison
@@ -566,7 +566,7 @@ The complete root result is 2,022/2,412 passed in 23.9 seconds, with 390 failure
 and one existing exclusion. All four doctests pass. The complete failure
 comparison resolves exactly the 24 mapped cases and adds no failing case.
 All 30 unported ReAct cases still fail and remain required. The three new
-[03_02 examples](../../examples/v3/profiles/03_02_tool_context.md) cover a named
+[03_02 examples](../../examples/03_tools/03_02_tool_context/README.md) cover a named
 native Session Agent, native Turn Agent and public Agent. All 14 focused tool
 context examples pass with integration and pending-DSL tags included.
 
@@ -635,7 +635,7 @@ cases and adds no failing case. ReAct now passes 66/78. All 12 unported cases
 remain required failures. The four new history cases and three retained
 response-context cases pass together.
 
-The [02_23 examples](../../examples/v3/profiles/02_23_context_operations.md) add
+The [02_23 examples](../../examples/02_requests/02_23_context_operations/README.md) add
 three cases through a public Agent and native buffered/streamed Agents. Real
 tools, steer/inject, portable reconstruction and a later request keep owned
 Thread refs, local caller refs and one copy of tool history. HTTP bodies keep
@@ -698,7 +698,7 @@ Comparison with checkpoint 12 shows exactly the two mapped failures resolved,
 five new passing boundary cases and no new failing case. All 230 production
 files pass forced compilation with warnings as errors.
 
-The [02_22 examples](../../examples/v3/profiles/02_22_request_inspection.md)
+The [02_22 examples](../../examples/02_requests/02_22_request_inspection/README.md)
 add named buffered and streaming Agents. All 16 focused cases pass. Each new
 case executes success/failure tools, replays an actual completion twice, checks
 one HTTP history entry per tool, finishes and starts a later request. It checks
@@ -772,7 +772,7 @@ nine new tests pass and no failing case is added.
 Root log: `/tmp/jido-ai-v3-root-test-35.log`.
 Failure inventory: `/tmp/jido-ai-v3-root-checkpoint-14-failures.json`.
 
-The [14_11 examples](../../examples/v3/profiles/14_11_initial_state.md) add seven
+The [14_11 examples](../../examples/14_resume/14_11_initial_state/README.md) add seven
 integration cases. Four public/native buffered/streamed Agents import image and
 completed tool history, make real model requests, save native state and restart
 without tool replay. Two selected-profile cases prove prompt and history
@@ -817,7 +817,7 @@ original and current name, with no removed, combined or skipped case. It records
 24 setup, 24 lifecycle, 18 context, two inspection, four initial-state and six
 terminal cases. The old private Strategy runtime calls are gone from this file.
 
-The [14_12 examples](../../examples/v3/profiles/14_12_terminal_state.md) add six
+The [14_12 examples](../../examples/14_resume/14_12_terminal_state/README.md) add six
 checks for native buffered/SSE success and two raw error forms. Each proves
 real model/tool work, empty final usage, portable checkpoint copy, retained
 request and trace, no restored active work, no tool replay and a later request

@@ -97,10 +97,14 @@ defmodule Jido.AI.Skill.Loader do
     end
   end
 
+  @doc false
+  @spec read_file(String.t()) :: {:ok, binary()} | {:error, term()}
+  def read_file(path) when is_binary(path), do: read_bounded_regular_file(path, Spec.max_body_bytes())
+
   defp do_load(path, opts, diagnostics) do
     lenient = Keyword.get(opts, :lenient, false)
 
-    case File.read(path) do
+    case read_file(path) do
       {:ok, content} ->
         with {:ok, diagnostics} <- validate_skill_filename(path, diagnostics, lenient),
              {:ok, {frontmatter, body}, diagnostics} <-
@@ -119,12 +123,60 @@ defmodule Jido.AI.Skill.Loader do
   defp do_parse(content, source_path, opts, diagnostics) do
     lenient = Keyword.get(opts, :lenient, false)
 
-    with {:ok, {frontmatter, body}, diagnostics} <-
+    with :ok <- validate_content_size(content),
+         {:ok, {frontmatter, body}, diagnostics} <-
            parse_frontmatter(content, source_path, diagnostics, lenient),
          {:ok, spec, diagnostics} <- build_spec(frontmatter, body, source_path, diagnostics, lenient) do
       {:ok, %{spec | diagnostics: diagnostics}, diagnostics}
+    else
+      {:error, reason} -> {:error, reason, diagnostics}
+      {:error, reason, next_diagnostics} -> {:error, reason, next_diagnostics}
     end
   end
+
+  defp validate_content_size(content) when is_binary(content) do
+    if byte_size(content) <= Spec.max_body_bytes(),
+      do: :ok,
+      else: {:error, {:skill_file_too_large, byte_size(content), Spec.max_body_bytes()}}
+  end
+
+  defp read_bounded_regular_file(path, limit) do
+    with {:ok, %File.Stat{type: :regular} = path_stat} <- File.lstat(path),
+         :ok <- within_file_limit(path_stat.size, limit),
+         {:ok, io} <- File.open(path, [:read, :binary]) do
+      try do
+        with {:ok, opened_info} <- :file.read_file_info(io),
+             opened_stat = File.Stat.from_record(opened_info),
+             true <- opened_stat.type == :regular and same_file?(path_stat, opened_stat),
+             {:ok, %File.Stat{type: :regular} = current_stat} <- File.lstat(path),
+             true <- same_file?(opened_stat, current_stat),
+             :ok <- within_file_limit(opened_stat.size, limit),
+             {:ok, content} when is_binary(content) <- :file.read(io, limit + 1),
+             :ok <- within_file_limit(byte_size(content), limit) do
+          {:ok, content}
+        else
+          false -> {:error, :skill_file_changed}
+          {:ok, %File.Stat{}} -> {:error, :unsafe_skill_file}
+          :eof -> {:ok, ""}
+          {:error, _} = error -> error
+          _ -> {:error, :skill_file_read_failed}
+        end
+      after
+        File.close(io)
+      end
+    else
+      {:ok, %File.Stat{}} -> {:error, :unsafe_skill_file}
+      {:error, _} = error -> error
+    end
+  end
+
+  defp same_file?(left, right) do
+    left.inode == right.inode and left.major_device == right.major_device and
+      left.minor_device == right.minor_device
+  end
+
+  defp within_file_limit(size, limit) when is_integer(size) and size <= limit, do: :ok
+  defp within_file_limit(size, limit), do: {:error, {:skill_file_too_large, size, limit}}
 
   defp parse_frontmatter(content, path, diagnostics, lenient) do
     content = strip_utf8_bom(content)

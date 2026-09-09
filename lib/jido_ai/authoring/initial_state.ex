@@ -28,8 +28,8 @@ defmodule Jido.AI.Agent.InitialState do
   defp definition(%Jido.Agent{} = source), do: Jido.Agent.new(source)
 
   defp definition(module) when is_atom(module) and not is_nil(module) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :agent, 0),
-      do: module.agent() |> Jido.Agent.new(),
+    if Code.ensure_loaded?(module) and function_exported?(module, :definition, 0),
+      do: module.definition() |> Jido.Agent.new(),
       else: error("Expected an Agent module or neutral definition")
   end
 

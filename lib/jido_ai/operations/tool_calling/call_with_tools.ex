@@ -50,9 +50,13 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
             description: "List of tool names to include (default: all registered)"
           )
           |> Zoi.optional(),
-        max_tokens: Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(4096),
-        temperature: Zoi.float(description: "Sampling temperature (0.0-2.0)") |> Zoi.default(0.7),
-        timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional(),
+        max_tokens: Zoi.integer(description: "Maximum tokens to generate") |> Zoi.min(1) |> Zoi.default(4096),
+        temperature:
+          Zoi.float(description: "Sampling temperature (0.0-2.0)")
+          |> Zoi.min(0)
+          |> Zoi.max(2)
+          |> Zoi.default(0.7),
+        timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.min(1) |> Zoi.optional(),
         auto_execute:
           Zoi.boolean(description: "Automatically execute tool calls in multi-turn conversation")
           |> Zoi.default(false),
@@ -84,7 +88,8 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
   def run(params, context) do
     context = ActionInput.context(context)
 
-    with {:ok, params} <-
+    with :ok <- validate_explicit_max_turns(params),
+         {:ok, params} <-
            ActionInput.parse(schema(), params, context, @defaults, [:chat, :tool_calling]),
          {:ok, params} <- Helpers.validate_and_sanitize_input(params),
          {:ok, max_turns} <- Validation.validate_max_turns(params.max_turns),
@@ -118,6 +123,29 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
       }
 
       Jido.Exec.run(Jido.AI.Actions.ToolCalling.ModelFlow, state, context)
+    end
+  end
+
+  defp validate_explicit_max_turns(params) when is_map(params) do
+    case Map.fetch(params, :max_turns) do
+      {:ok, max_turns} -> validate_max_turns_value(max_turns)
+      :error -> validate_optional_string_max_turns(params)
+    end
+  end
+
+  defp validate_explicit_max_turns(_params), do: :ok
+
+  defp validate_optional_string_max_turns(params) do
+    case Map.fetch(params, "max_turns") do
+      {:ok, max_turns} -> validate_max_turns_value(max_turns)
+      :error -> :ok
+    end
+  end
+
+  defp validate_max_turns_value(max_turns) do
+    case Validation.validate_max_turns(max_turns) do
+      {:ok, _max_turns} -> :ok
+      {:error, reason} -> {:error, reason}
     end
   end
 end

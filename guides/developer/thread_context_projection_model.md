@@ -1,16 +1,20 @@
-# Thread-Context Projection Model
+# Context History And Projection Model
 
-This guide defines the ReAct data model after the `thread -> context` materialized-view rename.
+This guide defines the V3 context history, portable session thread, and materialized projection.
 
 ## Ownership Boundaries
 
-- Core append-only event log: `agent.state[:__thread__]` (`Jido.Thread`).
-- ReAct materialized LLM state: `agent.state[:__strategy__].context` (`Jido.AI.Context`).
-- In-flight turn state: `agent.state[:__strategy__].run_context`.
+- Canonical message history: the Profile `memory.history` field in Agent state.
+- Portable interaction value: `agent.state.jido_ai_contexts[profile_id].session` (`Jido.Session`).
+- Append-only lane thread: `session.thread` (`Jido.Thread`).
+- Materialized LLM view: `Jido.AI.Context`, returned by `Jido.AI.get_strategy_context/2`.
+- In-flight turn state: live request execution state outside portable Agent state.
 
-`Jido.Thread` remains the source-of-truth audit log. ReAct `context` is a deterministic projection for LLM input.
+The declared history field is the source of truth for model messages. The
+Agent-owned session thread records lane operations and the message batches that
+support deterministic lane projection.
 
-## Canonical Core Thread Entry Kinds
+## Thread Entry Kinds
 
 ### `:ai_message`
 
@@ -47,11 +51,11 @@ Operation map fields:
 
 1. Run start:
 - use materialized `context` for `active_context_ref`
-- append user `:ai_message` to core thread
+- append the user `:ai_message` to the session thread
 - initialize `run_context`
 
 2. Run progression:
-- append assistant/tool `:ai_message` entries as runtime events arrive
+- append assistant/tool `:ai_message` entries when history commits
 - append drained steering/injection input as user `:ai_message` when runtime emits `:input_injected`
 - update `run_context` in lockstep
 
@@ -60,7 +64,7 @@ Operation map fields:
 - do not mutate `run_context` mid-flight
 
 4. Terminal transition:
-- finalize run state first
+- finalize request state first
 - apply deferred op second (append `:ai_context_operation`, then update materialized context)
 
 ## Projection Rule
@@ -79,7 +83,7 @@ For a lane (`context_ref`):
 ## Idempotency
 
 `op_id` is required for deterministic operation semantics. If already applied:
-- no duplicate core-thread append
+- no duplicate thread append
 - no duplicate materialized mutation
 
 ## Compaction
@@ -90,11 +94,14 @@ Compaction is represented as a normal context operation:
 - `result_context`: compacted snapshot
 - provenance in `meta`
 
-Core thread remains append-only.
+The session thread remains append-only.
 
 ## Compatibility Break
 
-ReAct runtime/checkpoint payload is now context-only:
-- `thread` key removed
+Old ReAct runtime/checkpoint payloads remain context-only:
+- the old private runtime `thread` key is not restored
 - token payload version bumped (`v2`, `rt2.` prefix)
-- legacy payloads with `thread` key are rejected
+- legacy private runtime payloads with `thread` are rejected
+
+This rule does not reject the new portable `Jido.Thread` value in declared
+Agent state. Native Agent checkpoints can retain `Jido.Session` and its thread.

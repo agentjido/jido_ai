@@ -126,8 +126,7 @@ defmodule Jido.AI.Quota.Store do
 
           %{
             row
-            | records:
-                Map.put(row.records, id, %{record | status: :complete, total_tokens: tokens}),
+            | records: Map.put(row.records, id, %{record | status: :complete, total_tokens: tokens}),
               usage: %{row.usage | total_tokens: row.usage.total_tokens + tokens - previous}
           }
 
@@ -272,8 +271,7 @@ defmodule Jido.AI.Quota.Store do
       window_ms: window,
       usage: row.usage,
       limits: %{max_requests: requests, max_total_tokens: tokens},
-      over_budget?:
-        exhausted?(requests, row.usage.requests) or exhausted?(tokens, row.usage.total_tokens),
+      over_budget?: exhausted?(requests, row.usage.requests) or exhausted?(tokens, row.usage.total_tokens),
       remaining: %{
         requests: remaining(requests, row.usage.requests),
         total_tokens: remaining(tokens, row.usage.total_tokens)

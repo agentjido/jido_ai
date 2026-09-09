@@ -246,7 +246,7 @@ defmodule Jido.AI.Context do
 
   ## Example
 
-      Thread.debug_view(thread, last: 5, truncate: 100)
+      Context.debug_view(context, last: 5, truncate: 100)
       # %{
       #   id: "abc123",
       #   length: 12,
@@ -284,7 +284,7 @@ defmodule Jido.AI.Context do
 
   ## Example
 
-      Thread.pp(thread)
+      Context.pp(context)
       # [system] You are a weather assistant...
       # [user]   What's the weather in Seattle?
       # [asst]   <tool: get_weather>

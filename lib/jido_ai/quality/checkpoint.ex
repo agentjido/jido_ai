@@ -27,7 +27,8 @@ defmodule Jido.AI.Quality.Checkpoint do
           required(:cmd) => String.t(),
           required(:args) => [String.t()],
           required(:status) => non_neg_integer(),
-          required(:elapsed_ms) => non_neg_integer()
+          required(:elapsed_ms) => non_neg_integer(),
+          optional(:error) => String.t()
         }
 
   @type traceability_result :: %{
@@ -37,7 +38,7 @@ defmodule Jido.AI.Quality.Checkpoint do
         }
 
   @story_id_pattern ~r/^ST-[A-Z]+-[0-9]{3}$/
-  @traceability_row_pattern ~r/^\| (ST-[A-Z]+-[0-9]{3}) \|/m
+  @traceability_row_pattern ~r/^\s*\|\s*(ST-[A-Z]+-[0-9]{3})\s*\|/m
   @story_commit_pattern ~r/^feat\(story\): (ST-[A-Z]+-[0-9]{3})\b/m
 
   @doc """
@@ -91,27 +92,28 @@ defmodule Jido.AI.Quality.Checkpoint do
     cwd = Keyword.get(opts, :cwd, File.cwd!())
     started = System.monotonic_time(:millisecond)
 
-    {_result, status} =
-      System.cmd(command.cmd, command.args,
-        cd: cwd,
-        into: IO.stream(:stdio, :line),
-        stderr_to_stdout: true
-      )
+    try do
+      {_result, status} =
+        System.cmd(command.cmd, command.args,
+          cd: cwd,
+          into: IO.stream(:stdio, :line),
+          stderr_to_stdout: true
+        )
 
-    elapsed_ms = System.monotonic_time(:millisecond) - started
+      elapsed_ms = System.monotonic_time(:millisecond) - started
 
-    if status == 0 do
-      {:ok, %{gate: command.gate, label: command.label, elapsed_ms: elapsed_ms}}
-    else
-      {:error,
-       %{
-         gate: command.gate,
-         label: command.label,
-         cmd: command.cmd,
-         args: command.args,
-         status: status,
-         elapsed_ms: elapsed_ms
-       }}
+      if status == 0 do
+        {:ok, %{gate: command.gate, label: command.label, elapsed_ms: elapsed_ms}}
+      else
+        {:error, command_failure(command, status, elapsed_ms)}
+      end
+    rescue
+      exception ->
+        elapsed_ms = System.monotonic_time(:millisecond) - started
+
+        {:error,
+         command_failure(command, 127, elapsed_ms)
+         |> Map.put(:error, Exception.message(exception))}
     end
   end
 
@@ -191,11 +193,22 @@ defmodule Jido.AI.Quality.Checkpoint do
       missing_story_ids: missing_story_ids
     }
 
-    if missing_story_ids == [] do
+    if traceability_story_ids != [] and missing_story_ids == [] do
       {:ok, result}
     else
       {:error, result}
     end
+  end
+
+  defp command_failure(command, status, elapsed_ms) do
+    %{
+      gate: command.gate,
+      label: command.label,
+      cmd: command.cmd,
+      args: command.args,
+      status: status,
+      elapsed_ms: elapsed_ms
+    }
   end
 
   @doc """

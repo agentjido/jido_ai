@@ -146,7 +146,7 @@ deterministic barriers. No excluded or specified test is passing port evidence.
 
 ## Standalone queue execution evidence: 2026-09-07
 
-[14_07](../../../examples/v3/profiles/14_07_standalone_input.md) adds 13 real
+[14_07](../../../examples/14_resume/14_07_standalone_input/README.md) adds 13 real
 integration cases. A caller-supplied queue serves the native Session directly.
 FIFO refs, real tool work, final-response continuation, missing-queue failures,
 owned cleanup, maximum iterations and closure before repair extend PR 225's
@@ -161,7 +161,7 @@ queues created by Session are stopped.
 
 ## Position after queued final-answer input: 2026-09-07
 
-[14_10](../../../examples/v3/profiles/14_10_failure_position.md) adds one partial
+[14_10](../../../examples/14_resume/14_10_failure_position/README.md) adds one partial
 PR 225 reference. Input received with a final response advances the reasoning
 position. If the next transformer rejects, terminal State keeps that position
 without inventing another model call. Queue durability and owner-loss recovery

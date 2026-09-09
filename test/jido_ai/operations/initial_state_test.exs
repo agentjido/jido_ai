@@ -104,7 +104,7 @@ defmodule Jido.AI.InitialStateTest do
   end
 
   test "the final state size limit includes the imported prompt" do
-    source = %{source() | max_state_size: 8_000}
+    assert {:ok, source} = Jido.AI.Authoring.with_state_size_limit(source(), 8_000)
     assert {:ok, _} = Agent.from_initial_state(source, %{context: context()})
     large = %{context() | system_prompt: String.duplicate("x", 9_000)}
     assert {:error, _} = Agent.from_initial_state(source, %{context: large})

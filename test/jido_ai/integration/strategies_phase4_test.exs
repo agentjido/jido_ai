@@ -15,6 +15,8 @@ defmodule Jido.AI.Integration.StrategiesPhase4Test do
   """
   use ExUnit.Case, async: true
 
+  @moduletag :legacy_v2
+
   alias Jido.Agent
   alias Jido.Agent.Directive, as: AgentDirective
   alias Jido.Agent.Strategy.State, as: StratState

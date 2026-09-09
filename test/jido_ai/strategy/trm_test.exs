@@ -1,6 +1,8 @@
 defmodule Jido.AI.Reasoning.TRM.StrategyTest do
   use ExUnit.Case, async: true
 
+  @moduletag :legacy_v2
+
   alias Jido.Agent
   alias Jido.Agent.Strategy.State
   alias Jido.AI.Directive

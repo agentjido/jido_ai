@@ -39,20 +39,16 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
           Zoi.enum([:bfs, :dfs, :best_first], description: "ToT traversal strategy")
           |> Zoi.optional(),
         generation_prompt: Zoi.string(description: "Custom generation prompt") |> Zoi.optional(),
-        evaluation_prompt:
-          Zoi.string(description: "Custom ToT evaluation prompt") |> Zoi.optional(),
+        evaluation_prompt: Zoi.string(description: "Custom ToT evaluation prompt") |> Zoi.optional(),
         # GoT options
         max_nodes: Zoi.integer(description: "GoT max nodes") |> Zoi.optional(),
         aggregation_strategy:
           Zoi.enum([:voting, :weighted, :synthesis], description: "GoT aggregation strategy")
           |> Zoi.optional(),
-        connection_prompt:
-          Zoi.string(description: "Custom GoT connection prompt") |> Zoi.optional(),
-        aggregation_prompt:
-          Zoi.string(description: "Custom GoT aggregation prompt") |> Zoi.optional(),
+        connection_prompt: Zoi.string(description: "Custom GoT connection prompt") |> Zoi.optional(),
+        aggregation_prompt: Zoi.string(description: "Custom GoT aggregation prompt") |> Zoi.optional(),
         # TRM options
-        max_supervision_steps:
-          Zoi.integer(description: "TRM max supervision steps") |> Zoi.optional(),
+        max_supervision_steps: Zoi.integer(description: "TRM max supervision steps") |> Zoi.optional(),
         act_threshold: Zoi.float(description: "TRM ACT threshold") |> Zoi.optional(),
         # AoT options
         profile:
@@ -172,8 +168,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
            Request.create_and_send(server, params.prompt,
              signal_type: "reasoning.run",
              source: "/ai/reasoning/action",
-             context:
-               Map.merge(Session.caller_context(context), Map.take(context, [:jido_ai_quota]))
+             context: Map.merge(Session.caller_context(context), Map.take(context, [:jido_ai_quota]))
            ) do
       result = Request.await(handle, timeout: timeout)
       if result == {:error, :timeout}, do: Session.cancel(handle, reason: :timeout)

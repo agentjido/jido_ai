@@ -32,7 +32,7 @@ real final token, check saved result/usage, and collect the completed token
 without more model requests. The terminal checkpoint event follows request
 completion. No synthetic token or old Strategy worker event proves this path.
 
-The [14_12 examples](../../examples/v3/profiles/14_12_terminal_state.md) add six
+The [14_12 examples](../../examples/14_resume/14_12_terminal_state/README.md) add six
 native cases: buffered/SSE responses with completion, a raw error map, or the
 exact incomplete-response tuple. Each executes a real tool and two provider
 calls before checkpointing. A safe ETF copy restores into a new Server, keeps
@@ -47,7 +47,7 @@ Two real model responses accumulate 17 input and eight output tokens. A
 separate public collector check retains the original nested numeric costs,
 boolean, list-replacement and image-count assertions. The SDK can change
 provider fields before collection, so the nested-map case is not a claim about
-all provider wire formats. The [02_24 usage examples](../../examples/v3/profiles/02_24_stream_usage.md)
+all provider wire formats. The [02_24 usage examples](../../examples/02_requests/02_24_stream_usage/README.md)
 keep four required SDK numeric-string failures visible.
 
 A real tool response supplies usage; the final model response supplies an
@@ -62,8 +62,8 @@ the exact `{:incomplete_response, :incomplete}` tuple or the original raw 503
 map. Await, inspection and event collection retain those values. A direct
 collector input also retains the exact tuple with `:llm_response` metadata.
 The control path does not claim to prove a provider's status decoding. The
-[02_25 examples](../../examples/v3/profiles/02_25_incomplete_response.md) and
-[02_08 contract](../../examples/v3/profiles/02_08_error_contract.md) cover the
+[02_25 examples](../../examples/02_requests/02_25_incomplete_response/README.md) and
+[02_08 contract](../../examples/02_requests/02_08_error_contract/README.md) cover the
 related provider and public error paths. Old wrapper-envelope root failures
 remain required work.
 

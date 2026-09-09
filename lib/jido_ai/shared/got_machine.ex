@@ -951,9 +951,30 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Machine do
       prompt: machine.prompt,
       thoughts: thoughts,
       node_ids: node_ids,
-      system_prompt: default_aggregation_prompt()
+      aggregation_strategy: machine.aggregation_strategy,
+      system_prompt: aggregation_prompt(machine.aggregation_strategy)
     }
   end
+
+  defp aggregation_prompt(:voting) do
+    """
+    You are selecting the strongest conclusion from several candidate thoughts.
+    Compare the candidates, vote for the one that best answers the original problem,
+    and return that candidate as the final conclusion. Resolve a tie by choosing the
+    candidate with the clearest evidence and the fewest unsupported assumptions.
+    """
+  end
+
+  defp aggregation_prompt(:weighted) do
+    """
+    You are combining several candidate thoughts into a weighted conclusion.
+    Give more weight to candidates with direct evidence, relevance, and internal
+    consistency. Give less weight to speculative or conflicting candidates. Return
+    one coherent final conclusion based on those weights.
+    """
+  end
+
+  defp aggregation_prompt(:synthesis), do: default_aggregation_prompt()
 
   defp extract_content(%{text: text}) when is_binary(text), do: text
   defp extract_content(%{content: content}) when is_binary(content), do: content

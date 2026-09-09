@@ -86,7 +86,7 @@ defmodule Jido.AI.Skill.Activation do
     else
       # Try to resolve the skill
       with {:ok, spec} <- resolve_skill(name, opts),
-           {:ok, resolved_spec} <- resolve_activation_spec(spec) do
+           {:ok, resolved_spec} <- resolve_activation_spec(spec, opts) do
         do_activate(resolved_spec, opts)
       end
     end
@@ -200,7 +200,7 @@ defmodule Jido.AI.Skill.Activation do
     if Registry.activated?(name, opts) do
       build_context_from_registry(spec.name, opts)
     else
-      with {:ok, resolved_spec} <- resolve_activation_spec(spec) do
+      with {:ok, resolved_spec} <- resolve_activation_spec(spec, opts) do
         do_activate(resolved_spec, opts)
       end
     end
@@ -244,18 +244,21 @@ defmodule Jido.AI.Skill.Activation do
     end
   end
 
-  defp resolve_activation_spec(%Spec{
-         source: {:file, path},
-         body_ref: {:file, path},
-         metadata: %{"jido_ai.discovery_scope" => _scope} = catalog_metadata
-       }) do
+  defp resolve_activation_spec(
+         %Spec{
+           source: {:file, path},
+           body_ref: {:file, path},
+           metadata: %{"jido_ai.discovery_scope" => _scope} = catalog_metadata
+         },
+         _opts
+       ) do
     case Loader.load(path, lenient: false) do
       {:ok, spec} -> {:ok, %{spec | metadata: Map.merge(spec.metadata, catalog_metadata)}}
       {:error, reason} -> {:error, reason}
     end
   end
 
-  defp resolve_activation_spec(%Spec{} = spec), do: {:ok, spec}
+  defp resolve_activation_spec(%Spec{} = spec, _opts), do: {:ok, spec}
 
   defp do_activate(%Spec{} = spec, opts) do
     with {:ok, skill_body} <- load_skill_body(spec),
@@ -294,13 +297,22 @@ defmodule Jido.AI.Skill.Activation do
   end
 
   defp load_skill_body(%Spec{body_ref: {:file, path}}) do
-    case File.read(path) do
+    case Loader.read_file(path) do
       {:ok, body} -> {:ok, body}
       {:error, reason} -> {:error, {:body_load_failed, reason}}
     end
   end
 
-  defp load_skill_body(%Spec{} = spec), do: {:ok, Jido.AI.Skill.body(spec)}
+  defp load_skill_body(%Spec{} = spec) do
+    body = Jido.AI.Skill.body(spec)
+
+    cond do
+      not is_binary(body) -> {:error, :invalid_skill_body}
+      byte_size(body) > Spec.max_body_bytes() -> {:error, {:skill_body_too_large, Spec.max_body_bytes()}}
+      not String.valid?(body) -> {:error, :invalid_skill_body_utf8}
+      true -> {:ok, body}
+    end
+  end
 
   defp root_dir(%Spec{source: {:file, path}}), do: Path.dirname(path)
   defp root_dir(%Spec{}), do: nil

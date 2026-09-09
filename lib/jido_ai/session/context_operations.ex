@@ -4,8 +4,9 @@ defmodule Jido.AI.Context.Operations.Change do
 end
 
 defmodule Jido.AI.Context.Operations do
-  @moduledoc "Portable context lanes, deferred operations and their Thread records."
+  @moduledoc "Portable context lanes, deferred operations, and their Agent-owned sessions."
   alias Jido.AI.{Configuration, Context, History, Profile}
+  alias Jido.{Session, Thread}
   alias __MODULE__.Change
   @key :jido_ai_contexts
   @signal_type "jido.ai.context.modify"
@@ -21,6 +22,27 @@ defmodule Jido.AI.Context.Operations do
   end
 
   def active_ref(state, id), do: get_in(state, [@key, id, :active_context_ref]) || "default"
+
+  @doc false
+  def session_id(state, profile, agent_id), do: value(state, profile, agent_id).session.id
+
+  @doc false
+  def migrate_state(state, agent_id) when is_map(state) do
+    case Map.get(state, @key) do
+      values when is_map(values) ->
+        migrated =
+          Map.new(values, fn {profile_id, lane} ->
+            {profile_id, migrate_value(lane, agent_id, profile_id)}
+          end)
+
+        Map.put(state, @key, migrated)
+
+      _ ->
+        state
+    end
+  end
+
+  def migrate_state(state, _agent_id), do: state
 
   def live(server, operation, opts \\ []) do
     signal =
@@ -84,8 +106,8 @@ defmodule Jido.AI.Context.Operations do
   def capture(state, profile, entries, agent_id, record) do
     value = value(state, profile, agent_id)
     value = sync(value, state, profile)
-    thread = append_messages(value.thread, entries, value.active_context_ref, record)
-    [%Change{profile_id: profile.id, value: %{value | thread: thread}}]
+    session = append_messages(value.session, entries, value.active_context_ref, record)
+    [%Change{profile_id: profile.id, value: %{value | session: session}}]
   end
 
   defp active?(state, id),
@@ -95,14 +117,76 @@ defmodule Jido.AI.Context.Operations do
       end)
 
   defp value(state, profile, agent_id) do
-    get_in(state, [@key, profile.id]) ||
-      %{
-        active_context_ref: "default",
-        pending_context_op: nil,
-        applied_context_ops: [],
-        thread: Jido.Thread.new(id: "ai:#{agent_id}:#{profile.id}")
-      }
+    case get_in(state, [@key, profile.id]) do
+      nil -> new_value(agent_id, profile.id)
+      value -> migrate_value(value, agent_id, profile.id)
+    end
   end
+
+  defp new_value(agent_id, profile_id) do
+    id = session_id(agent_id, profile_id)
+
+    %{
+      active_context_ref: "default",
+      pending_context_op: nil,
+      applied_context_ops: [],
+      session: Session.new(id: id, thread: Thread.new(id: "#{id}:thread"))
+    }
+  end
+
+  defp migrate_value(%{session: %Session{}} = value, _agent_id, _profile_id), do: value
+
+  defp migrate_value(value, agent_id, profile_id) when is_map(value) do
+    cond do
+      lane_shape?(value, :session) ->
+        case Session.decode(field(value, :session)) do
+          {:ok, session} -> canonical_lane(value, session)
+          {:error, _} -> value
+        end
+
+      lane_shape?(value, :thread) ->
+        migrate_thread(value, field(value, :thread), agent_id, profile_id)
+
+      lane_shape?(value, :log) ->
+        migrate_thread(value, field(value, :log), agent_id, profile_id)
+
+      true ->
+        value
+    end
+  end
+
+  defp migrate_value(value, _agent_id, _profile_id), do: value
+
+  defp migrate_thread(value, source, agent_id, profile_id) do
+    case Thread.decode(source) do
+      {:ok, thread} ->
+        canonical_lane(value, Session.from_thread(thread, id: session_id(agent_id, profile_id)))
+
+      {:error, _} ->
+        value
+    end
+  end
+
+  defp canonical_lane(value, session) do
+    %{
+      active_context_ref: field(value, :active_context_ref),
+      pending_context_op: field(value, :pending_context_op),
+      applied_context_ops: field(value, :applied_context_ops),
+      session: session
+    }
+  end
+
+  defp lane_shape?(value, owner) do
+    fields = [:active_context_ref, :pending_context_op, :applied_context_ops, owner]
+    allowed = fields ++ Enum.map(fields, &Atom.to_string/1)
+
+    map_size(value) == 4 and Map.keys(value) -- allowed == [] and
+      Enum.all?(fields, &has_field?(value, &1))
+  end
+
+  defp has_field?(map, key), do: Map.has_key?(map, key) or Map.has_key?(map, Atom.to_string(key))
+
+  defp session_id(agent_id, profile_id), do: "ai:#{agent_id}:#{profile_id}"
 
   defp normalize(params, value, profile, agent, signal_id) do
     operation = field(params, :operation)
@@ -175,7 +259,7 @@ defmodule Jido.AI.Context.Operations do
 
         :switch ->
           project(
-            value.thread,
+            value.session.thread,
             operation.context_ref,
             Context.new(system_prompt: profile.instructions)
           )
@@ -186,8 +270,8 @@ defmodule Jido.AI.Context.Operations do
         do: put_in(operation.operation.result_context, result),
         else: operation
 
-    thread =
-      Jido.Thread.append(value.thread, %{
+    session =
+      Session.append(value.session, %{
         kind: :ai_context_operation,
         payload: operation,
         refs: %{op_id: operation.op_id, context_ref: operation.context_ref}
@@ -197,7 +281,7 @@ defmodule Jido.AI.Context.Operations do
       value
       | active_context_ref: operation.context_ref,
         pending_context_op: nil,
-        thread: thread,
+        session: session,
         applied_context_ops:
           Enum.take(
             [operation.op_id | Enum.reject(value.applied_context_ops, &(&1 == operation.op_id))],
@@ -229,7 +313,7 @@ defmodule Jido.AI.Context.Operations do
 
     previous =
       project(
-        value.thread,
+        value.session.thread,
         value.active_context_ref,
         Context.new(system_prompt: profile.instructions)
       )
@@ -237,14 +321,14 @@ defmodule Jido.AI.Context.Operations do
     if current.entries == previous.entries and current.system_prompt == previous.system_prompt do
       value
     else
-      thread =
-        Jido.Thread.append(value.thread, %{
+      session =
+        Session.append(value.session, %{
           kind: :ai_context_snapshot,
           payload: %{context_ref: value.active_context_ref, result_context: current},
           refs: %{context_ref: value.active_context_ref}
         })
 
-      %{value | thread: thread}
+      %{value | session: session}
     end
   end
 
@@ -255,9 +339,9 @@ defmodule Jido.AI.Context.Operations do
     |> Context.append_messages(entries)
   end
 
-  defp append_messages(thread, entries, ref, record) do
-    Jido.Thread.append(
-      thread,
+  defp append_messages(session, entries, ref, record) do
+    Session.append(
+      session,
       Enum.map(entries, fn entry ->
         %{
           kind: :ai_message,
@@ -272,7 +356,7 @@ defmodule Jido.AI.Context.Operations do
   end
 
   defp project(thread, ref, fallback) do
-    Enum.reduce(Jido.Thread.to_list(thread), fallback, fn entry, context ->
+    Enum.reduce(Thread.to_list(thread), fallback, fn entry, context ->
       if field(entry.payload, :context_ref) == ref do
         case entry.kind do
           :ai_context_snapshot ->
@@ -382,7 +466,9 @@ defmodule Jido.AI.Context.Operations do
 
   def validate_state(values, profiles, _) when is_map(values) do
     valid =
-      Enum.all?(values, fn {id, value} -> Map.has_key?(profiles, id) and valid_value?(value) end)
+      Enum.all?(values, fn {id, value} ->
+        Map.has_key?(profiles, id) and valid_value?(migrate_value(value, "restored", id))
+      end)
 
     if valid and Jido.Action.validate_static_data(values) == :ok,
       do: :ok,
@@ -398,27 +484,26 @@ defmodule Jido.AI.Context.Operations do
            active_context_ref: ref,
            pending_context_op: pending,
            applied_context_ops: ids,
-           thread: %Jido.Thread{} = thread
+           session: %Session{} = session
          } = value
        ) do
-    Map.keys(value) -- [:active_context_ref, :pending_context_op, :applied_context_ops, :thread] ==
+    Map.keys(value) -- [:active_context_ref, :pending_context_op, :applied_context_ops, :session] ==
       [] and
       nonempty?(ref) and is_list(ids) and length(ids) <= 128 and Enum.all?(ids, &nonempty?/1) and
       length(ids) == length(Enum.uniq(ids)) and (is_nil(pending) or valid_operation?(pending)) and
-      valid_thread?(thread)
+      Session.open?(session) and valid_session?(session)
   end
 
   defp valid_value?(_), do: false
 
-  defp valid_thread?(thread) do
-    match?({:ok, _}, Zoi.parse(Jido.Thread.schema(), thread)) and
-      thread.rev == length(thread.entries) and thread.stats.entry_count == length(thread.entries) and
-      Enum.all?(Enum.with_index(thread.entries), fn {entry, index} ->
+  defp valid_session?(session) do
+    match?({:ok, _}, Session.validate(session)) and
+      Enum.all?(Enum.with_index(session.thread.entries), fn {entry, index} ->
         valid_entry?(entry, index)
       end)
   end
 
-  defp valid_entry?(%Jido.Thread.Entry{} = entry, index) do
+  defp valid_entry?(%Thread.Entry{} = entry, index) do
     nonempty?(entry.id) and entry.seq == index and is_integer(entry.at) and
       is_atom(entry.kind) and is_map(entry.payload) and is_map(entry.refs) and
       valid_payload?(entry.kind, entry.payload)
@@ -472,21 +557,38 @@ end
 
 defmodule Jido.AI.Context.Operations.Plugin do
   @moduledoc false
-  use Jido.Plugin
+  use Jido.Plugin, agent: Jido.AI.Context.Operations.Plugin.Agent
+end
+
+defmodule Jido.AI.Context.Operations.Plugin.Agent do
+  @moduledoc false
+  use Jido.Agent.Plugin
+
+  alias Jido.Agent.Plugin.Contribution
   alias Jido.AI.Context.Operations, as: Ops
 
+  @impl Jido.Agent.Plugin
   def state_spec(opts),
     do: {Ops.key(), Zoi.map() |> Zoi.refine({Ops, :validate_state, [opts[:profiles]]}) |> Zoi.default(%{})}
 
+  @impl Jido.Agent.Plugin
   def directives(_), do: [Ops.Change]
 
+  @impl Jido.Agent.Plugin
   def validate_directive(%Ops.Change{} = change, opts) do
     with :ok <- Ops.validate_state(%{change.profile_id => change.value}, opts[:profiles], nil),
          do: {:ok, change}
   end
 
-  def update_state(state, changes, _),
-    do: {:ok, Enum.reduce(changes, state, &Map.put(&2, &1.profile_id, &1.value))}
+  @impl Jido.Agent.Plugin
+  def contribute(transition, _opts) do
+    state =
+      Enum.reduce(transition.directives, transition.plugin_state, fn change, current ->
+        Map.put(current, change.profile_id, change.value)
+      end)
+
+    {:ok, %Contribution{plugin: transition.plugin, state: {:replace, state}}}
+  end
 end
 
 defmodule Jido.AI.Context.Operations.Apply do

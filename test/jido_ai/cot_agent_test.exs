@@ -50,7 +50,7 @@ defmodule Jido.AI.CoTAgentTest do
 
   describe "strategy configuration" do
     test "selects ChainOfThought in the native AI profile" do
-      assert {:ok, profile} = Configuration.profile(TestCoTAgent.agent())
+      assert {:ok, profile} = Configuration.profile(TestCoTAgent.definition())
       assert profile.reasoning.method == :chain_of_thought
     end
 

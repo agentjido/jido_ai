@@ -188,8 +188,7 @@ defmodule Jido.AI.Reasoning.TreeSearch do
 
   defp messages(state, messages, repair?) do
     with {:ok, messages} <- ReqLLM.Context.normalize(messages) do
-      {:ok,
-       %{state | messages: messages, tree_search: %{state.tree_search | parser_repair?: repair?}}}
+      {:ok, %{state | messages: messages, tree_search: %{state.tree_search | parser_repair?: repair?}}}
     end
   end
 

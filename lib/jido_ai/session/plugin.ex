@@ -1,23 +1,13 @@
 defmodule Jido.AI.Session.Plugin do
   @moduledoc "Owns portable request records and starts work only after an admission commit."
-  use Jido.Plugin
-  alias Jido.AI.Session.{Change, Runtime}
+  use Jido.Plugin,
+    agent: Jido.AI.Session.Plugin.Agent,
+    agent_server: Jido.AI.Session.Plugin.AgentServer
 
-  def child_spec(init), do: Supervisor.child_spec({Runtime, init}, id: __MODULE__)
-  def await_ready(runtime, _), do: GenServer.call(runtime, :ready)
-  def state_spec(_), do: {:requests, Jido.AI.Session.Record.records_schema()}
-  def directives(_), do: [Change, Jido.AI.Session.DeliveryReceipt]
+  alias Jido.AI.Session.Change
 
-  def validate_directive(%Change{} = change, _) do
-    with {:ok, change} <- Zoi.parse(Change.schema(), change),
-         :ok <- Jido.Action.validate_static_data(change),
-         do: {:ok, change}
-  end
-
-  def validate_directive(%Jido.AI.Session.DeliveryReceipt{} = receipt, _),
-    do: Zoi.parse(Jido.AI.Session.DeliveryReceipt.schema(), receipt)
-
-  def admit(runtime, command, opts) do
+  @doc false
+  def prepare_admission(runtime, command, opts) do
     catalogs = if opts[:skills], do: GenServer.call(runtime, :skill_catalogs), else: %{}
     command = %{command | context: Map.put(command.context, :jido_ai_skill_catalogs, catalogs)}
 
@@ -89,7 +79,8 @@ defmodule Jido.AI.Session.Plugin do
     {:ok, %{command | context: context}}
   end
 
-  def prepare(command, _) do
+  @doc false
+  def prepare_command(command) do
     command = ignore_unhandled_observation(command)
     # A work task gets the admission snapshot, never a caller-supplied snapshot.
     # Read the declared route binding, not profile_id supplied in Signal data.
@@ -118,7 +109,8 @@ defmodule Jido.AI.Session.Plugin do
     end
   end
 
-  def update_state(records, changes, _) do
+  @doc false
+  def reduce_records(records, changes) do
     changes = Enum.filter(changes, &match?(%Change{}, &1))
 
     Enum.reduce_while(changes, {:ok, records}, fn %Change{operation: op, record: record}, {:ok, records} ->
@@ -149,14 +141,19 @@ defmodule Jido.AI.Session.Plugin do
     end)
   end
 
-  def dispatch(runtime, %Jido.AI.Session.DeliveryReceipt{batch_id: id}, context, _) do
+  @doc false
+  def dispatch_directive(
+        runtime,
+        %Jido.AI.Session.DeliveryReceipt{batch_id: id},
+        context
+      ) do
     case context.turn_context[:jido_ai_delivery_grant] do
       %{id: ^id, ticket: ticket} -> GenServer.call(runtime, {:delivery_receipt, id, ticket})
       _ -> {:error, :invalid_delivery_grant}
     end
   end
 
-  def dispatch(runtime, change, context, _),
+  def dispatch_directive(runtime, change, context),
     do: GenServer.call(runtime, {:dispatch, change, context})
 
   # Core Emit defaults to the same Agent when no dispatch target is set. Give
@@ -182,4 +179,70 @@ defmodule Jido.AI.Session.Plugin do
       command
     end
   end
+end
+
+defmodule Jido.AI.Session.PreparationPlugin do
+  @moduledoc "Compatibility preparation adapter that needs the complete immutable Agent definition."
+  use Jido.Plugin
+
+  @impl Jido.Plugin
+  def prepare(command, _opts), do: Jido.AI.Session.Plugin.prepare_command(command)
+end
+
+defmodule Jido.AI.Session.Plugin.Agent do
+  @moduledoc false
+  use Jido.Agent.Plugin
+
+  alias Jido.AI.Session.{Change, Plugin}
+  alias Jido.Agent.Plugin.Contribution
+
+  @impl Jido.Agent.Plugin
+  def state_spec(_), do: {:requests, Jido.AI.Session.Record.records_schema()}
+
+  @impl Jido.Agent.Plugin
+  def directives(_), do: [Change, Jido.AI.Session.DeliveryReceipt]
+
+  @impl Jido.Agent.Plugin
+  def validate_directive(%Change{} = change, _) do
+    with {:ok, change} <- Zoi.parse(Change.schema(), change),
+         :ok <- Jido.Action.validate_static_data(change),
+         do: {:ok, change}
+  end
+
+  def validate_directive(%Jido.AI.Session.DeliveryReceipt{} = receipt, _),
+    do: Zoi.parse(Jido.AI.Session.DeliveryReceipt.schema(), receipt)
+
+  @impl Jido.Agent.Plugin
+  def contribute(transition, _opts) do
+    case Plugin.reduce_records(transition.plugin_state, transition.directives) do
+      {:ok, records} ->
+        {:ok,
+         %Contribution{
+           plugin: transition.plugin,
+           state: {:replace, records}
+         }}
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+end
+
+defmodule Jido.AI.Session.Plugin.AgentServer do
+  @moduledoc false
+  use Jido.AgentServer.Plugin
+
+  alias Jido.AI.Session.{Plugin, Runtime}
+
+  def child_spec(init), do: Supervisor.child_spec({Runtime, init}, id: Plugin)
+
+  @impl Jido.AgentServer.Plugin
+  def await_ready(runtime, _), do: GenServer.call(runtime, :ready)
+
+  @impl Jido.AgentServer.Plugin
+  def admit(runtime, command, opts), do: Plugin.prepare_admission(runtime, command, opts)
+
+  @impl Jido.AgentServer.Plugin
+  def dispatch(runtime, directive, context, _opts),
+    do: Plugin.dispatch_directive(runtime, directive, context)
 end

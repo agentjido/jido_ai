@@ -2,6 +2,8 @@ defmodule Jido.AI.Integration.RequestAwaitRejectionTest do
   use ExUnit.Case, async: false
   use Mimic
 
+  @moduletag :legacy_v2
+
   alias Jido.AI.TestSupport.StreamResponseFactory
 
   defmodule CoTAwaitAgent do

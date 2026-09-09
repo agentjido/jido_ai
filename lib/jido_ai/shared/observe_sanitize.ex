@@ -405,8 +405,7 @@ defmodule Jido.AI.Observe.Sanitize do
   defp sensitive_key?(_key), do: false
 
   defp json_scalar?(value),
-    do:
-      is_nil(value) or is_boolean(value) or is_binary(value) or is_number(value) or is_atom(value)
+    do: is_nil(value) or is_boolean(value) or is_binary(value) or is_number(value) or is_atom(value)
 
   defp inspect_limited(value, max_chars),
     do: inspect(value, limit: 20, printable_limit: max_chars)

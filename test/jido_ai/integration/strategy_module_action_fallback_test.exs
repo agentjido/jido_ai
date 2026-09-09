@@ -1,6 +1,8 @@
 defmodule Jido.AI.Integration.StrategyModuleActionFallbackTest do
   use ExUnit.Case, async: false
 
+  @moduletag :legacy_v2
+
   alias Jido.Agent
   alias Jido.AI.Reasoning.Adaptive.Strategy, as: Adaptive
   alias Jido.AI.Reasoning.ChainOfThought.Strategy, as: CoT

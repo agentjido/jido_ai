@@ -65,6 +65,21 @@ defmodule Jido.AI.Skill.SpecTest do
   end
 
   describe "validate_runtime/2" do
+    test "rejects an oversized inline body" do
+      spec = %Spec{
+        name: "large-body",
+        description: "Large body.",
+        body_ref: {:inline, String.duplicate("x", Spec.max_body_bytes() + 1)}
+      }
+
+      assert {:error,
+              {:invalid_runtime_skill_spec, 0,
+               %Jido.AI.Skill.Error.Validation.InvalidField{
+                 field: :body_ref,
+                 reason: :too_large
+               }}} = Spec.validate_runtime(spec, index: 0)
+    end
+
     test "accepts runtime specs with inline bodies" do
       spec = %Spec{name: "runtime-skill", description: "Runtime skill.", body_ref: {:inline, "Body."}}
       assert Spec.validate_runtime(spec, index: 3) == {:ok, spec}

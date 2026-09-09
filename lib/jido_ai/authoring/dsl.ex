@@ -121,7 +121,14 @@ defmodule Jido.AI.DSL.Entities do
   end
 
   defmodule AshResource do
-    defstruct [:resource, :description, :approval, :__spark_metadata__, actions: [], metadata: %{}]
+    defstruct [
+      :resource,
+      :description,
+      :approval,
+      :__spark_metadata__,
+      actions: [],
+      metadata: %{}
+    ]
   end
 
   defmodule MCPTools do
@@ -727,7 +734,11 @@ defmodule Jido.AI.DSL do
         %{
           id: entity.id,
           instructions: entity.instructions,
-          observability: if(observability, do: plain(observability), else: %{}),
+          observability:
+            if(observability,
+              do: observability |> plain() |> Map.reject(fn {_, value} -> is_nil(value) end),
+              else: %{}
+            ),
           metadata: entity.metadata,
           effect_policy: entity.effect_policy || %{},
           tool_interceptor: entity.tool_interceptor,
@@ -831,7 +842,15 @@ defmodule Jido.AI.DSL do
     |> Map.put(:kind, kind)
     |> Map.put(:ref, Map.fetch!(source, field))
     |> Map.delete(field)
-    |> omit_nil([:as, :description, :approval, :transport, :client_info, :protocol_version, :timeout])
+    |> omit_nil([
+      :as,
+      :description,
+      :approval,
+      :transport,
+      :client_info,
+      :protocol_version,
+      :timeout
+    ])
   end
 
   defp plain(value), do: value |> Map.from_struct() |> Map.delete(:__spark_metadata__)

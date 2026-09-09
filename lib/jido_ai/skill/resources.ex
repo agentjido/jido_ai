@@ -428,18 +428,49 @@ defmodule Jido.AI.Skill.Resources do
     else
       state = %{state | directories: state.directories + 1}
 
-      case File.ls(directory) do
+      case bounded_directory_entries(directory, policy) do
         {:ok, entries} ->
-          entries
-          |> Enum.sort()
-          |> Enum.reduce_while(state, fn entry, acc ->
+          Enum.reduce_while(entries, state, fn entry, acc ->
             next = walk_entry(root, Path.join(directory, entry), depth, policy, acc)
             if next.halt, do: {:halt, next}, else: {:cont, next}
           end)
 
+        {:error, :directory_listing_limit} ->
+          truncate(state, :directory_listing_limit, true)
+
         {:error, _reason} ->
           truncate(state, :unreadable_directory, false)
       end
+    end
+  end
+
+  defp bounded_directory_entries(directory, policy) do
+    entry_limit = policy.max_resources + policy.max_directories + 1
+    heap_words = max(100_000, entry_limit * 512)
+    owner = self()
+    token = make_ref()
+
+    {pid, monitor} =
+      spawn_monitor(fn ->
+        Process.flag(:max_heap_size, %{size: heap_words, kill: true, error_logger: false})
+
+        result =
+          case File.ls(directory) do
+            {:ok, entries} when length(entries) <= entry_limit -> {:ok, Enum.sort(entries)}
+            {:ok, _entries} -> {:error, :directory_listing_limit}
+            {:error, reason} -> {:error, reason}
+          end
+
+        send(owner, {token, result})
+      end)
+
+    receive do
+      {^token, result} ->
+        Process.demonitor(monitor, [:flush])
+        result
+
+      {:DOWN, ^monitor, :process, ^pid, _reason} ->
+        {:error, :directory_listing_limit}
     end
   end
 

@@ -5,6 +5,8 @@ defmodule Jido.AI.Integration.JidoV2MigrationTest do
 
   use ExUnit.Case, async: false
 
+  @moduletag :legacy_v2
+
   alias Jido.Agent
   alias Jido.AI.Plugins.Chat
   alias Jido.AI.Plugins.Planning

@@ -164,8 +164,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.Machine do
       temperature: normalize_temperature(map[:temperature] || 0.0),
       max_tokens: map[:max_tokens] || 2048,
       examples: normalize_examples(map[:examples] || []),
-      require_explicit_answer:
-        if(is_nil(map[:require_explicit_answer]), do: true, else: map[:require_explicit_answer]),
+      require_explicit_answer: if(is_nil(map[:require_explicit_answer]), do: true, else: map[:require_explicit_answer]),
       current_call_id: map[:current_call_id],
       result: map[:result],
       termination_reason: map[:termination_reason],

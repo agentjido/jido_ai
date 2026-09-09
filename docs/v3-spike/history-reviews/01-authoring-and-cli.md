@@ -1,7 +1,7 @@
 # History review 01: authoring, model inputs, tools and CLI
 
 Execution update, 2026-09-07:
-[02_19](../../../examples/v3/profiles/02_19_model_options.md) adds actual public
+[02_19](../../../examples/02_requests/02_19_model_options/README.md) adds actual public
 request model forms and alias checks for PRs 206, 238 and 248. Strings, aliases,
 both tuples, inline maps and model structs use the existing resolver and reach
 the shared HTTP mock. Declared defaults remain after each request. The complete

@@ -40,8 +40,7 @@ defmodule Jido.AI.AdaptiveAgent do
         [
           model: Keyword.get(@jido_ai_options, :model, :fast),
           default_strategy: unquote(Macro.escape(default)),
-          available_strategies:
-            Keyword.get(options, :available_strategies, [:cod, :cot, :react, :tot, :got, :trm])
+          available_strategies: Keyword.get(options, :available_strategies, [:cod, :cot, :react, :tot, :got, :trm])
         ] ++
           Keyword.take(options, [:complexity_thresholds, :strategy_override, :method_options]) ++
           Keyword.take(@jido_ai_options, [:tools])

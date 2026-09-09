@@ -23,9 +23,7 @@ defmodule Jido.AI.Actions.Retrieval.RecallMemory do
 
   @impl Jido.Action
   def run(params, context) do
-    Jido.AI.Actions.Retrieval.Request.run(schema(), params, context, fn params,
-                                                                        namespace,
-                                                                        store ->
+    Jido.AI.Actions.Retrieval.Request.run(schema(), params, context, fn params, namespace, store ->
       memories = Store.recall(namespace, params.query, top_k: max(params.top_k, 1), store: store)
 
       {:ok,

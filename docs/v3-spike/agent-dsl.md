@@ -488,11 +488,9 @@ end
 ## Milestone examples
 
 Use matching IDs for source, ExUnit tests, and profile documents, following core.
-The temporary `examples/v3` Mix project allows these tests before the root port.
-Integration tests are excluded by default and enabled with `--include integration`.
-Pending AI authoring tests use the separate `pending_dsl` tag; enable them explicitly to expose
-missing implementation. Neither exclusion nor an expected missing-module error
-counts as passing feature evidence.
+The root project compiles checked examples in the `:dev` and `:test`
+environments. Example tests use the `:example` tag and do not run by default.
+Use `mix examples` to run the complete checked catalog.
 
 | ID | Executable acceptance target |
 | --- | --- |
@@ -583,7 +581,7 @@ end
 
 The default remains `mode :turn`, with streaming off. Session routes lower to
 an admission Action with a core Plugin. The task executes the same reasoning
-Flow as one-Turn work. See [02_01](../../examples/v3/profiles/02_01_session.md)
+Flow as one-Turn work. See [02_01](../../examples/02_requests/02_01_session/README.md)
 for confirmed admission, awaits, SSE, tools/objects, usage, cancellation and
 failure tests. Public macro helpers, steering, history, keepalives, all legacy
 options and durable restore still need implementation. This block is a tested
@@ -594,7 +592,7 @@ subset of the desired DSL above.
 The production extension now also accepts `steering true` inside session
 `requests`, and `memory do history :messages end`. The history field must be
 declared in the domain schema and differ from `result.into`. The default has
-steering off and no history field. See [02_02](../../examples/v3/profiles/02_02_steering.md)
+steering off and no history field. See [02_02](../../examples/02_requests/02_02_steering/README.md)
 for the 13 live cases. Full macro/API parity, compaction, context operations,
 durable conversion and source JSON with enabled history remain open.
 
@@ -621,7 +619,7 @@ a repaired object, which must pass the declared schema. External captures
 become module/function references. Source JSON resolves those references through
 the core trusted Registry. No closure is stored in the profile.
 
-See [02_05](../../examples/v3/profiles/02_05_request_transform.md) for the same
+See [02_05](../../examples/02_requests/02_05_request_transform/README.md) for the same
 configuration executed through DSL, data, Builder and source JSON. The tests
 also cover direct `Output.repair/5` overrides, fresh repair credentials, model
 changes and limits. Full output events, standalone ReAct and durable callback
@@ -645,12 +643,12 @@ for both native and public Agents. Request events still occur when telemetry
 alone is disabled. Suppressing deltas preserves internal provider activity and
 the complete model response.
 DSL, data, Builder and source JSON execute the same configuration in
-[02_06](../../examples/v3/profiles/02_06_output_contract.md). Other observation
+[02_06](../../examples/02_requests/02_06_output_contract/README.md). Other observation
 options, full lifecycle Signals and durable recovery remain required.
 
 ## Implemented effect policy and commit boundary
 
-The [02_10 example](../../examples/v3/profiles/02_10_tool_effects.md) adds
+The [02_10 example](../../examples/02_requests/02_10_tool_effects/README.md) adds
 `effect_policy(...)` at the AI profile and reasoning scopes. The effective
 policy is their intersection. Source data, Builder and JSON use the same
 normalizer. The public `strategy_effect_policy` option maps to reasoning scope.
@@ -665,7 +663,7 @@ post-commit dispatch.
 
 ## Implemented tool callbacks
 
-The [02_12 example](../../examples/v3/profiles/02_12_tool_callbacks.md) adds
+The [02_12 example](../../examples/02_requests/02_12_tool_callbacks/README.md) adds
 `tool_interceptor MyApp.ToolCallbacks` within `ai`. It is an optional trusted
 module reference in the same profile used by data, Builder and source JSON.
 Without it, the host Agent's optional tool callbacks apply. This includes the
@@ -680,12 +678,12 @@ state and completed tool results. Core Exec owns deadlines and cancellation.
 
 The example implements the PR 347 long-key alias workflow with real Actions.
 Direct core Exec does not invoke AI callbacks. The later
-[09_05 example](../../examples/v3/profiles/09_05_tot_api.md) proves this alias
+[09_05 example](../../examples/09_reasoning/09_05_tot_api/README.md) proves this alias
 workflow for ToT. Standalone AI helpers and pending-work replay remain required.
 
 ## Implemented preflight and tool limits
 
-The [02_13 example](../../examples/v3/profiles/02_13_tool_limits.md) exposes
+The [02_13 example](../../examples/02_requests/02_13_tool_limits/README.md) exposes
 `timeout`, `max_retries` and `retry_backoff` on both `action` and `flow` tools.
 Timeout and backoff use milliseconds. The timeout is positive; retry values
 can be zero. Omitted retry fields keep catalog defaults and are omitted from
@@ -709,7 +707,7 @@ for the retry compatibility limits and required legacy facade evidence.
 
 ## Implemented session stream activity
 
-The [02_14 example](../../examples/v3/profiles/02_14_stream_activity.md) adds
+The [02_14 example](../../examples/02_requests/02_14_stream_activity/README.md) adds
 optional `idle_timeout` and `tool_heartbeat` values under `requests`, in
 milliseconds. These settings require `mode :session`. Static DSL, data,
 Builder and source JSON use the same validated fields. Omitted values do not
@@ -730,7 +728,7 @@ execution and durable event recovery still need their port and examples.
 
 ## Implemented early tool activity
 
-The [02_15 example](../../examples/v3/profiles/02_15_early_tool_activity.md)
+The [02_15 example](../../examples/02_requests/02_15_early_tool_activity/README.md)
 emits a named tool-activity delta while the model still supplies arguments.
 The event keeps the existing `:llm_delta` kind, `chunk_type: :tool_call`, and
 tool name as its payload. Complete decoding, full-batch admission and controls
@@ -744,7 +742,7 @@ native telemetry-only interpretation and avoids a second capture option.
 All source forms use the same existing profile field. Live `ai.llm.delta`
 Signal projection, other methods and durable replay remain required.
 
-The [14_06 example](../../examples/v3/profiles/14_06_trace_and_cycles.md)
+The [14_06 example](../../examples/14_resume/14_06_trace_and_cycles/README.md)
 adds `observability.redact_tool_args?` (default true). It hides sensitive keys
 in tool-start event arguments and leaves execution inputs intact. Standalone
 Config's flat `capture_deltas?` and `redact_tool_args?` options lower to these
@@ -753,7 +751,7 @@ options remain accepted without independent filtering behavior.
 
 ## Implemented typed Signal boundary
 
-The [02_16 example](../../examples/v3/profiles/02_16_typed_signals.md) uses
+The [02_16 example](../../examples/02_requests/02_16_typed_signals/README.md) uses
 static core Signal schemas for all ten public AI definitions. A small adapter
 handles known input keys, duplicate rejection, explicit nil and metadata
 accessors. Core owns constructors, errors and the CloudEvents envelope.
@@ -762,7 +760,7 @@ No new Agent DSL field or second Signal DSL is introduced.
 `Jido.AI.Signal.from_event/2` projects canonical events. `emit/1` returns core
 Emit Directives for an ordinary Agent Action. The example proves real outbound
 Plugin preparation and dispatch, including a committed-state delivery failure.
-The [02_17 example](../../examples/v3/profiles/02_17_signal_delivery.md) adds
+The [02_17 example](../../examples/02_requests/02_17_signal_delivery/README.md) adds
 automatic session delivery. The existing `observability` block accepts
 `emit_signals?` (default true). `emit_llm_deltas?` still controls capture before
 sequence assignment. There is no new publication DSL.
@@ -776,7 +774,7 @@ Durable Signal replay and all other reasoning methods remain required.
 
 ## Implemented linear methods
 
-The [09_01 example](../../examples/v3/profiles/09_01_linear.md) adds
+The [09_01 example](../../examples/09_reasoning/09_01_linear/README.md) adds
 `reasoning :chain_of_thought` and `reasoning :chain_of_draft` to the existing
 AI block. Use the same named model, controls, result and request declarations.
 DSL, data, Builder and source JSON produce the same Flow behavior. Direct Flow
@@ -797,7 +795,7 @@ CLI and capability entry points remain unported; no second DSL or executor is
 added to preserve those implementation types.
 
 
-The [09_02 example](../../examples/v3/profiles/09_02_method_api.md) makes method
+The [09_02 example](../../examples/09_reasoning/09_02_method_api/README.md) makes method
 selection explicit: namespace `method/0` returns the value used in the existing
 reasoning map. Result getters read committed records with an optional request
 ID. No new DSL block is needed. The old Strategy module names are read-only
@@ -806,7 +804,7 @@ compatibility adapters; core Agent and Flow keep execution ownership.
 
 ## Implemented AoT method settings
 
-The [09_03 example](../../examples/v3/profiles/09_03_aot.md) adds the existing
+The [09_03 example](../../examples/09_reasoning/09_03_aot/README.md) adds the existing
 single-generation AoT algorithm. Use `reasoning :algorithm_of_thoughts` with
 `options(profile: :short, search_style: :dfs, examples: [], require_explicit_answer: true)`.
 Options are method data. Named models retain temperature and token settings.
@@ -823,7 +821,7 @@ No new request owner, executor, tool DSL or graph language is introduced.
 
 ## Implemented native Tree of Thoughts
 
-The [09_04 example](../../examples/v3/profiles/09_04_tot.md) adds
+The [09_04 example](../../examples/09_reasoning/09_04_tot/README.md) adds
 `reasoning :tree_of_thoughts`. Search settings use `reasoning.options`; model,
 tool and control declarations use the common DSL. A small data adapter selects
 the next phase. The existing Flow runs every model and tool call. The ranked
@@ -834,7 +832,7 @@ callback evidence; the full old API mapping remains open.
 
 ## Implemented public ToT mapping
 
-The [09_05 example](../../examples/v3/profiles/09_05_tot_api.md) uses the same
+The [09_05 example](../../examples/09_reasoning/09_05_tot_api/README.md) uses the same
 reasoning, model, tool, control and request declarations for public ToT. The
 wrapper supplies method defaults to the shared lowerer. `strategy_opts/0` reads
 declared settings. It does not choose a runtime. No new DSL block is needed.
@@ -855,7 +853,7 @@ durable resume still require their own contract and examples.
 
 ## Implemented native Graph of Thoughts
 
-The [09_06 example](../../examples/v3/profiles/09_06_got.md) adds
+The [09_06 example](../../examples/09_reasoning/09_06_got/README.md) adds
 `reasoning :graph_of_thoughts` through the existing options declaration. Models,
 controls and requests retain the common syntax. A small method adapter supplies
 phase contexts to the same Flow. Graph data stays in the retained Machine;
@@ -876,7 +874,7 @@ them; retain core Flow as the composition and execution layer.
 
 ## Implemented public GoT mapping
 
-The [09_07 example](../../examples/v3/profiles/09_07_got_api.md) connects
+The [09_07 example](../../examples/09_reasoning/09_07_got_api/README.md) connects
 `GoTAgent` to the common `Jido.AI.Agent` lowerer. The common Agent can select
 GoT directly too. Public explore helpers retain text results and printable
 state fields. Method settings stay in `reasoning.options`; the wrapper supplies
@@ -893,7 +891,7 @@ identity remains an observation gap because no runtime job has been created.
 
 ## Implemented native TRM
 
-The [09_08 example](../../examples/v3/profiles/09_08_trm.md) adds `reasoning :trm`
+The [09_08 example](../../examples/09_reasoning/09_08_trm/README.md) adds `reasoning :trm`
 with `max_supervision_steps` and `act_threshold` in the existing options field.
 Each cycle runs reasoning, supervision and improvement through the shared Flow.
 Common limits apply to every model call. Declare 15 model calls and iterations
@@ -909,7 +907,7 @@ conversion, richer output and durable recovery remain open.
 
 ## Implemented public TRM mapping
 
-The [09_09 example](../../examples/v3/profiles/09_09_trm_api.md) lowers
+The [09_09 example](../../examples/09_reasoning/09_09_trm_api/README.md) lowers
 TRMAgent through the common Agent. Its two method settings share native TRM
 validation. The wrapper derives a bounded three-calls-per-cycle budget while
 explicit limits take precedence. The common Agent can select TRM directly.
@@ -923,7 +921,7 @@ contracts and durable recovery remain required.
 
 ## Implemented native Adaptive selection
 
-The [09_10 example](../../examples/v3/profiles/09_10_adaptive.md) adds
+The [09_10 example](../../examples/09_reasoning/09_10_adaptive/README.md) adds
 `reasoning :adaptive` with validated available methods, complexity thresholds,
 an optional override and per-method options. A pure selector runs before shared
 Flow preparation. It chooses one of the seven existing methods without a model
@@ -939,7 +937,7 @@ explicitly rejected. No additional executor or method owner was added.
 
 ## Public Adaptive checkpoint
 
-The [09_11 example](../../examples/v3/profiles/09_11_adaptive_api.md) lowers
+The [09_11 example](../../examples/09_reasoning/09_11_adaptive_api/README.md) lowers
 AdaptiveAgent through the same common Agent path. Nested method settings stay
 literal data. Native Adaptive retains four settings; the wrapper alone accepts
 the old unused default_strategy inspection field. Explicit strategy_override
@@ -948,7 +946,7 @@ call-limit formulas now serve Adaptive, ToT, GoT and TRM wrappers.
 
 ## Selected method control refinement
 
-The [09_12 cases](../../examples/v3/profiles/09_12_method_controls.md) add
+The [09_12 cases](../../examples/09_reasoning/09_12_method_controls/README.md) add
 `:method_default` as a value for the three existing count controls. Timeout
 remains an integer. The static profile retains this policy; the common Prepare
 path resolves counts after method selection and request output settings. Fixed
@@ -957,7 +955,7 @@ full TRM requests through DSL/data/Builder/JSON, direct Flow and Agent turns.
 
 ## Active Adaptive selection
 
-The [09_13 cases](../../examples/v3/profiles/09_13_active_selection.md) make
+The [09_13 cases](../../examples/09_reasoning/09_13_active_selection/README.md) make
 prepared Adaptive selection visible through a core progress Turn before the
 first provider call. This needs no DSL change. The existing Session owns its
 one-use grant and canonical metadata. Caller policy context survives; core
@@ -965,7 +963,7 @@ binds the new Turn's current state.
 
 ## Callable reasoning: 2026-09-07
 
-The [09_14 example](../../examples/v3/profiles/09_14_callable_reasoning.md) ports
+The [09_14 example](../../examples/09_reasoning/09_14_callable_reasoning/README.md) ports
 RunStrategy through the same Profile and Authoring lowerer. One factory creates
 a caller-owned Agent/Session for any of the seven supported methods. The factory
 uses native source data and adds no DSL form or reasoning executor. The ordinary
@@ -974,7 +972,7 @@ declarations and CLI use remain separate required ports.
 
 ## Reasoning capability refinement — 2026-09-07
 
-[Example 16_01](../../examples/v3/profiles/16_01_reasoning_capabilities.md)
+[Example 16_01](../../examples/16_capabilities/16_01_reasoning/README.md)
 keeps callable reasoning on the existing `plugin` and `route` declarations.
 There is no extra AI capability DSL or alternate executor. Seven thin Plugins
 share one state schema and command-preparation adapter. `RunCapability` calls
@@ -990,7 +988,7 @@ legacy default-Plugin conversion remain required.
 
 ## Planning capability refinement — 2026-09-07
 
-[Example 08_01](../../examples/v3/profiles/08_01_planning.md) adds the three
+[Example 08_01](../../examples/08_planning/08_01_planning/README.md) adds the three
 Planning Actions and their capability to the existing Agent declarations.
 The public prompts and parsed result maps remain. Core `plugin` and `route`
 declarations select the operation and result field. The new common candidate
@@ -1008,7 +1006,7 @@ and repair remain required; a text plan is not executable code.
 
 ## Chat capability refinement: 2026-09-07
 
-[Example 16_02](../../examples/v3/profiles/16_02_chat.md) adds a Chat Plugin
+[Example 16_02](../../examples/16_capabilities/16_02_chat/README.md) adds a Chat Plugin
 to ordinary `agent do` declarations and seven explicit routes. The same
 shared capability binding used by Planning and reasoning owns the result field.
 There is no new DSL keyword or alternate Agent compiler. Callable automatic
@@ -1017,7 +1015,7 @@ remain separate from native ReAct policy and session semantics.
 
 ## Prompt refinement: 2026-09-07
 
-[09_15](../../examples/v3/profiles/09_15_prompt_policy.md) proves method-selected
+[09_15](../../examples/09_reasoning/09_15_prompt_policy/README.md) proves method-selected
 prompt defaults through actual model requests. Keep one ReAct default and
 resolve it after Adaptive selects ReAct. Normalize omitted/nil/false/empty
 public prompt options in the common adapter. Native Adaptive nil selects the
@@ -1027,7 +1025,7 @@ profile; no extra DSL keyword or prompt-mode schema is needed.
 
 ## Dynamic configuration and public facade: 2026-09-07
 
-[03_01](../../examples/v3/profiles/03_01_dynamic_catalog.md) ports direct and
+[03_01](../../examples/03_tools/03_01_dynamic_catalog/README.md) ports direct and
 live tool/prompt changes through portable `jido_ai_config` state owned by the
 existing Runtime Plugin. One validated catalog supplies provider schemas and
 lookup. Core configuration directives commit live changes. Ordinary Actions
@@ -1049,7 +1047,7 @@ rollback gates before treating the package as migrated.
 
 ## Implemented skill authoring: 2026-09-07
 
-[18_02](../../examples/v3/profiles/18_02_skill_authoring.md) implements the
+[18_02](../../examples/18_skills/18_02_skill_authoring/README.md) implements the
 `skills` block in a ReAct Session profile. Use `skill Module`, `load_path
 "directory"`, and `resource_policy` options. `activation: :lazy` is not an
 option: file bodies are always loaded on selection. The earlier full example
@@ -1075,7 +1073,7 @@ An AI profile accepts `tool_context %{...}` as a static base map. The same
 Builder and JSON. It contains portable application values. Runtime identity,
 state and skill bindings stay with their existing owners.
 
-[03_02](../../examples/v3/profiles/03_02_tool_context.md) proves live replacement,
+[03_02](../../examples/03_tools/03_02_tool_context/README.md) proves live replacement,
 request precedence, active snapshots, projection, profile scope and restore.
 An explicit `false` or `nil` is invalid; omission gives an empty map. No new
 DSL block, compiler or process is needed.

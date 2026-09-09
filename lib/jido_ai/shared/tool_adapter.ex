@@ -162,8 +162,11 @@ defmodule Jido.AI.ToolAdapter do
 
   def to_action_map(%{} = tools) do
     cond do
-      Enum.all?(tools, fn {name, mod} -> is_binary(name) and valid_action_module?(mod) end) ->
-        tools
+      Enum.all?(tools, fn {name, mod} ->
+        (is_binary(name) or (is_atom(name) and name not in [nil, true, false])) and
+            valid_action_module?(mod)
+      end) ->
+        normalize_action_map_keys(tools)
 
       true ->
         tools
@@ -187,6 +190,19 @@ defmodule Jido.AI.ToolAdapter do
   end
 
   def to_action_map(_), do: %{}
+
+  defp normalize_action_map_keys(tools) do
+    entries = Enum.map(tools, fn {name, module} -> {to_string(name), module} end)
+    names = Enum.map(entries, &elem(&1, 0))
+    duplicates = names -- Enum.uniq(names)
+
+    if duplicates != [] do
+      raise ArgumentError,
+            "Duplicate tool aliases after normalization: #{inspect(Enum.uniq(duplicates))}"
+    end
+
+    Map.new(entries)
+  end
 
   @doc """
   Looks up an action module by tool name from a list of action modules.
@@ -285,8 +301,13 @@ defmodule Jido.AI.ToolAdapter do
           "additionalProperties" => false
         }
 
-      %{"type" => "object", "properties" => properties} = empty when map_size(properties) == 0 ->
-        Map.put_new(empty, "required", [])
+      %{"type" => "object", "properties" => properties} when map_size(properties) == 0 ->
+        %{
+          "type" => "object",
+          "properties" => %{},
+          "required" => [],
+          "additionalProperties" => false
+        }
 
       json_schema ->
         json_schema

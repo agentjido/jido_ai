@@ -20,6 +20,12 @@ defmodule Jido.AI.Quality.CheckpointTest do
                "ST-STR-001"
              ]
     end
+
+    test "accepts matrix rows without spaces around cell values" do
+      markdown = "|ST-OPS-001|Ops|\n | ST-QAL-001|Quality |"
+
+      assert Checkpoint.story_ids_from_traceability(markdown) == ["ST-OPS-001", "ST-QAL-001"]
+    end
   end
 
   describe "story_ids_from_git_log/1" do
@@ -54,6 +60,11 @@ defmodule Jido.AI.Quality.CheckpointTest do
                )
 
       assert result.missing_story_ids == []
+    end
+
+    test "rejects an empty traceability matrix" do
+      assert {:error, result} = Checkpoint.verify_traceability([], [])
+      assert result.traceability_story_ids == []
     end
   end
 
@@ -96,6 +107,23 @@ defmodule Jido.AI.Quality.CheckpointTest do
       assert failure.args == ["-c", "exit 7"]
       assert failure.status == 7
       assert is_integer(failure.elapsed_ms)
+    end
+
+    test "returns failure details when the command cannot start" do
+      command = %{gate: :fast, label: "missing", cmd: "missing-jido-ai-command", args: []}
+
+      assert {:error, failure} = Checkpoint.run_command(command)
+      assert failure.status == 127
+      assert failure.error =~ "enoent"
+    end
+
+    test "returns failure details when the working directory is invalid" do
+      command = %{gate: :fast, label: "bad cwd", cmd: "sh", args: ["-c", "exit 0"]}
+
+      assert {:error, failure} =
+               Checkpoint.run_command(command, cwd: "/missing/jido-ai-working-directory")
+
+      assert failure.status != 0
     end
   end
 

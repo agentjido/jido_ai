@@ -1,9 +1,8 @@
-# Proposed example catalog
+# Example catalog
 
-Status: migration acceptance catalog. The initial executable foundation lives in
-[examples/v3](../../examples/v3/README.md). The broader feature cases below remain
-proposed unless that project records a matching passing check.
-The numbers are discussion IDs, not a promise to keep this exact folder order.
+Status: the checked source and test catalog lives in
+[examples](../../examples/README.md). The IDs below map to matching source,
+guide, and test folders in the root project.
 
 The [unified DSL plan](agent-dsl.md) proposes a small combined authoring example:
 one model role, an Action tool, a Flow tool, an operation control, and a typed
@@ -260,7 +259,7 @@ Iterate, subflows, or Exec cancellation. Reuse core execution; retain AI policy.
 
 ## Checkpoint example progress: 2026-09-07
 
-[14_03](../../examples/v3/profiles/14_03_checkpoint_resume.md) adds 17 integration cases for native model and tool boundaries.
+[14_03](../../examples/14_resume/14_03_checkpoint_resume/README.md) adds 17 integration cases for native model and tool boundaries.
 The examples include a new operating-system VM, current tool permission, code
 changes under the same module, saved output repair, limits and expiry. Partial
 batches, old-state conversion, queue binding and durable replay control remain
@@ -268,7 +267,7 @@ required. The profile separates standalone tokens from Agent persistence.
 
 ## Standalone Action example progress: 2026-09-07
 
-[14_04](../../examples/v3/profiles/14_04_standalone_actions.md) adds 13 integration
+[14_04](../../examples/14_resume/14_04_standalone_actions/README.md) adds 13 integration
 cases for public Actions through Exec, Flow and an Agent route. The cases cover
 real tools and multimodal input, saved work, context, limits and ownership.
 The shared Runner requirements still apply; this does not close all standalone
@@ -276,7 +275,7 @@ or durable recovery work.
 
 ## Native worker example progress: 2026-09-07
 
-[14_05](../../examples/v3/profiles/14_05_worker_lifecycle.md) adds nine real
+[14_05](../../examples/14_resume/14_05_worker_lifecycle/README.md) adds nine real
 ReAct/CoT lifetime and file-ID cases. They replace the old worker callback-only
 regression test and support removal of the separate internal worker layer.
 The profile records the remaining parent Strategy and durable recovery work.
@@ -284,7 +283,7 @@ The profile records the remaining parent Strategy and durable recovery work.
 
 ## Skill authoring acceptance: 2026-09-07
 
-[18_02](../../examples/v3/profiles/18_02_skill_authoring.md) adds 21 cases to the
+[18_02](../../examples/18_skills/18_02_skill_authoring/README.md) adds 21 cases to the
 skill runtime examples. Both Agent authoring APIs and data/Builder/JSON forms
 use the shared mock to prove the same lazy catalogue and loading behavior.
 Startup, trust, precedence, separate profiles, restore and live tool/prompt
@@ -293,7 +292,7 @@ changes have executable cases. Root package and standalone continuation remain.
 
 ## Tool context acceptance: 2026-09-07
 
-[03_02](../../examples/v3/profiles/03_02_tool_context.md) adds 11 cases for
+[03_02](../../examples/03_tools/03_02_tool_context/README.md) adds 11 cases for
 persistent base replacement, raw Signals, request overrides, active snapshots,
 protected fields, profile scope, format parity and restore. The existing shared
 mock observes real tool execution and transmitted results. The root package

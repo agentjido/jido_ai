@@ -218,6 +218,8 @@ defmodule Jido.AI.CoreTest do
   end
 
   describe "tool management wrappers" do
+    @describetag :legacy_v2
+
     test "register_tool validates module presence and callbacks" do
       assert {:error, {:not_loaded, Missing.Tool}} = AI.register_tool(self(), Missing.Tool)
       assert {:error, :not_a_tool} = AI.register_tool(self(), IncompleteTool)

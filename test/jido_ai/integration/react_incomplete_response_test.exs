@@ -54,7 +54,7 @@ defmodule Jido.AI.Integration.ReActIncompleteResponseTest do
       pid = start_basic_agent()
       result = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000)
 
-      assert {:error, {:failed, :error, {:incomplete_response, :incomplete}}} = result
+      assert {:error, {:incomplete_response, :incomplete}} = result
     end
 
     test "does not return {:ok, \"\"} for incomplete response" do
@@ -72,7 +72,7 @@ defmodule Jido.AI.Integration.ReActIncompleteResponseTest do
       pid = start_basic_agent()
       result = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000)
 
-      assert {:error, {:failed, :error, {:incomplete_response, :error}}} = result
+      assert {:error, {:incomplete_response, :error}} = result
     end
 
     test "returns {:error, {:incomplete_response, :cancelled}} for cancelled finish_reason with blank text" do
@@ -81,7 +81,7 @@ defmodule Jido.AI.Integration.ReActIncompleteResponseTest do
       pid = start_basic_agent()
       result = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000)
 
-      assert {:error, {:failed, :error, {:incomplete_response, :cancelled}}} = result
+      assert {:error, {:incomplete_response, :cancelled}} = result
     end
 
     test "returns {:error, {:incomplete_response, :length}} for truncated blank responses" do
@@ -90,7 +90,7 @@ defmodule Jido.AI.Integration.ReActIncompleteResponseTest do
       pid = start_basic_agent()
       result = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000)
 
-      assert {:error, {:failed, :error, {:incomplete_response, :length}}} = result
+      assert {:error, {:incomplete_response, :length}} = result
     end
 
     test "returns {:error, {:incomplete_response, :content_filter}} for filtered blank responses" do
@@ -99,7 +99,7 @@ defmodule Jido.AI.Integration.ReActIncompleteResponseTest do
       pid = start_basic_agent()
       result = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000)
 
-      assert {:error, {:failed, :error, {:incomplete_response, :content_filter}}} = result
+      assert {:error, {:incomplete_response, :content_filter}} = result
     end
 
     test "successful response with :stop still returns {:ok, text}" do

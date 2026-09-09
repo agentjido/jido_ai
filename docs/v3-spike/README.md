@@ -9,7 +9,7 @@ the port map. Use Jido v3 Actions, Flows, and Plugins for their execution.
 - [Migration plan](migration-plan.md): the complete v2-to-v3 port, with DSL authoring first.
 - [Example catalog](examples.md): proposed examples and acceptance checks.
 - [Unified Agent DSL plan](agent-dsl.md): canonical authoring, the full Jidoka-derived example, lowering and acceptance requirements.
-- [V3 acceptance project](../../examples/v3/README.md): local foundation examples and one mock LLM server.
+- [Checked example catalog](../../examples/README.md): feature examples and one mock LLM server.
 - [Feature port map](feature-map.md): current features, proposed destinations,
   and source evidence.
 - [Public API map](public-api-map.md): entry points, generated wrappers and

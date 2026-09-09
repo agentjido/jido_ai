@@ -27,7 +27,7 @@ defmodule Jido.AI.Plugins.Reasoning.GraphOfThoughtsTest do
 
   test "configured defaults survive an empty restored state and reject another method" do
     config = [default_model: :fast, timeout: 800, options: %{system_prompt: "Use facts"}]
-    {:reasoning_got, schema} = Capability.state_spec(config)
+    {:reasoning_got, schema} = Capability.Agent.state_spec(config)
     assert {:ok, state} = Zoi.parse(schema, %{})
     assert state.default_model == :fast and state.timeout == 800
     assert state.options == %{system_prompt: "Use facts"}

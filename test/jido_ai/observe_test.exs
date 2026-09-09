@@ -156,6 +156,64 @@ defmodule Jido.AI.ObserveTest do
     assert {:ok, _json} = Jason.encode(sanitized)
   end
 
+  test "sanitizers handle structs, exceptions, improper lists, and invalid options" do
+    assert Observe.sanitize_sensitive(%URI{scheme: "https", host: "example.com", userinfo: "api_key"}).host ==
+             "example.com"
+
+    assert is_binary(Observe.sanitize_sensitive([1 | 2]))
+
+    exception = Observe.sanitize_transport_payload(RuntimeError.exception("boom"))
+    assert exception == %{type: "RuntimeError", message: "boom"}
+
+    uri = Observe.sanitize_transport_payload(%URI{scheme: "https", host: "example.com"})
+    assert uri.__struct__ == "URI"
+    assert uri.host == "example.com"
+
+    summarized = Observe.sanitize_telemetry_metadata(%{uri: %URI{host: "example.com"}})
+    assert summarized.uri.type == :map
+
+    assert Observe.sanitize_transport_payload("abcd", max_string_chars: 0, unknown: 1) == "abcd"
+  end
+
+  test "sanitizers bound deep, large, improper, and non-UTF-8 values" do
+    deep = Observe.sanitize_telemetry_metadata(%{outer: %{inner: %{value: "secret"}}}, max_depth: 2)
+    assert deep.outer.inner.type == :map
+
+    large_map = Map.new(1..5, &{&1, &1})
+    bounded_map = Observe.sanitize_transport_payload(large_map, max_map_entries: 2)
+    assert bounded_map.__jido_ai_truncated__ == %{omitted_entries: 3}
+    assert map_size(bounded_map) == 3
+
+    assert %{type: :list, length: :improper} =
+             Observe.sanitize_telemetry_metadata(%{result: [1 | 2]}).result
+
+    assert Observe.sanitize_transport_payload(<<255, 0>>) == "[BINARY 2 bytes]"
+    [{key, :value}] = Observe.sanitize_transport_payload(%{{:complex, :key} => :value}) |> Map.to_list()
+    assert is_binary(key)
+  end
+
+  test "telemetry error summaries cover exception, atom, and unusual message forms" do
+    exception = Observe.sanitize_telemetry_metadata(%{result: {:error, RuntimeError.exception("boom"), []}})
+    assert exception.result.error == %{type: "RuntimeError", message: "boom"}
+
+    atom = Observe.sanitize_telemetry_metadata(%{result: {:error, :timeout, []}})
+    assert atom.result.error.type == :atom
+    assert atom.result.error.value == :timeout
+
+    empty = Observe.sanitize_telemetry_metadata(%{result: {:error, %{details: %{private: true}}, []}})
+    assert empty.result.error.type == :map
+
+    unusual =
+      Observe.sanitize_telemetry_metadata(%{
+        result: {:error, %{type: :bad, message: {:nested, self()}}, []}
+      })
+
+    assert is_binary(unusual.result.error.message)
+
+    long = Observe.sanitize_telemetry_metadata(%{result: String.duplicate("x", 20)}, max_string_chars: 3)
+    assert long.result.truncated?
+  end
+
   test "emit executes telemetry with normalized shape" do
     ref = make_ref()
     handler_id = "observe-test-emit-#{inspect(ref)}"
@@ -326,5 +384,44 @@ defmodule Jido.AI.ObserveTest do
     assert span_ctx == :noop
     assert :ok = Observe.finish_span(span_ctx, %{duration_ms: 1})
     refute_receive {:unexpected_span_event, _, _, _}, 50
+  end
+
+  test "span wrappers emit start, stop, and exception events without a core tracing dependency" do
+    handler_id = "observe-test-span-active-#{System.unique_integer([:positive])}"
+    prefix = Observe.llm(:span)
+    start_event = prefix ++ [:start]
+    stop_event = prefix ++ [:stop]
+    exception_event = prefix ++ [:exception]
+
+    :telemetry.attach_many(
+      handler_id,
+      [start_event, stop_event, exception_event],
+      fn event, measurements, metadata, target ->
+        send(target, {:span_event, event, measurements, metadata})
+      end,
+      self()
+    )
+
+    on_exit(fn -> :telemetry.detach(handler_id) end)
+
+    span = Observe.start_span(%{emit_telemetry?: true}, prefix, %{request_id: "req_span"})
+    assert %Observe.Span{} = span
+    assert_receive {:span_event, ^start_event, start_measurements, start_metadata}
+    assert start_measurements.duration_ms == 0
+    assert start_metadata.request_id == "req_span"
+
+    assert :ok = Observe.finish_span(span, %{duration_ms: 2})
+    assert_receive {:span_event, ^stop_event, stop_measurements, _metadata}
+    assert stop_measurements.duration_ms == 2
+    assert is_integer(stop_measurements.duration)
+
+    failed = Observe.start_span(%{emit_telemetry?: true}, prefix, %{request_id: "req_failed"})
+    assert_receive {:span_event, ^start_event, _, _}
+    assert :ok = Observe.finish_span_error(failed, :error, RuntimeError.exception("boom"), [])
+
+    assert_receive {:span_event, ^exception_event, error_measurements, error_metadata}
+    assert is_integer(error_measurements.duration)
+    assert error_metadata.request_id == "req_failed"
+    assert error_metadata.error_type != nil
   end
 end

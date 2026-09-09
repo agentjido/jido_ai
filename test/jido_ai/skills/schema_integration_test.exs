@@ -24,61 +24,66 @@ defmodule Jido.AI.Plugins.SchemaIntegrationTest do
   alias Jido.AI.Actions.Skill.{LoadResource, LoadSkill}
   alias Jido.AI.Actions.ToolCalling.{CallWithTools, ExecuteTool, ListTools}
 
+  defp assert_schema(action) do
+    Code.ensure_loaded!(action)
+    assert function_exported?(action, :schema, 0)
+  end
+
   describe "LLM and Tool-Calling Action Schemas" do
     test "Chat action has schema function" do
-      assert function_exported?(Chat, :schema, 0)
+      assert_schema(Chat)
     end
 
     test "Complete action has schema function" do
-      assert function_exported?(Complete, :schema, 0)
+      assert_schema(Complete)
     end
 
     test "Embed action has schema function" do
-      assert function_exported?(Embed, :schema, 0)
+      assert_schema(Embed)
     end
 
     test "GenerateObject action has schema function" do
-      assert function_exported?(GenerateObject, :schema, 0)
+      assert_schema(GenerateObject)
     end
 
     test "CallWithTools action has schema function" do
-      assert function_exported?(CallWithTools, :schema, 0)
+      assert_schema(CallWithTools)
     end
 
     test "ExecuteTool action has schema function" do
-      assert function_exported?(ExecuteTool, :schema, 0)
+      assert_schema(ExecuteTool)
     end
 
     test "ListTools action has schema function" do
-      assert function_exported?(ListTools, :schema, 0)
+      assert_schema(ListTools)
     end
   end
 
   describe "Planning and Reasoning Action Schemas" do
     test "Plan action has schema function" do
-      assert function_exported?(Plan, :schema, 0)
+      assert_schema(Plan)
     end
 
     test "Decompose action has schema function" do
-      assert function_exported?(Decompose, :schema, 0)
+      assert_schema(Decompose)
     end
 
     test "Prioritize action has schema function" do
-      assert function_exported?(Prioritize, :schema, 0)
+      assert_schema(Prioritize)
     end
 
     test "RunStrategy action has schema function" do
-      assert function_exported?(RunStrategy, :schema, 0)
+      assert_schema(RunStrategy)
     end
   end
 
   describe "Skill Action Schemas" do
     test "LoadSkill action has schema function" do
-      assert function_exported?(LoadSkill, :schema, 0)
+      assert_schema(LoadSkill)
     end
 
     test "LoadResource action has schema function" do
-      assert function_exported?(LoadResource, :schema, 0)
+      assert_schema(LoadResource)
     end
   end
 
@@ -115,7 +120,7 @@ defmodule Jido.AI.Plugins.SchemaIntegrationTest do
       assert length(actions) == 7
 
       for action <- actions do
-        assert function_exported?(action, :schema, 0)
+        assert_schema(action)
       end
     end
 
@@ -124,7 +129,7 @@ defmodule Jido.AI.Plugins.SchemaIntegrationTest do
       assert length(actions) == 3
 
       for action <- actions do
-        assert function_exported?(action, :schema, 0)
+        assert_schema(action)
       end
     end
 

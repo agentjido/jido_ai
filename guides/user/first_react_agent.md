@@ -216,7 +216,7 @@ A nil `context.system_prompt` uses the Agent's configured prompt. A saved prompt
 overrides it. Use `profile: :review` to select another AI profile. This imports
 conversation data; it does not resume an old worker or convert a full v2 Agent
 checkpoint. Use native checkpoint restore for state saved after the v3 import.
-See the [initial-state examples](../../examples/v3/profiles/14_11_initial_state.md).
+See the [initial-state examples](../../examples/14_resume/14_11_initial_state/README.md).
 
 ## Note: Retrieval And ReAct
 

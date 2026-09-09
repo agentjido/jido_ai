@@ -133,7 +133,7 @@ defmodule Jido.AI.Actions.ToolCalling.ListToolsTest do
 
       refute is_nil(legacy_tool.schema)
       assert is_list(legacy_tool.schema)
-      assert Enum.any?(legacy_tool.schema, &(&1.name == :query and &1.type == :string))
+      assert Enum.any?(legacy_tool.schema, &(&1.name == :query and &1.type == "string"))
 
       refute is_nil(zoi_tool.schema)
       assert is_list(zoi_tool.schema)

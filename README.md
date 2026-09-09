@@ -235,8 +235,18 @@ Deep reference:
 
 ## Runnable Examples
 
-The runnable demos now live in the top-level [`examples/`](https://github.com/agentjido/jido_ai/tree/main/examples)
-folder and are loaded on demand, so they stay out of the core `jido_ai` compile path.
+The checked [example catalog](examples/README.md) uses real Jido AI features
+with a deterministic local model server. Example tests are skipped by default.
+
+```bash
+mix test
+mix examples --seed 0
+```
+
+Production builds compile `lib/` only. Development and test builds also compile
+the checked example modules.
+
+Older manual demos remain available:
 
 ```bash
 mix run examples/scripts/demo/actions_llm_runtime_demo.exs
@@ -245,7 +255,7 @@ mix run examples/scripts/demo/actions_reasoning_runtime_demo.exs
 mix run examples/scripts/demo/weather_multi_turn_context_demo.exs
 ```
 
-Additional examples:
+Manual example modules:
 - [`examples/lib/agents/weather_agent.ex`](https://github.com/agentjido/jido_ai/blob/main/examples/lib/agents/weather_agent.ex)
 - [`examples/lib/agents/react_demo_agent.ex`](https://github.com/agentjido/jido_ai/blob/main/examples/lib/agents/react_demo_agent.ex)
 - [`examples/lib/tools/weather_by_location.ex`](https://github.com/agentjido/jido_ai/blob/main/examples/lib/tools/weather_by_location.ex)

@@ -66,7 +66,7 @@ defmodule Jido.AI.Portable do
   defp profiles(%Profile{} = profile), do: {:ok, %{profile.id => profile}}
 
   defp profiles(module) when is_atom(module) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :agent, 0),
+    if Code.ensure_loaded?(module) and function_exported?(module, :definition, 0),
       do: {:ok, Agent.profiles(module)},
       else: Profile.error("agent", "Expected an Agent module, definition, or Profile")
   end
@@ -157,8 +157,8 @@ defmodule Jido.AI.Portable do
   end
 
   defp definition(module) when is_atom(module) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :agent, 0),
-      do: {:ok, module.agent()},
+    if Code.ensure_loaded?(module) and function_exported?(module, :definition, 0),
+      do: {:ok, module.definition()},
       else: Profile.error("agent", "Expected an Agent module or definition")
   end
 

@@ -11,10 +11,6 @@ defmodule Jido.AI.Reasoning.HelpersTest do
     :ok
   end
 
-  defmodule TestJido do
-    use Jido, otp_app: :jido_ai
-  end
-
   defmodule FailingAction do
     use Jido.Action,
       name: "failing_action",
@@ -45,26 +41,19 @@ defmodule Jido.AI.Reasoning.HelpersTest do
       assert error.details != %{}
     end
 
-    test "applies global action observability options" do
-      preserve_env(:jido, :telemetry)
+    test "uses explicit execution options from context" do
+      expect_exec_opts(fn opts ->
+        assert opts == [log_level: :warning, telemetry: :silent]
+      end)
 
-      for log_args <- [:none, :keys_only] do
-        Application.put_env(:jido, :telemetry, log_level: :debug, log_args: log_args)
-
-        expect_exec_opts(fn opts ->
-          assert opts[:log_level] == :warning
-          assert opts[:telemetry] == :silent
-        end)
-
-        Helpers.execute_action_instruction(test_agent(), test_instruction())
-      end
+      Helpers.execute_action_instruction(test_agent(), test_instruction(), %{
+        exec_opts: [log_level: :warning, telemetry: :silent]
+      })
     end
 
-    test "preserves explicit instruction options" do
+    test "does not use instruction options as Exec options" do
       expect_exec_opts(fn opts ->
-        assert opts[:log_level] == :error
-        assert opts[:telemetry] == :full
-        assert opts[:retry] == false
+        assert opts == []
       end)
 
       instruction =
@@ -74,16 +63,56 @@ defmodule Jido.AI.Reasoning.HelpersTest do
       Helpers.execute_action_instruction(test_agent(), instruction)
     end
 
-    test "uses per-instance observability options from strategy context" do
-      preserve_env(:jido_ai, TestJido)
-      Application.put_env(:jido_ai, TestJido, telemetry: [log_level: :debug, log_args: :full])
-
+    test "ignores unrelated context when no execution options are present" do
       expect_exec_opts(fn opts ->
-        assert opts[:log_level] == :debug
-        assert opts[:telemetry] == :full
+        assert opts == []
       end)
 
-      Helpers.execute_action_instruction(test_agent(), test_instruction(), %{jido_instance: TestJido})
+      Helpers.execute_action_instruction(test_agent(), test_instruction(), %{observability: %{log_level: :debug}})
+    end
+
+    test "applies successful two- and three-tuple results" do
+      for result <- [{:ok, %{}}, {:ok, %{}, []}] do
+        expect(Jido.Exec, :run, fn _instruction, %{}, %{}, [] -> result end)
+        {agent, directives} = Helpers.execute_action_instruction(test_agent(), test_instruction())
+        assert agent.state == %{}
+        assert directives == []
+      end
+    end
+
+    test "normalizes three-tuple errors and invalid state proposals" do
+      expect(Jido.Exec, :run, fn _instruction, %{}, %{}, [] -> {:error, :three_tuple, []} end)
+
+      {_agent, [%Jido.Agent.Directive.Error{error: error}]} =
+        Helpers.execute_action_instruction(test_agent(), test_instruction())
+
+      assert error.details.reason == :three_tuple
+
+      expect(Jido.Exec, :run, fn _instruction, %{}, %{}, [] -> {:ok, %{unknown: true}} end)
+
+      {_agent, [%Jido.Agent.Directive.Error{}]} =
+        Helpers.execute_action_instruction(test_agent(), test_instruction())
+    end
+
+    test "conditionally executes only resolvable targets" do
+      expect(Jido.Exec, :run, fn _instruction, %{}, %{}, [] -> {:error, :expected} end)
+
+      assert {_agent, [%Jido.Agent.Directive.Error{}]} =
+               Helpers.maybe_execute_action_instruction(test_agent(), test_instruction())
+
+      instruction = %Jido.Instruction{target: :not_an_executable, params: %{}, context: %{}}
+      assert :noop = Helpers.maybe_execute_action_instruction(test_agent(), instruction)
+    end
+
+    test "builds the complete Action context" do
+      agent = test_agent()
+
+      assert Helpers.action_context(agent, %{caller: :test}) == %{
+               caller: :test,
+               state: %{},
+               agent_state: %{},
+               agent_id: "test-agent"
+             }
     end
   end
 
@@ -102,17 +131,6 @@ defmodule Jido.AI.Reasoning.HelpersTest do
       schema: Zoi.object(%{}),
       module: Jido.Agent
     }
-
-  defp preserve_env(app, key) do
-    original = Application.fetch_env(app, key)
-
-    on_exit(fn ->
-      case original do
-        {:ok, value} -> Application.put_env(app, key, value)
-        :error -> Application.delete_env(app, key)
-      end
-    end)
-  end
 
   defp test_instruction do
     %Jido.Instruction{target: FailingAction, params: %{}, context: %{}}

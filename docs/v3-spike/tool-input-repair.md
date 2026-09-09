@@ -36,7 +36,7 @@ in these two files. There are no new failing cases. The root count increases
 from 2,388 to 2,396 because of the eight added cases. The final root result is
 1,934 passed, 462 failed and one existing exclusion. All four doctests pass.
 
-The [03_03 integration example](../../examples/v3/profiles/03_03_numeric_inputs.md)
+The [03_03 integration example](../../examples/03_tools/03_03_numeric_inputs/README.md)
 adds four cases with a native Agent DSL, the shared mocked LLM, and actual Action
 and Flow tools. It checks nested values, real execution, correlated model input,
 stored results and all-or-nothing batch admission. The first run reached every

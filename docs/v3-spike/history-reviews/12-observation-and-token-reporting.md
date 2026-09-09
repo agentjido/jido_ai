@@ -187,12 +187,12 @@ Tests: [Observe](../../../test/jido_ai/observe_test.exs),
 
 ## Chat port evidence: 2026-09-07
 
-[Example 16_02](../../../examples/v3/profiles/16_02_chat.md) supplies the
+[Example 16_02](../../../examples/16_capabilities/16_02_chat/README.md) supplies the
 new execution evidence. All four standalone LLM Actions now have actual HTTP and canonical telemetry evidence. Embedding requests return usage to the Action internally while preserving its vector result. Empty vectors, invalid inputs and provider failures are covered. Invalid typed output reports completed provider usage in error telemetry. CLI and the full cross-operation failure accounting gate remain open.
 
 ## Quota accounting evidence: 2026-09-07
 
-[13_01](../../../examples/v3/profiles/13_01_quota.md) now tests per-call budget
+[13_01](../../../examples/13_policy/13_01_quota/README.md) now tests per-call budget
 records through real model transport, independent of the Agent commit. It
 covers duplicate reports, separate repair/nested calls, cumulative stream
 snapshots and partial failure usage. The ledger preserves the distinction

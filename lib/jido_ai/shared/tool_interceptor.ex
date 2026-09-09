@@ -152,8 +152,7 @@ defmodule Jido.AI.ToolInterceptor do
         {:ok, filtered_result, stats}
 
       :error ->
-        {:error,
-         {:invalid_tool_interceptor_result, :after_tool_call, agent_module, {:ok, result}}}
+        {:error, {:invalid_tool_interceptor_result, :after_tool_call, agent_module, {:ok, result}}}
     end
   end
 
@@ -222,8 +221,7 @@ defmodule Jido.AI.ToolInterceptor do
 
       transformed.action_module != original.action_module ->
         {:error,
-         {:tool_interceptor_changed_action_module, agent_module, original.action_module,
-          transformed.action_module}}
+         {:tool_interceptor_changed_action_module, agent_module, original.action_module, transformed.action_module}}
 
       true ->
         :ok
@@ -231,8 +229,7 @@ defmodule Jido.AI.ToolInterceptor do
   end
 
   defp callback_exception(callback, agent_module, error) do
-    {:tool_interceptor_exception, callback, agent_module,
-     %{type: error.__struct__, message: Exception.message(error)}}
+    {:tool_interceptor_exception, callback, agent_module, %{type: error.__struct__, message: Exception.message(error)}}
   end
 
   defp callback_catch(callback, agent_module, kind, reason) do

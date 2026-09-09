@@ -200,7 +200,7 @@ All checks use the real production operation paths after kickoff.
 
 ## Partial v3 reasoning capability evidence — 2026-09-07
 
-[16_01](../../../examples/v3/profiles/16_01_reasoning_capabilities.md) now runs
+[16_01](../../../examples/16_capabilities/16_01_reasoning/README.md) now runs
 seven capability Plugins on core v3. It uses explicit routes, configured owned
 state, and the existing callable reasoning Action. Two Plugin orders produce
 the same request defaults and result field. A native AI profile shares an Agent
@@ -215,12 +215,12 @@ explicit route migration are listed in the example's API table.
 
 ## Chat port evidence: 2026-09-07
 
-[Example 16_02](../../../examples/v3/profiles/16_02_chat.md) supplies the
+[Example 16_02](../../../examples/16_capabilities/16_02_chat/README.md) supplies the
 new execution evidence. The PR 290 multiline code and JSON cases now have a real Chat request example. Single-line detection remains. Chat also uses explicit core routes, consistent tool aliases and a core Flow tool. The separate dynamic catalog and caller hook requirements remain open.
 
 ## Default Plugin and ordinary-route evidence: 2026-09-07
 
-[16_04](../../../examples/v3/profiles/16_04_plugin_stack.md) now runs the
+[16_04](../../../examples/16_capabilities/16_04_plugin_stack/README.md) now runs the
 public Agent with default Policy/ModelRouting, optional Retrieval/Quota and
 explicit custom Plugins. Static route input and a caller module-attribute route
 table reach real Actions before a later AI request. Explicit route choices
@@ -234,7 +234,7 @@ runtime-route case and all callback/consumer requirements remain separate gates.
 
 ## Persistent context evidence: 2026-09-07
 
-[03_02](../../../examples/v3/profiles/03_02_tool_context.md) adds base context
+[03_02](../../../examples/03_tools/03_02_tool_context/README.md) adds base context
 replacement through the existing Configuration Plugin. The cases prove live
 and direct changes, request precedence, admitted snapshots, callback context,
 protected fields, separate profiles, format parity and restore. Base values

@@ -165,7 +165,7 @@ Tests: [lifecycle parity](../../../test/jido_ai/integration/request_lifecycle_pa
 
 ## Native TRM evidence: 2026-09-07
 
-[09_08](../../../examples/v3/profiles/09_08_trm.md) now supplies the real
+[09_08](../../../examples/09_reasoning/09_08_trm/README.md) now supplies the real
 answer-review cycle required above. Three phases share the outer request ID
 and use distinct model/phase IDs. The selected scored answer reaches output
 controls and commit; an unreviewed improvement does not replace it. A common

@@ -530,6 +530,18 @@ defmodule Jido.AI.TurnTest do
       assert {:ok, ^turn} = Turn.run_tools(turn, %{})
     end
 
+    test "returns a validation result for malformed tool-call items" do
+      turn = %Turn{type: :tool_calls, text: "", tool_calls: [:malformed]}
+
+      assert {:ok, updated_turn} = Turn.run_tools(turn, %{})
+
+      assert [%{id: "", name: "", raw_result: {:error, error, []}}] =
+               updated_turn.tool_results
+
+      assert error.type == :validation
+      assert error.message == "Missing tool name"
+    end
+
     test "emits per-tool telemetry id without changing action context" do
       test_pid = self()
       handler_id = "turn-run-tools-stop-id-#{System.unique_integer([:positive])}"

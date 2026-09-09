@@ -53,7 +53,8 @@ defmodule Jido.AI.Actions.LLM.GenerateObjectTest do
     test "accepts NimbleOptions keyword list schema" do
       schema = [
         name: [type: :string, required: true],
-        age: [type: :integer, required: true]
+        age: [type: :integer, required: false],
+        model: [type: :string, required: false]
       ]
 
       assert {:ok, result} =

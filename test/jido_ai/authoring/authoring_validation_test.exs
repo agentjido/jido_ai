@@ -43,7 +43,7 @@ defmodule Jido.AI.Authoring.AuthoringValidationTest do
   end
 
   test "request binding and method inspection use normal Agent routes" do
-    agent = RoutedAgent.agent()
+    agent = RoutedAgent.definition()
     signal = Jido.Signal.new!("support.ask", %{query: "help"}, source: "/test")
 
     assert Authoring.request_binding(agent, signal) == %{
@@ -92,7 +92,7 @@ defmodule Jido.AI.Authoring.AuthoringValidationTest do
   end
 
   test "lower/2 rejects initialized Agents and non-field schemas" do
-    assert {:ok, initialized} = Jido.Agent.new(RoutedAgent, [])
+    assert {:ok, initialized} = Jido.Agent.instantiate(RoutedAgent, [])
     assert {:error, _} = Authoring.lower(initialized, [profile()])
 
     assert {:error, _} =

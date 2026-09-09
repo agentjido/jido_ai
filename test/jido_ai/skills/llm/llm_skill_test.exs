@@ -1,5 +1,7 @@
-defmodule Jido.AI.Plugins.ChatTest do
+defmodule Jido.AI.LegacyV2.Plugins.ChatTest do
   use ExUnit.Case, async: true
+
+  @moduletag :legacy_v2
 
   alias Jido.AI.Plugins.Chat
   alias Jido.Signal

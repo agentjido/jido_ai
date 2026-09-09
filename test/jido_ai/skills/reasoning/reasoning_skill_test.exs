@@ -1,5 +1,7 @@
-defmodule Jido.AI.Plugins.ReasoningTest do
+defmodule Jido.AI.LegacyV2.Plugins.ReasoningTest do
   use ExUnit.Case, async: true
+
+  @moduletag :legacy_v2
 
   alias Jido.AI.Plugins.Reasoning.TreeOfThoughts, as: Reasoning
   alias Jido.AI.Actions.Reasoning.{Analyze, Explain, Infer}

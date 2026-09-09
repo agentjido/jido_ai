@@ -1,6 +1,8 @@
 defmodule Jido.AI.ToTAgentTest do
   use ExUnit.Case, async: true
 
+  @moduletag :legacy_v2
+
   alias Jido.Agent.Strategy.State, as: StratState
 
   defmodule TestToTAgent do

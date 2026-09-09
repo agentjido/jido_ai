@@ -1,7 +1,7 @@
 # History review 14: model routing and WebSocket sessions
 
 Execution update, 2026-09-07:
-[02_19](../../../examples/v3/profiles/02_19_model_options.md) now covers public
+[02_19](../../../examples/02_requests/02_19_model_options/README.md) now covers public
 request model overrides, selected-model option merging, actual SSE labels and
 headers, and buffered Responses tools/objects. It reuses the existing resolver
 and Config merge functions. No separate session or executor was introduced.

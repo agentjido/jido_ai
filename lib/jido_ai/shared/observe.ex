@@ -13,9 +13,21 @@ defmodule Jido.AI.Observe do
   """
 
   alias Jido.AI.Observe.Sanitize
-  alias Jido.Observe, as: CoreObserve
 
   require Logger
+
+  defmodule Span do
+    @moduledoc false
+
+    @enforce_keys [:event_prefix, :start_time, :metadata]
+    defstruct [:event_prefix, :start_time, :metadata]
+
+    @type t :: %__MODULE__{
+            event_prefix: [atom()],
+            start_time: integer(),
+            metadata: map()
+          }
+  end
 
   @required_metadata_keys [
     :agent_id,
@@ -46,7 +58,7 @@ defmodule Jido.AI.Observe do
   @type event_name :: [atom()]
   @type measurements :: map()
   @type metadata :: map()
-  @type span_ctx :: CoreObserve.span_ctx() | :noop
+  @type span_ctx :: Span.t() | :noop
   @type feature_gate :: :llm_deltas
   @type sanitize_profile :: Sanitize.profile()
 
@@ -127,13 +139,23 @@ defmodule Jido.AI.Observe do
     obs_cfg = normalize_obs_cfg(obs_cfg)
 
     if emit_enabled?(obs_cfg, []) and valid_event?(event_prefix) do
-      CoreObserve.start_span(
-        event_prefix,
+      metadata =
         metadata
         |> ensure_required_metadata()
         |> enrich_with_trace_metadata()
         |> sanitize_telemetry_metadata()
+
+      :telemetry.execute(
+        event_prefix ++ [:start],
+        ensure_required_measurements(%{system_time: System.system_time()}),
+        metadata
       )
+
+      %Span{
+        event_prefix: event_prefix,
+        start_time: System.monotonic_time(),
+        metadata: metadata
+      }
     else
       :noop
     end
@@ -145,8 +167,14 @@ defmodule Jido.AI.Observe do
   @spec finish_span(span_ctx(), measurements()) :: :ok
   def finish_span(:noop, _extra_measurements), do: :ok
 
-  def finish_span(span_ctx, extra_measurements) when is_map(extra_measurements) do
-    CoreObserve.finish_span(span_ctx, ensure_required_measurements(extra_measurements))
+  def finish_span(%Span{} = span_ctx, extra_measurements) when is_map(extra_measurements) do
+    measurements =
+      extra_measurements
+      |> Map.put_new(:duration, System.monotonic_time() - span_ctx.start_time)
+      |> ensure_required_measurements()
+
+    :telemetry.execute(span_ctx.event_prefix ++ [:stop], measurements, span_ctx.metadata)
+    :ok
   end
 
   @doc """
@@ -155,9 +183,22 @@ defmodule Jido.AI.Observe do
   @spec finish_span_error(span_ctx(), atom(), term(), list()) :: :ok
   def finish_span_error(:noop, _kind, _reason, _stacktrace), do: :ok
 
-  def finish_span_error(span_ctx, kind, reason, stacktrace)
+  def finish_span_error(%Span{} = span_ctx, kind, reason, stacktrace)
       when is_atom(kind) and is_list(stacktrace) do
-    CoreObserve.finish_span_error(span_ctx, kind, reason, stacktrace)
+    measurements =
+      %{duration: System.monotonic_time() - span_ctx.start_time}
+      |> ensure_required_measurements()
+
+    error = Jido.AI.Error.normalize(reason)
+
+    metadata =
+      span_ctx.metadata
+      |> Map.put(:error_type, error.type)
+      |> Map.put(:error, Map.put(error, :kind, kind))
+      |> sanitize_telemetry_metadata()
+
+    :telemetry.execute(span_ctx.event_prefix ++ [:exception], measurements, metadata)
+    :ok
   end
 
   @doc """

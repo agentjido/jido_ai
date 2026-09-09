@@ -53,14 +53,14 @@ not depend on process-local counters across separate core Action tasks.
 
 ## Eight added integration cases
 
-[14_02](../../examples/v3/profiles/14_02_standalone_runtime.md) adds six cases:
+[14_02](../../examples/14_resume/14_02_standalone_runtime/README.md) adds six cases:
 before-only, after-only and combined tool callbacks; callback failure; invalid
 transformed messages; and provider-error recovery with a portable token.
 They check callback inputs, actual Action arguments, correlated tool JSON,
 terminal output metadata, call counts and saved token state. The token does
 not contain the test API key.
 
-[02_06](../../examples/v3/profiles/02_06_output_contract.md) adds two native
+[02_06](../../examples/02_requests/02_06_output_contract/README.md) adds two native
 Agent cases: repair recovery and exhaustion after a provider error. Both use
 an explicit two-attempt budget and make three HTTP calls including the initial
 invalid answer. The retained one-provider-error case now explicitly selects

@@ -123,7 +123,13 @@ defmodule Mix.Tasks.JidoAi.SkillTest do
 
   describe "validate command" do
     test "outputs JSON summary for valid and invalid files", %{valid_skill_path: valid, invalid_skill_path: invalid} do
-      messages = run_task_with_output(["validate", valid, invalid, "--json"])
+      flush_shell_messages()
+
+      assert_raise Mix.Error, "Validation failed for 1 skill(s)", fn ->
+        invoke_task(["validate", valid, invalid, "--json"])
+      end
+
+      messages = drain_shell_messages()
       json = first_info(messages)
 
       assert {:ok, decoded} = Jason.decode(json)
@@ -132,6 +138,12 @@ defmodule Mix.Tasks.JidoAi.SkillTest do
       assert decoded["warnings"] >= 0
       assert Enum.any?(decoded["results"], &(&1["path"] == valid and &1["valid"] == true))
       assert Enum.any?(decoded["results"], &(&1["path"] == invalid and &1["valid"] == false))
+    end
+
+    test "raises for validation errors without strict mode", %{invalid_skill_path: invalid} do
+      assert_raise Mix.Error, "Validation failed for 1 skill(s)", fn ->
+        invoke_task(["validate", invalid])
+      end
     end
 
     test "raises in strict mode when validation errors are present", %{invalid_skill_path: invalid} do

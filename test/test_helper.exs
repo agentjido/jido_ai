@@ -7,4 +7,13 @@ Mimic.copy(ReqLLM.StreamResponse)
 Mimic.copy(Jido.AgentServer)
 Mimic.copy(Jido.AI.CLI.Adapter)
 
-ExUnit.start(exclude: [:flaky], capture_log: true)
+coverage_active? =
+  :ets.whereis(:excoveralls_conf_server) != :undefined and
+    ExCoveralls.ConfServer.get() != []
+
+coverage_exclusions = if coverage_active?, do: [:coverage_external_vm], else: []
+
+ExUnit.start(
+  exclude: [:flaky, :example, :legacy_v2] ++ coverage_exclusions,
+  capture_log: true
+)

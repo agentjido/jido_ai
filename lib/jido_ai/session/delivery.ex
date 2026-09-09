@@ -85,8 +85,7 @@ defmodule Jido.AI.Session.Delivery do
       |> Enum.filter(&(&1.request_id == id))
       |> Enum.max_by(& &1.serial, fn -> nil end)
 
-    {:reply,
-     if(report, do: {:ok, Map.delete(report, :serial)}, else: {:error, :unknown_delivery}), state}
+    {:reply, if(report, do: {:ok, Map.delete(report, :serial)}, else: {:error, :unknown_delivery}), state}
   end
 
   def handle_call({:enqueue, event}, _, state) do
@@ -140,8 +139,7 @@ defmodule Jido.AI.Session.Delivery do
         _,
         %{active: %{id: id, ticket: ticket, claimed?: true, consumed?: false} = batch} = state
       ) do
-    {:reply, {:ok, Enum.flat_map(batch.items, & &1.signals)},
-     %{state | active: %{batch | consumed?: true}}}
+    {:reply, {:ok, Enum.flat_map(batch.items, & &1.signals)}, %{state | active: %{batch | consumed?: true}}}
   end
 
   def handle_call({:consume, _, _}, _, state),

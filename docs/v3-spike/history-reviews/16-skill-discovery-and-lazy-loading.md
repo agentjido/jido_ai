@@ -204,7 +204,7 @@ Guide: [Skills System](../../../guides/developer/skills_system.md).
 
 ## Native runtime evidence: 2026-09-07
 
-[18_01](../../../examples/v3/profiles/18_01_skill_runtime.md) connects real
+[18_01](../../../examples/18_skills/18_01_skill_runtime/README.md) connects real
 activation, resource access, callback approval, committed context, compaction
 and later HTTP requests in 27 integration cases. The linked ledger entries
 are partial evidence for the feature boundaries in this review. A separate
@@ -215,7 +215,7 @@ and release gates remain open. These results do not close the history rows.
 
 ## Automatic authoring evidence: 2026-09-07
 
-[18_02](../../../examples/v3/profiles/18_02_skill_authoring.md) adds 21 cases
+[18_02](../../../examples/18_skills/18_02_skill_authoring/README.md) adds 21 cases
 for public/native authoring and static format parity. The live Session prepares
 one selected catalogue for prompt disclosure and loading. Cases cover runtime
 roots, trust, source precedence, current-file activation, profile isolation,

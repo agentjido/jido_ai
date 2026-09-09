@@ -7,7 +7,14 @@ defmodule Jido.AI.Actions.ToolCalling.RequestModel do
     case Models.request(:text, state.model, state.messages, state.options, nil, context) do
       {:ok, response} ->
         turn = Turn.from_response(response, model: state.model)
-        usage = state.usage |> Usage.merge(turn.usage) |> Usage.ensure_total_tokens()
+
+        turn_usage =
+          case Usage.normalize(turn.usage) do
+            %{} = usage -> Usage.ensure_total_tokens(usage)
+            nil -> %{}
+          end
+
+        usage = Usage.merge(state.usage, turn_usage)
 
         {:ok,
          %{
@@ -28,18 +35,7 @@ defmodule Jido.AI.Actions.ToolCalling.Decide do
   use Jido.Action, name: "tool_calling_decide"
   alias Jido.AI.Turn
 
-  def run(%{failure: failure, round: 0}, _) when not is_nil(failure), do: {:error, failure}
-
-  def run(%{failure: failure} = state, _) when not is_nil(failure),
-    do:
-      {:ok,
-       %{
-         type: :error,
-         reason: failure,
-         turns: state.round,
-         model: state.model,
-         usage: state.usage
-       }}
+  def run(%{failure: failure}, _) when not is_nil(failure), do: {:error, failure}
 
   def run(state, _) do
     result = Turn.to_result_map(state.turn)

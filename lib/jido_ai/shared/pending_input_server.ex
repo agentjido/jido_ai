@@ -153,8 +153,7 @@ defmodule Jido.AI.PendingInputServer do
         if state.queue_len >= state.max_queue_size do
           {:reply, {:error, :queue_full}, state}
         else
-          {:reply, :ok,
-           %{state | queue: :queue.in(item, state.queue), queue_len: state.queue_len + 1}}
+          {:reply, :ok, %{state | queue: :queue.in(item, state.queue), queue_len: state.queue_len + 1}}
         end
 
       {:error, reason} ->

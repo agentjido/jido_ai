@@ -235,7 +235,7 @@ Tests: [runtime](../../../test/jido_ai/react/runtime_runner_test.exs),
 
 ## Native context-operation evidence: 2026-09-07
 
-[02_23](../../../examples/v3/profiles/02_23_context_operations.md) adds 28 cases
+[02_23](../../../examples/02_requests/02_23_context_operations/README.md) adds 28 cases
 for real Agent context operations. The linked ledger references cover core
 Thread request refs, pending-operation recovery, durable terminal application
 and accepted-history compaction. The original skill call and result now replace
@@ -247,7 +247,7 @@ the old Agent conversion and root package gates.
 
 ## Native runtime evidence: 2026-09-07
 
-[18_01](../../../examples/v3/profiles/18_01_skill_runtime.md) connects real
+[18_01](../../../examples/18_skills/18_01_skill_runtime/README.md) connects real
 activation, resource access, callback approval, committed context, compaction
 and later HTTP requests in 27 integration cases. The linked ledger entries
 are partial evidence for the feature boundaries in this review. A separate
@@ -258,7 +258,7 @@ and release gates remain open. These results do not close the history rows.
 
 ## Automatic authoring evidence: 2026-09-07
 
-[18_02](../../../examples/v3/profiles/18_02_skill_authoring.md) adds 21 cases
+[18_02](../../../examples/18_skills/18_02_skill_authoring/README.md) adds 21 cases
 for public/native authoring and static format parity. The live Session prepares
 one selected catalogue for prompt disclosure and loading. Cases cover runtime
 roots, trust, source precedence, current-file activation, profile isolation,
@@ -270,7 +270,7 @@ This evidence does not close a history row.
 
 ## Persistent context evidence: 2026-09-07
 
-[03_02](../../../examples/v3/profiles/03_02_tool_context.md) adds base context
+[03_02](../../../examples/03_tools/03_02_tool_context/README.md) adds base context
 replacement through the existing Configuration Plugin. The cases prove live
 and direct changes, request precedence, admitted snapshots, callback context,
 protected fields, separate profiles, format parity and restore. Base values

@@ -24,8 +24,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Helpers do
       llm_opts: params[:llm_opts],
       llm_timeout_ms: params[:llm_timeout_ms] || params[:timeout_ms],
       req_http_options: params[:req_http_options],
-      stream_timeout_ms:
-        Map.get(params, :stream_timeout_ms, Map.get(params, :stream_receive_timeout_ms)),
+      stream_timeout_ms: Map.get(params, :stream_timeout_ms, Map.get(params, :stream_receive_timeout_ms)),
       tool_heartbeat_ms: params[:tool_heartbeat_ms],
       tool_timeout_ms: params[:tool_timeout_ms],
       tool_max_retries: params[:tool_max_retries],

@@ -54,6 +54,7 @@ defmodule Jido.AI.Validation do
 
   def validate_and_sanitize_prompt(prompt) when is_binary(prompt) do
     with :ok <- validate_prompt_length(prompt),
+         :ok <- validate_non_blank(prompt, :empty_prompt),
          :ok <- validate_prompt_content(prompt),
          {:ok, sanitized} <- sanitize_prompt(prompt) do
       {:ok, String.trim(sanitized)}
@@ -68,6 +69,7 @@ defmodule Jido.AI.Validation do
   @spec validate_prompt(prompt()) :: validation_result()
   def validate_prompt(prompt) when is_binary(prompt) do
     with :ok <- validate_prompt_length(prompt),
+         :ok <- validate_non_blank(prompt, :empty_prompt),
          :ok <- validate_prompt_content(prompt) do
       validate_prompt_injection_safe(prompt)
     end
@@ -89,6 +91,7 @@ defmodule Jido.AI.Validation do
     allow_patterns = Keyword.get(opts, :allow_injection_patterns, false)
 
     with :ok <- validate_custom_length(custom_prompt, max_length),
+         :ok <- validate_non_blank(custom_prompt, :empty_custom_prompt),
          :ok <- validate_content_characters(custom_prompt),
          {:ok, sanitized} <- sanitize_custom_prompt(custom_prompt, allow_patterns) do
       {:ok, String.trim(sanitized)}
@@ -277,6 +280,10 @@ defmodule Jido.AI.Validation do
     if byte_size(prompt) > max_length, do: {:error, :custom_prompt_too_long}, else: :ok
   end
 
+  defp validate_non_blank(prompt, error) do
+    if String.trim(prompt) == "", do: {:error, error}, else: :ok
+  end
+
   defp validate_content_characters(prompt) do
     case find_dangerous_character(prompt) do
       nil -> :ok
@@ -308,9 +315,7 @@ defmodule Jido.AI.Validation do
 
   defp wrap_with_exec(callback, timeout) do
     fn arg ->
-      case Jido.Exec.run(Jido.AI.Actions.InvokeCallback, %{callback: callback, value: arg}, %{},
-             timeout: timeout
-           ) do
+      case Jido.Exec.run(Jido.AI.Actions.InvokeCallback, %{callback: callback, value: arg}, %{}, timeout: timeout) do
         {:ok, %{value: result}} -> result
         {:error, %Jido.Action.Error.TimeoutError{}} -> {:error, :callback_timeout}
         {:error, _} -> {:error, :callback_execution_failed}

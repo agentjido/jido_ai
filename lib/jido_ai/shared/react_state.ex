@@ -108,23 +108,18 @@ defmodule Jido.AI.Reasoning.ReAct.State do
         llm_response_id: Map.get(map, :llm_response_id, Map.get(map, "llm_response_id")),
         context: context,
         active_tools: Map.get(map, :active_tools, Map.get(map, "active_tools", %{})) || %{},
-        pending_tool_calls:
-          restore_pending(
-            Map.get(map, :pending_tool_calls, Map.get(map, "pending_tool_calls", []))
-          ),
+        pending_tool_calls: restore_pending(Map.get(map, :pending_tool_calls, Map.get(map, "pending_tool_calls", []))),
         usage: Map.get(map, :usage, Map.get(map, "usage", %{})) || %{},
         output: Map.get(map, :output, Map.get(map, "output", %{})) || %{},
         streaming_text: Map.get(map, :streaming_text, Map.get(map, "streaming_text", "")) || "",
-        streaming_thinking:
-          Map.get(map, :streaming_thinking, Map.get(map, "streaming_thinking", "")) || "",
+        streaming_thinking: Map.get(map, :streaming_thinking, Map.get(map, "streaming_thinking", "")) || "",
         result: Map.get(map, :result, Map.get(map, "result")),
         termination_reason: Map.get(map, :termination_reason, Map.get(map, "termination_reason")),
         checkpoint: Map.get(map, :checkpoint, Map.get(map, "checkpoint")),
         error: Map.get(map, :error, Map.get(map, "error")),
         started_at_ms: Map.get(map, :started_at_ms, Map.get(map, "started_at_ms", now_ms())),
         updated_at_ms: Map.get(map, :updated_at_ms, Map.get(map, "updated_at_ms", now_ms())),
-        prev_tool_signature:
-          Map.get(map, :prev_tool_signature, Map.get(map, "prev_tool_signature")),
+        prev_tool_signature: Map.get(map, :prev_tool_signature, Map.get(map, "prev_tool_signature")),
         seq: Map.get(map, :seq, Map.get(map, "seq", 0))
       }
 

@@ -84,6 +84,11 @@ defmodule Jido.AI.Authoring.ToolSourceTest do
 
     assert {:error, _} =
              ToolSource.new([
+               [kind: :browser, name: :docs, mode: :read_only, mode: :read_write, approval: true]
+             ])
+
+    assert {:error, _} =
+             ToolSource.new([
                %{kind: :browser, name: :writer, mode: :read_write, allow: ["https://example.com"]}
              ])
 

@@ -149,15 +149,16 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapter do
 
     %{
       status: status.snapshot.status,
-      iterations: Map.get(strategy_state, :iteration, 0),
+      iterations: Map.get(details, :iteration) || Map.get(strategy_state, :iteration, 0),
       usage: extract_usage(strategy_state, details),
       model: Map.get(details, :model)
     }
   end
 
   defp extract_usage(strategy_state, details) do
-    # Try strategy state first (accumulated), then snapshot details
-    usage = Map.get(strategy_state, :usage) || Map.get(details, :usage) || %{}
+    # Current Session snapshots own request metadata. The strategy-state fallback
+    # keeps compatibility with older callers during the V3 transition.
+    usage = Map.get(details, :usage) || Map.get(strategy_state, :usage) || %{}
 
     if map_size(usage) > 0 do
       %{

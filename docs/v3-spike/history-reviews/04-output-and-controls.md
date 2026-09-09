@@ -272,7 +272,7 @@ enabled integration test against production v3 code before the port gate closes.
 
 ## Partial Planning helper evidence — 2026-09-07
 
-[08_01](../../../examples/v3/profiles/08_01_planning.md) adds actual HTTP cases
+[08_01](../../../examples/08_planning/08_01_planning/README.md) adds actual HTTP cases
 for the three Planning Actions. Direct, Exec and live capability calls retain
 the full text and parsed result maps. A raw multi-block provider response goes
 through the common Turn extractor and keeps token usage. Known string input
@@ -287,12 +287,12 @@ The full AI acceptance run passes 678 tests. All history statuses remain pending
 
 ## Chat port evidence: 2026-09-07
 
-[Example 16_02](../../../examples/v3/profiles/16_02_chat.md) supplies the
+[Example 16_02](../../../examples/16_capabilities/16_02_chat/README.md) supplies the
 new execution evidence. Known nested Zoi keys and enum labels are now validated in the callable GenerateObject path through the shared Output validator. The public result retains decoded forms. Invalid output fails without an added repair request and preserves available usage in error telemetry.
 
 ## Failure position evidence: 2026-09-07
 
-[14_10](../../../examples/v3/profiles/14_10_failure_position.md) adds partial
+[14_10](../../../examples/14_resume/14_10_failure_position/README.md) adds partial
 PR 269 evidence for failed repair calls, validation failure, repair after tools
 and successful repair. Reasoning position stays separate from model calls.
 The repair-transform rejection case extends PR 343; the real configured local

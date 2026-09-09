@@ -31,7 +31,7 @@ defmodule Jido.AI.AoTAgentTest do
 
   describe "strategy configuration" do
     test "selects AlgorithmOfThoughts in the native profile" do
-      assert {:ok, profile} = Configuration.profile(TestAoTAgent.agent())
+      assert {:ok, profile} = Configuration.profile(TestAoTAgent.definition())
       assert profile.reasoning.method == :algorithm_of_thoughts
     end
 

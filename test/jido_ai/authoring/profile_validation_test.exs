@@ -21,6 +21,17 @@ defmodule Jido.AI.Authoring.ProfileValidationTest do
     def route(_request, _context), do: {:ok, :answer}
   end
 
+  defmodule SelectRouter do
+    def select(_request, _context), do: {:ok, :answer}
+  end
+
+  defmodule Interceptor do
+    def before_tool_call(tool, context), do: {:ok, tool, context}
+  end
+
+  defmodule NoCallbacks do
+  end
+
   defp attrs(overrides \\ %{}) do
     Map.merge(%{id: :support, model: :capable, result: %{into: :answer}}, overrides)
   end
@@ -186,6 +197,46 @@ defmodule Jido.AI.Authoring.ProfileValidationTest do
     end
   end
 
+  test "constructor rejects invalid effect policy fields and values" do
+    invalid = [
+      attrs(%{effect_policy: %{mode: :deny_al}}),
+      attrs(%{effect_policy: %{unknown: true}}),
+      attrs(%{effect_policy: %{allow: ["Elixir.Jido.AI.UnknownEffect"]}}),
+      attrs(%{effect_policy: %{constraints: %{unknown: %{}}}}),
+      attrs(%{effect_policy: %{constraints: %{schedule: %{max_delay_ms: -1}}}}),
+      attrs(%{effect_policy: %{constraints: %{emit: %{unknown: []}}}}),
+      attrs(%{effect_policy: %{constraints: %{emit: %{allowed_signal_types: [" "]}}}}),
+      attrs(%{effect_policy: %{constraints: %{emit: %{allowed_dispatches: [true]}}}})
+    ]
+
+    for input <- invalid do
+      assert {:error, %Jido.AI.Error.Validation.Invalid{}} = Profile.new(input)
+    end
+  end
+
+  test "constructor keeps valid effect policy settings" do
+    assert {:ok, profile} =
+             Profile.new(
+               attrs(%{
+                 effect_policy: %{
+                   mode: "allow_list",
+                   allow: [Jido.AI.Effects.State, Jido.Agent.StateOp.SetState],
+                   constraints: %{
+                     emit: %{allowed_signal_prefixes: ["ai."]},
+                     schedule: %{}
+                   }
+                 }
+               })
+             )
+
+    assert profile.effect_policy.mode == :allow_list
+
+    assert profile.effect_policy.allow ==
+             Enum.sort([Jido.AI.Effects.State, Jido.Agent.StateOp.SetState])
+
+    assert profile.effect_policy.constraints.schedule == %{}
+  end
+
   test "constructor enforces reasoning feature combinations" do
     assert {:error, _} = Profile.new(attrs(%{reasoning: :chain_of_thought, tools: [Action]}))
 
@@ -240,5 +291,167 @@ defmodule Jido.AI.Authoring.ProfileValidationTest do
     assert {:error, _} =
              put_in(input, ["tools"], [%{"kind" => "action", "ref" => "missing"}])
              |> Profile.new(registries: registries)
+  end
+
+  test "keyword profiles, sources, fields, and portable data use their public edge contracts" do
+    assert {:ok, profile} =
+             Profile.new(id: :support, model: :capable, result: [into: :answer])
+
+    assert profile.id == :support
+    assert {:error, _} = Profile.new(id: :support, id: :duplicate)
+
+    assert {:ok, {sourced, [:primary]}} =
+             Profile.source(%{
+               id: :support,
+               models: %{default: :capable},
+               result: %{into: :answer},
+               routes: [:primary]
+             })
+
+    assert sourced.id == :support
+    assert {:ok, {^profile, []}} = Profile.source(profile)
+    assert {:error, _} = Profile.source(%{id: :support, result: %{into: :answer}, unknown: true})
+
+    assert {:ok, %{id: :support}} = Profile.fields(%{"id" => :support}, [:id], "profile")
+    assert {:error, _} = Profile.fields(%{:id => :support, "id" => :other}, [:id], "profile")
+    assert {:error, _} = Profile.fields(:invalid, [:id], "profile")
+
+    assert Profile.portable_data(%{mode: :react, nested: [:cot, %{flag: true}]}) == %{
+             "mode" => "react",
+             "nested" => ["cot", %{"flag" => true}]
+           }
+  end
+
+  test "constructor rejects additional malformed container and identifier forms" do
+    invalid = [
+      attrs(%{id: nil}),
+      attrs(%{id: "not_a_registered_atom"}),
+      attrs(%{models: :invalid}),
+      attrs(%{tools: :invalid}),
+      attrs(%{tool_sources: :invalid}),
+      attrs(%{reasoning: [:not_keyword]}),
+      attrs(%{reasoning: %{method: 1}}),
+      attrs(%{reasoning: %{method: "not_supported"}}),
+      attrs(%{reasoning: %{tool_concurrency: 0}}),
+      attrs(%{reasoning: %{unknown: true}}),
+      attrs(%{models: %{first: :fast, second: :capable}, reasoning: %{method: :react}}),
+      attrs(%{models: %{first: :fast}, reasoning: %{method: :react, model: "missing"}}),
+      attrs(%{requests: :invalid}),
+      attrs(%{requests: %{mode: :invalid}}),
+      attrs(%{requests: %{on_busy: :queue}}),
+      attrs(%{requests: %{streaming: :yes}}),
+      attrs(%{memory: :invalid}),
+      attrs(%{observability: :invalid}),
+      attrs(%{observability: %{emit_signals: :yes}}),
+      attrs(%{tool_interceptor: "bad"}),
+      attrs(%{tool_interceptor: NoCallbacks}),
+      attrs(%{result: %{into: :answer, repair_action: "bad"}})
+    ]
+
+    for input <- invalid do
+      assert {:error, %Jido.AI.Error.Validation.Invalid{}} = Profile.new(input)
+    end
+  end
+
+  test "model options validate generation, provider, metadata, and router variants" do
+    invalid = [
+      attrs(%{models: %{answer: %{model: :capable, generation: %{temperature: 0.2}}}}),
+      attrs(%{models: %{answer: %{model: :capable, max_tokens: 0}}}),
+      attrs(%{models: %{answer: %{model: :capable, timeout: 0}}}),
+      attrs(%{models: %{answer: %{model: :capable, metadata: URI.parse("https://example.com")}}}),
+      attrs(%{models: %{answer: %{model: :capable, provider_options: %{"not_registered" => 1}}}}),
+      attrs(%{models: %{entries: %{answer: :capable}, router: %{module: NoCallbacks}}}),
+      attrs(%{models: %{entries: %{answer: :capable}, router: %{module: Router, fallback: :missing}}}),
+      attrs(%{model_router: :invalid})
+    ]
+
+    for input <- invalid do
+      assert {:error, %Jido.AI.Error.Validation.Invalid{}} = Profile.new(input)
+    end
+
+    assert {:ok, profile} =
+             Profile.new(
+               attrs(%{
+                 models: %{
+                   entries: %{
+                     answer: %{
+                       model: :capable,
+                       generation: [top_p: 0.8],
+                       provider_options: [seed: 7],
+                       metadata: %{tier: :primary}
+                     }
+                   },
+                   router: %{module: SelectRouter, fallback: :answer}
+                 },
+                 reasoning: %{model: :answer}
+               })
+             )
+
+    assert profile.model_router == %{module: SelectRouter, fallback: :answer}
+    assert profile.models.answer.generation == [top_p: 0.8, seed: 7]
+    assert profile.models.answer.metadata == %{"tier" => "primary"}
+  end
+
+  test "output, observability, control, and effect-policy edge forms normalize" do
+    schema = Zoi.object(%{answer: Zoi.string()})
+    assert {:ok, nil} = Profile.output_contract(%{schema: nil})
+    assert {:ok, nil} = Profile.output_contract(%{into: :answer})
+    assert {:ok, contract} = Profile.output_contract(%{schema: schema, max_repairs: 1})
+    assert contract.retries == 1
+
+    assert {:ok, profile} =
+             Profile.new(
+               attrs(%{
+                 tool_interceptor: Interceptor,
+                 controls: [input: [[module: Control, when: [kind: :request]]]],
+                 observability: %{
+                   emit_telemetry: true,
+                   emit_llm_deltas: false,
+                   emit_signals: true,
+                   redact_tool_args: false
+                 },
+                 effect_policy: %{
+                   mode: :allow_list,
+                   allow: MapSet.new([Jido.AI.Effects.State]),
+                   deny: [],
+                   constraints: %{
+                     emit: %{allowed_dispatches: [:pid, "logger"]},
+                     schedule: %{max_delay_ms: 0}
+                   }
+                 }
+               })
+             )
+
+    assert profile.controls.input == [%{module: Control, when: %{"kind" => "request"}}]
+    assert profile.observability.emit_telemetry?
+    assert profile.observability.emit_signals?
+    assert profile.effect_policy.allow == [Jido.AI.Effects.State]
+
+    for effect_policy <- [
+          :invalid,
+          %{allow: :invalid},
+          %{allow: [:not_a_module]},
+          %{allow: [123]},
+          %{constraints: :invalid},
+          %{constraints: %{emit: :invalid}},
+          %{constraints: %{schedule: :invalid}},
+          %{constraints: %{emit: %{allowed_signal_types: :invalid}}},
+          %{constraints: %{emit: %{allowed_dispatches: :invalid}}}
+        ] do
+      assert {:error, %Jido.AI.Error.Validation.Invalid{}} =
+               Profile.new(attrs(%{effect_policy: effect_policy}))
+    end
+  end
+
+  test "method-specific output and adaptive control limits report unsupported combinations" do
+    schema = Zoi.object(%{answer: Zoi.string()})
+
+    for method <- [:graph_of_thoughts, :trm] do
+      assert {:error, %Jido.AI.Error.Validation.Invalid{}} =
+               Profile.new(attrs(%{reasoning: method, result: %{into: :answer, schema: schema}}))
+    end
+
+    assert {:ok, adaptive} = Profile.new(attrs(%{reasoning: :adaptive}))
+    assert {:error, %Jido.AI.Error.Validation.Invalid{}} = Profile.resolve_controls(adaptive)
   end
 end

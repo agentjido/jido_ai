@@ -12,7 +12,10 @@ defmodule Jido.AI.Plugins.Retrieval do
   reads for Chat, reasoning and native AI requests. Pure preparation only binds
   capability input; direct Agent commands do not implicitly read memory.
   """
-  use Jido.Plugin
+  use Jido.Plugin,
+    agent: Jido.AI.Plugins.Retrieval.Agent,
+    agent_server: Jido.AI.Plugins.Retrieval.AgentServer
+
   alias Jido.AI.Retrieval.Store
   alias Jido.AI.Actions.Retrieval.{UpsertMemory, RecallMemory, ClearMemory}
   @defaults %{enabled: true, namespace: nil, top_k: 3, max_snippet_chars: 280}
@@ -39,8 +42,8 @@ defmodule Jido.AI.Plugins.Retrieval do
 
   def schema, do: state_schema(@defaults)
 
-  @impl Jido.Plugin
-  def state_spec(opts) do
+  @doc false
+  def agent_state_spec(opts) do
     Jido.AI.PluginConfig.validate!(opts, Map.keys(@defaults) ++ [:into, :store], "Retrieval")
     into = Keyword.get(opts, :into, :result)
     store = Keyword.get(opts, :store, Store)
@@ -67,13 +70,13 @@ defmodule Jido.AI.Plugins.Retrieval do
     |> Zoi.default(defaults)
   end
 
-  @impl Jido.Plugin
-  def prepare(command, opts) do
-    state = effective_state(command)
-    context = Map.put(command.context, :retrieval_store, Keyword.get(opts, :store, Store))
+  @doc false
+  def prepare_agent(preparation, opts) do
+    state = effective_preparation_state(preparation)
+    context = Map.put(preparation.context, :retrieval_store, Keyword.get(opts, :store, Store))
 
     binding =
-      if action = @routes[command.signal.type] do
+      if action = @routes[preparation.effective_signal.type] do
         %{
           action: action,
           key: :retrieval,
@@ -82,12 +85,16 @@ defmodule Jido.AI.Plugins.Retrieval do
         }
       end
 
-    Jido.AI.Capability.bind(%{command | context: context}, :jido_ai_retrieval_capability, binding)
+    Jido.AI.Capability.bind(
+      %{preparation | context: context},
+      :jido_ai_retrieval_capability,
+      binding
+    )
   end
 
-  @impl Jido.Plugin
-  def admit(_, command, opts) do
-    state = effective_state(command)
+  @doc false
+  def admit_command(command, opts) do
+    state = effective_command_state(command)
     signal = command.signal
     binding = Jido.AI.Authoring.request_binding(command.agent, signal)
     data = if binding, do: binding.input, else: signal.data
@@ -106,14 +113,29 @@ defmodule Jido.AI.Plugins.Retrieval do
     end
   end
 
-  defp effective_state(command) do
+  defp effective_preparation_state(preparation) do
+    state = preparation.plugin_state
+    %{state | namespace: state.namespace || preparation.agent_id || "default"}
+  end
+
+  defp effective_command_state(command) do
     state = command.agent.state.retrieval
     %{state | namespace: state.namespace || command.agent.id || "default"}
   end
 
-  defp enrich(command, query, key, state, opts) when is_binary(query) and query != "" do
+  defp enrich(command, query, key, state, opts) do
+    query_text = retrieval_query_text(query)
+
+    if query_text == "" do
+      {:ok, command}
+    else
+      enrich_with_query_text(command, query, query_text, key, state, opts)
+    end
+  end
+
+  defp enrich_with_query_text(command, query, query_text, key, state, opts) do
     snippets =
-      Store.recall(state.namespace, query,
+      Store.recall(state.namespace, query_text,
         top_k: max(state.top_k, 1),
         store: Keyword.get(opts, :store, Store)
       )
@@ -123,7 +145,7 @@ defmodule Jido.AI.Plugins.Retrieval do
     else
       data =
         command.signal.data
-        |> Map.put(key, build_enriched_prompt(query, snippets, state.max_snippet_chars))
+        |> Map.put(key, build_enriched_query(query, snippets, state.max_snippet_chars))
         |> Map.put(:retrieval, %{
           namespace: state.namespace,
           snippets: Enum.map(snippets, &Map.take(&1, [:id, :score, :metadata]))
@@ -133,20 +155,32 @@ defmodule Jido.AI.Plugins.Retrieval do
     end
   end
 
-  defp enrich(command, _, _, _, _), do: {:ok, command}
+  defp retrieval_query_text(query) when is_binary(query), do: String.trim(query)
+
+  defp retrieval_query_text(query) when is_list(query) do
+    query
+    |> Enum.flat_map(fn
+      %ReqLLM.Message.ContentPart{type: :text, text: text} when is_binary(text) -> [text]
+      %{type: :text, text: text} when is_binary(text) -> [text]
+      %{"type" => "text", "text" => text} when is_binary(text) -> [text]
+      _ -> []
+    end)
+    |> Enum.join("\n")
+    |> String.trim()
+  end
+
+  defp retrieval_query_text(_query), do: ""
+
+  defp build_enriched_query(query, snippets, max_snippet_chars) when is_binary(query),
+    do: build_enriched_prompt(query, snippets, max_snippet_chars)
+
+  defp build_enriched_query(query, snippets, max_snippet_chars) when is_list(query) do
+    memory = build_memory_block(snippets, max_snippet_chars)
+    [ReqLLM.Message.ContentPart.text("Relevant memory:\n#{memory}\n\nUser prompt:") | query]
+  end
 
   defp build_enriched_prompt(query, snippets, max_snippet_chars) do
-    memory_block =
-      snippets
-      |> Enum.map_join("\n", fn snippet ->
-        text =
-          snippet
-          |> Map.get(:text, "")
-          |> to_string()
-          |> String.slice(0, max_snippet_chars)
-
-        "- #{text}"
-      end)
+    memory_block = build_memory_block(snippets, max_snippet_chars)
 
     """
     Relevant memory:
@@ -158,6 +192,42 @@ defmodule Jido.AI.Plugins.Retrieval do
     |> String.trim()
   end
 
+  defp build_memory_block(snippets, max_snippet_chars) do
+    Enum.map_join(snippets, "\n", fn snippet ->
+      text =
+        snippet
+        |> Map.get(:text, "")
+        |> to_string()
+        |> String.slice(0, max_snippet_chars)
+
+      "- #{text}"
+    end)
+  end
+
   defp extract_query(data),
     do: Enum.find([data[:prompt], data["prompt"], data[:query], data["query"]], &(not is_nil(&1)))
+end
+
+defmodule Jido.AI.Plugins.Retrieval.Agent do
+  @moduledoc false
+  use Jido.Agent.Plugin
+
+  @impl Jido.Agent.Plugin
+  def state_spec(opts), do: Jido.AI.Plugins.Retrieval.agent_state_spec(opts)
+
+  @impl Jido.Agent.Plugin
+  def observes(opts), do: [Keyword.get(opts, :into, :result)]
+
+  @impl Jido.Agent.Plugin
+  def prepare(preparation, opts),
+    do: Jido.AI.Plugins.Retrieval.prepare_agent(preparation, opts)
+end
+
+defmodule Jido.AI.Plugins.Retrieval.AgentServer do
+  @moduledoc false
+  use Jido.AgentServer.Plugin
+
+  @impl Jido.AgentServer.Plugin
+  def admit(_runtime, command, opts),
+    do: Jido.AI.Plugins.Retrieval.admit_command(command, opts)
 end

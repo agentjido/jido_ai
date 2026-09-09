@@ -10,6 +10,16 @@ defmodule Jido.AI.Session do
   @publish "jido.ai.session.publish"
   @ignore "jido.ai.session.ignore"
   @progress "jido.ai.session.progress"
+  @observations [
+    "ai.request.started",
+    "ai.request.completed",
+    "ai.request.failed",
+    "ai.llm.delta",
+    "ai.llm.response",
+    "ai.usage",
+    "ai.tool.started",
+    "ai.tool.result"
+  ]
 
   @doc """
   Reads a committed Agent revision and the selected request's inspection data.
@@ -76,6 +86,8 @@ defmodule Jido.AI.Session do
   def publish_type, do: @publish
   @doc false
   def ignore_type, do: @ignore
+  @doc false
+  def observation_type?(type), do: type in @observations
 
   @doc "Reads transient Signal delivery status. A committed answer does not prove delivery."
   def delivery_status(server, request_id) do
@@ -116,7 +128,12 @@ defmodule Jido.AI.Session do
          {:ok, publish} <- Jido.Agent.Authoring.route(@publish, Jido.AI.Session.Publish, []),
          {:ok, ignore} <- Jido.Agent.Authoring.route(@ignore, Jido.AI.Session.IgnoreSignal, []),
          {:ok, progress} <- Jido.Agent.Authoring.route(@progress, Jido.AI.Session.Progress, []),
-         do: {:ok, [settle, cancel, control, history, publish, ignore, progress]}
+         {:ok, observations} <-
+           Jido.AI.Profile.traverse(
+             @observations,
+             &Jido.Agent.Authoring.route(&1, Jido.AI.Session.IgnoreSignal, [])
+           ),
+         do: {:ok, [settle, cancel, control, history, publish, ignore, progress] ++ observations}
   end
 
   @doc false
@@ -154,7 +171,7 @@ defmodule Jido.AI.Session do
     # A fresh core Turn owns these fields. Keep caller policy/context, but do
     # not carry the old Turn's state snapshot or private AI runtime bindings.
     context
-    |> Map.drop([:agent_id, :agent_state, :signal, :state])
+    |> Map.drop([:agent_id, :agent_state, :plugin_inputs, :signal, :state])
     |> Map.reject(fn {key, _} ->
       is_atom(key) and String.starts_with?(Atom.to_string(key), "jido_ai_")
     end)
@@ -308,7 +325,13 @@ defmodule Jido.AI.Session do
   defp admission_error(%Jido.Action.Error.ExecutionFailureError{details: %{reason: :busy}}),
     do: :busy
 
-  defp admission_error(reason), do: reason
+  defp admission_error(reason) do
+    if Jido.AI.Authoring.state_size_error?(reason) do
+      Jido.Error.validation_error("Agent state exceeds max_state_size", kind: :state_size)
+    else
+      reason
+    end
+  end
 
   defp duplicate?(:duplicate_request), do: true
 
@@ -332,6 +355,9 @@ defmodule Jido.AI.Session do
       {:ok, _} -> :ok
       {:error, _} = error -> error
     end
+  catch
+    :exit, {:timeout, _} -> {:error, :timeout}
+    :exit, _ -> {:error, :agent_server_unavailable}
   end
 
   @doc false

@@ -180,6 +180,32 @@ defmodule Jido.AI.Skill.ActivationTest do
 
       refute Activation.activated?("strict-skill")
     end
+
+    test "rejects a discovered skill file replaced by a symlink before activation", %{
+      tmp_dir: tmp_dir
+    } do
+      trusted_root = Path.join(tmp_dir, "trusted")
+      outside_root = Path.join(tmp_dir, "outside")
+      skill_path = write_skill(trusted_root, "swapped-skill", "Trusted body.")
+      outside_path = write_skill(outside_root, "swapped-skill", "Outside body.")
+
+      assert {:ok, [metadata]} = Discovery.discover_from([trusted_root], trust: true)
+      assert {:ok, catalog_spec} = Discovery.to_catalog_spec(metadata)
+
+      File.rm!(skill_path)
+      File.ln_s!(outside_path, skill_path)
+
+      assert {:error, :unsafe_skill_file} = Activation.activate(catalog_spec)
+      refute Activation.activated?("swapped-skill")
+    end
+  end
+
+  test "rejects oversized inline skill bodies" do
+    body = String.duplicate("x", Spec.max_body_bytes() + 1)
+    spec = %Spec{name: "large-body", description: "Large.", body_ref: {:inline, body}}
+
+    assert {:error, {:skill_body_too_large, limit}} = Activation.activate(spec)
+    assert limit == Spec.max_body_bytes()
   end
 
   describe "activate/1 with module" do

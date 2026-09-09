@@ -143,9 +143,7 @@ defmodule Jido.AI.Actions.Reasoning.Analyze do
 
   # Private Functions
 
-  defp resolve_model(nil), do: {:ok, Jido.AI.resolve_model(:reasoning)}
-  defp resolve_model(model) when is_atom(model), do: {:ok, Jido.AI.resolve_model(model)}
-  defp resolve_model(model) when is_binary(model), do: {:ok, model}
+  defp resolve_model(model), do: Helpers.resolve_model(model, :reasoning)
 
   defp build_analysis_messages(params) do
     system_prompt = build_analysis_system_prompt(params[:analysis_type], params[:custom_prompt])

@@ -210,7 +210,7 @@ Tests: [usage](../../../test/jido_ai/usage_test.exs),
 
 ## Native TRM usage evidence: 2026-09-07
 
-The [09_08 example](../../../examples/v3/profiles/09_08_trm.md) adds TRM to
+The [09_08 example](../../../examples/09_reasoning/09_08_trm/README.md) adds TRM to
 the common usage path. Its retained Machine no longer adds arbitrary map
 values; it uses the shared nested merge and derives a missing total when both
 canonical counters are present. A full five-cycle Agent run makes 15 real model
@@ -220,12 +220,12 @@ require the broader history cases.
 
 ## Chat port evidence: 2026-09-07
 
-[Example 16_02](../../../examples/v3/profiles/16_02_chat.md) supplies the
+[Example 16_02](../../../examples/16_capabilities/16_02_chat/README.md) supplies the
 new execution evidence. The callable tool Flow now accumulates decoded nested usage over two real tool rounds. It retains prior usage after a later provider failure. Actual follow-up requests retain reasoning details and Responses identity. This does not close all native session or interrupted-provider accounting cases.
 
 ## Quota accounting evidence: 2026-09-07
 
-[13_01](../../../examples/v3/profiles/13_01_quota.md) now tests per-call budget
+[13_01](../../../examples/13_policy/13_01_quota/README.md) now tests per-call budget
 records through real model transport, independent of the Agent commit. It
 covers duplicate reports, separate repair/nested calls, cumulative stream
 snapshots and partial failure usage. The ledger preserves the distinction
@@ -235,7 +235,7 @@ they do not close all telemetry, provider or durable recovery requirements.
 
 ## Tool-start redaction execution evidence: 2026-09-07
 
-[14_06](../../../examples/v3/profiles/14_06_trace_and_cycles.md) applies the
+[14_06](../../../examples/14_resume/14_06_trace_and_cycles/README.md) applies the
 existing sensitive-key sanitizer to real tool-start events. Nested secret
 values become explicit redaction markers while the real tool gets complete
 inputs. Flat standalone options and native DSL observation settings use the

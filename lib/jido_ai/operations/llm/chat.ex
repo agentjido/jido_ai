@@ -49,9 +49,13 @@ defmodule Jido.AI.Actions.LLM.Chat do
         system_prompt:
           Zoi.string(description: "Optional system prompt to guide the LLM's behavior")
           |> Zoi.optional(),
-        max_tokens: Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(1024),
-        temperature: Zoi.float(description: "Sampling temperature (0.0-2.0)") |> Zoi.default(0.7),
-        timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
+        max_tokens: Zoi.integer(description: "Maximum tokens to generate") |> Zoi.min(1) |> Zoi.default(1024),
+        temperature:
+          Zoi.float(description: "Sampling temperature (0.0-2.0)")
+          |> Zoi.min(0)
+          |> Zoi.max(2)
+          |> Zoi.default(0.7),
+        timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.min(1) |> Zoi.optional()
       })
 
   def category, do: "ai"

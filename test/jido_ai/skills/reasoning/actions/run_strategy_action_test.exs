@@ -49,14 +49,12 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyTest do
   describe "run/2" do
     test "executes Chain-of-Draft strategy" do
       params = %{strategy: :cod, prompt: "Answer tersely with drafts", timeout: 750}
-      payload = assert_strategy_response(RunStrategy.run(params, %{}), :cod)
-      assert not is_nil(payload.output)
+      assert_strategy_response(RunStrategy.run(params, %{}), :cod)
     end
 
     test "executes Chain-of-Thought strategy" do
       params = %{strategy: :cot, prompt: "Explain 2+2", timeout: 750}
-      payload = assert_strategy_response(RunStrategy.run(params, %{}), :cot)
-      assert not is_nil(payload.output)
+      assert_strategy_response(RunStrategy.run(params, %{}), :cot)
     end
 
     test "executes Tree-of-Thoughts strategy" do

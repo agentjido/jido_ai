@@ -298,6 +298,18 @@ defmodule Jido.AI.ToolAdapterTest do
       assert ToolAdapter.to_action_map(tools) == tools
     end
 
+    test "preserves atom-key aliases as strings" do
+      assert ToolAdapter.to_action_map(%{custom_alias: ParamAction}) == %{
+               "custom_alias" => ParamAction
+             }
+    end
+
+    test "rejects aliases that collide after key normalization" do
+      assert_raise ArgumentError, ~r/Duplicate tool aliases/, fn ->
+        ToolAdapter.to_action_map(%{:custom_alias => ParamAction, "custom_alias" => EmptySchemaAction})
+      end
+    end
+
     test "ignores invalid non-module atoms in module lists" do
       assert ToolAdapter.to_action_map([ParamAction, :not_a_module]) == %{
                ParamAction.name() => ParamAction

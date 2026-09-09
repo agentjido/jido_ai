@@ -50,6 +50,11 @@ defmodule Jido.AI.Actions.Reasoning.ExplainTest do
   end
 
   describe "validation and security" do
+    test "returns an error for an unsupported model value" do
+      assert {:error, :invalid_model_format} =
+               Explain.run(%{model: [:invalid], topic: "Recursion"}, %{})
+    end
+
     test "returns error when topic is missing" do
       assert {:error, :topic_required} = Explain.run(%{}, %{})
     end

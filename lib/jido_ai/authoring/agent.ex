@@ -182,7 +182,7 @@ defmodule Jido.AI.Agent do
 
   defmacro __using__(opts) do
     if canonical_use?(opts) do
-      canonical_using(opts)
+      canonical_using(opts, __CALLER__)
     else
       prompt = Keyword.get(opts, :system_prompt)
       prompt_line = system_prompt_line(prompt, __CALLER__.line)
@@ -329,9 +329,48 @@ defmodule Jido.AI.Agent do
       Keyword.keys(opts) -- [:name, :description, :metadata, :max_state_size, :extensions] == []
   end
 
-  defp canonical_using(opts) do
-    extensions = Keyword.get(opts, :extensions, [])
-    opts = Keyword.put(opts, :extensions, Enum.uniq([Jido.AI.DSL | extensions]))
+  defp canonical_using(opts, caller_env) do
+    {max_state_size, opts} = Keyword.pop(opts, :max_state_size)
+    metadata = Keyword.get(opts, :metadata, {:%{}, [], []})
+
+    metadata =
+      if is_nil(max_state_size) do
+        metadata
+      else
+        quote do
+          Map.put(
+            unquote(metadata),
+            Jido.AI.Authoring.state_size_key(),
+            unquote(max_state_size)
+          )
+        end
+      end
+
+    extensions_ast = Keyword.get(opts, :extensions, [])
+
+    extensions =
+      case extensions_ast do
+        {:@, _, _} ->
+          raise CompileError,
+            file: caller_env.file,
+            line: caller_env.line,
+            description: "extensions must be an inline compile-time list of modules"
+
+        value ->
+          value |> Code.eval_quoted([], caller_env) |> elem(0)
+      end
+
+    unless is_list(extensions) and Enum.all?(extensions, &is_atom/1) do
+      raise CompileError,
+        file: caller_env.file,
+        line: caller_env.line,
+        description: "extensions must be a compile-time list of modules"
+    end
+
+    opts =
+      opts
+      |> Keyword.put(:metadata, metadata)
+      |> Keyword.put(:extensions, Enum.uniq([Jido.AI.DSL | extensions]))
 
     quote location: :keep do
       use Jido.Agent, unquote(opts)
@@ -364,7 +403,7 @@ defmodule Jido.AI.Agent do
   end
 
   @doc "Returns all declared AI profiles from an Agent module or definition."
-  def profiles(module) when is_atom(module), do: profiles(module.agent())
+  def profiles(module) when is_atom(module), do: profiles(module.definition())
 
   def profiles(%Jido.Agent{} = agent) do
     case Jido.AI.Configuration.options(agent) do
@@ -513,7 +552,12 @@ defmodule Jido.AI.Agent do
       @spec restore(map(), map()) :: {:ok, Jido.Agent.t()} | {:error, term()}
       def restore(data, ctx) when is_map(data) and is_map(ctx) do
         agent = new(id: data[:id])
-        base_state = Jido.AI.Checkpoint.rehydrate_state(data[:state] || %{})
+
+        base_state =
+          (data[:state] || %{})
+          |> Jido.AI.Checkpoint.rehydrate_state()
+          |> Jido.AI.Context.Operations.migrate_state(agent.id)
+
         agent = %{agent | state: Map.merge(agent.state, base_state)}
         externalized_keys = data[:externalized_keys] || %{}
 

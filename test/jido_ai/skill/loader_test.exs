@@ -199,6 +199,25 @@ defmodule Jido.AI.Skill.LoaderTest do
 
       assert {:ok, %Spec{source: {:file, "custom/path.md"}}} = Loader.parse(content, "custom/path.md")
     end
+
+    test "rejects oversized inline content before parsing" do
+      content = String.duplicate("x", Spec.max_body_bytes() + 1)
+
+      assert {:error, {:skill_file_too_large, size, limit}} = Loader.parse(content)
+      assert size == Spec.max_body_bytes() + 1
+      assert limit == Spec.max_body_bytes()
+    end
+
+    test "lenient parsing returns diagnostics for missing and invalid frontmatter" do
+      assert {:ok, %Spec{} = missing} =
+               Loader.parse("Body without frontmatter", "inline", lenient: true)
+
+      assert Enum.any?(missing.diagnostics.errors, &match?(%Error.Parse.NoFrontmatter{}, &1))
+
+      invalid = "---\nname: [invalid\n---\nBody"
+      assert {:ok, %Spec{} = parsed} = Loader.parse(invalid, "inline", lenient: true)
+      assert Enum.any?(parsed.diagnostics.errors, &match?(%Error.Parse.InvalidYaml{}, &1))
+    end
   end
 
   describe "name validation" do
@@ -358,6 +377,96 @@ defmodule Jido.AI.Skill.LoaderTest do
                Loader.parse("---\nname: strict-tools\ndescription: Valid\nallowed-tools: [read, write]\n---\n")
     end
 
+    test "lenient mode truncates long names and descriptions" do
+      long_name = String.duplicate("a", 70)
+      long_description = String.duplicate("d", 1_030)
+
+      content =
+        "---\nname: #{long_name}\ndescription: #{long_description}\n---\nBody"
+
+      assert {:ok, %Spec{} = spec} = Loader.parse(content, "inline", lenient: true)
+      assert String.length(spec.name) == 64
+      assert String.length(spec.description) == 1_024
+      assert Enum.any?(spec.diagnostics.warnings, &(&1.type == :name_too_long))
+      assert Enum.any?(spec.diagnostics.warnings, &(&1.type == :description_too_long))
+    end
+
+    test "lenient mode handles invalid description, compatibility, and allowed-tools types" do
+      content = """
+      ---
+      name: unusual-fields
+      description: 123
+      compatibility: [jido, v3]
+      allowed-tools: 42
+      ---
+      Body
+      """
+
+      assert {:ok, %Spec{} = spec} = Loader.parse(content, "inline", lenient: true)
+      assert spec.description == "No description provided"
+      assert spec.compatibility == nil
+      assert spec.allowed_tools == []
+      assert Enum.any?(spec.diagnostics.warnings, &(&1.type == :invalid_description_type))
+      assert Enum.any?(spec.diagnostics.warnings, &(&1.type == :invalid_compatibility))
+      assert Enum.any?(spec.diagnostics.warnings, &(&1.type == :invalid_allowed_tools_type))
+
+      assert {:error, %Error.Validation.MissingField{field: :description}} =
+               Loader.parse(String.replace(content, "lenient", "strict"))
+    end
+
+    test "empty and long compatibility values follow strict and lenient rules" do
+      empty = "---\nname: empty-compat\ndescription: Valid\ncompatibility: \"\"\n---\n"
+      assert {:error, %Error.Validation.InvalidField{field: :compatibility, reason: :empty}} = Loader.parse(empty)
+
+      assert {:ok, %Spec{compatibility: nil, diagnostics: empty_diagnostics}} =
+               Loader.parse(empty, "inline", lenient: true)
+
+      assert Enum.any?(empty_diagnostics.warnings, &(&1.type == :invalid_compatibility))
+
+      long = String.duplicate("c", 501)
+      content = "---\nname: long-compat\ndescription: Valid\ncompatibility: #{long}\n---\n"
+
+      assert {:ok, %Spec{compatibility: compatibility, diagnostics: diagnostics}} =
+               Loader.parse(content, "inline", lenient: true)
+
+      assert String.length(compatibility) == 500
+      assert Enum.any?(diagnostics.warnings, &(&1.type == :compatibility_too_long))
+    end
+
+    test "strict mode rejects scalar metadata and lenient mode normalizes unusual metadata values" do
+      strict = "---\nname: scalar-metadata\ndescription: Valid\nmetadata: invalid\n---\n"
+
+      assert {:error, %Error.Validation.InvalidField{field: :metadata, reason: :invalid_type}} =
+               Loader.parse(strict)
+
+      lenient = """
+      ---
+      name: normalized-metadata
+      description: Valid
+      metadata:
+        number: 7
+        list: [one, two]
+      ---
+      """
+
+      assert {:ok, %Spec{metadata: metadata}} = Loader.parse(lenient, "inline", lenient: true)
+      assert metadata["number"] == "7"
+      assert metadata["list"] == ~s(["one", "two"])
+    end
+
+    test "lenient legacy tags and version accept list, scalar, and non-string forms" do
+      cases = [
+        {"tags: one\nversion: 2", ["one"], nil},
+        {"tags: [one, 2]\nversion: v2", ["one", "2"], "v2"},
+        {"tags: 3\nversion: false", ["3"], nil}
+      ]
+
+      for {legacy, tags, version} <- cases do
+        content = "---\nname: legacy-fields\ndescription: Valid\n#{legacy}\n---\n"
+        assert {:ok, %Spec{tags: ^tags, vsn: ^version}} = Loader.parse(content, "inline", lenient: true)
+      end
+    end
+
     @tag :tmp_dir
     test "strict mode requires the name to match the parent directory", %{tmp_dir: tmp_dir} do
       skill_dir = Path.join(tmp_dir, "actual-name")
@@ -440,6 +549,40 @@ defmodule Jido.AI.Skill.LoaderTest do
 
       assert String.starts_with?(name, "unnamed-skill-")
       assert Enum.any?(diagnostics.warnings, &(&1.type == :invalid_name_format))
+    end
+  end
+
+  describe "skill file size limits" do
+    @tag :tmp_dir
+    test "rejects an oversized file before parsing it", %{tmp_dir: tmp_dir} do
+      skill_dir = Path.join(tmp_dir, "large-file")
+      File.mkdir_p!(skill_dir)
+      path = Path.join(skill_dir, "SKILL.md")
+      File.write!(path, String.duplicate("x", Spec.max_body_bytes() + 1))
+
+      assert {:error, {:skill_file_too_large, size, limit}} = Loader.load(path)
+      assert size > limit
+      assert limit == Spec.max_body_bytes()
+    end
+
+    @tag :tmp_dir
+    test "bounded reads accept empty regular files and reject directories", %{tmp_dir: tmp_dir} do
+      empty = Path.join(tmp_dir, "empty")
+      File.write!(empty, "")
+
+      assert {:ok, ""} = Loader.read_file(empty)
+      assert {:error, :unsafe_skill_file} = Loader.read_file(tmp_dir)
+    end
+
+    @tag :tmp_dir
+    test "load reports invalid filenames in strict mode and warnings in lenient mode", %{tmp_dir: tmp_dir} do
+      path = Path.join(tmp_dir, "skill.txt")
+      File.write!(path, "---\nname: #{Path.basename(tmp_dir)}\ndescription: Valid\n---\n")
+
+      assert {:error, %Error.Validation.InvalidField{reason: :invalid_skill_filename}} = Loader.load(path)
+
+      assert {:ok, %Spec{diagnostics: diagnostics}} = Loader.load(path, lenient: true)
+      assert Enum.any?(diagnostics.warnings, &(&1.type == :invalid_skill_filename))
     end
   end
 

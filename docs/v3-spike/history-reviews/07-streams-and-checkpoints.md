@@ -192,7 +192,7 @@ Keep the actual provider and core persistence paths in those cases.
 
 ## Explicit standalone State conversion: 2026-09-07
 
-[14_09](../../../examples/v3/profiles/14_09_state_migration.md) converts portable
+[14_09](../../../examples/14_resume/14_09_state_migration/README.md) converts portable
 standalone State with caller-supplied phase, counts, domain and remaining time.
 It proves real failure after a completed tool can restart without repeating it.
 Unresolved or partial tool work requires reconciliation. Old v2 emits its model
@@ -203,7 +203,7 @@ HIST-12's old Agent namespace, persisted sink or custom persistence requirements
 
 ## Native request inspection evidence: 2026-09-07
 
-[02_22](../../../examples/v3/profiles/02_22_request_inspection.md) adds 14 real
+[02_22](../../../examples/02_requests/02_22_request_inspection/README.md) adds 14 real
 integration cases. The linked history rows gain partial evidence for raw
 failure inspection, per-call thinking, completed tool results, correlated
 trace prefixes and portable recovery. A durable lost completion reply retains
@@ -215,7 +215,7 @@ CLI, context/skill, package and recovery gates stay open.
 
 ## Native context-operation evidence: 2026-09-07
 
-[02_23](../../../examples/v3/profiles/02_23_context_operations.md) adds 28 cases
+[02_23](../../../examples/02_requests/02_23_context_operations/README.md) adds 28 cases
 for real Agent context operations. The linked ledger references cover core
 Thread request refs, pending-operation recovery, durable terminal application
 and accepted-history compaction. The original skill call and result now replace

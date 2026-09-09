@@ -873,6 +873,8 @@ defmodule Jido.AI.Turn do
     get_field(tool_call, :id, "")
   end
 
+  defp extract_tool_call_id(_tool_call), do: ""
+
   defp extract_tool_call_name(%ReqLLM.ToolCall{} = tool_call) do
     ReqLLM.ToolCall.name(tool_call)
   rescue
@@ -882,6 +884,8 @@ defmodule Jido.AI.Turn do
   defp extract_tool_call_name(%{} = tool_call) do
     get_field(tool_call, :name, get_field(get_field(tool_call, :function, %{}), :name, ""))
   end
+
+  defp extract_tool_call_name(_tool_call), do: ""
 
   defp extract_tool_call_arguments(%ReqLLM.ToolCall{} = tool_call) do
     ReqLLM.ToolCall.args_map(tool_call)
@@ -899,6 +903,8 @@ defmodule Jido.AI.Turn do
       get_field(get_field(tool_call, :function, %{}), :arguments, %{})
     )
   end
+
+  defp extract_tool_call_arguments(_tool_call), do: %{}
 
   defp normalize_tool_arguments(arguments) when is_map(arguments), do: arguments
 

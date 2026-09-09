@@ -340,6 +340,39 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.MachineTest do
     end
   end
 
+  describe "aggregation strategies" do
+    test "selects distinct aggregation instructions for synthesis, voting, and weighting" do
+      prompts =
+        for strategy <- [:synthesis, :voting, :weighted], into: %{} do
+          machine =
+            Machine.new(aggregation_strategy: strategy)
+            |> Map.merge(%{
+              status: "connecting",
+              prompt: "Choose an answer",
+              current_call_id: "connect_1",
+              generation_count: 2,
+              nodes: %{
+                "one" => %{id: "one", content: "First", score: 0.7, depth: 1, metadata: %{}},
+                "two" => %{id: "two", content: "Second", score: 0.9, depth: 1, metadata: %{}}
+              }
+            })
+
+          {_machine, [{:aggregate, _call_id, _node_ids, context}]} =
+            Machine.update(machine, {:connections_found, "connect_1", []}, %{
+              min_nodes_for_aggregation: 2
+            })
+
+          assert context.aggregation_strategy == strategy
+          {strategy, context.system_prompt}
+        end
+
+      assert prompts.synthesis =~ "synthesizing"
+      assert prompts.voting =~ "vote"
+      assert prompts.weighted =~ "weighted"
+      assert MapSet.size(MapSet.new(Map.values(prompts))) == 3
+    end
+  end
+
   describe "ID generation" do
     test "generate_node_id/0 creates unique IDs" do
       id1 = Machine.generate_node_id()
@@ -377,6 +410,126 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.MachineTest do
       prompt = Machine.default_aggregation_prompt()
       assert is_binary(prompt)
       assert String.contains?(prompt, "synthesiz")
+    end
+  end
+
+  describe "edge state transitions" do
+    test "rejects starts while each active phase is busy" do
+      for status <- ["generating", "connecting", "aggregating"] do
+        machine = %{Machine.new() | status: status}
+
+        assert {^machine, [{:request_error, "call", :busy, message}]} =
+                 Machine.update(machine, {:start, "ignored", "call"}, %{})
+
+        assert message =~ status
+      end
+    end
+
+    test "accepts content results and ignores malformed results, partials, and messages" do
+      {machine, _} = Machine.update(Machine.new(), {:start, "Problem", "call_1"}, %{})
+
+      {with_content, _} =
+        Machine.update(machine, {:llm_result, "call_1", {:ok, %{content: "content"}}}, %{})
+
+      assert Enum.any?(Machine.get_nodes(with_content), &(&1.content == "content"))
+      assert {^machine, []} = Machine.update(machine, {:llm_result, "call_1", :malformed}, %{})
+      assert {^machine, []} = Machine.update(machine, {:llm_partial, "call_1", "delta", :thinking}, %{})
+      assert {^machine, []} = Machine.update(machine, {:unknown, :message}, %{})
+    end
+
+    test "thought_generated accepts matching calls and ignores stale calls" do
+      {machine, _} = Machine.update(Machine.new(), {:start, "Problem", "call_1"}, %{})
+
+      assert {updated, [_directive]} =
+               Machine.update(machine, {:thought_generated, "call_1", "Direct thought"}, %{})
+
+      assert Enum.any?(Machine.get_nodes(updated), &(&1.content == "Direct thought"))
+      assert {^machine, []} = Machine.update(machine, {:thought_generated, "stale", "ignored"}, %{})
+    end
+
+    test "connections without leaves finish and invalid transitions are ignored" do
+      connecting = %{
+        Machine.new()
+        | status: "connecting",
+          prompt: "fallback",
+          current_call_id: "connect",
+          started_at: System.monotonic_time(:millisecond)
+      }
+
+      assert {completed, [{:completed, "fallback"}]} =
+               Machine.update(connecting, {:connections_found, "connect", []}, %{})
+
+      assert completed.status == "completed"
+
+      idle = %{
+        Machine.new()
+        | current_call_id: "connect",
+          generation_count: 2,
+          nodes: %{
+            "a" => %{id: "a", content: "A", score: nil, depth: 0, metadata: %{}},
+            "b" => %{id: "b", content: "B", score: nil, depth: 0, metadata: %{}},
+            "c" => %{id: "c", content: "C", score: nil, depth: 0, metadata: %{}}
+          }
+      }
+
+      assert {^idle, []} = Machine.update(idle, {:connections_found, "connect", []}, %{})
+      assert {^idle, []} = Machine.update(idle, {:connections_found, "stale", []}, %{})
+    end
+
+    test "aggregation completion adds source edges and rejects completion after terminal state" do
+      aggregating = %{
+        Machine.new()
+        | status: "aggregating",
+          current_call_id: "aggregate",
+          pending_node_ids: ["a", "b"],
+          nodes: %{
+            "a" => %{id: "a", content: "A", score: nil, depth: 0, metadata: %{}},
+            "b" => %{id: "b", content: "B", score: nil, depth: 0, metadata: %{}}
+          },
+          started_at: System.monotonic_time(:millisecond)
+      }
+
+      assert {completed, [{:completed, "Combined"}]} =
+               Machine.update(aggregating, {:aggregation_complete, "aggregate", "Combined"}, %{})
+
+      assert completed.status == "completed"
+      assert Enum.count(completed.edges, &(&1.type == :aggregates)) == 2
+
+      terminal = %{completed | current_call_id: "again"}
+      assert {still_terminal, []} = Machine.update(terminal, {:aggregation_complete, "again", "ignored"}, %{})
+      assert still_terminal.status == "completed"
+      assert {^terminal, []} = Machine.update(terminal, {:aggregation_complete, "stale", "ignored"}, %{})
+    end
+
+    test "max-node completion selects a scored leaf" do
+      machine = %{
+        Machine.new(max_nodes: 3)
+        | status: "generating",
+          prompt: "Problem",
+          current_call_id: "call",
+          current_node_id: "root",
+          root_id: "root",
+          started_at: System.monotonic_time(:millisecond),
+          nodes: %{
+            "root" => %{id: "root", content: "Root", score: nil, depth: 0, metadata: %{}},
+            "best" => %{id: "best", content: "Best", score: 0.9, depth: 1, metadata: %{}}
+          }
+      }
+
+      assert {completed, [{:completed, "Best"}]} =
+               Machine.update(machine, {:thought_generated, "call", "New"}, %{})
+
+      assert completed.termination_reason == :max_nodes
+    end
+
+    test "status and path helpers handle all restored forms" do
+      for status <- ["generating", "connecting", "aggregating", "completed", "error"] do
+        assert Machine.status(%{Machine.new() | status: status}) == String.to_existing_atom(status)
+      end
+
+      assert Machine.status(%{Machine.new() | status: :completed}) == :completed
+      assert Machine.trace_path(build_simple_graph(), "missing") == ["missing"]
+      assert Machine.to_map(%{Machine.new() | status: :idle}).status == :idle
     end
   end
 

@@ -15,11 +15,22 @@ defmodule Jido.AI.Plugins.ModelRoutingTest do
     %Jido.Agent.Command{agent: Jido.Agent.instantiate!(definition), signal: signal, context: %{}}
   end
 
+  defp prepare(command) do
+    with {:ok, command, _specs, _inputs} <-
+           Jido.Plugin.prepare_evaluation(
+             command,
+             command.signal,
+             command.agent.plugins
+           ) do
+      {:ok, command}
+    end
+  end
+
   describe "prepare/2 routing" do
     test "applies the built-in default route from declared state" do
       signal = Signal.new!("chat.simple", %{prompt: "hello"}, source: "/test")
 
-      assert {:ok, %{signal: rewritten}} = ModelRouting.prepare(command(signal), [])
+      assert {:ok, %{signal: rewritten}} = prepare(command(signal))
       assert rewritten.data.model == :fast
     end
 
@@ -29,7 +40,7 @@ defmodule Jido.AI.Plugins.ModelRoutingTest do
       signal =
         Signal.new!("chat.simple", %{prompt: "hello", model: "custom:model"}, source: "/test")
 
-      assert {:ok, %{signal: ^signal}} = ModelRouting.prepare(command(signal, routes), [])
+      assert {:ok, %{signal: ^signal}} = prepare(command(signal, routes))
     end
 
     test "prefers exact route match over wildcard route match" do
@@ -40,7 +51,7 @@ defmodule Jido.AI.Plugins.ModelRoutingTest do
 
       signal = Signal.new!("reasoning.cot.run", %{prompt: "solve"}, source: "/test")
 
-      assert {:ok, %{signal: rewritten}} = ModelRouting.prepare(command(signal, routes), [])
+      assert {:ok, %{signal: rewritten}} = prepare(command(signal, routes))
       assert rewritten.data.model == :capable
     end
 
@@ -48,7 +59,7 @@ defmodule Jido.AI.Plugins.ModelRoutingTest do
       routes = %{"reasoning.*.run" => :reasoning}
       signal = Signal.new!("reasoning.cot.run", %{prompt: "solve"}, source: "/test")
 
-      assert {:ok, %{signal: rewritten}} = ModelRouting.prepare(command(signal, routes), [])
+      assert {:ok, %{signal: rewritten}} = prepare(command(signal, routes))
       assert rewritten.data.model == :reasoning
     end
 
@@ -56,7 +67,7 @@ defmodule Jido.AI.Plugins.ModelRoutingTest do
       routes = %{"reasoning.*.run" => :reasoning}
       signal = Signal.new!("reasoning.cot.worker.run", %{prompt: "solve"}, source: "/test")
 
-      assert {:ok, %{signal: ^signal}} = ModelRouting.prepare(command(signal, routes), [])
+      assert {:ok, %{signal: ^signal}} = prepare(command(signal, routes))
     end
   end
 end

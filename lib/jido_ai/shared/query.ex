@@ -173,8 +173,7 @@ defmodule Jido.AI.Query do
     if function_exported?(ContentPart, :file_id, 3) do
       :ok
     else
-      {:error,
-       {:unsupported_content_part_file_id, "ReqLLM.Message.ContentPart.file_id/3 is required"}}
+      {:error, {:unsupported_content_part_file_id, "ReqLLM.Message.ContentPart.file_id/3 is required"}}
     end
   end
 

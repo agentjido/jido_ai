@@ -49,6 +49,11 @@ defmodule Jido.AI.Actions.Reasoning.AnalyzeTest do
   end
 
   describe "validation and security" do
+    test "returns an error for an unsupported model value" do
+      assert {:error, :invalid_model_format} =
+               Analyze.run(%{model: [:invalid], input: "hello", analysis_type: :summary}, %{})
+    end
+
     test "returns error when input is missing" do
       assert {:error, :input_required} = Analyze.run(%{analysis_type: :summary}, %{})
     end

@@ -118,10 +118,11 @@ This key is runtime-managed and overrides same-named entries from user `tool_con
 
 ## ReAct Context Projection Internals
 
-ReAct now uses explicit separation between core event log and LLM projection:
+ReAct uses explicit separation between the Agent-owned log and LLM projection:
 
-- Core append-only log: `agent.state[:__thread__]` (`Jido.Thread`)
-- ReAct materialized view: `agent.state[:__strategy__].context` (`Jido.AI.Context`)
+- Portable interaction value: `agent.state.jido_ai_contexts[profile_id].session` (`Jido.Session`)
+- Agent-owned append-only log: `session.thread` (`Jido.Thread`)
+- Materialized view: `Jido.AI.get_strategy_context/2` returns `Jido.AI.Context`
 
 Canonical ReAct control surface:
 
@@ -129,7 +130,7 @@ Canonical ReAct control surface:
 - `ai.react.steer`
 - `ai.react.inject`
 
-Core thread entries emitted by ReAct:
+Context log entries emitted by the runtime:
 
 - `:ai_message` for user/assistant/tool message lifecycle
 - `:ai_context_operation` for context operations (`replace`, `switch`)
@@ -139,7 +140,7 @@ Pending-input semantics:
 - active runs own a per-run `Jido.AI.PendingInputServer`
 - `ai.react.steer` and `ai.react.inject` synchronously enqueue user-style input there
 - enqueue success means the input is queued for best-effort delivery, not durably accepted
-- queued input is not appended to the core thread on enqueue
+- queued input is not appended to the session thread on enqueue
 - runtime emits `:input_injected` only when it drains queued input into `run_context`
 - strategy appends a user `:ai_message` only on `:input_injected`, so undrained input is not persisted
 - if a run fails, is cancelled, or exits before drain, queued input is dropped

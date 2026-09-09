@@ -8,9 +8,7 @@ defmodule Jido.AI.Plugins.TaskSupervisor do
   the Plugin child specification when it needs a separate task supervisor.
   """
 
-  use Jido.Plugin
-
-  def child_spec(_init), do: Supervisor.child_spec({Task.Supervisor, []}, id: __MODULE__)
+  use Jido.Plugin, agent_server: Jido.AI.Plugins.TaskSupervisor.AgentServer
 
   require Logger
 
@@ -38,4 +36,12 @@ defmodule Jido.AI.Plugins.TaskSupervisor do
   defp start_supervisor do
     Task.Supervisor.start_link()
   end
+end
+
+defmodule Jido.AI.Plugins.TaskSupervisor.AgentServer do
+  @moduledoc false
+  use Jido.AgentServer.Plugin
+
+  def child_spec(_init),
+    do: Supervisor.child_spec({Task.Supervisor, []}, id: Jido.AI.Plugins.TaskSupervisor)
 end

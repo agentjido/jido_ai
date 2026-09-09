@@ -14,9 +14,12 @@ defmodule Jido.AI.ReasoningCapability do
 
   defmacro __using__(opts) do
     strategy = Keyword.fetch!(opts, :strategy)
+    package = __CALLER__.module
+    facet = Module.concat(package, Agent)
+    state_key = :"reasoning_#{strategy}"
 
     quote do
-      use Jido.Plugin
+      use Jido.Plugin, agent: unquote(facet)
       @strategy unquote(strategy)
       def name, do: unquote(Keyword.fetch!(opts, :name))
       def description, do: unquote(Keyword.fetch!(opts, :description))
@@ -24,7 +27,7 @@ defmodule Jido.AI.ReasoningCapability do
       def tags, do: ["reasoning", Atom.to_string(@strategy), "strategies"]
       def vsn, do: "2.0.0"
       def actions, do: [Jido.AI.Actions.Reasoning.RunStrategy]
-      def state_key, do: unquote(:"reasoning_#{strategy}")
+      def state_key, do: unquote(state_key)
       def signal_patterns, do: [unquote("reasoning.#{strategy}.run")]
 
       def signal_routes(_config),
@@ -32,11 +35,28 @@ defmodule Jido.AI.ReasoningCapability do
 
       def schema, do: Jido.AI.ReasoningCapability.schema(@strategy, [])
 
-      @impl Jido.Plugin
-      def state_spec(opts), do: {state_key(), Jido.AI.ReasoningCapability.schema(@strategy, opts)}
+      defmodule unquote(facet) do
+        @moduledoc false
+        use Jido.Agent.Plugin
 
-      @impl Jido.Plugin
-      def prepare(command, _opts), do: Jido.AI.ReasoningCapability.prepare(command)
+        @impl Jido.Agent.Plugin
+        def state_spec(opts),
+          do: {unquote(state_key), Jido.AI.ReasoningCapability.schema(unquote(strategy), opts)}
+
+        @impl Jido.Agent.Plugin
+        def observes(opts), do: [Keyword.get(opts, :into, :result)]
+
+        @impl Jido.Agent.Plugin
+        def prepare(preparation, opts),
+          do:
+            Jido.AI.ReasoningCapability.prepare(
+              preparation,
+              unquote(package),
+              unquote(strategy),
+              unquote(state_key),
+              opts
+            )
+      end
     end
   end
 
@@ -72,25 +92,34 @@ defmodule Jido.AI.ReasoningCapability do
     })
   end
 
-  def prepare(command) do
-    # Rebuild the binding from all declarations on each call. This also clears
-    # caller-supplied bindings on unrelated Signals, in either Plugin order.
+  def prepare(preparation, package, strategy, state_key, opts) do
+    signal = preparation.effective_signal
+    current = Map.get(preparation.context, :jido_ai_reasoning_capability)
+
     selected =
-      Enum.find_value(command.agent.plugins, fn {module, opts} ->
-        strategy = @plugins[module]
-
-        if strategy && command.signal.type == "reasoning.#{strategy}.run" do
-          key = module.state_key()
-
+      cond do
+        signal.type == "reasoning.#{strategy}.run" ->
           %{
+            owner: package,
             strategy: strategy,
             into: Keyword.get(opts, :into, :result),
-            key: key,
-            defaults: Map.fetch!(command.agent.state, key)
+            key: state_key,
+            defaults: preparation.plugin_state
           }
-        end
-      end)
 
-    Jido.AI.Capability.bind(command, :jido_ai_reasoning_capability, selected)
+        owned_binding?(current, signal) ->
+          current
+
+        true ->
+          nil
+      end
+
+    Jido.AI.Capability.bind(preparation, :jido_ai_reasoning_capability, selected)
   end
+
+  defp owned_binding?(%{owner: owner, strategy: strategy}, signal) do
+    @plugins[owner] == strategy and signal.type == "reasoning.#{strategy}.run"
+  end
+
+  defp owned_binding?(_, _), do: false
 end

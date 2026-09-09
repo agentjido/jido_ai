@@ -1,6 +1,6 @@
 # Incomplete response port
 
-The [02_25 examples](../../examples/v3/profiles/02_25_incomplete_response.md)
+The [02_25 examples](../../examples/02_requests/02_25_incomplete_response/README.md)
 cover blank provider failure, accepted partial content, saved history, usage,
 and terminal tokens through native Agent DSL and standalone requests.
 

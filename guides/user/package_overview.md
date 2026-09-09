@@ -16,6 +16,15 @@ After this guide, you should be able to explain the package in a prioritized way
 6. First-class observability via signals, directives, and telemetry
 7. Public ExUnit helpers for deterministic ReAct tests without ReqLLM stubs
 
+## Portable Interaction Values
+
+`Jido.Thread` is an append-only interaction log. `Jido.Session` owns one
+Thread and adds a portable lifecycle and metadata value. These modules do not
+own a process, runtime server, storage adapter, or live model request.
+
+`Jido.Session` is separate from `Jido.AI.Session`. The first is portable data.
+The second is the live request API for an AI agent process.
+
 ## Priority 1: `Jido.AI.Agent` (Default ReAct Agent)
 
 `Jido.AI.Agent` is the anchor feature.

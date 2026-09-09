@@ -29,8 +29,7 @@ defmodule Jido.AI.Actions.ToolCalling.ListTools do
         filter:
           Zoi.string(description: "Filter tools by name pattern (substring match)")
           |> Zoi.optional(),
-        include_schema:
-          Zoi.boolean(description: "Include tool schemas in result") |> Zoi.default(true),
+        include_schema: Zoi.boolean(description: "Include tool schemas in result") |> Zoi.default(true),
         include_sensitive:
           Zoi.boolean(description: "Include tools marked as sensitive (default: false)")
           |> Zoi.default(false),

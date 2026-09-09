@@ -429,8 +429,8 @@ defmodule Jido.AI.Reasoning.ReAct.Checkpoint do
 
   defp binding(config, tools, effects) do
     contract =
-      {Config.fingerprint(config), config.tools, config.effect_policy, config.output,
-       config.llm.max_tokens, config.llm.temperature, config.llm.tool_choice}
+      {Config.fingerprint(config), config.tools, config.effect_policy, config.output, config.llm.max_tokens,
+       config.llm.temperature, config.llm.tool_choice}
 
     code =
       modules([config.tools, config.output, config.request_transformer, tools, effects])

@@ -10,6 +10,8 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
 
   use ExUnit.Case, async: false
 
+  @moduletag :legacy_v2
+
   alias Jido.AI.Plugins.Chat
   alias Jido.AI.Actions.LLM.Chat, as: ChatAction
   alias Jido.AI.Plugins.Planning

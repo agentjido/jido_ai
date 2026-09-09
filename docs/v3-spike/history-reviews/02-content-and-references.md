@@ -257,7 +257,7 @@ Do not add another conversation engine or another mock to close these gaps.
 
 ## Initial-State rich append evidence: 2026-09-07
 
-[14_08](../../../examples/v3/profiles/14_08_query_append.md) extends PR 278's
+[14_08](../../../examples/14_resume/14_08_query_append/README.md) extends PR 278's
 entry-point evidence. A real standalone State adds text and an uploaded file
 ID; the buffered Responses request contains the earlier user entry and complete
 new content once. The actual provider encoder rejects PDFs on buffered Chat
@@ -266,7 +266,7 @@ not evidence for all providers or for released v2 State conversion.
 
 ## Standalone old-State content conversion: 2026-09-07
 
-[14_09](../../../examples/v3/profiles/14_09_state_migration.md) proves an old
+[14_09](../../../examples/14_resume/14_09_state_migration/README.md) proves an old
 State-format-v3 map retains uploaded PDF content and refs through explicit
 conversion and buffered Responses encoding. The current system instruction and
 user input each appear once. This adds one partial PR 278 reference. Other
@@ -275,7 +275,7 @@ provider/media paths remain required.
 
 ## Native context-operation evidence: 2026-09-07
 
-[02_23](../../../examples/v3/profiles/02_23_context_operations.md) adds 28 cases
+[02_23](../../../examples/02_requests/02_23_context_operations/README.md) adds 28 cases
 for real Agent context operations. The linked ledger references cover core
 Thread request refs, pending-operation recovery, durable terminal application
 and accepted-history compaction. The original skill call and result now replace

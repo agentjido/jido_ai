@@ -206,7 +206,7 @@ defmodule Jido.AI.Authoring.FullSpecParityTest do
       model_routers: %{"router" => Router},
       schemas: %{
         "answer" => @answer_schema,
-        "agent_state" => FullAgent.agent().schema
+        "agent_state" => FullAgent.definition().schema
       },
       ash_resources: %{"resource" => Resource},
       catalogs: %{"catalog" => Catalog},

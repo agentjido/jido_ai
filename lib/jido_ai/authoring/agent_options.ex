@@ -131,7 +131,7 @@ defmodule Jido.AI.Agent.Options do
 
     plugins = Jido.AI.PluginStack.for_agent(opts)
 
-    Enum.each(plugins, fn {module, _} -> Code.ensure_compiled!(module) end)
+    Enum.each(plugins, fn {module, _} -> ensure_plugin_compiled!(module) end)
 
     explicit_routes =
       [
@@ -165,11 +165,16 @@ defmodule Jido.AI.Agent.Options do
         },
         else: domain_schema
 
+    metadata =
+      case opts[:max_state_size] do
+        nil -> %{tags: Keyword.get(opts, :tags, [])}
+        limit -> %{Authoring.state_size_key() => limit, tags: Keyword.get(opts, :tags, [])}
+      end
+
     base = %{
       name: Keyword.fetch!(opts, :name),
       description: Keyword.get(opts, :description, "AI agent #{opts[:name]}"),
-      metadata: %{tags: Keyword.get(opts, :tags, [])},
-      max_state_size: opts[:max_state_size],
+      metadata: metadata,
       schema: domain_schema,
       plugins: plugins,
       routes: routes
@@ -178,8 +183,8 @@ defmodule Jido.AI.Agent.Options do
     case Authoring.lower(base, [profile]) do
       {:ok, definition} ->
         definition
-        |> Jido.Agent.to_map()
-        |> Map.drop([:id, :state, :module])
+        |> Map.from_struct()
+        |> Map.drop([:id, :state, :module, :vsn])
         |> Map.update!(:plugins, fn plugins ->
           Enum.map(plugins, fn
             {Jido.AI.Runtime.Plugin, config} ->
@@ -213,6 +218,22 @@ defmodule Jido.AI.Agent.Options do
   end
 
   defp instructions(_method, prompt), do: prompt
+
+  defp ensure_plugin_compiled!(module) do
+    Code.ensure_compiled!(module)
+
+    case module.__jido_plugin__() do
+      %Jido.Plugin.Manifest{} = manifest ->
+        manifest
+        |> Map.take([:agent, :agent_server, :persistence, :topology])
+        |> Map.values()
+        |> Enum.reject(&is_nil/1)
+        |> Enum.each(&Code.ensure_compiled!/1)
+
+      _ ->
+        :ok
+    end
+  end
 
   defp schema(model, method) do
     fields = %{

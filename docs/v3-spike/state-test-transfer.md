@@ -52,7 +52,7 @@ answer. Cancellation and invalid proposals leave domain state unchanged.
 Successful ReAct completion omitted `termination_reason` from stored metadata.
 The shared completion path now supplies `:final_answer` when a method or limit
 has not already supplied a reason. Four added
-[response-metadata examples](../../examples/v3/test/examples/02_requests/02_07_response_metadata_test.exs)
+[response-metadata examples](../../test/examples/02_requests/02_07_response_metadata/02_07_response_metadata_test.exs)
 check plain and streamed calls, with and without a tool round. The request,
 terminal event, and Session view must agree. Existing limit and method cases
 still check their distinct reasons. This relates to

@@ -2,6 +2,7 @@ defmodule Jido.AI.Plugins.RetrievalTest do
   use ExUnit.Case, async: false
   alias Jido.AI.Plugins.Retrieval
   alias Jido.AI.Retrieval.Store
+  alias ReqLLM.Message.ContentPart
 
   setup do
     start_supervised!({Store, []})
@@ -33,16 +34,39 @@ defmodule Jido.AI.Plugins.RetrievalTest do
     })
 
     assert {:ok, %{signal: enriched}} =
-             Retrieval.admit(nil, command(%{prompt: "Tokyo weather"}, namespace: "weather"), [])
+             Retrieval.AgentServer.admit(
+               nil,
+               command(%{prompt: "Tokyo weather"}, namespace: "weather"),
+               []
+             )
 
     assert enriched.data.prompt =~ "Relevant memory:"
     assert [%{id: "m1", metadata: %{tag: "weather"}}] = enriched.data.retrieval.snippets
   end
 
+  test "live admission enriches multimodal prompts and preserves every original part" do
+    Store.upsert("weather", %{id: "m1", text: "Tokyo weather forecast"})
+
+    image = ContentPart.image_url("https://example.com/tokyo.png")
+    query = [ContentPart.text("Tokyo weather"), image]
+
+    assert {:ok, %{signal: enriched}} =
+             Retrieval.AgentServer.admit(
+               nil,
+               command(%{prompt: query}, namespace: "weather"),
+               []
+             )
+
+    assert [memory_part | ^query] = enriched.data.prompt
+    assert memory_part.type == :text
+    assert memory_part.text =~ "Relevant memory:"
+    assert memory_part.text =~ "Tokyo weather forecast"
+  end
+
   for key <- [:disable_retrieval, "disable_retrieval"] do
     test "live admission keeps the request when #{key |> inspect()} is true" do
       cmd = command(Map.put(%{prompt: "Tokyo weather"}, unquote(key), true))
-      assert {:ok, ^cmd} = Retrieval.admit(nil, cmd, [])
+      assert {:ok, ^cmd} = Retrieval.AgentServer.admit(nil, cmd, [])
     end
   end
 
@@ -57,7 +81,7 @@ defmodule Jido.AI.Plugins.RetrievalTest do
     Store.upsert("agent_weather", %{id: "m1", text: "Tokyo weather forecast"})
 
     assert {:ok, %{signal: enriched}} =
-             Retrieval.admit(nil, command(%{prompt: "Tokyo weather"}), [])
+             Retrieval.AgentServer.admit(nil, command(%{prompt: "Tokyo weather"}), [])
 
     assert enriched.data.retrieval.namespace == "agent_weather"
   end

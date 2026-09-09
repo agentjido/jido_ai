@@ -49,6 +49,14 @@ defmodule Jido.AI.Error.ModelTest do
 
       assert Error.Validation.Invalid.message(%Error.Validation.Invalid{}) == "Validation error"
     end
+
+    test "output message variants" do
+      assert Error.Validation.Output.message(%Error.Validation.Output{field: :output}) ==
+               "Structured output validation failed"
+
+      assert Error.Validation.Output.message(%Error.Validation.Output{}) ==
+               "Structured output validation failed"
+    end
   end
 
   describe "runtime envelope normalization" do
@@ -236,6 +244,39 @@ defmodule Jido.AI.Error.ModelTest do
                retryable?: false
              }
     end
+
+    test "normalizes string codes, tuple messages, and non-exception structs" do
+      assert Error.normalize(%{code: "timeout", message: nil, details: nil}, :fallback).type == :timeout
+      assert Error.normalize(%{"code" => "timeout", "message" => :late}).type == :timeout
+
+      tuple = Error.normalize({:rate_limited, "slow down"})
+      assert tuple.type == :rate_limited
+      assert tuple.message == "slow down"
+      assert tuple.retryable?
+
+      unusual = Error.normalize(%{message: {:bad, :shape}}, :bad_response, "fallback")
+      assert unusual.type == :bad_response
+      assert unusual.message == "{:bad, :shape}"
+
+      struct = Error.normalize(%URI{scheme: "https", host: "example.com"}, :bad_uri, "Invalid URI")
+      assert struct.type == :bad_uri
+      assert struct.message == "Invalid URI"
+      assert struct.details.reason =~ "%URI{"
+    end
+
+    test "normalizes JSON-unsafe scalar and struct detail values" do
+      envelope =
+        Error.error_envelope(:bad_data, <<255>>, %{
+          float: 1.5,
+          struct: %URI{host: "example.com"},
+          invalid_binary: <<255>>
+        })
+
+      assert envelope.message == "base64:/w=="
+      assert envelope.details.float == 1.5
+      assert envelope.details.struct.host == "example.com"
+      assert envelope.details.invalid_binary == "base64:/w=="
+    end
   end
 
   describe "retryable?/1" do
@@ -256,6 +297,22 @@ defmodule Jido.AI.Error.ModelTest do
       refute Error.retryable?(%{type: :timeout, details: %{"retry" => "off"}})
       refute Error.retryable?({:error, %{type: :execution_error}, []})
       refute Error.retryable?({:ok, :done, []})
+    end
+
+    test "reads all canonical flag and code forms" do
+      refute Error.retryable?({:ok, :done})
+      assert Error.retryable?({:error, :timeout})
+      assert Error.retryable?(%{retryable: true})
+      assert Error.retryable?(%{"retryable?" => true})
+      assert Error.retryable?(%{"retryable" => true})
+      assert Error.retryable?(%{code: :timeout})
+      assert Error.retryable?(%{code: "timeout"})
+      assert Error.retryable?(%{"code" => "timeout"})
+      refute Error.retryable?(%{type: "not_registered", details: %{retry: 0}})
+      assert Error.retryable?(%{type: "not_registered", details: [retry: true]})
+      assert Error.retryable?(%{type: :execution_error, details: %{reason: :timeout}})
+      assert Error.retryable?(%{type: :execution_error, details: %{message: "timeout"}})
+      refute Error.retryable?(%{type: :execution_error, details: %{message: 123}})
     end
   end
 end

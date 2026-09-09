@@ -140,7 +140,7 @@ Tests: [Agent](../../../test/jido_ai/agent_test.exs),
 
 ## Native Adaptive evidence: 2026-09-07
 
-The [09_10 profile](../../../examples/v3/profiles/09_10_adaptive.md) now proves
+The [09_10 profile](../../../examples/09_reasoning/09_10_adaptive/README.md) now proves
 all seven methods through actual Agent/Flow calls. It checks invalid or empty
 available sets, unknown or unavailable overrides, thresholds and method options
 before provider work. ReAct and ToT run actual tools. TRM failure retains its
@@ -152,7 +152,7 @@ legacy command/phase conversion, CoT status conversion, the other acceptance
 variants above or the runtime matrix. The public Adaptive API still needs its
 own port and examples. All history statuses remain pending.
 
-The [public 09_11 cases](../../../examples/v3/profiles/09_11_adaptive_api.md)
+The [public 09_11 cases](../../../examples/09_reasoning/09_11_adaptive_api/README.md)
 also execute each method through AdaptiveAgent and reject invalid settings at
 authoring. Deprecated Strategy analysis and getters remain loadable; its old
 execution callbacks are removed. This does not close old phase-input/state
@@ -160,7 +160,7 @@ conversion, active inspection, per-method default controls or the runtime gate.
 
 ## Callable runtime evidence: 2026-09-07
 
-[09_14](../../../examples/v3/profiles/09_14_callable_reasoning.md) proves the
+[09_14](../../../examples/09_reasoning/09_14_callable_reasoning/README.md) proves the
 RunStrategy runtime cases with actual mock transport. Calls can share an existing
 host runtime while they retain distinct linked Agents and request/run IDs. A
 standalone call needs no implicit named instance. This replaces the old global

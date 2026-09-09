@@ -334,17 +334,20 @@ defmodule Jido.AI.Request do
   def await_many(requests, opts \\ []) when is_list(requests) do
     timeout = Keyword.get(opts, :timeout, @default_timeout)
 
-    # Run awaits concurrently with Task.async_stream
-    requests
-    |> Task.async_stream(
-      fn request -> await(request, timeout: timeout) end,
-      timeout: if(timeout == :infinity, do: :infinity, else: timeout + 1000),
-      on_timeout: :kill_task
-    )
+    tasks = Enum.map(requests, &Task.async(fn -> await(&1, timeout: :infinity) end))
+
+    tasks
+    |> Task.yield_many(timeout)
     |> Enum.map(fn
-      {:ok, result} -> result
-      {:exit, :timeout} -> {:error, :timeout}
-      {:exit, reason} -> {:error, reason}
+      {_task, {:ok, result}} ->
+        result
+
+      {_task, {:exit, reason}} ->
+        {:error, reason}
+
+      {task, nil} ->
+        Task.shutdown(task, :brutal_kill)
+        {:error, :timeout}
     end)
   end
 

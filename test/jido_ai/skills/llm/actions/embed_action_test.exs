@@ -24,8 +24,8 @@ defmodule Jido.AI.Actions.LLM.EmbedTest do
       expect(ReqLLM.Embedding, :embed, fn model, texts, opts ->
         assert model == Jido.AI.resolve_model(:embedding)
         assert texts == ["Hello world"]
-        assert opts == []
-        {:ok, [[0.1, 0.2, 0.3]]}
+        assert opts == [return_usage: true]
+        {:ok, %{embedding: [[0.1, 0.2, 0.3]], usage: %{input_tokens: 2}}}
       end)
 
       assert {:ok, result} = Embed.run(%{texts: "Hello world"}, %{})
@@ -41,7 +41,8 @@ defmodule Jido.AI.Actions.LLM.EmbedTest do
         assert texts == ["one", "two"]
         assert opts[:dimensions] == 2
         assert opts[:receive_timeout] == 1_000
-        {:ok, [[0.5, 0.4], [0.3, 0.2]]}
+        assert opts[:return_usage]
+        {:ok, %{embedding: [[0.5, 0.4], [0.3, 0.2]], usage: %{input_tokens: 4}}}
       end)
 
       params = %{
@@ -66,7 +67,7 @@ defmodule Jido.AI.Actions.LLM.EmbedTest do
       expect(ReqLLM.Embedding, :embed, fn model, texts, _opts ->
         assert model == Jido.AI.resolve_model(:capable)
         assert texts == ["hello"]
-        {:ok, [[0.9]]}
+        {:ok, %{embedding: [[0.9]], usage: %{input_tokens: 1}}}
       end)
 
       assert {:ok, result} = Embed.run(%{texts: "hello"}, context)
@@ -82,7 +83,7 @@ defmodule Jido.AI.Actions.LLM.EmbedTest do
       expect(ReqLLM.Embedding, :embed, fn model, texts, _opts ->
         assert model == "custom:embedding-model"
         assert texts == ["hello"]
-        {:ok, [[0.8]]}
+        {:ok, %{embedding: [[0.8]], usage: %{input_tokens: 1}}}
       end)
 
       assert {:ok, result} = Embed.run(%{texts: "hello", model: "custom:embedding-model"}, context)

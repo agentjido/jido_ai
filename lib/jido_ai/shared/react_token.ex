@@ -85,7 +85,10 @@ defmodule Jido.AI.Reasoning.ReAct.Token do
       cancelled_state =
         state
         |> State.put_status(:cancelled)
-        |> State.put_result("Request cancelled (reason: #{inspect(reason)})")
+        |> State.put_result(nil)
+        |> State.put_error(reason)
+        |> State.clear_pending_tools()
+        |> Map.put(:termination_reason, :cancelled)
         |> Map.put(:checkpoint, nil)
 
       {:ok, issue(cancelled_state, config)}

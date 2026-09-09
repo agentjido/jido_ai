@@ -139,5 +139,41 @@ defmodule Jido.AI.UsageTest do
                total_tokens: 5
              }
     end
+
+    test "returns empty token data and nil helpers for invalid usage" do
+      assert Jido.AI.Usage.token_counts(:invalid) == %{
+               input_tokens: 0,
+               output_tokens: 0,
+               total_tokens: 0
+             }
+
+      assert Jido.AI.Usage.with_token_counts(:invalid) == nil
+      assert Jido.AI.Usage.value(:invalid, :input_tokens) == nil
+    end
+  end
+
+  describe "normalization edge cases" do
+    test "normalizes nested lists and keeps invalid numeric text unchanged" do
+      assert Jido.AI.Usage.normalize(%{
+               "total_tokens" => "1.5",
+               "items" => [%{"input_tokens" => "2"}, :plain],
+               "attempts" => "",
+               "output_tokens" => "1.2bad"
+             }) == %{
+               "items" => [%{input_tokens: 2}, :plain],
+               "attempts" => "",
+               total_tokens: 1.5,
+               output_tokens: "1.2bad"
+             }
+    end
+
+    test "merges nil metadata values and nonstandard key types" do
+      assert Jido.AI.Usage.merge(%{17 => :left, provider: nil}, %{17 => :right, provider: "openai"}) == %{
+               17 => :right,
+               provider: "openai"
+             }
+
+      assert Jido.AI.Usage.merge(%{provider: "openai"}, %{provider: nil}) == %{provider: "openai"}
+    end
   end
 end

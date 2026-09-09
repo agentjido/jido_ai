@@ -2,7 +2,7 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithToolsTest do
   use ExUnit.Case, async: true
   use Mimic
 
-  alias Jido.AI.Actions.ToolCalling.CallWithTools
+  alias Jido.AI.Actions.ToolCalling.{CallWithTools, Decide}
   alias Jido.AI.TestSupport.FakeReqLLM
   alias Jido.AI.Turn
 
@@ -72,6 +72,11 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithToolsTest do
   end
 
   describe "run/2" do
+    test "returns later model failures as action errors" do
+      state = %{failure: :provider_failed, round: 1}
+      assert {:error, :provider_failed} = Decide.run(state, %{})
+    end
+
     test "returns error when prompt is missing" do
       assert {:error, _} = CallWithTools.run(%{}, %{})
     end
@@ -83,6 +88,17 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithToolsTest do
     test "returns error for invalid max_turns format" do
       assert {:error, :invalid_max_turns} =
                CallWithTools.run(%{prompt: "hello", max_turns: "many"}, %{})
+    end
+
+    test "rejects invalid numeric request limits" do
+      for invalid <- [
+            %{max_tokens: 0},
+            %{temperature: -0.1},
+            %{temperature: 2.1},
+            %{timeout: 0}
+          ] do
+        assert {:error, _reason} = CallWithTools.run(Map.put(invalid, :prompt, "hello"), %{})
+      end
     end
 
     test "returns result with valid prompt" do

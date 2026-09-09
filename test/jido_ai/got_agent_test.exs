@@ -1,6 +1,8 @@
 defmodule Jido.AI.GoTAgentTest do
   use ExUnit.Case, async: true
 
+  @moduletag :legacy_v2
+
   alias Jido.AI.Request
   alias Jido.AI.Reasoning.GraphOfThoughts.Strategy, as: GraphOfThoughts
 

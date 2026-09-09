@@ -265,7 +265,7 @@ defmodule Jido.AI.Reasoning.TRM.MachineTest do
 
     test "completes when max_supervision_steps reached", %{machine: machine} do
       # Advance to max steps
-      machine = %{machine | supervision_step: 3}
+      machine = %{machine | supervision_step: 3, best_answer: "Earlier answer"}
       call_id = machine.current_call_id
       result = {:ok, %{text: "Final answer"}}
 
@@ -273,6 +273,7 @@ defmodule Jido.AI.Reasoning.TRM.MachineTest do
 
       assert machine.status == "completed"
       assert machine.termination_reason == :max_steps
+      assert machine.result == "Final answer"
       assert directives == []
     end
 

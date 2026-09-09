@@ -1,6 +1,8 @@
 defmodule Jido.AI.AgentRuntimeAdapterTest do
   use ExUnit.Case, async: true
 
+  @moduletag :legacy_v2
+
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.CLI.Adapter
   alias Jido.AI.Reasoning.ReAct.CLIAdapter, as: ReActCLIAdapter

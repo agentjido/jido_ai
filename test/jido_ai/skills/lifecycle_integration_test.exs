@@ -5,6 +5,8 @@ defmodule Jido.AI.Plugins.LifecycleIntegrationTest do
 
   use ExUnit.Case, async: false
 
+  @moduletag :legacy_v2
+
   alias Jido.Agent
   alias Jido.AI.Directive.Helpers
   alias Jido.AI.Plugins.Chat

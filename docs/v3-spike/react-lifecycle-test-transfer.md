@@ -58,7 +58,7 @@ so these tests execute their Actions through core Exec.
 
 ## Examples and refinement
 
-The [03_02 Agent examples](../../examples/v3/profiles/03_02_tool_context.md)
+The [03_02 Agent examples](../../examples/03_tools/03_02_tool_context/README.md)
 add three cases: native Session, native direct Turn, and public Agent. Each
 runs a real tool and a second model call. They check the named host module,
 Agent ID, state snapshot, base tenant, unchanged definition and portable state.

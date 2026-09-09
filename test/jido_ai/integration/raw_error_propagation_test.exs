@@ -1,6 +1,8 @@
 defmodule Jido.AI.Integration.RawErrorPropagationTest do
   use ExUnit.Case, async: true
 
+  @moduletag :legacy_v2
+
   alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
   alias Jido.AI.Request
 

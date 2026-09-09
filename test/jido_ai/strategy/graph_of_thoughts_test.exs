@@ -1,6 +1,8 @@
 defmodule Jido.AI.Reasoning.GraphOfThoughts.StrategyTest do
   use ExUnit.Case, async: true
 
+  @moduletag :legacy_v2
+
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Directive
   alias Jido.AI.Reasoning.GraphOfThoughts.Strategy, as: GraphOfThoughts

@@ -30,7 +30,7 @@ defmodule Jido.AI.Plugins.ModelRouting do
   patterns use lexical order. The Plugin prepares Signal input through core.
   """
 
-  use Jido.Plugin
+  use Jido.Plugin, agent: Jido.AI.Plugins.ModelRouting.Agent
   def name, do: "model_routing"
   def description, do: "Routes model selection by signal intent"
   def category, do: "ai"
@@ -48,8 +48,8 @@ defmodule Jido.AI.Plugins.ModelRouting do
     "reasoning.*.run" => :reasoning
   }
 
-  @impl Jido.Plugin
-  def state_spec(opts) do
+  @doc false
+  def agent_state_spec(opts) do
     Jido.AI.PluginConfig.validate!(opts, [:routes], "ModelRouting")
     configured = Keyword.get(opts, :routes, %{})
 
@@ -65,22 +65,22 @@ defmodule Jido.AI.Plugins.ModelRouting do
   defp state_schema(routes),
     do: Zoi.object(%{routes: Zoi.map() |> Zoi.default(routes)}) |> Zoi.default(%{routes: routes})
 
-  @impl Jido.Plugin
-  def prepare(command, _opts) do
-    data = command.signal.data
-    routes = command.agent.state.model_routing.routes
+  @doc false
+  def prepare_agent(preparation) do
+    signal = preparation.effective_signal
+    data = signal.data
+    routes = preparation.plugin_state.routes
 
     request_override? =
-      explicit_model?(Map.get(command.context, :jido_ai_request, %{})) and
-        not is_nil(Jido.AI.Authoring.request_binding(command.agent, command.signal))
+      explicit_model?(Map.get(preparation.context, :jido_ai_request, %{}))
 
     model =
       if is_map(data) and not explicit_model?(data) and not request_override?,
-        do: route_model(command.signal.type, routes)
+        do: route_model(signal.type, routes)
 
     if is_nil(model),
-      do: {:ok, command},
-      else: {:ok, %{command | signal: %{command.signal | data: Map.put(data, :model, model)}}}
+      do: {:ok, preparation},
+      else: {:ok, %{preparation | effective_signal: %{signal | data: Map.put(data, :model, model)}}}
   end
 
   defp route_model(type, routes) when is_binary(type) and is_map(routes) do
@@ -131,4 +131,16 @@ defmodule Jido.AI.Plugins.ModelRouting do
       Map.put(acc, key, v)
     end)
   end
+end
+
+defmodule Jido.AI.Plugins.ModelRouting.Agent do
+  @moduledoc false
+  use Jido.Agent.Plugin
+
+  @impl Jido.Agent.Plugin
+  def state_spec(opts), do: Jido.AI.Plugins.ModelRouting.agent_state_spec(opts)
+
+  @impl Jido.Agent.Plugin
+  def prepare(preparation, _opts),
+    do: Jido.AI.Plugins.ModelRouting.prepare_agent(preparation)
 end

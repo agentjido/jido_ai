@@ -1,6 +1,8 @@
 defmodule Jido.AI.TRMAgentTest do
   use ExUnit.Case, async: true
 
+  @moduletag :legacy_v2
+
   alias Jido.AI.Request
 
   defmodule TestTRMAgent do

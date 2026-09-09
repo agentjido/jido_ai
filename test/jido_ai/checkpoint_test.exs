@@ -1,6 +1,8 @@
 defmodule Jido.AI.CheckpointTest do
   use Jido.AI.TestCase, async: false
 
+  @moduletag :legacy_v2
+
   alias Jido.AI.Request
 
   defmodule ReadTool do

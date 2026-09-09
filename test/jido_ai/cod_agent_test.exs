@@ -43,7 +43,7 @@ defmodule Jido.AI.CoDAgentTest do
 
   describe "strategy configuration" do
     test "selects ChainOfDraft in the native AI profile" do
-      assert {:ok, profile} = Configuration.profile(DefaultCoDAgent.agent())
+      assert {:ok, profile} = Configuration.profile(DefaultCoDAgent.definition())
       assert profile.reasoning.method == :chain_of_draft
     end
 

@@ -2,6 +2,8 @@ Code.require_file(Path.expand("../../../examples/scripts/shared/bootstrap.exs", 
 
 defmodule Jido.AI.Examples.WeatherAgentTest do
   use ExUnit.Case, async: false
+
+  @moduletag :legacy_v2
   use Mimic
 
   alias Jido.Agent.Strategy.State, as: StratState

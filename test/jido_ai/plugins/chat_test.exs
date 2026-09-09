@@ -26,7 +26,7 @@ defmodule Jido.AI.Plugins.ChatTest do
              agent.state.chat.default_system_prompt == "Use labels"
 
     assert agent.state.chat.auto_execute == false and agent.state.chat.max_turns == 0
-    {:chat, schema} = Chat.state_spec(default_max_tokens: 321, auto_execute: false)
+    {:chat, schema} = Chat.Agent.state_spec(default_max_tokens: 321, auto_execute: false)
 
     assert {:ok, %{default_max_tokens: 321, auto_execute: false, tools: %{}, available_tools: []}} =
              Zoi.parse(schema, %{})

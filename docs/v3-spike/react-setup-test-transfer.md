@@ -60,7 +60,7 @@ defaults. Session and direct Turn execution use the same helper. This is a merge
 headers or other option values. A supplied headers list replaces that value.
 Per-call provider option replacement remains separate and unchanged.
 
-The [02_26 integration examples](../../examples/v3/profiles/02_26_request_setup.md)
+The [02_26 integration examples](../../examples/02_requests/02_26_request_setup/README.md)
 provide six checks for header preservation, callback execution for buffered
 Session calls, selected generation values, the next request's defaults and
 portable state. Native Session, native Turn and public Agent modes each run

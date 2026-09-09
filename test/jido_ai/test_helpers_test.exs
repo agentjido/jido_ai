@@ -2,6 +2,7 @@ defmodule Jido.AI.TestHelpersTest do
   use Jido.AI.TestCase, async: false
 
   alias Jido.AI.Reasoning.ReAct
+  alias Jido.AI.Test.ReActScript
 
   defmodule ReadTool do
     use Jido.Action,
@@ -236,6 +237,141 @@ defmodule Jido.AI.TestHelpersTest do
           call("read", %{path: "README.md"})
         end
       end
+    end
+
+    test "rejects duplicate users and nested builders" do
+      assert_raise ArgumentError, ~r/only define one/, fn ->
+        expect_react do
+          user("one")
+          user("two")
+          answer("done")
+        end
+      end
+
+      assert :ok = Jido.AI.Test.__start_react_script__()
+
+      assert_raise ArgumentError, ~r/nested expect_react/, fn ->
+        Jido.AI.Test.__start_react_script__()
+      end
+
+      assert :ok = Jido.AI.Test.__clear_react_script_builder__()
+    end
+
+    test "assertion helpers accept trace and string-keyed tool events" do
+      events = [
+        %{
+          kind: :llm_completed,
+          data: %{
+            "turn_type" => :tool_calls,
+            "tool_calls" => [%{"name" => "read", "arguments" => %{"path" => "README.md"}}]
+          }
+        },
+        %{kind: :request_completed, data: %{result: "done"}}
+      ]
+
+      assert Jido.AI.Test.assert_final_answer(events, "done") == events
+      assert Jido.AI.Test.assert_tool_called(events, :read, %{path: "README.md"}) == events
+      assert Jido.AI.Test.assert_tool_called(events, "read") == events
+      assert Jido.AI.Test.assert_no_runtime_failure(events) == events
+      assert Jido.AI.Test.assert_final_answer(%{trace: events}, ~r/done/) == %{trace: events}
+    end
+
+    test "assertion helpers handle malformed sources and calls" do
+      assert_raise ExUnit.AssertionError, fn -> Jido.AI.Test.assert_final_answer(:invalid, "done") end
+
+      malformed = [
+        %{kind: :llm_completed, data: %{turn_type: :tool_calls, tool_calls: [:bad, %{name: "x"}]}},
+        %{kind: :other, data: %{}}
+      ]
+
+      assert_raise ExUnit.AssertionError, fn ->
+        Jido.AI.Test.assert_tool_called(malformed, "missing", :invalid)
+      end
+
+      assert Jido.AI.Test.assert_no_runtime_failure(:invalid) == :invalid
+    end
+
+    test "ReActScript public helpers validate malformed scripts and explicit options" do
+      assert_raise ArgumentError, fn -> ReActScript.new(%{}) end
+      assert_raise ArgumentError, fn -> ReActScript.new(%{user: "hello", turns: []}) end
+
+      assert_raise ArgumentError, ~r/cannot add turns/, fn ->
+        ReActScript.new(%{
+          user: "hello",
+          turns: [%{type: :answer, text: "done"}, %{type: :answer, text: "again"}]
+        })
+      end
+
+      assert_raise ArgumentError, ~r/invalid react test script turn/, fn ->
+        ReActScript.new(%{user: "hello", turns: [%{type: :unknown}]})
+      end
+
+      assert_raise ArgumentError, ~r/non-empty tool name/, fn ->
+        ReActScript.new(%{
+          user: "hello",
+          turns: [%{type: :tool_call, name: nil, arguments: %{}}, %{type: :answer, text: "done"}]
+        })
+      end
+
+      assert_raise ArgumentError, ~r/arguments must be a map/, fn ->
+        ReActScript.new(%{
+          user: "hello",
+          turns: [%{type: :tool_call, name: "read", arguments: []}, %{type: :answer, text: "done"}]
+        })
+      end
+
+      assert {:error, %{type: :invalid_react_test_script}} =
+               ReActScript.next_response([jido_ai_react_script: :bad], [])
+
+      assert :not_scripted = ReActScript.next_response(:bad, :bad)
+    end
+
+    test "ReActScript binds registered scripts into maps and nil options" do
+      script = ReActScript.new(%{user: "bound", turns: [%{type: :answer, text: "done"}]})
+      messages = [%{role: :user, content: "bound"}]
+
+      ReActScript.register(script)
+      assert %{jido_ai_react_script: ^script} = ReActScript.bind_messages(messages, %{})
+      assert [jido_ai_react_script: ^script] = ReActScript.bind_messages(messages, nil)
+
+      atom_options = %{jido_ai_react_script: :existing}
+      string_options = %{"jido_ai_react_script" => :existing}
+      assert ReActScript.bind_messages(messages, atom_options) == atom_options
+      assert ReActScript.bind_messages(messages, string_options) == string_options
+      assert ReActScript.bind_messages(messages, :other) == :other
+      assert :ok = ReActScript.clear_current_owner()
+    end
+
+    test "ReActScript consumes registered responses and reports exhausted scripts" do
+      script = ReActScript.new(%{id: "registered", user: "registered", turns: [%{type: :answer, text: "done"}]})
+      ReActScript.register(script)
+
+      assert {:ok, %{message: %{content: "done"}}} =
+               ReActScript.next_response([], [%{role: :user, content: "registered"}])
+
+      assert :not_scripted = ReActScript.next_response([], [%{role: :user, content: "registered"}])
+
+      messages = [
+        %ReqLLM.Message{role: :user, content: nil},
+        %ReqLLM.Message{role: :user, content: "registered"},
+        %ReqLLM.Message{role: :assistant, content: nil, tool_calls: []},
+        %ReqLLM.Message{role: :assistant, content: nil, tool_calls: [%{id: "call"}]}
+      ]
+
+      assert {:error, %{type: :react_test_script_exhausted, script_id: "registered"}} =
+               ReActScript.next_response(ReActScript.llm_opts(script), messages)
+    end
+
+    test "ReActScript request rejects unsupported request kinds" do
+      script = ReActScript.new(%{user: "object", turns: [%{type: :answer, text: "done"}]})
+
+      assert {:error, %{type: :invalid_react_test_script}} =
+               ReActScript.request(
+                 :object,
+                 [%{role: :user, content: "object"}],
+                 ReActScript.llm_opts(script),
+                 fn _, _ -> flunk("request callback must not run") end
+               )
     end
   end
 end

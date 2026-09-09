@@ -21,9 +21,7 @@ defmodule Jido.AI.Actions.Retrieval.ClearMemory do
 
   @impl Jido.Action
   def run(params, context) do
-    Jido.AI.Actions.Retrieval.Request.run(schema(), params, context, fn _params,
-                                                                        namespace,
-                                                                        store ->
+    Jido.AI.Actions.Retrieval.Request.run(schema(), params, context, fn _params, namespace, store ->
       {:ok, %{retrieval: %{namespace: namespace, cleared: Store.clear(namespace, store)}}}
     end)
   end

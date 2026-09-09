@@ -5,7 +5,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
 
   # See docs/v3-spike/state-test-transfer.md for all old case mappings.
   defp start(jido, opts \\ []) do
-    {:ok, profile} = Configuration.profile(Agent.agent())
+    {:ok, profile} = Configuration.profile(Agent.definition())
     profile = %{profile | requests: %{profile.requests | streaming: Keyword.get(opts, :streaming, false)}}
 
     base = %{

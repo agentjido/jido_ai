@@ -410,7 +410,7 @@ and undrained items. Internally created queues are stopped at cleanup.
 A checkpoint stores consumed history, not the queue or pending input. Bind a
 new queue in Config when resume must accept new input. The old queue stays
 sealed. Input acceptance does not prove consumption or durable delivery.
-See the [v3 input example](../../examples/v3/profiles/14_07_standalone_input.md)
+See the [v3 input example](../../examples/14_resume/14_07_standalone_input/README.md)
 for limits, closure, failure and resume checks.
 
 ### Append a query on native v3
@@ -426,7 +426,7 @@ count. Output repair can increase calls without increasing reasoning iteration.
 Earlier native checkpoint version 1 still resumes. The token envelope remains
 `rt2` with payload version 2. This does not convert all released v2 State or
 failed/cancelled continuations. See the
-[query append example](../../examples/v3/profiles/14_08_query_append.md).
+[query append example](../../examples/14_resume/14_08_query_append/README.md).
 
 ## Failure Mode: Config Fingerprint Mismatch On Resume
 
@@ -488,7 +488,7 @@ The returned State uses the normal native stream and token APIs. Conversion
 executes no work and leaves the original value intact. Complete tool results
 are retained; unresolved or partly executed tools need reconciliation. New input
 uses the retained budget and current Config. See the
-[State migration example](../../examples/v3/profiles/14_09_state_migration.md)
+[State migration example](../../examples/14_resume/14_09_state_migration/README.md)
 for the full contract and remaining Agent persistence scope.
 
 ## Reasoning position on native v3
@@ -499,4 +499,4 @@ Stream chunks keep their existing fields. Event `iteration`
 counts started model operations, including repair calls. Repair can therefore
 increase the event counter while State stays on the same reasoning step.
 Failure and cancellation retain the last established position. See the
-[failure-position examples](../../examples/v3/profiles/14_10_failure_position.md).
+[failure-position examples](../../examples/14_resume/14_10_failure_position/README.md).

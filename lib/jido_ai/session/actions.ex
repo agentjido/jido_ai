@@ -4,6 +4,7 @@ defmodule Jido.AI.Session.Record do
             %{
               id: Zoi.string() |> Zoi.min(1),
               run_id: Zoi.string() |> Zoi.min(1),
+              session_id: Zoi.string() |> Zoi.min(1) |> Zoi.nullable() |> Zoi.default(nil),
               profile_id: Zoi.atom(),
               method: Zoi.atom() |> Zoi.default(:react),
               query: Jido.AI.Query.schema(),
@@ -116,6 +117,15 @@ defmodule Jido.AI.Session.Start do
           record = %{
             id: id,
             run_id: run_id,
+            session_id:
+              if(profile.memory.history,
+                do:
+                  Jido.AI.Context.Operations.session_id(
+                    context.agent_state,
+                    profile,
+                    context.jido_ai_agent.id
+                  )
+              ),
             profile_id: profile_id,
             method: profile.reasoning.method,
             query: query,
@@ -238,7 +248,10 @@ defmodule Jido.AI.Session.Settle do
                }, plan.directives}
             else
               {:error, reason} ->
-                meta = Jido.AI.Session.failed_metadata(meta, reason)
+                meta =
+                  meta
+                  |> Jido.AI.Session.failed_metadata(reason)
+                  |> compact_failure_metadata(reason)
 
                 {context.agent_state, %{status: :failed, error: Jido.AI.Error.for_storage(reason), meta: meta}, []}
             end
@@ -268,10 +281,20 @@ defmodule Jido.AI.Session.Settle do
 
   defp domain(candidate, context) do
     case Zoi.parse(context.jido_ai_domain_schema, candidate) do
-      {:ok, _} = result -> result
-      {:error, _} -> {:error, :invalid_domain_result}
+      {:ok, _} = result ->
+        result
+
+      {:error, errors} ->
+        if Jido.AI.Authoring.state_size_error?(errors),
+          do: {:error, :state_size},
+          else: {:error, :invalid_domain_result}
     end
   end
+
+  defp compact_failure_metadata(meta, :state_size),
+    do: Map.put(meta, :completion, %{details_elided?: true})
+
+  defp compact_failure_metadata(meta, _reason), do: meta
 end
 
 defmodule Jido.AI.Session.Cancel do

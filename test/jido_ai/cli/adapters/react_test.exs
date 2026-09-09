@@ -2,11 +2,17 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapterTest do
   use ExUnit.Case, async: true
   use Mimic
 
-  alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.AI.Reasoning.ReAct.CLIAdapter, as: ReActAdapter
   alias Jido.AI.TestSupport.CLIAdapter, as: AdapterTestSupport
 
   setup :set_mimic_from_context
+
+  defp profile(module) do
+    {Jido.AI.Runtime.Plugin, opts} =
+      Enum.find(module.definition().plugins, &(elem(&1, 0) == Jido.AI.Runtime.Plugin))
+
+    opts[:profiles].assistant
+  end
 
   defmodule StubReActAgent do
     def ask(pid, query) do
@@ -61,35 +67,36 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapterTest do
     end
 
     test "uses custom model/tools/max_iterations/system_prompt from config", %{custom_module: module} do
-      state = module.new() |> StratState.get(%{})
-      config = state[:config]
+      config = profile(module)
+      generation = config.models.answer.generation
 
-      assert config.model == "openai:gpt-4.1"
-      assert config.tools == [TestCalculator]
-      assert config.max_iterations == 4
-      assert config.max_tokens == 4_096
-      assert config.system_prompt == "Think step by step, then call tools."
-      assert config.base_req_http_options == [plug: {Req.Test, []}]
-      assert config.base_llm_opts == [thinking: %{type: :enabled, budget_tokens: 512}, reasoning_effort: :high]
+      assert config.models.answer.model == "openai:gpt-4.1"
+      assert Enum.map(config.tools, & &1.target) == [TestCalculator]
+      assert config.controls.max_iterations == 4
+      assert generation[:max_tokens] == 4_096
+      assert config.instructions == "Think step by step, then call tools."
+      assert generation[:req_http_options] == [plug: {Req.Test, []}]
+      assert generation[:thinking] == %{type: :enabled, budget_tokens: 512}
+      assert generation[:reasoning_effort] == :high
     end
 
     test "uses default values when options are omitted", %{default_module: module} do
-      state = module.new() |> StratState.get(%{})
-      config = state[:config]
+      config = profile(module)
 
-      assert config.model == Jido.AI.resolve_model(:fast)
-      assert config.max_iterations == 10
-      assert config.max_tokens == 4_096
+      assert config.models.answer.model == :fast
+      assert config.controls.max_iterations == 10
+      assert config.models.answer.generation[:max_tokens] == 4_096
 
-      assert config.tools == [
-               Jido.AI.Tools.Arithmetic.Add,
-               Jido.AI.Tools.Arithmetic.Subtract,
-               Jido.AI.Tools.Arithmetic.Multiply,
-               Jido.AI.Tools.Arithmetic.Divide
-             ]
+      assert MapSet.new(Enum.map(config.tools, & &1.target)) ==
+               MapSet.new([
+                 Jido.AI.Tools.Arithmetic.Add,
+                 Jido.AI.Tools.Arithmetic.Subtract,
+                 Jido.AI.Tools.Arithmetic.Multiply,
+                 Jido.AI.Tools.Arithmetic.Divide
+               ])
 
-      assert is_binary(config.system_prompt)
-      assert config.system_prompt != ""
+      assert is_binary(config.instructions)
+      assert config.instructions != ""
     end
   end
 
@@ -138,11 +145,12 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapterTest do
       status =
         AdapterTestSupport.status(
           result: nil,
-          details: %{model: "openai:gpt-4o"},
-          raw_state: %{
-            last_answer: "ReAct answer",
-            __strategy__: %{iteration: 2, usage: %{input_tokens: 10, output_tokens: 5}}
-          }
+          details: %{
+            model: "openai:gpt-4o",
+            iteration: 2,
+            usage: %{input_tokens: 10, output_tokens: 5}
+          },
+          raw_state: %{last_answer: "ReAct answer"}
         )
 
       expect(Jido.AI.CLI.Adapter, :status, fn _pid -> {:ok, status} end)

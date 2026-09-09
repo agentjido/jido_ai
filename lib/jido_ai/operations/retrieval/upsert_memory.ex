@@ -24,9 +24,7 @@ defmodule Jido.AI.Actions.Retrieval.UpsertMemory do
 
   @impl Jido.Action
   def run(params, context) do
-    Jido.AI.Actions.Retrieval.Request.run(schema(), params, context, fn params,
-                                                                        namespace,
-                                                                        store ->
+    Jido.AI.Actions.Retrieval.Request.run(schema(), params, context, fn params, namespace, store ->
       entry = Store.upsert(namespace, Map.take(params, [:id, :text, :metadata]), store)
       {:ok, %{retrieval: %{namespace: namespace, last_upsert: entry}}}
     end)

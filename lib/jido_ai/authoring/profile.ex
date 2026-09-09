@@ -475,9 +475,11 @@ defmodule Jido.AI.Profile do
 
   defp instructions(value) when is_nil(value), do: :ok
 
+  defp instructions(""), do: :ok
+
   defp instructions(value) when is_binary(value) do
     if String.trim(value) == "",
-      do: error("instructions", "Expected non-empty text"),
+      do: error("instructions", "Expected non-empty text or an empty override"),
       else: :ok
   end
 
@@ -629,20 +631,155 @@ defmodule Jido.AI.Profile do
 
   defp effect_policy(value) when value in [nil, [], %{}], do: {:ok, %{}}
 
-  defp effect_policy(value) when is_map(value) or is_list(value) or is_nil(value) do
-    policy = Jido.AI.Effects.Policy.new(value)
+  defp effect_policy(value) when is_map(value) or is_list(value) do
+    with {:ok, value} <- input_map(value),
+         {:ok, value} <- fields(value, [:mode, :allow, :deny, :constraints], "effect_policy"),
+         {:ok, mode} <- effect_policy_mode(Map.get(value, :mode, :allow_list)),
+         {:ok, allow} <- effect_policy_matchers(Map.get(value, :allow), "effect_policy.allow"),
+         {:ok, deny} <- effect_policy_matchers(Map.get(value, :deny), "effect_policy.deny"),
+         {:ok, constraints} <- effect_policy_constraints(Map.get(value, :constraints, %{})) do
+      policy_input =
+        value
+        |> Map.put(:mode, mode)
+        |> maybe_put(:allow, allow)
+        |> maybe_put(:deny, deny)
+        |> Map.put(:constraints, constraints)
 
-    {:ok,
-     %{
-       mode: policy.mode,
-       allow: Enum.sort(policy.allow),
-       deny: Enum.sort(policy.deny),
-       constraints: policy.constraints
-     }}
+      policy = Jido.AI.Effects.Policy.new(policy_input)
+
+      {:ok,
+       %{
+         mode: policy.mode,
+         allow: Enum.sort(policy.allow),
+         deny: Enum.sort(policy.deny),
+         constraints: policy.constraints
+       }}
+    end
   end
 
   defp effect_policy(_),
     do: error("effect_policy", "Expected an effect policy map or keyword list")
+
+  defp effect_policy_mode(mode) when mode in [:deny_all, :allow_all, :allow_list], do: {:ok, mode}
+
+  defp effect_policy_mode(mode) when is_binary(mode) do
+    case Enum.find([:deny_all, :allow_all, :allow_list], &(Atom.to_string(&1) == mode)) do
+      nil -> error("effect_policy.mode", "Expected deny_all, allow_all, or allow_list")
+      mode -> {:ok, mode}
+    end
+  end
+
+  defp effect_policy_mode(_),
+    do: error("effect_policy.mode", "Expected deny_all, allow_all, or allow_list")
+
+  defp effect_policy_matchers(nil, _path), do: {:ok, nil}
+  defp effect_policy_matchers(%MapSet{} = values, path), do: effect_policy_matchers(MapSet.to_list(values), path)
+
+  defp effect_policy_matchers(values, path) when is_list(values) do
+    traverse(values, fn value -> effect_policy_matcher(value, path) end)
+  end
+
+  defp effect_policy_matchers(_, path), do: error(path, "Expected a list of effect modules")
+
+  defp effect_policy_matcher(module, path)
+       when is_atom(module) and module not in [nil, true, false] do
+    if module |> Atom.to_string() |> String.starts_with?("Elixir."),
+      do: {:ok, module},
+      else: error(path, "Expected a module alias, got #{inspect(module)}")
+  end
+
+  defp effect_policy_matcher(module, path) when is_binary(module) do
+    try do
+      effect_policy_matcher(String.to_existing_atom(module), path)
+    rescue
+      ArgumentError -> error(path, "Unknown effect module #{inspect(module)}")
+    end
+  end
+
+  defp effect_policy_matcher(value, path),
+    do: error(path, "Expected an effect module, got #{inspect(value)}")
+
+  defp effect_policy_constraints(value) do
+    with {:ok, value} <- input_map(value),
+         {:ok, value} <- fields(value, [:emit, :schedule], "effect_policy.constraints"),
+         {:ok, emit} <- effect_policy_emit_constraints(Map.get(value, :emit)),
+         {:ok, schedule} <- effect_policy_schedule_constraints(Map.get(value, :schedule)) do
+      {:ok, %{} |> maybe_put(:emit, emit) |> maybe_put(:schedule, schedule)}
+    end
+  end
+
+  defp effect_policy_emit_constraints(nil), do: {:ok, nil}
+
+  defp effect_policy_emit_constraints(value) do
+    with {:ok, value} <- input_map(value),
+         {:ok, value} <-
+           fields(
+             value,
+             [:allowed_signal_prefixes, :allowed_signal_types, :allowed_dispatches],
+             "effect_policy.constraints.emit"
+           ),
+         :ok <- effect_policy_string_list(value[:allowed_signal_prefixes], "allowed_signal_prefixes"),
+         :ok <- effect_policy_string_list(value[:allowed_signal_types], "allowed_signal_types"),
+         :ok <- effect_policy_dispatch_list(value[:allowed_dispatches]) do
+      {:ok, value}
+    end
+  end
+
+  defp effect_policy_schedule_constraints(nil), do: {:ok, nil}
+
+  defp effect_policy_schedule_constraints(value) do
+    with {:ok, value} <- input_map(value),
+         {:ok, value} <-
+           fields(value, [:max_delay_ms], "effect_policy.constraints.schedule") do
+      case Map.fetch(value, :max_delay_ms) do
+        :error ->
+          {:ok, value}
+
+        {:ok, max_delay_ms} when is_integer(max_delay_ms) and max_delay_ms >= 0 ->
+          {:ok, value}
+
+        {:ok, _max_delay_ms} ->
+          error(
+            "effect_policy.constraints.schedule.max_delay_ms",
+            "Expected a non-negative integer"
+          )
+      end
+    else
+      {:error, _} = error -> error
+    end
+  end
+
+  defp effect_policy_string_list(nil, _field), do: :ok
+
+  defp effect_policy_string_list(values, _field)
+       when is_list(values) and values != [] do
+    if Enum.all?(values, &(is_binary(&1) and String.trim(&1) != "")),
+      do: :ok,
+      else: error("effect_policy.constraints.emit", "Expected non-empty strings")
+  end
+
+  defp effect_policy_string_list([], _field), do: :ok
+
+  defp effect_policy_string_list(_, field),
+    do: error("effect_policy.constraints.emit.#{field}", "Expected a list")
+
+  defp effect_policy_dispatch_list(nil), do: :ok
+
+  defp effect_policy_dispatch_list(values) when is_list(values) do
+    if Enum.all?(values, fn
+         value when is_atom(value) -> value not in [nil, true, false]
+         value when is_binary(value) -> String.trim(value) != ""
+         _value -> false
+       end),
+       do: :ok,
+       else: error("effect_policy.constraints.emit.allowed_dispatches", "Expected atoms or strings")
+  end
+
+  defp effect_policy_dispatch_list(_),
+    do: error("effect_policy.constraints.emit.allowed_dispatches", "Expected a list")
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
   defp reasoning(value, models) do
     with {:ok, value} <-

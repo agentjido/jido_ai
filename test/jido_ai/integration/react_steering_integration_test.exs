@@ -27,6 +27,7 @@ defmodule Jido.AI.Integration.ReActSteeringIntegrationTest do
     :ok
   end
 
+  @tag :legacy_v2
   test "public steer continues the active request instead of starting a second one" do
     test_pid = self()
 
@@ -94,11 +95,15 @@ defmodule Jido.AI.Integration.ReActSteeringIntegrationTest do
     assert {:error, {:rejected, :idle}} = AI.inject(pid, "Programmatic input")
   end
 
+  defp user_contents(%ReqLLM.Context{} = context), do: context |> ReqLLM.Context.to_list() |> user_contents()
+
   defp user_contents(messages) when is_list(messages) do
     messages
     |> Enum.filter(&(message_role(&1) == :user))
     |> Enum.map(&message_content/1)
   end
+
+  defp assistant_contents(%ReqLLM.Context{} = context), do: context |> ReqLLM.Context.to_list() |> assistant_contents()
 
   defp assistant_contents(messages) when is_list(messages) do
     messages
@@ -118,6 +123,8 @@ defmodule Jido.AI.Integration.ReActSteeringIntegrationTest do
   end
 
   defp message_content(message) when is_map(message) do
-    Map.get(message, :content, Map.get(message, "content"))
+    message
+    |> Map.get(:content, Map.get(message, "content"))
+    |> Jido.AI.Turn.extract_text()
   end
 end

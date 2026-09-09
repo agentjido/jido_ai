@@ -53,8 +53,7 @@ defmodule Jido.AI.Actions.Planning.Prioritize do
         criteria:
           Zoi.string(description: "Prioritization criteria (e.g., 'impact, urgency, effort')")
           |> Zoi.optional(),
-        context:
-          Zoi.string(description: "Additional context about the project") |> Zoi.optional(),
+        context: Zoi.string(description: "Additional context about the project") |> Zoi.optional(),
         max_tokens: Zoi.integer(description: "Maximum tokens to generate") |> Zoi.default(4096),
         temperature: Zoi.float(description: "Sampling temperature") |> Zoi.default(0.5),
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
@@ -212,16 +211,23 @@ defmodule Jido.AI.Actions.Planning.Prioritize do
 
   defp parse_ordered_tasks(order_section) do
     order_section
-    |> String.split("\n")
+    |> String.split(~r/\s*→\s*|\r?\n/)
     |> Enum.map(&extract_task_from_line/1)
     |> Enum.reject(&is_nil/1)
   end
 
   defp extract_task_from_line(line) do
-    case Regex.run(~r/^\d+\.\s+\*\*(.+?)\*\*/, line) do
-      [_, task] -> String.trim(task)
-      _ -> nil
-    end
+    [
+      ~r/^\s*\d+\.\s+\*\*(.+?)\*\*/,
+      ~r/^\s*\d+\.\s+\[(.+?)\]\s*$/,
+      ~r/^\s*\d+\.\s+(.+?)\s*$/
+    ]
+    |> Enum.find_value(fn pattern ->
+      case Regex.run(pattern, line) do
+        [_, task] -> String.trim(task)
+        _ -> nil
+      end
+    end)
   end
 
   defp extract_scores(text) do

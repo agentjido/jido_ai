@@ -36,7 +36,26 @@ defmodule Jido.AI.Actions.Reasoning.InferTest do
       assert result.model == Jido.AI.resolve_model(:reasoning)
       assert result.result =~ "Premises:"
       assert result.reasoning == result.result
+      assert Map.has_key?(result, :confidence)
       assert_usage(result.usage)
+    end
+
+    test "extracts the requested confidence value" do
+      expect(ReqLLM.Generation, :generate_text, fn _model, _messages, _opts ->
+        {:ok,
+         %{
+           message: %{content: "The conclusion follows.\nCONFIDENCE: 0.87"},
+           usage: %{input_tokens: 3, output_tokens: 4}
+         }}
+      end)
+
+      assert {:ok, result} =
+               Infer.run(
+                 %{premises: "All cats are mammals.", question: "Are cats mammals?"},
+                 %{}
+               )
+
+      assert result.confidence == 0.87
     end
 
     test "includes optional context in inference prompt" do
@@ -53,6 +72,11 @@ defmodule Jido.AI.Actions.Reasoning.InferTest do
   end
 
   describe "validation and security" do
+    test "returns an error for an unsupported model value" do
+      assert {:error, :invalid_model_format} =
+               Infer.run(%{model: [:invalid], premises: "A", question: "B"}, %{})
+    end
+
     test "returns error when premises are missing" do
       assert {:error, :premises_and_question_required} = Infer.run(%{question: "Test"}, %{})
     end

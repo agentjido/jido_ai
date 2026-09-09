@@ -232,7 +232,7 @@ Validated on 2026-09-06:
   whitespace. Tracked production files and dependencies have no changes.
 
 No runtime tests were run for the final documentation pass. The isolated
-foundation results remain in its [run record](../../examples/v3/README.md).
+foundation results remain in the checked [example catalog](../../examples/README.md).
 
 ## First implementation evidence: 2026-09-06
 
@@ -268,7 +268,7 @@ PRs 225/235 steering helper results, PR 262 event streams, PR 314 event order,
 PR 332 portable completed state, and the actual HTTP header path. The complete
 ReAct facade, remaining options and failure/recovery cases stay open. All 126
 row-level statuses remain pending. See
-[02_03](../../examples/v3/profiles/02_03_public_agent.md) for the exact scope.
+[02_03](../../examples/02_requests/02_03_public_agent/README.md) for the exact scope.
 
 ## Request policy implementation evidence: 2026-09-06
 
@@ -277,7 +277,7 @@ partial evidence for PR 291 iteration overrides, PR 269 raw/custom output,
 PR 319 imported JSON schemas, and PR 341 open tool schemas. The 32 existing
 ToolAdapter assertions also pass against v3 test Actions. Fourteen history rows
 now have partial execution evidence. All 126 row-level statuses remain pending.
-See [02_04](../../examples/v3/profiles/02_04_request_scope.md) for the exact scope.
+See [02_04](../../examples/02_requests/02_04_request_scope/README.md) for the exact scope.
 
 ## Request transformation implementation evidence: 2026-09-06
 
@@ -289,7 +289,7 @@ formats and callback identity. The existing Output tests also pass on v3.
 Sixteen history rows now have partial execution evidence. All 126 row-level
 statuses remain pending. Full events, standalone execution, fresh-runtime
 restore and token compatibility remain required. See
-[02_05](../../examples/v3/profiles/02_05_request_transform.md) for the scope.
+[02_05](../../examples/02_requests/02_05_request_transform/README.md) for the scope.
 
 ## Output implementation evidence: 2026-09-06
 
@@ -299,7 +299,7 @@ has a live nested-array/default/enum case. PR 300 gains the retained Observe
 helper checks and the actual output telemetry boundary. PR 339 gains held
 callback cancellation and deadline evidence. Eighteen rows have partial
 execution evidence. All 126 row-level statuses remain pending. See
-[02_06](../../examples/v3/profiles/02_06_output_contract.md) for the limits.
+[02_06](../../examples/02_requests/02_06_output_contract/README.md) for the limits.
 
 ## Response metadata implementation evidence: 2026-09-06
 
@@ -309,7 +309,7 @@ later-request isolation and snapshot source order. Tool rounds, output repair,
 later provider failure and cancellation retain completed-call metadata.
 The shared helper suite has 117 passing tests, including 21 existing error-model
 tests. Nineteen rows have partial execution evidence. All 126 row-level statuses
-remain pending. See [02_07](../../examples/v3/profiles/02_07_response_metadata.md)
+remain pending. See [02_07](../../examples/02_requests/02_07_response_metadata/README.md)
 for the remaining method, failure and recovery checks.
 
 ## Error implementation evidence: 2026-09-06
@@ -319,12 +319,12 @@ The 177-test acceptance run adds 15 error cases. PRs 214, 223, 258, 275 and
 portable failure storage, provider status/cause data and shared normalization.
 PR 300 gains a finite null-error summary and valid transport-key checks.
 Twenty-four rows have partial execution evidence. All 126 row-level statuses
-remain pending. See [02_08](../../examples/v3/profiles/02_08_error_contract.md)
+remain pending. See [02_08](../../examples/02_requests/02_08_error_contract/README.md)
 for the exact boundary and remaining tool, method and recovery checks.
 
 ## Tool result execution checkpoint
 
-The [02_09 example](../../examples/v3/profiles/02_09_tool_results.md) raises
+The [02_09 example](../../examples/02_requests/02_09_tool_results/README.md) raises
 the enabled acceptance result to 196 passed. The retained shared helper suite
 has 117 passed. PRs 230, 250, 296 and 306 gain first partial evidence for tool
 envelopes, binary content and completed tool inspection. PRs 258, 299 and 300
@@ -339,7 +339,7 @@ standalone APIs, method parity and package checks remain required.
 
 ## Tool effect execution checkpoint
 
-The [02_10 example](../../examples/v3/profiles/02_10_tool_effects.md) raises
+The [02_10 example](../../examples/02_requests/02_10_tool_effects/README.md) raises
 the enabled acceptance result to 220 passed. The retained shared suite now has
 128 passed, including 11 Policy/Applier cases updated for current core types.
 PR 318 gains local-file I/O, effect filtering and final-delivery evidence.
@@ -350,7 +350,7 @@ reporting, pending-work recovery and package validation remain required.
 
 ## Completion execution checkpoint
 
-The [02_11 example](../../examples/v3/profiles/02_11_completion.md) raises
+The [02_11 example](../../examples/02_requests/02_11_completion/README.md) raises
 the enabled acceptance result to 231 passed. PR 262 gains terminal-failure
 evidence after a rejected completion. PR 318 gains the post-commit Directive
 failure boundary. PR 332 gains actual storage-conflict and lost-write-reply
@@ -361,7 +361,7 @@ all methods/facades and package validation remain required.
 
 ## Tool callback execution checkpoint
 
-The [02_12 example](../../examples/v3/profiles/02_12_tool_callbacks.md) raises
+The [02_12 example](../../examples/02_requests/02_12_tool_callbacks/README.md) raises
 the enabled acceptance result to 263 passed. The retained shared suite adds
 11 ToolInterceptor tests. PR 347 gains its first partial execution evidence:
 the alias workflow uses real tools and explicit candidate state; callbacks
@@ -373,7 +373,7 @@ required.
 
 ## Preflight and time-limit execution checkpoint
 
-The [02_13 example](../../examples/v3/profiles/02_13_tool_limits.md) raises
+The [02_13 example](../../examples/02_requests/02_13_tool_limits/README.md) raises
 the enabled acceptance result to 282 passed, including 19 new cases. The
 retained shared suite has 139 passed. PR 260 gains batch preflight, prepared
 arguments, interruption, failure events, request isolation and real callback
@@ -391,7 +391,7 @@ recovery and package validation remain required.
 
 ## Session stream activity execution checkpoint
 
-The [02_14 example](../../examples/v3/profiles/02_14_stream_activity.md) raises
+The [02_14 example](../../examples/02_requests/02_14_stream_activity/README.md) raises
 the enabled acceptance result to 298 passed, including 16 new cases. The
 retained shared suite has 139 passed. PR 308 gains its first partial evidence:
 public keepalives preserve runtime and enumerable idle limits around real
@@ -408,7 +408,7 @@ evidence, with 227 concrete test references. All 126 row statuses remain pending
 
 ## Early tool activity execution checkpoint
 
-The [02_15 example](../../examples/v3/profiles/02_15_early_tool_activity.md)
+The [02_15 example](../../examples/02_requests/02_15_early_tool_activity/README.md)
 raises the enabled acceptance result to 311 passed, including 13 new cases.
 PR 247 gains its first partial evidence. The real decoder emits tool-name
 activity before argument completion and document execution. Empty names are
@@ -426,7 +426,7 @@ and other methods, durable recovery and full package checks remain required.
 
 ## Typed Signal execution checkpoint
 
-The [02_16 example](../../examples/v3/profiles/02_16_typed_signals.md) raises
+The [02_16 example](../../examples/02_requests/02_16_typed_signals/README.md) raises
 the enabled acceptance result to 329 passed, including 18 new cases. The
 retained shared suite now has 227 passed, including 88 Turn and Signal cases.
 PR 310 gains static core schemas, constructors, duplicate/nil/type/options
@@ -443,7 +443,7 @@ references. All 126 row statuses remain pending.
 
 ## Automatic session Signal checkpoint
 
-The [02_17 example](../../examples/v3/profiles/02_17_signal_delivery.md) adds
+The [02_17 example](../../examples/02_requests/02_17_signal_delivery/README.md) adds
 26 executed cases for automatic ReAct session delivery through core Agent
 commits, outbound Plugins and dispatch adapters. PR 310 gains the complete
 new example references. PRs 247 and 271 gain automatic early/ordered delta
@@ -459,7 +459,7 @@ The [implementation record](implementation.md) records final suite checks.
 
 ## CoT and CoD execution evidence
 
-The [09_01 example](../../examples/v3/profiles/09_01_linear.md) adds 33 cases.
+The [09_01 example](../../examples/09_reasoning/09_01_linear/README.md) adds 33 cases.
 The full integration run has 388 passed. PR 218 gains first partial evidence
 for real prompt attributes, default normalization and invalid authoring in both
 public linear wrappers. PR 217 gains the corresponding method scope. PRs 223
@@ -480,7 +480,7 @@ linear request default and CoD's actual observation label.
 
 ## Retained linear API execution evidence
 
-The [09_02 example](../../examples/v3/profiles/09_02_method_api.md) adds seven
+The [09_02 example](../../examples/09_reasoning/09_02_method_api/README.md) adds seven
 cases; the full acceptance run has 395 passed. The retained CoT Machine tests
 run unchanged on v3. Its finite transitions replace Fsmx, and its data API,
 raw failures and legacy telemetry remain. PR 297 gains first partial evidence
@@ -497,7 +497,7 @@ required.
 
 ## AoT execution evidence
 
-The [09_03 example](../../examples/v3/profiles/09_03_aot.md) adds 24 integration
+The [09_03 example](../../examples/09_reasoning/09_03_aot/README.md) adds 24 integration
 cases and one default lifecycle case. The full acceptance run has 420 passed.
 AoT retains its single-generation search prompt and complete result through
 actual Agent/Flow execution. Seven retained Machine cases also remain usable
@@ -518,7 +518,7 @@ the original target commit.
 
 ## Native ToT execution evidence
 
-The [09_04 example](../../examples/v3/profiles/09_04_tot.md) adds 23 native
+The [09_04 example](../../examples/09_reasoning/09_04_tot/README.md) adds 23 native
 integration cases. The full acceptance run has 443 passed. Search order,
 ranked results, node/branch/beam limits, parser repair, tools in both phases,
 callback order, usage, cancellation and owner interruption use actual core
@@ -534,7 +534,7 @@ AoT lifecycle case; that case remains enabled.
 
 ## Public ToT and alias execution evidence
 
-The [09_05 example](../../examples/v3/profiles/09_05_tot_api.md) adds 28 public
+The [09_05 example](../../examples/09_reasoning/09_05_tot_api/README.md) adds 28 public
 and callback integration cases. The full acceptance run has 471 passed. The
 public macro, result helpers, failed-tree getters, cancellation, search budget
 and provider-timeout mapping use actual Agent/Flow and mock HTTP/SSE execution.
@@ -567,7 +567,7 @@ recovery or package acceptance requirements.
 
 ## Native GoT execution evidence
 
-The [09_06 example](../../examples/v3/profiles/09_06_got.md) adds 22 integration
+The [09_06 example](../../examples/09_reasoning/09_06_got/README.md) adds 22 integration
 cases. Native generation, connection discovery and synthesis use the existing
 Agent/Flow/Session. All 41 retained Machine tests pass unchanged on v3. A real
 model connection and separate diamond/cycle cases cover the graph change in
@@ -582,7 +582,7 @@ complete provider variants, durable recovery and package gates remain required.
 
 ## Public GoT execution evidence
 
-The [09_07 example](../../examples/v3/profiles/09_07_got_api.md) adds 11 cases
+The [09_07 example](../../examples/09_reasoning/09_07_got_api/README.md) adds 11 cases
 for public authoring, retained graph inspection, failed causes, larger call
 budgets, cancellation and method filtering. A bounded path test fixes infinite
 parent-cycle traversal. Busy admission now has the same request/stream result
@@ -597,7 +597,7 @@ provider variants, durable recovery and root package gates remain required.
 
 ## Native TRM implementation evidence: 2026-09-07
 
-The [09_08 profile](../../examples/v3/profiles/09_08_trm.md) adds 24 integration
+The [09_08 profile](../../examples/09_reasoning/09_08_trm/README.md) adds 24 integration
 cases for the existing TRM method. The five retained support modules also pass
 204 tests on v3 dependencies. PRs 223, 231, 233, 239, 297, 299 and 314 gain
 partial evidence for scored-answer selection, method and phase identity, request
@@ -614,7 +614,7 @@ release checks remain open.
 
 ## Public TRM implementation evidence: 2026-09-07
 
-The [09_09 profile](../../examples/v3/profiles/09_09_trm_api.md) adds 12 public
+The [09_09 profile](../../examples/09_reasoning/09_09_trm_api/README.md) adds 12 public
 TRM integration cases. They preserve reason/sync/await, declared options, default
 model resolution, all five cycles, retained review data, printable failures,
 streaming and cancellation through the common Agent and native Flow. PRs 223,
@@ -626,7 +626,7 @@ required. The pinned source inventory is unchanged.
 
 ## Native Adaptive evidence: 2026-09-07
 
-The [09_10 profile](../../examples/v3/profiles/09_10_adaptive.md) adds 28
+The [09_10 profile](../../examples/09_reasoning/09_10_adaptive/README.md) adds 28
 integration cases. All seven methods use actual model calls through the shared
 Flow. ReAct and ToT execute real tools. Selection repeats for each request and
 retains its method, result, usage and failure data. Invalid settings fail before
@@ -642,7 +642,7 @@ and root package gates remain required. The pinned API inventory is unchanged.
 
 ## Public Adaptive evidence: 2026-09-07
 
-The [09_11 profile](../../examples/v3/profiles/09_11_adaptive_api.md) adds 22
+The [09_11 profile](../../examples/09_reasoning/09_11_adaptive_api/README.md) adds 22
 public integration cases. All seven methods run through the common Agent and
 Flow. The cases retain public selection, typed results, printable failures,
 tool callbacks, streams, cancellation and actual method usage. PR 234 gains
@@ -657,7 +657,7 @@ package/release gates remain open. The baseline API inventory is unchanged.
 
 ## Selected method control refinement: 2026-09-07
 
-The [09_12 cases](../../examples/v3/profiles/09_12_method_controls.md) fix
+The [09_12 cases](../../examples/09_reasoning/09_12_method_controls/README.md) fix
 the initial combined Adaptive budget. Actual ReAct and TRM requests preserve
 their respective counts on one Agent. Explicit Agent/request limits, whole-batch
 tool limits, typed repair and source-format parity have focused evidence.
@@ -667,7 +667,7 @@ resolve. The full feature, recovery, API and package gates remain required.
 
 ## Active Adaptive selection: 2026-09-07
 
-The [09_13 cases](../../examples/v3/profiles/09_13_active_selection.md)
+The [09_13 cases](../../examples/09_reasoning/09_13_active_selection/README.md)
 restore active method and score inspection. Core commits prepared selection
 before model work. Input controls, one-use owner grants, host policy rejection,
 unrelated domain changes, cancellation and owner loss have focused evidence.
@@ -681,7 +681,7 @@ CLI/capability/skill paths, durable recovery and root package gates stay open.
 
 ## Callable reasoning evidence: 2026-09-07
 
-The [09_14 cases](../../examples/v3/profiles/09_14_callable_reasoning.md) add
+The [09_14 cases](../../examples/09_reasoning/09_14_callable_reasoning/README.md) add
 partial evidence for commit e2b2d275 and PRs 231, 233 and 297. Twenty cases
 execute all seven RunStrategy methods through direct Exec and an Agent. They
 check defaults, full method outputs, failure usage, cancellation, timeouts and
@@ -692,7 +692,7 @@ statuses remain pending. PR 342 cold-catalog timing remains unproved.
 
 ## Reasoning capability evidence — 2026-09-07
 
-[Example 16_01](../../examples/v3/profiles/16_01_reasoning_capabilities.md)
+[Example 16_01](../../examples/16_capabilities/16_01_reasoning/README.md)
 adds 17 integration cases and 21 native Plugin contract cases. The full AI
 acceptance suite now passes 659 cases. This adds partial evidence for PR 263
 (Plugin choices), PR 281 (ordinary routes), callable reasoning dispatch and
@@ -702,7 +702,7 @@ lists the unproved legacy conversion, other capabilities and release gates.
 
 ## Planning helper evidence — 2026-09-07
 
-[08_01](../../examples/v3/profiles/08_01_planning.md) adds 18 integration cases
+[08_01](../../examples/08_planning/08_01_planning/README.md) adds 18 integration cases
 for the three Planning Actions and Plugin, plus 12 native API/Plugin checks.
 The full AI acceptance suite passes 678 cases. Six exact test references add
 partial PR 279 evidence for text extraction, parser results, string inputs and
@@ -712,7 +712,7 @@ remaining feature/release gates are not complete.
 
 ## Chat Action evidence: 2026-09-07
 
-[Example 16_02](../../examples/v3/profiles/16_02_chat.md) adds 32 integration
+[Example 16_02](../../examples/16_capabilities/16_02_chat/README.md) adds 32 integration
 cases for the seven Chat Actions and the native Plugin. Actual HTTP tests
 cover schema/input conversion, model inputs, empty embeddings, returned usage,
 canonical telemetry, nested usage, invalid structured output and the PR 290
@@ -723,7 +723,7 @@ required. No baseline inventory or history range was changed.
 
 ## Routing and Policy evidence: 2026-09-07
 
-[Example 16_03](../../examples/v3/profiles/16_03_routing_policy.md) adds 21
+[Example 16_03](../../examples/16_capabilities/16_03_routing_policy/README.md) adds 21
 integration cases and 11 native Plugin checks. The full acceptance suite passes
 732 tests. Ten new exact references add partial evidence for canonical errors,
 PR 279 input conversion, PR 340 typed content in Policy, and PR 295 request model
@@ -737,7 +737,7 @@ complete package, consumer, conversion and recovery requirements are unchanged.
 
 ## Retrieval boundary evidence: 2026-09-07
 
-[Example 07_01](../../examples/v3/profiles/07_01_memory.md) adds actual Store,
+[Example 07_01](../../examples/07_retrieval/07_01_memory/README.md) adds actual Store,
 Action, Agent and model-tool checks. Three references add partial PR 279 evidence
 for memory input conversion, ranking and current Agent context. The reproduced
 unknown-key defect is fixed without creating atoms. Supervised ownership,
@@ -750,7 +750,7 @@ remain required. The reviewed commit range and baseline inventory are unchanged.
 
 ## Quota accounting evidence: 2026-09-07
 
-[13_01](../../examples/v3/profiles/13_01_quota.md) adds partial evidence for
+[13_01](../../examples/13_policy/13_01_quota/README.md) adds partial evidence for
 PR 297 and PR 312. The user reports in issues 294 and 311 require correct usage
 beyond a successful answer. The new cases keep call cost outside Agent commit,
 distinguish cumulative stream snapshots from separate calls, preserve partial
@@ -766,7 +766,7 @@ checks remain open. Immutable baseline paths and hashes are unchanged.
 
 ## Default Plugin integration evidence: 2026-09-07
 
-[16_04](../../examples/v3/profiles/16_04_plugin_stack.md) adds six exact
+[16_04](../../examples/16_capabilities/16_04_plugin_stack/README.md) adds six exact
 references for PR 263 Plugin choices and PR 281 ordinary routes. The examples
 retain explicit configuration, static route input and a caller module-attribute
 route table through real Agent calls. One Session owns work; optional stores
@@ -779,12 +779,12 @@ baseline paths and commit scope are unchanged. All 126 statuses remain pending.
 
 ## Request admission and options evidence: 2026-09-07
 
-[02_18](../../examples/v3/profiles/02_18_admission.md) adds actual rejection
+[02_18](../../examples/02_requests/02_18_admission/README.md) adds actual rejection
 events for PR 262 and canonical method identity for PR 314. The tests preserve
 the original stream after a duplicate ID. Custom routes use the declared
 profile instead of a method inferred from the Signal name.
 
-[02_19](../../examples/v3/profiles/02_19_model_options.md) adds public model
+[02_19](../../examples/02_requests/02_19_model_options/README.md) adds public model
 forms and option evidence for PRs 206, 238, 248 and 295. Request headers use
 actual HTTP/SSE and retain the issue 212 cases. The shared mock now serves
 buffered Responses, including a real Action round and a typed object.
@@ -797,12 +797,12 @@ The immutable baseline paths, hashes and reviewed commit range are unchanged.
 
 ## Failed-call counts and prompt evidence: 2026-09-07
 
-[02_20](../../examples/v3/profiles/02_20_call_counts.md) checks terminal
+[02_20](../../examples/02_requests/02_20_call_counts/README.md) checks terminal
 failure/cancellation counts and preserved usage for PRs 262, 314, 297 and 312.
 These counts describe started v3 model operations; they do not replace HTTP
 or Quota accounting. Recovery does not invent an uncommitted count.
 
-[09_15](../../examples/v3/profiles/09_15_prompt_policy.md) extends related
+[09_15](../../examples/09_reasoning/09_15_prompt_policy/README.md) extends related
 PR 217 and 218 prompt-attribute and default evidence to Adaptive. Actual model
 messages retain the documented differences between public and native inputs.
 
@@ -812,7 +812,7 @@ unchanged. Full feature, recovery, package and consumer checks remain required.
 
 ## Raw reasoning-tool evidence: 2026-09-07
 
-[09_16](../../examples/v3/profiles/09_16_reasoning_tool.md) closes the raw
+[09_16](../../examples/09_reasoning/09_16_reasoning_tool/README.md) closes the raw
 RunStrategy schema-export gap and adds five exact references. They cover
 PR 341 schema conversion, the runtime-maintenance method-dispatch requirement,
 and related PR 332 portable-state and cancellation boundaries. All seven
@@ -825,7 +825,7 @@ conversion or durable recovery. Immutable baseline paths and hashes remain.
 
 ## Dynamic catalog and facade evidence: 2026-09-07
 
-[03_01](../../examples/v3/profiles/03_01_dynamic_catalog.md) adds ten exact
+[03_01](../../examples/03_tools/03_01_dynamic_catalog/README.md) adds ten exact
 references for PR 267 dynamic/direct tools, PR 281 ordinary routes and related
 PR 332 portable reconstruction. The real Action and held-tool cases preserve
 request identity, next-request visibility and protected Plugin state. Repeated
@@ -838,7 +838,7 @@ legacy checkpoint conversion. Baseline paths and hashes remain unchanged.
 
 ## Native checkpoint resume: 2026-09-07
 
-[14_03](../../examples/v3/profiles/14_03_checkpoint_resume.md) adds 17 integration cases through the actual public ReAct API.
+[14_03](../../examples/14_resume/14_03_checkpoint_resume/README.md) adds 17 integration cases through the actual public ReAct API.
 The common Flow now pauses after a model response or a complete tool round.
 The next stream pull releases it. Stopping at that boundary cancels the private
 Agent before the next operation. Resume rebuilds an Agent and Session from AI
@@ -867,7 +867,7 @@ statuses remain pending. Root Mix files still select v2.
 
 ## Standalone Action port: 2026-09-07
 
-[14_04](../../examples/v3/profiles/14_04_standalone_actions.md) adds 13 integration
+[14_04](../../examples/14_resume/14_04_standalone_actions/README.md) adds 13 integration
 cases for the actual Start, Continue, Collect and Cancel Actions. They execute
 through v3 Exec. A portable Flow connects Start and Collect, and an Agent route
 commits the aggregate result. The live stream stays in execution context.
@@ -892,7 +892,7 @@ select v2. Full validation is recorded in [implementation](implementation.md).
 
 ## Native worker lifetime and failure: 2026-09-07
 
-[14_05](../../examples/v3/profiles/14_05_worker_lifecycle.md) adds nine integration
+[14_05](../../examples/14_resume/14_05_worker_lifecycle/README.md) adds nine integration
 cases through the public ReAct and CoT Agents. Task loss stops held work,
 preserves observed usage and commits one failure. Later work succeeds, and late
 old task data cannot finish the next request. Session-owner loss interrupts
@@ -919,7 +919,7 @@ Root Mix files still select v2. All history statuses remain pending. See the
 
 ## Trace and repeated-call evidence: 2026-09-07
 
-[14_06](../../examples/v3/profiles/14_06_trace_and_cycles.md) adds 13 cases using
+[14_06](../../examples/14_resume/14_06_trace_and_cycles/README.md) adds 13 cases using
 the real Flow and the shared model mock. Three exact tool-start redaction
 references extend PR 300's partial sanitizer evidence. The other cases retain
 baseline stream and repeated-call behavior. The repeated-call code entered in
@@ -932,7 +932,7 @@ The focused set passes 82 checks. Full results and remaining gates are in the
 
 ## Standalone queue evidence: 2026-09-07
 
-[14_07](../../examples/v3/profiles/14_07_standalone_input.md) adds 13 integration
+[14_07](../../examples/14_resume/14_07_standalone_input/README.md) adds 13 integration
 cases for caller queues through the native runtime. Twelve exact references
 extend PR 225's input and lifecycle evidence; one shared-control reference
 extends PR 235. The ledger now has 706 references and 59 rows with partial
@@ -945,7 +945,7 @@ validation is recorded in [implementation](implementation.md).
 
 ## Native query append evidence: 2026-09-07
 
-[14_08](../../examples/v3/profiles/14_08_query_append.md) adds 15 native
+[14_08](../../examples/14_resume/14_08_query_append/README.md) adds 15 native
 continuation cases. One exact rich-input reference extends PR 278. Query append
 already existed before v2.0.0; the canonical Runner relocation is visible in
 `eeadb632`, an ancestor of the baseline. No post-release row is invented for it.
@@ -958,7 +958,7 @@ conversion gates are in [implementation](implementation.md).
 
 ## Standalone State conversion evidence: 2026-09-07
 
-[14_09](../../examples/v3/profiles/14_09_state_migration.md) adds 22 conversion
+[14_09](../../examples/14_resume/14_09_state_migration/README.md) adds 22 conversion
 and recovery examples. Its rich-input case extends PR 278 with an uploaded PDF
 file ID and retained refs. The ledger now has 708 exact references and 59 rows
 with partial evidence; all 126 statuses remain pending. The other conversion
@@ -968,7 +968,7 @@ and hashes are unchanged.
 
 ## Failure-position evidence: 2026-09-07
 
-[14_10](../../examples/v3/profiles/14_10_failure_position.md) adds 18 integration
+[14_10](../../examples/14_resume/14_10_failure_position/README.md) adds 18 integration
 cases. Eight exact references extend PRs 269, 343, 339 and 225. The ledger now
 has 716 exact references and 59 rows with partial evidence. All 126 history
 statuses stay pending. Baseline source/test paths and hashes are unchanged.
@@ -978,7 +978,7 @@ they do not close Agent persistence, lost-owner recovery or package acceptance.
 
 ## Parent inspection evidence: 2026-09-07
 
-[02_22](../../examples/v3/profiles/02_22_request_inspection.md) adds 14 integration
+[02_22](../../examples/02_requests/02_22_request_inspection/README.md) adds 14 integration
 cases. Eight exact references extend PRs 223, 233, 296, 332 and 262. The ledger
 now has 724 references and 59 rows with partial evidence. All 126 statuses stay
 pending. Immutable baseline paths and hashes are unchanged. The prefix/commit
@@ -988,7 +988,7 @@ profile. Root package acceptance remains open.
 
 ## Context-operation evidence: 2026-09-07
 
-[02_23](../../examples/v3/profiles/02_23_context_operations.md) adds 28 integration
+[02_23](../../examples/02_requests/02_23_context_operations/README.md) adds 28 integration
 cases. Seven references extend PRs 325, 332 and 211. The ledger now has 731 exact
 references and 60 rows with partial evidence. All 126 statuses remain pending.
 Immutable baseline paths and hashes are unchanged. Context operations that
@@ -998,7 +998,7 @@ invented for them. Skill provenance, full recovery and root package gates remain
 
 ## Skill runtime evidence: 2026-09-07
 
-[18_01](../../examples/v3/profiles/18_01_skill_runtime.md) adds 27 integration
+[18_01](../../examples/18_skills/18_01_skill_runtime/README.md) adds 27 integration
 cases. Thirty-one exact references extend PRs 286, 316, 325, 353, 354, 358
 and 360. The ledger now has 762 references and 66 rows with partial
 evidence. All 126 statuses remain pending. Immutable baseline paths, hashes
@@ -1008,7 +1008,7 @@ resources, CLI, complete conversion/recovery and root package gates remain open.
 
 ## Automatic skill authoring evidence: 2026-09-07
 
-[18_02](../../examples/v3/profiles/18_02_skill_authoring.md) adds 21 integration
+[18_02](../../examples/18_skills/18_02_skill_authoring/README.md) adds 21 integration
 cases and 25 exact references for PRs 286, 316, 325, 353, 354 and 358.
 The ledger has 787 references and 66 rows with partial evidence. All 126
 row statuses remain pending. Baseline paths, source-review details and the API
@@ -1018,7 +1018,7 @@ complete conversion/recovery and root package gates still need acceptance.
 
 ## Persistent tool context evidence: 2026-09-07
 
-[03_02](../../examples/v3/profiles/03_02_tool_context.md) adds 11 cases and
+[03_02](../../examples/03_tools/03_02_tool_context/README.md) adds 11 cases and
 10 exact references for PRs 325 and 347. The ledger has 797 references and
 66 rows with partial evidence. All 126 row statuses remain pending. Source
 review and baseline fields are unchanged. Remaining feature, conversion,

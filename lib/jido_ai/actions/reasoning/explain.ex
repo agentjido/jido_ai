@@ -142,9 +142,7 @@ defmodule Jido.AI.Actions.Reasoning.Explain do
 
   # Private Functions
 
-  defp resolve_model(nil), do: {:ok, Jido.AI.resolve_model(:reasoning)}
-  defp resolve_model(model) when is_atom(model), do: {:ok, Jido.AI.resolve_model(model)}
-  defp resolve_model(model) when is_binary(model), do: {:ok, model}
+  defp resolve_model(model), do: Helpers.resolve_model(model, :reasoning)
 
   defp build_explanation_messages(params) do
     system_prompt = build_explanation_system_prompt(params[:detail_level], params[:include_examples])

@@ -121,6 +121,19 @@ defmodule Jido.AI.Authoring.AgentDSLTest do
            }
   end
 
+  test "canonical use rejects extension module attributes with a compile error" do
+    module = Module.concat(__MODULE__, "AttributeExtensions#{System.unique_integer([:positive])}")
+
+    assert_raise CompileError, ~r/extensions must be an inline compile-time list/, fn ->
+      Code.compile_string("""
+      defmodule #{inspect(module)} do
+        @extensions []
+        use Jido.AI.Agent, name: "attribute_extensions_agent", extensions: @extensions
+      end
+      """)
+    end
+  end
+
   test "the builder and dynamic instruction Action use the canonical constructor" do
     assert {:ok, profile} =
              Jido.AI.profile(

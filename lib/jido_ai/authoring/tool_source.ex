@@ -114,10 +114,24 @@ defmodule Jido.AI.ToolSource do
   defp input_map(%{} = value) when not is_struct(value), do: {:ok, value}
 
   defp input_map(value) when is_list(value) do
-    if Keyword.keyword?(value), do: {:ok, Map.new(value)}, else: Profile.error("tools", "Expected a map")
+    cond do
+      not Keyword.keyword?(value) ->
+        Profile.error("tools", "Expected a map")
+
+      duplicate_keyword_keys?(value) ->
+        Profile.error("tools", "Duplicate tool-source key")
+
+      true ->
+        {:ok, Map.new(value)}
+    end
   end
 
   defp input_map(_), do: Profile.error("tools", "Expected a map")
+
+  defp duplicate_keyword_keys?(value) do
+    keys = Keyword.keys(value)
+    length(keys) != length(Enum.uniq(keys))
+  end
 
   defp kind(value) do
     case normalize_kind(value) do

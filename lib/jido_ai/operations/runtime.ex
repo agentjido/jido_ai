@@ -1,25 +1,17 @@
 defmodule Jido.AI.Runtime.Plugin do
   @moduledoc "Binds host AI profiles and owns portable tool and prompt overrides."
-  use Jido.Plugin
+  use Jido.Plugin, agent: Jido.AI.Runtime.Plugin.Agent
 
-  @impl Jido.Plugin
-  def state_spec(opts) do
+  @doc false
+  def agent_state_spec(opts) do
     {Jido.AI.Configuration.key(),
      Zoi.map()
      |> Zoi.refine({Jido.AI.Configuration, :validate_state, [opts[:profiles]]})
      |> Zoi.default(%{})}
   end
 
-  @impl Jido.Plugin
-  def directives(_), do: [Jido.AI.Configuration.Change]
-  @impl Jido.Plugin
-  def validate_directive(change, opts), do: Jido.AI.Configuration.validate(change, opts)
-  @impl Jido.Plugin
-  def update_state(state, directives, opts),
-    do: Jido.AI.Configuration.reduce(state, directives, opts)
-
-  @impl Jido.Plugin
-  def prepare(command, opts) do
+  @doc false
+  def prepare_command(command, opts) do
     binding = Jido.AI.Authoring.request_binding(command.agent, command.signal)
 
     resources = Map.get(command.context, :jido_ai_request, %{})
@@ -84,6 +76,55 @@ defmodule Jido.AI.Runtime.Plugin do
     end
   rescue
     error in ArgumentError -> Jido.AI.Profile.error("model", Exception.message(error))
+  end
+end
+
+defmodule Jido.AI.Runtime.Plugin.Agent do
+  @moduledoc false
+  use Jido.Agent.Plugin
+
+  alias Jido.Agent.Plugin.Contribution
+
+  @impl Jido.Agent.Plugin
+  def state_spec(opts), do: Jido.AI.Runtime.Plugin.agent_state_spec(opts)
+
+  @impl Jido.Agent.Plugin
+  def directives(_), do: [Jido.AI.Configuration.Change]
+
+  @impl Jido.Agent.Plugin
+  def validate_directive(change, opts), do: Jido.AI.Configuration.validate(change, opts)
+
+  @impl Jido.Agent.Plugin
+  def contribute(transition, opts) do
+    case Jido.AI.Configuration.reduce(
+           transition.plugin_state,
+           transition.directives,
+           opts
+         ) do
+      {:ok, state} ->
+        {:ok, %Contribution{plugin: transition.plugin, state: {:replace, state}}}
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+end
+
+defmodule Jido.AI.Runtime.PreparationPlugin do
+  @moduledoc "Compatibility preparation adapter that needs the complete immutable Agent definition."
+  use Jido.Plugin
+
+  @impl Jido.Plugin
+  def prepare(command, _opts) do
+    with {:ok, command} <- Jido.AI.Plugins.Policy.prepare_bound_command(command),
+         {:ok, command} <- Jido.AI.Plugins.Quota.prepare_bound_command(command),
+         {Jido.AI.Runtime.Plugin, opts} <-
+           Enum.find(command.agent.plugins, &(elem(&1, 0) == Jido.AI.Runtime.Plugin)) do
+      Jido.AI.Runtime.Plugin.prepare_command(command, opts)
+    else
+      {:error, _reason} = error -> error
+      _ -> Jido.AI.Profile.error("plugins", "Missing AI runtime Plugin")
+    end
   end
 end
 

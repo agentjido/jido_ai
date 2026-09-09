@@ -4,8 +4,8 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
   alias Jido.AI.Reasoning.ReAct
   alias Jido.AI.Reasoning.ReAct.{Config, Token}
   alias Jido.AI.Usage
-  alias Jido.Thread
   alias Jido.AI.Context
+  alias Jido.Thread
   alias Jido.AI.Context.Operations, as: ContextOps
   alias ReqLLM.Message.ContentPart
 
@@ -200,8 +200,8 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
   defp current_context(server), do: Jido.AI.get_strategy_context(Server.agent(server))
   defp context_lane(server), do: Server.agent(server).state[ContextOps.key()].assistant
-  defp thread_messages(server), do: Thread.filter_by_kind(context_lane(server).thread, :ai_message)
-  defp context_operations(server), do: Thread.filter_by_kind(context_lane(server).thread, :ai_context_operation)
+  defp thread_messages(server), do: Thread.filter_by_kind(context_lane(server).session.thread, :ai_message)
+  defp context_operations(server), do: Thread.filter_by_kind(context_lane(server).session.thread, :ai_context_operation)
 
   defp replace_context(server, value, opts \\ []),
     do: Session.modify_context(server, %{type: :replace, result_context: value}, opts)
@@ -262,7 +262,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
     assert context_lane(server).applied_context_ops == ["deferred"]
     assert [entry] = context_operations(server)
     assert entry.payload.operation.type == :replace and entry.payload.operation.reason == :manual
-    assert List.last(Thread.to_list(context_lane(server).thread)).id == entry.id
+    assert List.last(Thread.to_list(context_lane(server).session.thread)).id == entry.id
     assert {:ok, next} = request(server, mock, :react, "Continue")
     assert {:ok, "Next answer"} = Request.await(next)
     [first_wire, second_wire] = MockLLM.report(mock).requests
@@ -1405,7 +1405,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
                meta: %{window: %{from: 1, to: 100}}
              }
 
-      assert is_integer(context_lane(server).thread.rev)
+      assert is_integer(context_lane(server).session.thread.rev)
       assert {:ok, handle} = request(server, mock, :react, "Continue")
       assert {:ok, "Done"} = Request.await(handle)
       assert_script_done(mock)

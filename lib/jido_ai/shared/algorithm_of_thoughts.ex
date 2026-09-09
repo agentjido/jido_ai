@@ -110,8 +110,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts do
       with {:ok, answer} <- validate_answer(state.output, result.answer) do
         result = %{result | answer: answer}
 
-        {:ok, result,
-         %{termination_reason: :success, reasoning: %{method: method(), result: result}}}
+        {:ok, result, %{termination_reason: :success, reasoning: %{method: method(), result: result}}}
       end
     else
       {:method_error, {:failed, parsed.reason, result}}

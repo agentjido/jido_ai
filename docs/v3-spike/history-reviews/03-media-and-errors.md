@@ -266,7 +266,7 @@ checks close only when production v3 code and the required enabled tests pass.
 
 ## Public Adaptive follow-up: 2026-09-07
 
-The [09_11 cases](../../../examples/v3/profiles/09_11_adaptive_api.md) now give
+The [09_11 cases](../../../examples/09_reasoning/09_11_adaptive_api/README.md) now give
 partial PR 234 evidence. An actual HTTP 503 stays structured in the request
 record and is printable in last_result. Selected-method failures retain the
 actual cause and method data. Typed success and AoT/ToT maps stay canonical in
@@ -277,7 +277,7 @@ output still requires its separate port. All history statuses remain pending.
 
 ## Native request inspection evidence: 2026-09-07
 
-[02_22](../../../examples/v3/profiles/02_22_request_inspection.md) adds 14 real
+[02_22](../../../examples/02_requests/02_22_request_inspection/README.md) adds 14 real
 integration cases. The linked history rows gain partial evidence for raw
 failure inspection, per-call thinking, completed tool results, correlated
 trace prefixes and portable recovery. A durable lost completion reply retains

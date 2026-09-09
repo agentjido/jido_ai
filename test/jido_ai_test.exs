@@ -100,6 +100,8 @@ defmodule Jido.AITest do
   end
 
   describe "struct-level strategy helpers" do
+    @describetag :legacy_v2
+
     test "get_strategy_context prefers run_context while a request is active" do
       agent = create_react_agent(system_prompt: "Prompt")
 
