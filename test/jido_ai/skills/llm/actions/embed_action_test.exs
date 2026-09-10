@@ -81,13 +81,15 @@ defmodule Jido.AI.Actions.LLM.EmbedTest do
       }
 
       expect(ReqLLM.Embedding, :embed, fn model, texts, _opts ->
-        assert model == "custom:embedding-model"
+        assert model == "openai:text-embedding-3-small"
         assert texts == ["hello"]
         {:ok, %{embedding: [[0.8]], usage: %{input_tokens: 1}}}
       end)
 
-      assert {:ok, result} = Embed.run(%{texts: "hello", model: "custom:embedding-model"}, context)
-      assert result.model == "custom:embedding-model"
+      assert {:ok, result} =
+               Embed.run(%{texts: "hello", model: "openai:text-embedding-3-small"}, context)
+
+      assert result.model == "openai:text-embedding-3-small"
     end
 
     test "returns validation error when text input is missing" do

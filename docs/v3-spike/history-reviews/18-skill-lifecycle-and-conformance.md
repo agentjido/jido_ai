@@ -217,7 +217,7 @@ Do not merge their entry points into a helper that silently changes scope.
 Review `aec0165e`, `d71a78cc`, `3e391971` and `fc5bc143` next for final catalog,
 resource, provider and binary behavior.
 
-Source: [Agent](../../../lib/jido_ai/authoring/agent.ex),
+Source: [Agent](../../../lib/jido_ai/agent/definition.ex),
 [integration](../../../lib/jido_ai/skill/agent_integration.ex),
 [loading Action](../../../lib/jido_ai/actions/skill/load_skill.ex),
 [runner](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a68443f03bc6a198c5a2/lib/jido_ai/reasoning/react/runner.ex),

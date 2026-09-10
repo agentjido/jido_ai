@@ -31,7 +31,7 @@ defmodule Jido.AI.PluginFacetsTest do
     end
   end
 
-  test "the complete-Agent preparation bridge is the only mixed compatibility Plugin" do
+  test "AI library Plugins do not use the mixed compatibility form" do
     legacy_plugins =
       :jido_ai
       |> Application.spec(:modules)
@@ -40,16 +40,7 @@ defmodule Jido.AI.PluginFacetsTest do
           module.__jido_plugin__() == :agent
       end)
 
-    assert MapSet.new(legacy_plugins) ==
-             MapSet.new([
-               Jido.AI.Runtime.PreparationPlugin,
-               Jido.AI.Session.PreparationPlugin
-             ])
-
-    for plugin <- legacy_plugins do
-      assert {:ok, [%{legacy?: true, state_key: nil, agent_server: nil}]} =
-               Jido.Plugin.normalize_all([plugin])
-    end
+    assert legacy_plugins == []
   end
 
   defp library_module?(module) do

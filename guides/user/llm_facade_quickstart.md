@@ -1,29 +1,22 @@
-# LLM Facade Quickstart
+# Model Alias And ReqLLM Quickstart
 
-You want one-shot LLM generation without running a long-lived agent process.
-
-After this guide, you can use `Jido.AI.generate_text/2`, `generate_object/3`, `stream_text/2`, and `ask/2` with model aliases and sane defaults.
+Use ReqLLM for a direct model call. Use `Jido.AI.Models` only when your
+application needs stable names such as `:fast` or `:capable`.
 
 ## Prerequisites
 
 - Elixir `~> 1.18`
-- `jido_ai` dependency installed
-- at least one provider key configured under `:req_llm`
+- `jido_ai` installed
+- At least one provider key configured for ReqLLM
 
-## 1. Configure Aliases And LLM Defaults
+## 1. Configure Aliases
 
 ```elixir
 # config/config.exs
 config :jido_ai,
   model_aliases: %{
     fast: "provider:fast-model",
-    capable: "provider:capable-model",
-    thinking: "provider:thinking-model"
-  },
-  llm_defaults: %{
-    text: %{model: :fast, temperature: 0.2, max_tokens: 1024, timeout: 30_000},
-    object: %{model: :thinking, temperature: 0.0, max_tokens: 1024, timeout: 30_000},
-    stream: %{model: :fast, temperature: 0.2, max_tokens: 1024, timeout: 30_000}
+    capable: "provider:capable-model"
   }
 
 config :req_llm,
@@ -31,118 +24,92 @@ config :req_llm,
   openai_api_key: System.get_env("OPENAI_API_KEY")
 ```
 
-`Jido.AI.resolve_model/1` resolves aliases at runtime, so you can keep app code model-agnostic.
+The alias table can contain any model input accepted by ReqLLM. It can contain
+a model string, tuple, inline model map, or `%LLMDB.Model{}` value.
 
-## 2. Quick Text Generation
+## 2. Generate Text
 
 ```elixir
-# Full response envelope from ReqLLM
+model = Jido.AI.Models.resolve(:fast)
+
 {:ok, response} =
-  Jido.AI.generate_text(
+  ReqLLM.generate_text(
+    model,
     "Summarize OTP in one sentence.",
-    model: :fast,
-    temperature: 0.3
+    temperature: 0.3,
+    max_tokens: 1_024,
+    receive_timeout: 30_000
   )
 
-# Convenience text-only helper
-{:ok, text} = Jido.AI.ask("Summarize OTP in one sentence.", model: :fast)
+text = ReqLLM.Response.text(response)
 ```
 
-Use `generate_text/2` when you need full provider response metadata.  
-Use `ask/2` when you only need normalized text.
+ReqLLM owns the request options and response contract. Jido AI does not add a
+second defaults system or response wrapper.
 
-## 3. Structured Output With `generate_object/3`
+## 3. Generate Structured Data
 
 ```elixir
-schema = %{
-  type: "object",
-  properties: %{
-    "title" => %{type: "string"},
-    "priority" => %{type: "string", enum: ["low", "medium", "high"]}
-  },
-  required: ["title", "priority"]
-}
+schema = Zoi.object(%{
+  title: Zoi.string(),
+  priority: Zoi.enum([:low, :medium, :high])
+})
 
-{:ok, result} =
-  Jido.AI.generate_object(
-    "Extract title and priority from: Urgent production incident in checkout",
-    schema,
-    model: :thinking
+model = Jido.AI.Models.resolve(:capable)
+
+{:ok, response} =
+  ReqLLM.generate_object(
+    model,
+    "Extract the title and priority from this incident.",
+    schema
   )
+
+result = ReqLLM.Response.object(response)
 ```
 
-Use this path when downstream code expects stable structured fields instead of free-form text.
-
-## 4. Streaming With `stream_text/2`
+## 4. Stream Text
 
 ```elixir
-case Jido.AI.stream_text("Write a short release note for version 2.0", model: :fast) do
-  {:ok, stream_response} ->
-    # Consume this with your ReqLLM streaming pipeline.
-    stream_response
+model = Jido.AI.Models.resolve(:fast)
 
-  {:error, reason} ->
-    {:error, reason}
+case ReqLLM.stream_text(model, "Write a short release note.") do
+  {:ok, stream} -> ReqLLM.StreamResponse.text(stream)
+  {:error, reason} -> {:error, reason}
 end
 ```
 
-`stream_text/2` is a thin pass-through to ReqLLM streaming behavior.
+The returned stream is a native ReqLLM stream.
 
-## 5. Override Defaults Per Call
+## 5. Use A Direct Model Input
+
+Aliases are optional:
 
 ```elixir
-# Uses llm_defaults(:text)
-{:ok, _} = Jido.AI.generate_text("Default-path call")
-
-# Override default model/timeout for one call
-{:ok, _} =
-  Jido.AI.generate_text(
-    "High-importance call",
-    model: :capable,
-    timeout: 60_000,
-    max_tokens: 2048
-  )
+ReqLLM.generate_text(
+  "anthropic:claude-sonnet-4-5",
+  "Review this design."
+)
 ```
 
-`Jido.AI.llm_defaults/0` and `Jido.AI.llm_defaults/1` are useful for debugging effective runtime config.
+`Jido.AI.Models.resolve/1` also passes a valid direct ReqLLM model input through
+without changing it.
 
-## Failure Mode: Unknown Model Alias
+## Common Errors
 
-Symptom:
+An unknown atom is an unknown application alias:
 
 ```elixir
 ** (ArgumentError) Unknown model alias: :my_model
 ```
 
-Fix:
-- add alias under `config :jido_ai, model_aliases: ...`
-- or pass a direct model string (`"provider:exact-model-id"`)
+Add it under `config :jido_ai, model_aliases: ...`, or pass a direct ReqLLM
+model input. Provider authentication and request failures use the normal ReqLLM
+error contract.
 
-## Failure Mode: Provider Credential Missing
+## When To Use An Agent
 
-Symptom:
-- provider authentication/request errors from ReqLLM
-
-Fix:
-- set provider key in `config :req_llm, ...`
-- verify the selected model belongs to a configured provider
-
-## Defaults You Should Know
-
-- `llm_defaults(:text)` default model is `:fast`, `temperature: 0.2`, `max_tokens: 1024`, `timeout: 30_000`
-- `llm_defaults(:object)` default model is `:thinking`, `temperature: 0.0`
-- `llm_defaults(:stream)` default model is `:fast`
-- built-in aliases include `:fast`, `:capable`, `:thinking`, `:reasoning`, `:planning`, `:image`, `:embedding`
-
-## When To Use / Not Use
-
-Use this facade when:
-- you need one-shot generation from jobs, controllers, or scripts
-- you do not need request-handle orchestration or tool loops
-
-Do not use this facade when:
-- you need multi-step tool-calling workflows (`Jido.AI.Agent`)
-- you need strategy-level control (`Jido.AI.*Agent` macros)
+Use direct ReqLLM calls for one model request. Use `Jido.AI.Agent` when you need
+named AI profiles, tool loops, request tracking, Sessions, or reasoning policy.
 
 ## Next
 

@@ -126,6 +126,19 @@ defmodule Jido.AI.Profile do
     end
   end
 
+  @doc "Builds one validated inert profile or raises its Splode validation error."
+  @spec new!(map() | keyword() | t(), keyword()) :: t() | no_return()
+  def new!(attrs, opts \\ []) do
+    case new(attrs, opts) do
+      {:ok, profile} -> profile
+      {:error, error} -> raise error
+    end
+  end
+
+  @doc "Validates one profile value through the canonical constructor."
+  @spec validate(term()) :: {:ok, t()} | {:error, Exception.t()}
+  def validate(value), do: new(value)
+
   defp options(opts) when is_list(opts) do
     if Keyword.keyword?(opts) and Keyword.keys(opts) -- [:registries] == [],
       do: {:ok, opts},
@@ -152,7 +165,7 @@ defmodule Jido.AI.Profile do
       Map.get(
         attrs,
         :model,
-        Map.get(configured, :model, Jido.AI.Models.llm_defaults(:text).model)
+        Map.get(configured, :model, :fast)
       )
 
     {models, router} =
@@ -612,7 +625,7 @@ defmodule Jido.AI.Profile do
   defp model_input(value) when is_atom(value) and value not in [nil, true, false], do: {:ok, value}
 
   defp model_input(value) when is_binary(value) and not is_struct(value) do
-    aliases = Jido.AI.Models.model_aliases()
+    aliases = Jido.AI.Models.aliases()
 
     case Enum.find(Map.keys(aliases), &(Atom.to_string(&1) == value)) do
       nil -> req_llm_model(value)

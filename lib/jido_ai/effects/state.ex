@@ -51,7 +51,9 @@ defmodule Jido.AI.Effects.Candidate do
   defp merge(base, current, proposed, agent) when is_map(proposed) and not is_struct(proposed) do
     with :ok <- Jido.Action.validate_static_data(proposed),
          {:ok, specs} <- Jido.Plugin.normalize_all(agent.plugins),
-         {:ok, _, []} <- Jido.Plugin.protect_state({:ok, proposed, []}, base, specs) do
+         agent_specs = Jido.Agent.Plugin.specs(specs),
+         {:ok, _, []} <-
+           Jido.Agent.Plugin.Pipeline.run({:ok, proposed, []}, base, agent_specs) do
       changed =
         Enum.filter(
           Enum.uniq(Map.keys(base) ++ Map.keys(proposed)),

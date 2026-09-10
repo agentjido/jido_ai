@@ -6,6 +6,7 @@ defmodule Jido.AI.AgentTest do
   import ExUnit.CaptureIO
 
   alias Jido.AI.Agent
+  alias Jido.AI.Agent.Definition, as: AgentDefinition
   alias Jido.AI.Session
   alias ReqLLM.Message.ContentPart
 
@@ -267,7 +268,7 @@ defmodule Jido.AI.AgentTest do
       env = __ENV__
 
       # The function should walk the AST and expand aliases
-      result = Agent.expand_aliases_in_ast(ast, env)
+      result = AgentDefinition.expand_aliases_in_ast(ast, env)
 
       # The __aliases__ node should be expanded (in this case to SomeModule atom)
       assert is_tuple(result)
@@ -277,7 +278,7 @@ defmodule Jido.AI.AgentTest do
       ast = {:%{}, [], [key: "string", num: 42, flag: true, atom_val: :test]}
       env = __ENV__
 
-      result = Agent.expand_aliases_in_ast(ast, env)
+      result = AgentDefinition.expand_aliases_in_ast(ast, env)
 
       # Should preserve the structure
       assert is_tuple(result)
@@ -287,7 +288,7 @@ defmodule Jido.AI.AgentTest do
       ast = {:%{}, [], [outer: {:%{}, [], [inner: "value"]}]}
       env = __ENV__
 
-      result = Agent.expand_aliases_in_ast(ast, env)
+      result = AgentDefinition.expand_aliases_in_ast(ast, env)
 
       assert is_tuple(result)
     end
@@ -296,7 +297,7 @@ defmodule Jido.AI.AgentTest do
       ast = {:%{}, [], [items: [1, 2, 3]]}
       env = __ENV__
 
-      result = Agent.expand_aliases_in_ast(ast, env)
+      result = AgentDefinition.expand_aliases_in_ast(ast, env)
 
       assert is_tuple(result)
     end
@@ -307,7 +308,7 @@ defmodule Jido.AI.AgentTest do
       env = __ENV__
 
       assert_raise CompileError, ~r/Unsafe construct.*function call/, fn ->
-        Agent.expand_aliases_in_ast(ast, env)
+        AgentDefinition.expand_aliases_in_ast(ast, env)
       end
     end
   end

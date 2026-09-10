@@ -285,7 +285,7 @@ defmodule Jido.AI.Session do
     id = signal.data.request_id
     timeout = Keyword.get(opts, :admission_timeout, 5_000)
     agent = Jido.AgentServer.agent(server, timeout)
-    method = Jido.AI.Authoring.request_method(agent, signal)
+    method = Jido.AI.Runtime.Binding.method(agent, signal)
     # These values can contain runtime resources. They do not enter Signal data.
     {portable, resources} = Map.split(signal.data, [:request_id, :query, :prompt, :extra_refs])
 
@@ -326,7 +326,7 @@ defmodule Jido.AI.Session do
     do: :busy
 
   defp admission_error(reason) do
-    if Jido.AI.Authoring.state_size_error?(reason) do
+    if Jido.AI.Runtime.StateSize.error?(reason) do
       Jido.Error.validation_error("Agent state exceeds max_state_size", kind: :state_size)
     else
       reason

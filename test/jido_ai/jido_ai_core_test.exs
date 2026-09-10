@@ -23,19 +23,12 @@ defmodule Jido.AI.CoreTest do
 
   setup do
     old_aliases = Application.get_env(:jido_ai, :model_aliases)
-    old_defaults = Application.get_env(:jido_ai, :llm_defaults)
 
     on_exit(fn ->
       if is_nil(old_aliases) do
         Application.delete_env(:jido_ai, :model_aliases)
       else
         Application.put_env(:jido_ai, :model_aliases, old_aliases)
-      end
-
-      if is_nil(old_defaults) do
-        Application.delete_env(:jido_ai, :llm_defaults)
-      else
-        Application.put_env(:jido_ai, :llm_defaults, old_defaults)
       end
     end)
 
@@ -57,8 +50,8 @@ defmodule Jido.AI.CoreTest do
     fun.()
   end
 
-  describe "model aliases and llm defaults" do
-    test "model_aliases/0 merges configured aliases over defaults" do
+  describe "model aliases" do
+    test "model_aliases/0 merges application aliases over package configuration" do
       aliases =
         with_model_aliases(%{fast: "openai:gpt-4.1-mini", custom: "test:custom"}, fn ->
           AI.model_aliases()
@@ -103,117 +96,18 @@ defmodule Jido.AI.CoreTest do
       assert AI.resolve_model(struct_model) == struct_model
     end
 
-    test "model helpers normalize labels and fingerprints for direct ReqLLM inputs" do
-      tuple_model = {:openai, "gpt-4.1", [reasoning_effort: :medium]}
-
-      assert AI.model_label(:fast) == AI.resolve_model(:fast)
-      assert AI.model_label(tuple_model) == "openai:gpt-4.1"
-      assert is_binary(AI.model_fingerprint_segment(tuple_model))
-      assert AI.provider_opt_keys(:fast) |> is_map()
-    end
-
-    test "model helpers normalize labels and fingerprints for alias-backed inline specs" do
-      inline_model = %{provider: :openai, id: "gpt-4.1", base_url: "http://localhost:4000/v1"}
-
-      with_model_aliases(%{capable: inline_model}, fn ->
-        assert AI.model_label(:capable) == "openai:gpt-4.1"
-        assert is_binary(AI.model_fingerprint_segment(:capable))
-        assert AI.provider_opt_keys(:capable) |> is_map()
-      end)
-    end
-
     test "resolve_model/1 raises for invalid configured alias specs" do
       with_model_aliases(%{capable: [:invalid]}, fn ->
-        assert_raise ArgumentError, ~r/Invalid model spec configured for alias :capable/, fn ->
+        assert_raise ArgumentError, ~r/Invalid model configured for alias :capable/, fn ->
           AI.resolve_model(:capable)
         end
       end)
     end
 
     test "resolve_model/1 raises for unsupported direct model inputs" do
-      assert_raise ArgumentError, ~r/invalid model input/, fn ->
+      assert_raise ArgumentError, ~r/Expected a valid ReqLLM model input/, fn ->
         AI.resolve_model(123)
       end
-    end
-
-    test "llm_defaults merges configured maps and validates kind" do
-      Application.put_env(:jido_ai, :llm_defaults, %{text: %{max_tokens: 55, temperature: 0.6}})
-
-      defaults = AI.llm_defaults()
-      assert defaults[:text][:max_tokens] == 55
-      assert defaults[:text][:temperature] == 0.6
-
-      text_defaults = AI.llm_defaults(:text)
-      assert text_defaults[:max_tokens] == 55
-
-      assert_raise ArgumentError, ~r/Unknown LLM defaults kind/, fn ->
-        AI.llm_defaults(:unknown)
-      end
-    end
-  end
-
-  describe "llm facade wrappers" do
-    test "generate_text/2 resolves model and merges req options" do
-      Mimic.stub(ReqLLM.Generation, :generate_text, fn model, messages, opts ->
-        assert model == AI.resolve_model(:fast)
-        assert Enum.map(messages, & &1.role) == [:system, :user]
-        assert hd(Enum.at(messages, 0).content).text == "System"
-        assert hd(Enum.at(messages, 1).content).text == "hello"
-        assert opts[:max_tokens] == 99
-        assert opts[:temperature] == 0.9
-        assert opts[:receive_timeout] == 777
-        assert opts[:tool_choice] == :none
-        assert opts[:foo] == :bar
-        {:ok, %{message: %{content: "ok"}}}
-      end)
-
-      assert {:ok, %{message: %{content: "ok"}}} =
-               AI.generate_text("hello",
-                 model: :fast,
-                 system_prompt: "System",
-                 max_tokens: 99,
-                 temperature: 0.9,
-                 timeout: 777,
-                 tool_choice: :none,
-                 opts: [foo: :bar]
-               )
-    end
-
-    test "generate_object/3 uses object defaults and passes schema/options through" do
-      schema = %{type: "object", properties: %{"name" => %{type: "string"}}}
-
-      Mimic.stub(ReqLLM.Generation, :generate_object, fn model, messages, object_schema, opts ->
-        assert model == AI.resolve_model(:thinking)
-        assert Enum.map(messages, & &1.role) == [:user]
-        assert hd(Enum.at(messages, 0).content).text == "extract"
-        assert object_schema == schema
-        assert opts[:max_tokens] == 222
-        assert opts[:receive_timeout] == 888
-        {:ok, %{object: %{"name" => "Alice"}}}
-      end)
-
-      assert {:ok, %{object: %{"name" => "Alice"}}} =
-               AI.generate_object("extract", schema, max_tokens: 222, timeout: 888)
-    end
-
-    test "stream_text/2 delegates to ReqLLM.stream_text/3" do
-      Mimic.stub(ReqLLM, :stream_text, fn model, messages, opts ->
-        assert model == AI.resolve_model(:fast)
-        assert Enum.map(messages, & &1.role) == [:user]
-        assert hd(Enum.at(messages, 0).content).text == "stream this"
-        assert opts[:max_tokens] == 10
-        {:ok, %{stream: []}}
-      end)
-
-      assert {:ok, %{stream: []}} = AI.stream_text("stream this", max_tokens: 10)
-    end
-
-    test "ask/2 extracts normalized text from generate_text response" do
-      Mimic.stub(ReqLLM.Generation, :generate_text, fn _model, _messages, _opts ->
-        {:ok, %{message: %{content: "final answer"}}}
-      end)
-
-      assert {:ok, "final answer"} = AI.ask("What is the answer?")
     end
   end
 

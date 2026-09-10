@@ -1,10 +1,6 @@
 defmodule Jido.AI.Capability do
   @moduledoc false
 
-  def bind(%Jido.Agent.Plugin.Preparation{} = preparation, key, binding) do
-    {:ok, %{preparation | context: Map.put(preparation.context, key, binding)}}
-  end
-
   def bind(command, key, binding) do
     with :ok <- result_field(command.agent.schema, binding) do
       {:ok, %{command | context: Map.put(command.context, key, binding)}}
@@ -29,6 +25,7 @@ defmodule Jido.AI.Capability do
   end
 
   defp result_field(_, %{into: into}), do: invalid_field(into)
+  defp result_field(_, binding) when is_map(binding), do: :ok
 
   defp invalid_field(into) do
     {:error,

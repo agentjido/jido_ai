@@ -1,24 +1,24 @@
 # 10 — Authoring And Definitions Alignment
 
-> Seam alignment plan. This document and its design are pending approval.
+> Seam alignment plan and current implementation record.
 
 ## Status
 
-- Design reviewed: 2026-09-09 for alignment only.
+- Design approved: 2026-09-09.
 - Code reviewed: 17c97ca04d97b26a1c7017250c90053ad674f33f.
 - Prerequisites: seams 00 through 09.
-- Alignment state: Blocked.
-- Blockers: design approval, package compile failure, and the active core Plugin contract.
+- Alignment state: Active. The first authoring refinement is implemented.
+- Current gate: warnings-as-errors compile and the full default test suite pass.
 
-Proven means that current source and a direct executable test assertion exist. It does not mean that the current package test suite passes.
+Proven means that current source and a direct executable test assertion exist. The current package test suite also passes.
 
 ## Inputs And Evidence
 
 - Target design: design.md.
-- Profile definition and validation: lib/jido_ai/authoring/profile.ex.
-- Extension DSL: lib/jido_ai/authoring/dsl.ex:679-760.
+- Profile definition and validation: lib/jido_ai/profile.ex.
+- Spark extension DSL: lib/jido_ai/authoring/dsl.ex.
 - Neutral Agent and Flow lowering: lib/jido_ai/authoring/authoring.ex:43-243.
-- Compatibility macro: lib/jido_ai/authoring/agent.ex:70-102 and 507-548.
+- Compatibility macro: lib/jido_ai/agent/definition.ex:70-102 and 507-548.
 - Profile codec and portable authoring tests: test/jido_ai/authoring.
 - Full specification parity: test/jido_ai/authoring/full_spec_parity_test.exs:218-291.
 - Validation examples: examples/v3/test/examples/01_authoring/01_06_ai_extension_test.exs:14-89.
@@ -36,11 +36,11 @@ Proven means that current source and a direct executable test assertion exist. I
 
 | Gap | Requirement | Current evidence | Difference | Disposition |
 | --- | --- | --- | --- | --- |
-| AUT-GAP-001 | AUT-REQ-010 | lib/jido_ai/authoring/agent.ex | The compatibility macro uses the lowerer, but complete V2 option and behavior coverage is not proved. | Publish a V2-to-V3 option matrix and add fixtures. |
+| AUT-GAP-001 | AUT-REQ-010 | lib/jido_ai/agent/definition.ex | The compatibility macro uses the lowerer, but complete V2 option and behavior coverage is not proved. | Publish a V2-to-V3 option matrix and add fixtures. |
 | AUT-GAP-002 | AUT-REQ-013 | inline Action support and core schemas | Ordinary named Actions work, but the full inline Action input, output, and context validation contract is not proved. | Add focused inline Action compile and runtime tests. |
 | AUT-GAP-003 | AUT-REQ-020 | authoring validation | Local duplicate and field checks are strong, but full Plugin, directive, and route collisions depend on the active sibling core contract. | Add conformance tests after core Plugin approval. |
 | AUT-GAP-004 | AUT-REQ-026, AUT-REQ-027 | generated APIs and compatibility wrapper | Public surface and deprecation metadata are incomplete for every legacy helper. | Define the approved API list, since version, and removal plan. |
-| AUT-GAP-005 | Blocker: package compile failure | package compile output | The generated authoring surface cannot receive a full warnings-as-errors and test gate. | Remove the Jido.Thread blocker, then run compile and all authoring examples. |
+| AUT-GAP-005 | Compile and test gate | package compile and test output | Resolved: warnings-as-errors compile, full default tests, and selected authoring examples pass. | Keep these checks as the authoring gate. |
 
 ## High-Level Work Sequence
 

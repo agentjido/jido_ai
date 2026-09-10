@@ -8,10 +8,10 @@ defmodule Jido.AI.CapabilityTest do
     def run(%{value: value}, context), do: {:ok, %{value: value, provided: context.provided_params}}
   end
 
-  test "binds a capability to preparation context" do
-    preparation = struct(Jido.Agent.Plugin.Preparation, context: %{existing: true})
+  test "binds a capability to command context" do
+    command = %{agent: %{schema: Zoi.object(%{result: Zoi.any()})}, context: %{existing: true}}
 
-    assert {:ok, bound} = Capability.bind(preparation, :capability, %{mode: :test})
+    assert {:ok, bound} = Capability.bind(command, :capability, %{mode: :test})
     assert bound.context == %{existing: true, capability: %{mode: :test}}
   end
 

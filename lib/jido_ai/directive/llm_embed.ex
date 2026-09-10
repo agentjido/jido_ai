@@ -101,7 +101,7 @@ defmodule Jido.AI.Directive.LLMEmbed.Execution do
       |> add_dimensions_opt(dimensions)
       |> Helpers.add_timeout_opt(timeout)
 
-    case Jido.AI.Models.request(:embedding, model, texts, opts) do
+    case Jido.AI.Runtime.ModelCall.request(:embedding, model, texts, opts) do
       {:ok, embeddings} ->
         {:ok, %{embeddings: embeddings, count: count_embeddings(embeddings)}}
 

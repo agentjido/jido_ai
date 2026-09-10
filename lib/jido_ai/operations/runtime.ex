@@ -1,133 +1,3 @@
-defmodule Jido.AI.Runtime.Plugin do
-  @moduledoc "Binds host AI profiles and owns portable tool and prompt overrides."
-  use Jido.Plugin, agent: Jido.AI.Runtime.Plugin.Agent
-
-  @doc false
-  def agent_state_spec(opts) do
-    {Jido.AI.Configuration.key(),
-     Zoi.map()
-     |> Zoi.refine({Jido.AI.Configuration, :validate_state, [opts[:profiles]]})
-     |> Zoi.default(%{})}
-  end
-
-  @doc false
-  def prepare_command(command, opts) do
-    binding = Jido.AI.Authoring.request_binding(command.agent, command.signal)
-
-    resources = Map.get(command.context, :jido_ai_request, %{})
-
-    catalogs = Map.get(command.context, :jido_ai_skill_catalogs, %{})
-
-    with {:ok, declared} <-
-           Jido.AI.Skill.Source.profiles(
-             Keyword.fetch!(opts, :profiles),
-             catalogs,
-             Keyword.get(opts, :tool_defaults, %{})
-           ),
-         {:ok, effective} <-
-           Jido.AI.Configuration.profiles(
-             declared,
-             Map.get(command.agent.state, Jido.AI.Configuration.key(), %{})
-           ),
-         {:ok, profiles} <- request_models(effective, binding, resources) do
-      context =
-        command.context
-        |> Jido.AI.ToolContext.bind(binding, profiles)
-        |> Jido.AI.Skill.Source.context(binding, catalogs)
-        |> Map.put(:jido_ai_agent, command.agent)
-        |> Map.put(
-          :jido_ai_checkpoint,
-          if(opts[:standalone_checkpoints?], do: command.context[:jido_ai_checkpoint])
-        )
-        |> Map.put(:jido_ai_agent_id, command.agent.id)
-        |> Map.delete(:jido_ai_session)
-        |> Map.put(:jido_ai_profiles, profiles)
-        |> Map.put(:jido_ai_legacy_agent_profile, opts[:legacy_agent_profile])
-        |> Map.put(
-          :jido_ai_legacy_iteration_result,
-          opts[:legacy_iteration_result?] || opts[:legacy_agent_profile]
-        )
-        |> Map.put(:jido_ai_tool_defaults, Keyword.get(opts, :tool_defaults, %{}))
-
-      profile_id = if match?(%{mode: :turn}, binding), do: binding.id
-      {:ok, %{command | context: Map.put(context, :jido_ai_turn_profile, profile_id)}}
-    end
-  end
-
-  defp request_models(profiles, nil, _), do: {:ok, profiles}
-
-  defp request_models(profiles, %{id: id, input: input}, resources) do
-    model =
-      case resources[:model] do
-        value when value in [nil, ""] -> Map.get(input, :model, Map.get(input, "model"))
-        value -> value
-      end
-
-    if model in [nil, ""] do
-      {:ok, profiles}
-    else
-      with %Jido.AI.Profile{} = profile <- Map.get(profiles, id) do
-        model = Jido.AI.Models.resolve_model(model)
-        models = Map.update!(profile.models, profile.reasoning.model, &Map.put(&1, :model, model))
-        {:ok, Map.put(profiles, id, %{profile | models: models})}
-      else
-        _ -> Jido.AI.Profile.error("profile", "No trusted profile binding")
-      end
-    end
-  rescue
-    error in ArgumentError -> Jido.AI.Profile.error("model", Exception.message(error))
-  end
-end
-
-defmodule Jido.AI.Runtime.Plugin.Agent do
-  @moduledoc false
-  use Jido.Agent.Plugin
-
-  alias Jido.Agent.Plugin.Contribution
-
-  @impl Jido.Agent.Plugin
-  def state_spec(opts), do: Jido.AI.Runtime.Plugin.agent_state_spec(opts)
-
-  @impl Jido.Agent.Plugin
-  def directives(_), do: [Jido.AI.Configuration.Change]
-
-  @impl Jido.Agent.Plugin
-  def validate_directive(change, opts), do: Jido.AI.Configuration.validate(change, opts)
-
-  @impl Jido.Agent.Plugin
-  def contribute(transition, opts) do
-    case Jido.AI.Configuration.reduce(
-           transition.plugin_state,
-           transition.directives,
-           opts
-         ) do
-      {:ok, state} ->
-        {:ok, %Contribution{plugin: transition.plugin, state: {:replace, state}}}
-
-      {:error, _reason} = error ->
-        error
-    end
-  end
-end
-
-defmodule Jido.AI.Runtime.PreparationPlugin do
-  @moduledoc "Compatibility preparation adapter that needs the complete immutable Agent definition."
-  use Jido.Plugin
-
-  @impl Jido.Plugin
-  def prepare(command, _opts) do
-    with {:ok, command} <- Jido.AI.Plugins.Policy.prepare_bound_command(command),
-         {:ok, command} <- Jido.AI.Plugins.Quota.prepare_bound_command(command),
-         {Jido.AI.Runtime.Plugin, opts} <-
-           Enum.find(command.agent.plugins, &(elem(&1, 0) == Jido.AI.Runtime.Plugin)) do
-      Jido.AI.Runtime.Plugin.prepare_command(command, opts)
-    else
-      {:error, _reason} = error -> error
-      _ -> Jido.AI.Profile.error("plugins", "Missing AI runtime Plugin")
-    end
-  end
-end
-
 defmodule Jido.AI.Control do
   @moduledoc "A pure policy check at an AI input, model, operation, or output boundary."
   @callback check(value :: term(), context :: map()) ::
@@ -240,7 +110,7 @@ defmodule Jido.AI.Operations.Generate do
        ) do
     kind = if is_nil(schema), do: :stream, else: :stream_object
 
-    with {:ok, stream} <- Jido.AI.Models.request(kind, model, messages, opts, schema) do
+    with {:ok, stream} <- Jido.AI.Runtime.ModelCall.request(kind, model, messages, opts, schema) do
       try do
         callbacks = [
           on_chunk: fn chunk ->
@@ -268,7 +138,7 @@ defmodule Jido.AI.Operations.Generate do
   defp execute(%{model: model, messages: messages, options: opts, schema: schema}, _, _progress) do
     kind = if is_nil(schema), do: :text, else: :object
 
-    with {:ok, response} <- Jido.AI.Models.request(kind, model, messages, opts, schema),
+    with {:ok, response} <- Jido.AI.Runtime.ModelCall.request(kind, model, messages, opts, schema),
          do: {:ok, %{response: Jido.AI.Runtime.Response.align_context(response)}}
   end
 
@@ -279,7 +149,7 @@ defmodule Jido.AI.Operations.Generate do
       Jido.AI.Session.emit(context, :llm_delta, %{
         chunk_type: kind,
         delta: text,
-        model: Jido.AI.Models.model_label(model)
+        model: Jido.AI.Runtime.ModelCall.label(model)
       })
 end
 
@@ -303,7 +173,7 @@ defmodule Jido.AI.Runtime.Prepare do
          {:ok, history} <- Jido.AI.History.read(context.agent_state, profile),
          {:ok, history_messages} <- Jido.AI.History.messages(history) do
       entry = profile.models[profile.reasoning.model]
-      model = Models.resolve_model(entry.model)
+      model = Models.resolve(entry.model)
       runtime_options = get_in(context, [:ai, id, :options]) || []
 
       options =
@@ -436,7 +306,7 @@ defmodule Jido.AI.Runtime.CallModel do
                %{
                  model_call: state.model_calls + 1,
                  call_id: state.llm_call_id,
-                 model: Jido.AI.Models.model_label(request.model)
+                 model: Jido.AI.Runtime.ModelCall.label(request.model)
                },
                Jido.AI.Reasoning.event(state)
              )

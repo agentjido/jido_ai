@@ -195,7 +195,7 @@ ReAct, and Start/Continue/Collect Actions where supported. Preserve full input
 for the model while keeping image/file summaries in the applicable event fields.
 
 Baseline evidence: [Query](../../../lib/jido_ai/query.ex),
-[generated Agent helpers](../../../lib/jido_ai/authoring/agent.ex),
+[generated Agent helpers](../../../lib/jido_ai/agent/definition.ex),
 [Request](../../../lib/jido_ai/request.ex),
 [worker startup](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a68443f03bc6a198c5a2/lib/jido_ai/reasoning/react/worker/strategy.ex),
 [Query tests](../../../test/jido_ai/query_test.exs),

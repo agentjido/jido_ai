@@ -8,12 +8,12 @@ defmodule Jido.AI.AoTAgent do
       opts
       |> Keyword.take(keys)
       |> Keyword.update(:examples, [], fn value ->
-        value = Jido.AI.Agent.expand_and_eval_literal_option(value, __CALLER__)
+        value = Jido.AI.Agent.Definition.expand_and_eval_literal_option(value, __CALLER__)
         Jido.AI.Reasoning.AlgorithmOfThoughts.Machine.new(examples: value).examples
       end)
 
     temperature =
-      Jido.AI.Agent.expand_and_eval_literal_option(
+      Jido.AI.Agent.Definition.expand_and_eval_literal_option(
         Keyword.get(opts, :temperature, 0.0),
         __CALLER__
       )

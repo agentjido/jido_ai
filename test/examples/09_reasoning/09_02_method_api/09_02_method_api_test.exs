@@ -107,8 +107,9 @@ defmodule JidoAI.Examples.MethodAPITest do
     {machine, [{:call_llm_stream, id, conversation}]} =
       Machine.update(Machine.new(), {:start, "Add", "cot_api"})
 
-    opts = Keyword.put(MockLLM.options(mock), :model, MockLLM.model())
-    assert {:ok, response} = Jido.AI.Models.generate_text(conversation, opts)
+    assert {:ok, response} =
+             ReqLLM.generate_text(MockLLM.model(), conversation, MockLLM.options(mock))
+
     legacy_result = %{text: ReqLLM.Response.text(response), usage: response.usage}
     assert {completed, []} = Machine.update(machine, {:llm_result, id, {:ok, legacy_result, []}})
     assert completed.result == "4" and completed.termination_reason == :success

@@ -8,7 +8,10 @@ defmodule Jido.AI.Plugins.Policy do
   Native AI bindings and legacy AI request namespaces share this policy.
   Model/tool results and text deltas retain the existing normalization rules.
   """
-  use Jido.Plugin, agent: Jido.AI.Plugins.Policy.Agent
+  use Jido.Plugin,
+    agent: Jido.AI.Plugins.Policy.Agent,
+    agent_server: Jido.AI.Plugins.Policy.AgentServer
+
   alias Jido.AI.{Error, Validation}
   alias Jido.AI.Signal.Helpers, as: SignalHelpers
   alias Jido.Signal, as: BaseSignal
@@ -59,36 +62,32 @@ defmodule Jido.AI.Plugins.Policy do
   end
 
   @doc false
-  def prepare_agent(preparation) do
-    state = preparation.plugin_state
-    signal = preparation.effective_signal
+  def prepare_command(command) do
+    state = command.agent.state.policy
+    signal = command.signal
 
     cond do
       signal.type == "ai.llm.delta" ->
-        {:ok, %{preparation | effective_signal: sanitize_llm_delta(signal, state.max_delta_chars)}}
+        {:ok, %{command | signal: sanitize_llm_delta(signal, state.max_delta_chars)}}
 
       signal.type in ["ai.llm.response", "ai.tool.result"] ->
-        {:ok, %{preparation | effective_signal: normalize_result_signal(signal)}}
+        {:ok, %{command | signal: normalize_result_signal(signal)}}
 
-      state.mode == :enforce and state.block_on_validation_error and violation?(signal) ->
+      state.mode == :enforce and state.block_on_validation_error and
+          command_violation?(command) ->
         {:error, policy_error(signal)}
 
       true ->
-        {:ok, preparation}
+        {:ok, command}
     end
   end
 
-  @doc false
-  def prepare_bound_command(command) do
-    with true <- Enum.any?(command.agent.plugins, &(plugin_module(&1) == __MODULE__)),
-         %{input: input} <- Jido.AI.Authoring.request_binding(command.agent, command.signal),
-         %{mode: mode, block_on_validation_error: block?} <- command.agent.state[state_key()],
-         true <- mode == :enforce and block?,
-         signal = %{command.signal | data: input},
-         true <- policy_violation?(signal) do
-      {:error, policy_error(signal)}
-    else
-      _ -> {:ok, command}
+  defp command_violation?(command) do
+    signal = command.signal
+
+    case Jido.AI.Runtime.Binding.request(command.agent, signal) do
+      %{input: input} -> policy_violation?(%{signal | data: input})
+      nil -> violation?(signal)
     end
   end
 
@@ -171,9 +170,6 @@ defmodule Jido.AI.Plugins.Policy do
   defp sanitize_llm_delta(signal, _), do: signal
 
   defp put_signal_data(%BaseSignal{} = signal, data), do: %{signal | data: data}
-
-  defp plugin_module({module, _opts}), do: module
-  defp plugin_module(module), do: module
 end
 
 defmodule Jido.AI.Plugins.Policy.Agent do
@@ -182,7 +178,12 @@ defmodule Jido.AI.Plugins.Policy.Agent do
 
   @impl Jido.Agent.Plugin
   def state_spec(opts), do: Jido.AI.Plugins.Policy.agent_state_spec(opts)
+end
 
-  @impl Jido.Agent.Plugin
-  def prepare(preparation, _opts), do: Jido.AI.Plugins.Policy.prepare_agent(preparation)
+defmodule Jido.AI.Plugins.Policy.AgentServer do
+  @moduledoc false
+  use Jido.AgentServer.Plugin
+
+  @impl Jido.AgentServer.Plugin
+  def admit(_runtime, command, _opts), do: Jido.AI.Plugins.Policy.prepare_command(command)
 end

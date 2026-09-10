@@ -32,9 +32,8 @@ listed in the inventory. Keep tagged errors and each public result shape.
 
 | Surface | Contract and required acceptance |
 | --- | --- |
-| `model_aliases/0`, `llm_defaults/0,1`, `resolve_model/1`, `model_label/1` | `API/model-facade`: built-in defaults, application configuration and explicit call options select the actual model and provider request. Preserve supported strings, tuples, maps and model structs. Test invalid aliases and invalid default kinds. Pair this with HIST-01 and the stream-header case. |
-| `generate_text/1,2`, `generate_object/2,3`, `stream_text/1,2` | Preserve the ReqLLM response/stream boundary, object schema and pass-through provider options. The object facade is not the Agent output/repair loop. Test defaults separately for text, object and stream, using the actual transport. |
-| `ask/1,2` | This facade returns extracted text in `{:ok, text}`. It is distinct from a generated Agent's request-handle API. Test both through the same mock and preserve their different results. |
+| `Jido.AI.Models.aliases/0`, `resolve/1` | `API/model-aliases`: application configuration maps stable names to native ReqLLM inputs. Preserve supported strings, tuples, maps and model structs. Test invalid aliases and direct pass-through inputs. Pair this with HIST-01 and the stream-header case. |
+| ReqLLM direct APIs | Text, object, and stream calls keep native ReqLLM options, responses, streams, usage data, and errors. Jido AI does not add generation defaults or a second direct-call facade. |
 | `register_tool/2,3`, `unregister_tool/2,3`, `set_system_prompt/2,3` | `API/tool-contracts`: live calls return the supported tagged Agent result. Validate a real loadable tool, actual next-turn schema/prompt and unknown server/error handling. Preserve documented validation and timeout options. |
 | `register_tool_direct/2,3`, `unregister_tool_direct/2`, `set_system_prompt_direct/2` | Direct registration/removal return tagged Agent results; direct prompt update returns an Agent. Prove no Server self-call when invoked during real work. Preserve supported behavior through complete candidate-state assembly. |
 | `list_tools/1`, `has_tool?/2` | Struct input returns a plain list/boolean. Server input returns a tagged result. Test both, plus a change during active work and the catalog boundary before the next tool round. |
@@ -55,7 +54,7 @@ Core-generated construction and command functions need consumer compilation.
 
 | Macro source | Application functions declared by its template |
 | --- | --- |
-| [Agent](../../lib/jido_ai/authoring/agent.ex) | `ask/2,3`, `ask_stream/2,3`, `await/1,2`, `ask_sync/2,3`, `cancel/1,2`, `steer/2,3`, `inject/2,3`; tool callbacks; checkpoint/restore integration |
+| [Agent](../../lib/jido_ai/agent.ex) | `ask/2,3`, `ask_stream/2,3`, `await/1,2`, `ask_sync/2,3`, `cancel/1,2`, `steer/2,3`, `inject/2,3`; tool callbacks; checkpoint/restore integration |
 | [CoDAgent](../../lib/jido_ai/authoring/cod_agent.ex) | `draft/2,3`, `draft_sync/2,3`, `await/1,2`, `strategy_opts/0` |
 | [CoTAgent](../../lib/jido_ai/authoring/cot_agent.ex) | `think/2,3`, `think_sync/2,3`, `await/1,2`, `strategy_opts/0` |
 | [AoTAgent](../../lib/jido_ai/authoring/aot_agent.ex) | `explore/2,3`, `explore_sync/2,3`, `await/1,2`, `strategy_opts/0`, `answer/1` |
@@ -1127,7 +1126,7 @@ Strategy tests remain open.
 
 ### Initial conversation state import
 
-[`Jido.AI.Agent.from_initial_state/3`](../../lib/jido_ai/authoring/agent.ex)
+[`Jido.AI.Agent.from_initial_state/3`](../../lib/jido_ai/agent/definition.ex)
 accepts a module or neutral definition, application initial state, and optional
 `:id`/`:profile`. It replaces conversation-only `initial_state: %{context: ...}`
 startup. It uses core instantiation plus shared history preparation and portable

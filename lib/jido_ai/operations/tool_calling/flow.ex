@@ -1,10 +1,17 @@
 defmodule Jido.AI.Actions.ToolCalling.RequestModel do
   @moduledoc false
   use Jido.Action, name: "tool_calling_request_model"
-  alias Jido.AI.{Models, Turn, Usage}
+  alias Jido.AI.{Turn, Usage}
 
   def run(state, context) do
-    case Models.request(:text, state.model, state.messages, state.options, nil, context) do
+    case Jido.AI.Runtime.ModelCall.request(
+           :text,
+           state.model,
+           state.messages,
+           state.options,
+           nil,
+           context
+         ) do
       {:ok, response} ->
         turn = Turn.from_response(response, model: state.model)
 

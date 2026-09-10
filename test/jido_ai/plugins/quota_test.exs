@@ -19,7 +19,7 @@ defmodule Jido.AI.Plugins.QuotaTest do
     definition =
       Jido.Agent.new!(%{
         name: "quota_test",
-        schema: Zoi.object(%{}),
+        schema: Zoi.object(%{result: Zoi.any() |> Zoi.default(nil)}),
         plugins: [{Quota, Map.to_list(state)}]
       })
 

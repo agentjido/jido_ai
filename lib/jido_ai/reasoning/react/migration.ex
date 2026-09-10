@@ -223,7 +223,7 @@ defmodule Jido.AI.Reasoning.ReAct.Migration do
 
         response = %ReqLLM.Response{
           id: state.llm_response_id || "migrated:#{state.run_id}",
-          model: Jido.AI.Models.model_label(config.model),
+          model: Jido.AI.Runtime.ModelCall.label(config.model),
           message: message,
           context: messages,
           usage: %{},

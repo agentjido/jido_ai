@@ -45,7 +45,7 @@ end
 - [jido_action](https://hex.pm/packages/jido_action): typed tool/action contract used by `jido_ai`
 - [req_llm](https://hex.pm/packages/req_llm): provider abstraction for Anthropic, OpenAI, Google, and others
 
-Use `jido_ai` when you need long-lived agents, tool-calling loops, or explicit reasoning strategies. You can also use it without a running agent process via `Jido.AI.generate_text/2`, `Jido.AI.ask/2`, or `Jido.Exec.run/3` with any action module.
+Use `jido_ai` when you need long-lived agents, tool-calling loops, or explicit reasoning strategies. For direct model calls, resolve an optional application alias with `Jido.AI.Models.resolve/1`, then use ReqLLM. You can also use `Jido.Exec.run/3` with any action module.
 For cross-package tutorials and the package map, see [jido.run/ecosystem](https://jido.run/ecosystem).
 
 In `jido_ai`, tool actions are allowed to be effectful. They often perform HTTP, LLM, database, or file I/O because the model needs the result back in the same ReAct loop.
@@ -159,7 +159,9 @@ For retrieval or classification flows, prefer having tools write `StateOp.SetSta
 Need one-shot text generation without an agent process?
 
 ```elixir
-{:ok, text} = Jido.AI.ask("Summarize Phoenix PubSub in one paragraph.", model: :fast)
+model = Jido.AI.Models.resolve(:fast)
+{:ok, response} = ReqLLM.generate_text(model, "Summarize Phoenix PubSub in one paragraph.")
+text = ReqLLM.Response.text(response)
 ```
 
 ## Choose Your Integration Surface
@@ -170,7 +172,7 @@ Need one-shot text generation without an agent process?
 | Fixed reasoning strategy | `Jido.AI.CoDAgent`, `Jido.AI.CoTAgent`, `Jido.AI.AoTAgent`, `Jido.AI.ToTAgent`, `Jido.AI.GoTAgent`, `Jido.AI.TRMAgent`, `Jido.AI.AdaptiveAgent` | Strategy-specific control over reasoning behavior |
 | AI inside existing workflows/jobs | `Jido.AI.Actions.*` | Run via `Jido.Exec.run/3` without defining an agent module |
 | Streaming + checkpoint/resume | `Jido.AI.Reasoning.ReAct` | Standalone ReAct runtime with event streams and checkpoint tokens |
-| Thin model facade helpers | `Jido.AI.generate_text/2`, `generate_object/3`, `stream_text/2`, `ask/2` | Fast path for direct LLM calls with alias/default support |
+| Direct model calls | `Jido.AI.Models.resolve/1` and ReqLLM | Optional application aliases with the native model API |
 
 ## Strategy Quick Pick
 

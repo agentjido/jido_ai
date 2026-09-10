@@ -7,7 +7,7 @@ defmodule Jido.AI.AdaptiveAgent do
     options =
       opts
       |> Keyword.take(@method_keys)
-      |> Jido.AI.Agent.expand_and_eval_literal_option(__CALLER__)
+      |> Jido.AI.Agent.Definition.expand_and_eval_literal_option(__CALLER__)
 
     case Jido.AI.Reasoning.options(:adaptive, options) do
       {:ok, _} -> :ok
@@ -18,7 +18,7 @@ defmodule Jido.AI.AdaptiveAgent do
     default =
       opts
       |> Keyword.get(:default_strategy, :react)
-      |> Jido.AI.Agent.expand_and_eval_literal_option(__CALLER__)
+      |> Jido.AI.Agent.Definition.expand_and_eval_literal_option(__CALLER__)
 
     opts =
       opts

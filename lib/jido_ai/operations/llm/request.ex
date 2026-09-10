@@ -1,6 +1,6 @@
 defmodule Jido.AI.Actions.LLM.Request do
   @moduledoc false
-  alias Jido.AI.{ActionInput, Models, Observe, Validation}
+  alias Jido.AI.{ActionInput, Observe, Validation}
   alias Jido.AI.Actions.Helpers
 
   @defaults %{
@@ -54,7 +54,14 @@ defmodule Jido.AI.Actions.LLM.Request do
          options =
            if(kind == :embed, do: Keyword.put(options, :return_usage, true), else: options),
          {:ok, response} <-
-           Models.request(request_kind(kind), model, input, options, object_schema, context) do
+           Jido.AI.Runtime.ModelCall.request(
+             request_kind(kind),
+             model,
+             input,
+             options,
+             object_schema,
+             context
+           ) do
       case validate_response(kind, response, object_schema) do
         :ok ->
           extra = if kind == :embed, do: %{dimensions: dimensions(response.embedding)}, else: %{}

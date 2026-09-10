@@ -7,7 +7,7 @@ defmodule Jido.AI.TRMAgent do
     options =
       opts
       |> Keyword.take(@method_keys)
-      |> Jido.AI.Agent.expand_and_eval_literal_option(__CALLER__)
+      |> Jido.AI.Agent.Definition.expand_and_eval_literal_option(__CALLER__)
 
     normalized =
       case Jido.AI.Reasoning.options(:trm, options) do

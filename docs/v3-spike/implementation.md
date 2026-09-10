@@ -1508,7 +1508,7 @@ runtime simplification gate or establish full history/recovery/API parity.
 
 ## Public Agent slice and refinement
 
-`Jido.AI.Agent` moved to `lib/jido_ai/authoring/agent.ex`. The basic option
+`Jido.AI.Agent` moved to `lib/jido_ai/agent/definition.ex`. The basic option
 macro now builds one profile through the common lowerer and then uses the
 ordinary core Agent macro. It no longer starts a v2 ReAct Strategy. The
 production generated helpers supply ask, ask_stream, await, ask_sync, cancel,

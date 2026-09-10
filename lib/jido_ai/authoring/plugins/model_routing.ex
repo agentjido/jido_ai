@@ -30,7 +30,10 @@ defmodule Jido.AI.Plugins.ModelRouting do
   patterns use lexical order. The Plugin prepares Signal input through core.
   """
 
-  use Jido.Plugin, agent: Jido.AI.Plugins.ModelRouting.Agent
+  use Jido.Plugin,
+    agent: Jido.AI.Plugins.ModelRouting.Agent,
+    agent_server: Jido.AI.Plugins.ModelRouting.AgentServer
+
   def name, do: "model_routing"
   def description, do: "Routes model selection by signal intent"
   def category, do: "ai"
@@ -66,21 +69,21 @@ defmodule Jido.AI.Plugins.ModelRouting do
     do: Zoi.object(%{routes: Zoi.map() |> Zoi.default(routes)}) |> Zoi.default(%{routes: routes})
 
   @doc false
-  def prepare_agent(preparation) do
-    signal = preparation.effective_signal
+  def prepare_command(command) do
+    signal = command.signal
     data = signal.data
-    routes = preparation.plugin_state.routes
+    routes = command.agent.state.model_routing.routes
 
     request_override? =
-      explicit_model?(Map.get(preparation.context, :jido_ai_request, %{}))
+      explicit_model?(Map.get(command.context, :jido_ai_request, %{}))
 
     model =
       if is_map(data) and not explicit_model?(data) and not request_override?,
         do: route_model(signal.type, routes)
 
     if is_nil(model),
-      do: {:ok, preparation},
-      else: {:ok, %{preparation | effective_signal: %{signal | data: Map.put(data, :model, model)}}}
+      do: {:ok, command},
+      else: {:ok, %{command | signal: %{signal | data: Map.put(data, :model, model)}}}
   end
 
   defp route_model(type, routes) when is_binary(type) and is_map(routes) do
@@ -139,8 +142,12 @@ defmodule Jido.AI.Plugins.ModelRouting.Agent do
 
   @impl Jido.Agent.Plugin
   def state_spec(opts), do: Jido.AI.Plugins.ModelRouting.agent_state_spec(opts)
+end
 
-  @impl Jido.Agent.Plugin
-  def prepare(preparation, _opts),
-    do: Jido.AI.Plugins.ModelRouting.prepare_agent(preparation)
+defmodule Jido.AI.Plugins.ModelRouting.AgentServer do
+  @moduledoc false
+  use Jido.AgentServer.Plugin
+
+  @impl Jido.AgentServer.Plugin
+  def admit(_runtime, command, _opts), do: Jido.AI.Plugins.ModelRouting.prepare_command(command)
 end

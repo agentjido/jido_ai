@@ -250,7 +250,7 @@ Baseline evidence: [Output options](../../../lib/jido_ai/output.ex),
 [retrieval input](../../../lib/jido_ai/retrieval/store.ex),
 [GoT input](../../../lib/jido_ai/reasoning/graph_of_thoughts/strategy.ex),
 [TRM input](../../../lib/jido_ai/reasoning/trm/strategy.ex),
-[Agent restore](../../../lib/jido_ai/authoring/agent.ex),
+[Agent restore](../../../lib/jido_ai/agent/definition.ex),
 [usage helper](../../../lib/jido_ai/actions/helpers.ex), and
 [packaged skill test](../../../test/jido_ai/skill/runtime_contracts_test.exs).
 

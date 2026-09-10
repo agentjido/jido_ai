@@ -168,7 +168,7 @@ behavior even though the primary commit purpose was streaming.
 
 ## Baseline evidence and simplification gates
 
-Source: [Agent stream helper](../../../lib/jido_ai/authoring/agent.ex),
+Source: [Agent stream helper](../../../lib/jido_ai/agent/definition.ex),
 [request dispatch](../../../lib/jido_ai/request.ex),
 [public enumerable](../../../lib/jido_ai/request/stream.ex),
 [canonical event](../../../lib/jido_ai/runtime/event.ex),

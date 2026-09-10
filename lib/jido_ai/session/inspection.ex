@@ -123,7 +123,7 @@ defmodule Jido.AI.Session.Inspection do
   end
 
   def fit(record, candidate, context) do
-    limit = Jido.AI.Authoring.state_size_limit(context.jido_ai_agent)
+    limit = Jido.AI.Runtime.StateSize.limit(context.jido_ai_agent)
     state = put_in(candidate, [:requests, record.id], record)
 
     if is_integer(limit) and :erlang.external_size(state) > limit,

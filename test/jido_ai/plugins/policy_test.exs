@@ -18,14 +18,8 @@ defmodule Jido.AI.Plugins.PolicyTest do
   end
 
   defp prepare(command) do
-    with {:ok, command, _specs, _inputs} <-
-           Jido.Plugin.prepare_evaluation(
-             command,
-             command.signal,
-             command.agent.plugins
-           ) do
-      {:ok, command}
-    end
+    with {:ok, specs} <- Jido.Plugin.normalize_all(command.agent.plugins),
+         do: Jido.Plugin.admit(command, specs, %{})
   end
 
   describe "enforcement behavior" do

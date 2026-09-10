@@ -7,7 +7,10 @@ defmodule Jido.AI.Plugins.Chat do
   Tools may be supplied by name or as Action modules. `tool_policy` is retained
   as descriptive state; it is not an execution authorization rule.
   """
-  use Jido.Plugin, agent: Jido.AI.Plugins.Chat.Agent
+  use Jido.Plugin,
+    agent: Jido.AI.Plugins.Chat.Agent,
+    agent_server: Jido.AI.Plugins.Chat.AgentServer
+
   alias Jido.AI.Actions.LLM.{Chat, Complete, Embed, GenerateObject}
   alias Jido.AI.Actions.ToolCalling.{CallWithTools, ExecuteTool, ListTools}
 
@@ -73,21 +76,21 @@ defmodule Jido.AI.Plugins.Chat do
   end
 
   @doc false
-  def prepare_agent(preparation, opts) do
+  def prepare_command(command, opts) do
     binding =
       if action =
            Enum.find_value(@routes, fn {signal, action} ->
-             if signal == preparation.effective_signal.type, do: action
+             if signal == command.signal.type, do: action
            end) do
         %{
           action: action,
           key: :chat,
           into: Keyword.get(opts, :into, :result),
-          defaults: preparation.plugin_state
+          defaults: command.agent.state.chat
         }
       end
 
-    Jido.AI.Capability.bind(preparation, :jido_ai_chat_capability, binding)
+    Jido.AI.Capability.bind(command, :jido_ai_chat_capability, binding)
   end
 
   defp state_schema(defaults) do
@@ -111,10 +114,12 @@ defmodule Jido.AI.Plugins.Chat.Agent do
 
   @impl Jido.Agent.Plugin
   def state_spec(opts), do: Jido.AI.Plugins.Chat.agent_state_spec(opts)
+end
 
-  @impl Jido.Agent.Plugin
-  def observes(opts), do: [Keyword.get(opts, :into, :result)]
+defmodule Jido.AI.Plugins.Chat.AgentServer do
+  @moduledoc false
+  use Jido.AgentServer.Plugin
 
-  @impl Jido.Agent.Plugin
-  def prepare(preparation, opts), do: Jido.AI.Plugins.Chat.prepare_agent(preparation, opts)
+  @impl Jido.AgentServer.Plugin
+  def admit(_runtime, command, opts), do: Jido.AI.Plugins.Chat.prepare_command(command, opts)
 end

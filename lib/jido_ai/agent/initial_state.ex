@@ -9,10 +9,26 @@ defmodule Jido.AI.Agent.InitialState do
          {:ok, state} <- domain(state, definition),
          {:ok, profile} <- Configuration.profile(definition, opts[:profile]),
          {:ok, state, prompt} <- context(state, profile),
-         {:ok, agent} <- Jido.Agent.instantiate(definition, Keyword.put(Keyword.take(opts, [:id]), :state, state)) do
-      if is_nil(prompt),
-        do: {:ok, agent},
-        else: Configuration.direct(agent, :prompt, prompt, profile: profile.id)
+         {:ok, agent} <-
+           Jido.Agent.instantiate(
+             definition,
+             Keyword.put(Keyword.take(opts, [:id]), :state, state)
+           ),
+         {:ok, agent} <- apply_prompt(agent, prompt, profile),
+         :ok <- validate_state_size(agent, definition) do
+      {:ok, agent}
+    end
+  end
+
+  defp apply_prompt(agent, nil, _profile), do: {:ok, agent}
+
+  defp apply_prompt(agent, prompt, profile),
+    do: Configuration.direct(agent, :prompt, prompt, profile: profile.id)
+
+  defp validate_state_size(agent, definition) do
+    case Jido.AI.Runtime.StateSize.limit(definition) do
+      nil -> :ok
+      limit -> Jido.AI.Runtime.StateSize.validate(agent.state, limit, %{})
     end
   end
 

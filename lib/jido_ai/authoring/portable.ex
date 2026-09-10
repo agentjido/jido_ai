@@ -116,7 +116,7 @@ defmodule Jido.AI.Portable do
   defp request_view(_), do: %{}
 
   defp resolve_model(model) do
-    {:ok, Jido.AI.Models.resolve_model(model)}
+    {:ok, Jido.AI.Models.resolve(model)}
   rescue
     error in ArgumentError -> Profile.error("model", Exception.message(error))
   end

@@ -123,7 +123,7 @@ defmodule Jido.AI.Actions.Planning.Plan do
     with {:ok, params, model, opts} <- Request.prepare(schema(), params, context),
          {:ok, req_context} <- build_plan_messages(params),
          {:ok, response} <-
-           Jido.AI.Models.request(:text, model, req_context.messages, opts, nil, context) do
+           Jido.AI.Runtime.ModelCall.request(:text, model, req_context.messages, opts, nil, context) do
       {:ok, format_result(response, model, params[:goal])}
     end
   end

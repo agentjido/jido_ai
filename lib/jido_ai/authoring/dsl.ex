@@ -371,7 +371,7 @@ defmodule Jido.AI.DSL.Compiler do
 end
 
 defmodule Jido.AI.DSL do
-  @moduledoc "AI profile declarations inside the core `agent do` block."
+  @moduledoc "Spark extension for AI profile declarations inside the core `agent do` block."
   alias Jido.AI.DSL.Entities, as: E
 
   @model %Spark.Dsl.Entity{

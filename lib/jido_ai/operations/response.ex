@@ -37,7 +37,7 @@ defmodule Jido.AI.Runtime.Response do
         call_id: state.llm_call_id,
         response_id: response.id,
         iteration: state.model_calls + 1,
-        model: Jido.AI.Models.model_label(request.model),
+        model: Jido.AI.Runtime.ModelCall.label(request.model),
         turn_type: if(request.schema != nil or calls == [], do: :final_answer, else: :tool_calls),
         text: ReqLLM.Response.text(response),
         content_parts: if(response.message, do: response.message.content, else: []),

@@ -58,7 +58,7 @@ defmodule Jido.AI.Actions.Helpers do
   def resolve_model(nil, default), do: resolve_model(default, default)
 
   def resolve_model(model, _default) do
-    {:ok, Jido.AI.Models.resolve_model(model)}
+    {:ok, Jido.AI.Models.resolve(model)}
   rescue
     ArgumentError -> {:error, :invalid_model_format}
   end

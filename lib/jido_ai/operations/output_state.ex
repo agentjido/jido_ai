@@ -82,7 +82,7 @@ defmodule Jido.AI.Runtime.OutputState do
       run_id: state.run_id,
       iteration: state.iterations,
       llm_call_id: state[:llm_call_id],
-      model: Jido.AI.Models.model_label(state.model),
+      model: Jido.AI.Runtime.ModelCall.label(state.model),
       observability: state.profile.observability
     })
   end

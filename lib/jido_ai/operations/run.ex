@@ -7,7 +7,7 @@ defmodule Jido.AI.Runtime.Run do
   defp execute(%{query: query}, context) do
     profile = context.jido_ai_profiles[context.jido_ai_turn_profile]
 
-    with {:ok, flow} <- Jido.AI.Authoring.reasoning_flow(profile),
+    with {:ok, flow} <- Jido.AI.Runtime.Flow.build(profile),
          {:ok, output} <-
            Jido.Exec.run(flow, %{query: query}, context, timeout: profile.controls.timeout),
          {:ok, candidate} <-

@@ -124,7 +124,7 @@ proves the behavior. Keep one error conversion and declared state shape. Do not
 recreate the old Strategy runtime to preserve its private helper functions.
 
 Source: [commit](https://github.com/agentjido/jido_ai/commit/e2b2d275ccdb3d3b1bf8cfcae106e13776475e39),
-[Agent authoring](../../../lib/jido_ai/authoring/agent.ex),
+[Agent authoring](../../../lib/jido_ai/agent/definition.ex),
 [errors](../../../lib/jido_ai/error.ex),
 [observation](../../../lib/jido_ai/observe/sanitize.ex),
 [runner](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a68443f03bc6a198c5a2/lib/jido_ai/reasoning/react/runner.ex),

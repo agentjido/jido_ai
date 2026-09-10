@@ -174,7 +174,7 @@ Source: [runner](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a
 [request](../../../lib/jido_ai/request.ex),
 [request stream](../../../lib/jido_ai/request/stream.ex),
 [checkpoint](../../../lib/jido_ai/checkpoint.ex),
-[Agent persistence wrapper](../../../lib/jido_ai/authoring/agent.ex), and
+[Agent persistence wrapper](../../../lib/jido_ai/agent/definition.ex), and
 [tool adapter](../../../lib/jido_ai/tool_adapter.ex).
 
 Tests: [incomplete Agent response](../../../test/jido_ai/integration/react_incomplete_response_test.exs),

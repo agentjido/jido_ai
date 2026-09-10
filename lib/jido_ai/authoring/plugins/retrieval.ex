@@ -71,12 +71,12 @@ defmodule Jido.AI.Plugins.Retrieval do
   end
 
   @doc false
-  def prepare_agent(preparation, opts) do
-    state = effective_preparation_state(preparation)
-    context = Map.put(preparation.context, :retrieval_store, Keyword.get(opts, :store, Store))
+  def prepare_command(command, opts) do
+    state = effective_command_state(command)
+    context = Map.put(command.context, :retrieval_store, Keyword.get(opts, :store, Store))
 
     binding =
-      if action = @routes[preparation.effective_signal.type] do
+      if action = @routes[command.signal.type] do
         %{
           action: action,
           key: :retrieval,
@@ -86,7 +86,7 @@ defmodule Jido.AI.Plugins.Retrieval do
       end
 
     Jido.AI.Capability.bind(
-      %{preparation | context: context},
+      %{command | context: context},
       :jido_ai_retrieval_capability,
       binding
     )
@@ -96,7 +96,7 @@ defmodule Jido.AI.Plugins.Retrieval do
   def admit_command(command, opts) do
     state = effective_command_state(command)
     signal = command.signal
-    binding = Jido.AI.Authoring.request_binding(command.agent, signal)
+    binding = Jido.AI.Runtime.Binding.request(command.agent, signal)
     data = if binding, do: binding.input, else: signal.data
     native? = not is_nil(binding)
 
@@ -111,11 +111,6 @@ defmodule Jido.AI.Plugins.Retrieval do
     else
       {:ok, command}
     end
-  end
-
-  defp effective_preparation_state(preparation) do
-    state = preparation.plugin_state
-    %{state | namespace: state.namespace || preparation.agent_id || "default"}
   end
 
   defp effective_command_state(command) do
@@ -214,13 +209,6 @@ defmodule Jido.AI.Plugins.Retrieval.Agent do
 
   @impl Jido.Agent.Plugin
   def state_spec(opts), do: Jido.AI.Plugins.Retrieval.agent_state_spec(opts)
-
-  @impl Jido.Agent.Plugin
-  def observes(opts), do: [Keyword.get(opts, :into, :result)]
-
-  @impl Jido.Agent.Plugin
-  def prepare(preparation, opts),
-    do: Jido.AI.Plugins.Retrieval.prepare_agent(preparation, opts)
 end
 
 defmodule Jido.AI.Plugins.Retrieval.AgentServer do
@@ -228,6 +216,8 @@ defmodule Jido.AI.Plugins.Retrieval.AgentServer do
   use Jido.AgentServer.Plugin
 
   @impl Jido.AgentServer.Plugin
-  def admit(_runtime, command, opts),
-    do: Jido.AI.Plugins.Retrieval.admit_command(command, opts)
+  def admit(_runtime, command, opts) do
+    with {:ok, command} <- Jido.AI.Plugins.Retrieval.prepare_command(command, opts),
+         do: Jido.AI.Plugins.Retrieval.admit_command(command, opts)
+  end
 end

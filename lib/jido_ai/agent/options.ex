@@ -78,6 +78,12 @@ defmodule Jido.AI.Agent.Options do
 
     repairs = if output && output.on_validation_error == :repair, do: output.retries, else: 0
 
+    tool_input =
+      if(fresh?, do: Keyword.get(opts, :tools, []), else: Keyword.fetch!(opts, :tools))
+
+    ensure_tool_modules_compiled!(tool_input)
+    tools = tools!(tool_input, tool_defaults(opts))
+
     profile = %{
       id: :assistant,
       observability: Keyword.get(opts, :observability, %{}),
@@ -114,11 +120,7 @@ defmodule Jido.AI.Agent.Options do
           ),
         timeout: Keyword.get(opts, :request_timeout_ms, 60_000)
       },
-      tools:
-        tools!(
-          if(fresh?, do: Keyword.get(opts, :tools, []), else: Keyword.fetch!(opts, :tools)),
-          tool_defaults(opts)
-        ),
+      tools: tools,
       result: %{
         into: :last_result,
         schema: if(output, do: output.schema),
@@ -286,6 +288,16 @@ defmodule Jido.AI.Agent.Options do
     end
   end
 
+  defp ensure_tool_modules_compiled!(tools) when is_list(tools) do
+    Enum.each(tools, fn
+      module when is_atom(module) -> Code.ensure_compiled(module)
+      %{target: module} when is_atom(module) -> Code.ensure_compiled(module)
+      _other -> :ok
+    end)
+  end
+
+  defp ensure_tool_modules_compiled!(_tools), do: :ok
+
   defp model_options!(value) do
     if Keyword.keyword?(value) or (is_map(value) and not is_struct(value)),
       do: Jido.AI.Reasoning.ReAct.Config.normalize_option_names(value),
@@ -297,92 +309,4 @@ defmodule Jido.AI.Agent.Options do
       do: value,
       else: raise(ArgumentError, "#{key} must be a keyword list")
   end
-end
-
-defmodule Jido.AI.Agent.StateProjection do
-  @moduledoc false
-
-  # This adapter supplies the old public convenience fields. Session Actions
-  # call it while building the complete domain candidate. It owns no process
-  # or request store, and the core validates the resulting candidate.
-  def apply(state, record, context) do
-    if context[:jido_ai_legacy_agent_profile] == record.profile_id do
-      projected =
-        case record.status do
-          :pending ->
-            Map.merge(state, %{
-              last_request_id: record.id,
-              last_query: record.query,
-              last_answer: "",
-              last_result: nil,
-              completed: false
-            })
-
-          :completed ->
-            Map.merge(state, %{
-              last_answer: Jido.AI.Request.compat_text(record.result),
-              completed: true
-            })
-
-          :failed ->
-            Map.put(state, :completed, true)
-        end
-
-      projected =
-        if Map.get(record, :method) == :adaptive,
-          do: Map.put(projected, :selected_strategy, get_in(record, [:meta, :adaptive, :strategy])),
-          else: projected
-
-      if Jido.AI.Reasoning.Linear.linear?(Map.get(record, :method, :react)) or
-           Map.get(record, :method) in [:graph_of_thoughts, :trm, :adaptive] do
-        case record.status do
-          :pending -> Map.merge(projected, %{last_prompt: record.query, last_result: ""})
-          :completed -> Map.put(projected, :last_result, printable(record.result))
-          :failed -> Map.put(projected, :last_result, printable(project_error(record)))
-        end
-      else
-        if Map.get(record, :method) in [:algorithm_of_thoughts, :tree_of_thoughts] do
-          case record.status do
-            :pending ->
-              Map.put(projected, :last_prompt, record.query)
-
-            :completed ->
-              projected
-
-            :failed ->
-              result =
-                case record.error do
-                  {:failed, _, result} -> result
-                  _ -> nil
-                end
-
-              Map.put(projected, :last_result, result)
-          end
-        else
-          projected
-        end
-      end
-    else
-      state
-    end
-  end
-
-  defp project_error(%{method: :adaptive, error: {:failed, reason, details}})
-       when is_map(details),
-       do: Map.get(details, :result, reason)
-
-  defp project_error(%{method: :graph_of_thoughts, error: {:failed, reason, _}}),
-    do: {:error, reason}
-
-  defp project_error(%{method: :trm, error: {:failed, _, %{result: result}}}),
-    do: result
-
-  defp project_error(%{method: :trm, error: reason}),
-    do: Jido.AI.Reasoning.TRM.Helpers.safe_error_message(reason)
-
-  defp project_error(record), do: record.error
-
-  defp printable(nil), do: ""
-  defp printable(value) when is_binary(value), do: value
-  defp printable(value), do: inspect(value)
 end

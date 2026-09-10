@@ -128,7 +128,7 @@ Reuse the release checks from [review 06](06-release-and-documentation.md):
 
 The baseline anchors are [package requirements](../../../mix.exs),
 [resolved dependencies](../../../mix.lock),
-[Agent options](../../../lib/jido_ai/authoring/agent.ex),
+[Agent options](../../../lib/jido_ai/agent/definition.ex),
 [request options](../../../lib/jido_ai/request.ex),
 [ReAct execution](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a68443f03bc6a198c5a2/lib/jido_ai/reasoning/react/runner.ex),
 [HTTP option tests](../../../test/jido_ai/react/runtime_runner_test.exs),

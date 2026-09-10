@@ -99,9 +99,9 @@ Each transform returns a tagged tuple and cannot perform hidden Agent state muta
 
 ### Response and output
 
-`MDL-REQ-016`: The gateway shall convert provider responses to `Jido.AI.Turn`, `Jido.AI.Usage`, and `Jido.AI.Error` before it returns to another seam.
+`MDL-REQ-016`: Direct model calls shall keep the native ReqLLM response and usage contracts.
 
-`MDL-REQ-017`: The gateway shall not expose a ReqLLM response, message, content part, stream item, or exception as a stable public result.
+`MDL-REQ-017`: Agent runtime seams can convert ReqLLM values when an Agent contract needs a stable stored result.
 
 `MDL-REQ-018`: When structured-output validation requests repair, the gateway shall perform only the bounded attempts allowed by the output contract.
 
@@ -111,26 +111,24 @@ Each transform returns a tagged tuple and cannot perform hidden Agent state muta
 
 `MDL-REQ-020`: When the gateway needs a provider client or credential, it shall resolve it from a trusted runtime binding supplied by the host.
 
-`MDL-REQ-021`: When ReqLLM returns or raises an error, the gateway shall preserve the provider cause in a bounded internal field and shall return a safe Jido AI error.
+`MDL-REQ-021`: Direct calls shall keep ReqLLM errors. Agent runtime seams shall preserve the provider cause in a bounded internal field when they convert an error.
 
 `MDL-REQ-022`: The gateway shall classify retry eligibility but shall not schedule retry delay or create an independent retry worker.
 
 ## Public contract
 
-The direct facade remains small:
+Jido AI owns semantic aliases only. ReqLLM remains the native public model API:
 
 ```elixir
-Jido.AI.generate_text(model_ref, query, opts \\ [])
-  :: {:ok, Jido.AI.Turn.t()} | {:error, Jido.AI.Error.t()}
-
-Jido.AI.generate_object(model_ref, query, output, opts \\ [])
-  :: {:ok, map(), Jido.AI.Usage.t()} | {:error, Jido.AI.Error.t()}
-
-Jido.AI.stream_text(model_ref, query, opts \\ [])
-  :: {:ok, Enumerable.t()} | {:error, Jido.AI.Error.t()}
+model = Jido.AI.Models.resolve(:capable)
+ReqLLM.generate_text(model, query, opts)
+ReqLLM.generate_object(model, query, output, opts)
+ReqLLM.stream_text(model, query, opts)
 ```
 
-The stream enumerable emits Jido AI stream items, not ReqLLM items. The terminal item contains the normalized Turn and Usage.
+Direct calls return native ReqLLM responses, streams, usage data, and errors.
+The Jido AI runtime can add request policy and orchestration when a call is part
+of an Agent Turn or Session.
 
 Model Actions use the same gateway:
 

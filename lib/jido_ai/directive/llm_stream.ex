@@ -249,7 +249,7 @@ defmodule Jido.AI.Directive.LLMStream.Execution do
 
     messages = Helpers.build_directive_messages(context, system_prompt)
 
-    case Jido.AI.Models.request(:stream, model, messages, opts) do
+    case Jido.AI.Runtime.ModelCall.request(:stream, model, messages, opts) do
       {:ok, stream_response} ->
         on_content = fn text ->
           partial_signal =

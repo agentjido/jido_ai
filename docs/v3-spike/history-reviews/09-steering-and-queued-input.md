@@ -132,7 +132,7 @@ Source: [queue](../../../lib/jido_ai/pending_input_server.ex),
 [runner](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a68443f03bc6a198c5a2/lib/jido_ai/reasoning/react/runner.ex),
 [projection](../../../lib/jido_ai/reasoning/react/strategy.ex),
 [compatibility wrapper](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a68443f03bc6a198c5a2/lib/jido_ai.ex), and
-[generated helpers](../../../lib/jido_ai/authoring/agent.ex).
+[generated helpers](../../../lib/jido_ai/agent/definition.ex).
 
 Tests: [Agent steering integration](../../../test/jido_ai/integration/react_steering_integration_test.exs),
 [queue](../../../test/jido_ai/pending_input_server_test.exs),

@@ -130,14 +130,14 @@ defmodule Jido.AI.Actions.LLM.ChatTest do
 
       params = %{
         prompt: "hello",
-        model: "custom:model",
+        model: "openai:gpt-4o-mini",
         system_prompt: "Explicit system prompt",
         max_tokens: 55,
         temperature: 0.4
       }
 
       expect(ReqLLM.Generation, :generate_text, fn model, messages, opts ->
-        assert model == "custom:model"
+        assert model == "openai:gpt-4o-mini"
         assert opts[:max_tokens] == 55
         assert opts[:temperature] == 0.4
         assert has_system_prompt?(messages, "Explicit system prompt")
@@ -146,7 +146,7 @@ defmodule Jido.AI.Actions.LLM.ChatTest do
       end)
 
       assert {:ok, result} = Chat.run(params, context)
-      assert result.model == "custom:model"
+      assert result.model == "openai:gpt-4o-mini"
       assert result.text == "overridden"
     end
 

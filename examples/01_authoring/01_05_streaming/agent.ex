@@ -4,7 +4,7 @@ defmodule JidoAI.Examples.Streaming.Generate do
 
   def run(%{query: query}, context) do
     with {:ok, stream} <-
-           Jido.AI.Models.request(:stream, context.model, query, context.model_options) do
+           Jido.AI.Runtime.ModelCall.request(:stream, context.model, query, context.model_options) do
       send(context.observer, {:stream_opened, stream})
 
       try do

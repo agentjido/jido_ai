@@ -52,8 +52,8 @@ Jido AI owns AI-specific behavior and contracts:
 
 The current authoring layer states this direction directly:
 
-- `lib/jido_ai/authoring/agent.ex:2-20` builds a V3 Agent from an AI profile, a core Flow, and a session Plugin.
-- `lib/jido_ai/authoring/profile.ex:2-8` defines static AI policy that lowers to core Agent and Flow data.
+- `lib/jido_ai/agent/definition.ex:2-20` builds a V3 Agent from an AI profile, a core Flow, and a session Plugin.
+- `lib/jido_ai/profile.ex:2-8` defines static AI policy that lowers to core Agent and Flow data.
 - `lib/jido_ai/authoring/authoring.ex:42-126` lowers profiles to ordinary core Agent definitions.
 - `lib/jido_ai/authoring/authoring.ex:163-243` builds the reasoning Flow with `Jido.Flow.Builder`.
 - `lib/jido_ai/authoring/plugin_stack.ex:2-12` composes AI Plugins and assigns store supervision to the host application.
@@ -137,9 +137,9 @@ This section reports implemented source and test evidence. It does not claim tha
 
 The current V3 branch has a complete first authoring path:
 
-- `lib/jido_ai/authoring/profile.ex:11-65` defines the portable profile fields.
-- `lib/jido_ai/authoring/profile.ex:68-126` validates inert profile data.
-- `lib/jido_ai/authoring/agent.ex:183-425` provides Agent macros and request calls.
+- `lib/jido_ai/profile.ex:11-65` defines the portable profile fields.
+- `lib/jido_ai/profile.ex:68-126` validates inert profile data.
+- `lib/jido_ai/agent/definition.ex:183-425` provides Agent macros and request calls.
 - `lib/jido_ai/authoring/authoring.ex:42-126` lowers profiles to core Agent data.
 - `lib/jido_ai/authoring/authoring.ex:163-243` creates the core reasoning Flow.
 - `lib/jido_ai/authoring/plugin_stack.ex:95-102` rejects the old package-owned TaskSupervisor option.
@@ -508,7 +508,7 @@ Suggested requirements: `SKL-REQ-001` and later.
 | Owner | Profile, Authoring, Agent DSL, codec, portable definition, and convenience-agent maintainers |
 | Scope | Define inert AI profiles, module and data authoring parity, lowering to core Agent and Flow values, route targets, Plugin stack assembly, and public convenience calls. |
 | Non-goals | No runtime side effect during compilation or decoding, second Flow DSL, hidden provider client, store supervisor, or behavior that exists only in one authoring form. |
-| Current implementation | `lib/jido_ai/authoring/profile.ex`, `lib/jido_ai/authoring/agent.ex`, `lib/jido_ai/authoring/authoring.ex`, and `lib/jido_ai/authoring/plugin_stack.ex`; tests in `test/jido_ai/authoring/full_spec_parity_test.exs:218-294`, `test/jido_ai/authoring/agent_dsl_test.exs:95-185`, and `test/jido_ai/authoring/runtime_boundary_test.exs:49-102`. |
+| Current implementation | `lib/jido_ai/profile.ex`, `lib/jido_ai/agent/definition.ex`, `lib/jido_ai/authoring/authoring.ex`, and `lib/jido_ai/authoring/plugin_stack.ex`; tests in `test/jido_ai/authoring/full_spec_parity_test.exs:218-294`, `test/jido_ai/authoring/agent_dsl_test.exs:95-185`, and `test/jido_ai/authoring/runtime_boundary_test.exs:49-102`. |
 | Planned target | One portable definition model. Module DSL, direct profile data, and codec input lower to the same Agent, Plugins, and Flow with the same validation. |
 | Public contracts | Profile schema and version, DSL macros, codec form, lowering result, generated route ownership, default Plugin stack, and convenience request calls. |
 | Dependencies | Seams 00 through 09. It must assemble approved contracts and must not invent new runtime behavior. |

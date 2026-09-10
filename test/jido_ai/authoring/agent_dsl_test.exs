@@ -156,6 +156,18 @@ defmodule Jido.AI.Authoring.AgentDSLTest do
     assert resolved.instructions == "acme: refund"
   end
 
+  test "the raising builder uses the same canonical profile value" do
+    profile =
+      Jido.AI.profile!(
+        id: :support,
+        model: :capable,
+        result: [into: :answer]
+      )
+
+    assert %Jido.AI.Profile{id: :support} = profile
+    assert profile.models.default.model == :capable
+  end
+
   test "model routers select declared roles and use the declared fallback" do
     profile = CanonicalAgent.ai_profile(:support)
 

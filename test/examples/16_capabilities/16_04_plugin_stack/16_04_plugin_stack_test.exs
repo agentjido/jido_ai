@@ -31,9 +31,7 @@ defmodule JidoAI.Examples.PluginStackTest do
              Policy,
              ModelRouting,
              Jido.AI.Runtime.Plugin,
-             Jido.AI.Runtime.PreparationPlugin,
              Jido.AI.Session.Plugin,
-             Jido.AI.Session.PreparationPlugin,
              Jido.AI.Context.Operations.Plugin
            ] ==
              Enum.map(Example.Agent.plugins(), &elem(&1, 0))

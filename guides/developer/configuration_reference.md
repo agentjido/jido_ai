@@ -15,7 +15,8 @@ config :jido_ai,
   }
 ```
 
-Package defaults are built into `Jido.AI`; `model_aliases` is merged on top for overrides.
+The package declares its default aliases in its global `config/config.exs`.
+Application `model_aliases` are merged over that configured baseline.
 
 ## Strategy/Macro Defaults
 

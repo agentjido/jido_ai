@@ -116,14 +116,14 @@ defmodule Jido.AI.Actions.LLM.GenerateObjectTest do
       params = %{
         prompt: "Generate person data",
         object_schema: schema,
-        model: "custom:model",
+        model: "openai:gpt-4o-mini",
         system_prompt: "Explicit system prompt",
         max_tokens: 44,
         temperature: 0.2
       }
 
       expect(ReqLLM.Generation, :generate_object, fn model, messages, req_schema, opts ->
-        assert model == "custom:model"
+        assert model == "openai:gpt-4o-mini"
         assert req_schema == schema
         assert opts[:max_tokens] == 44
         assert opts[:temperature] == 0.2
@@ -133,7 +133,7 @@ defmodule Jido.AI.Actions.LLM.GenerateObjectTest do
       end)
 
       assert {:ok, result} = GenerateObject.run(params, context)
-      assert result.model == "custom:model"
+      assert result.model == "openai:gpt-4o-mini"
       assert result.object == %{name: "explicit"}
     end
 

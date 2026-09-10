@@ -1238,7 +1238,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     session = exited_pid()
 
     Mimic.stub(ReqLLM.Providers.OpenAI, :start_responses_session, fn model, _opts ->
-      send(parent, {:websocket_started, Jido.AI.model_label(model)})
+      send(parent, {:websocket_started, Jido.AI.Runtime.ModelCall.label(model)})
       {:ok, session}
     end)
 
@@ -1274,7 +1274,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     parent = self()
 
     Mimic.stub(ReqLLM.Providers.OpenAI, :start_responses_session, fn model, _opts ->
-      send(parent, {:unexpected_websocket_start, Jido.AI.model_label(model)})
+      send(parent, {:unexpected_websocket_start, Jido.AI.Runtime.ModelCall.label(model)})
       {:ok, exited_pid()}
     end)
 

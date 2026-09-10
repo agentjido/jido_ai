@@ -131,7 +131,7 @@ Catalog 01 owns the authoring cases. Catalog 09 owns CoT/CoD behavior. The later
 multiline-code validation case from PR 290 remains part of HIST-02 and needs
 its own source review.
 
-Baseline evidence: [Agent normalization](../../../lib/jido_ai/authoring/agent.ex),
+Baseline evidence: [Agent normalization](../../../lib/jido_ai/agent/definition.ex),
 [ReAct normalization](../../../lib/jido_ai/reasoning/react/strategy.ex),
 [CoT normalization](../../../lib/jido_ai/reasoning/chain_of_thought/strategy.ex),
 [CoD delegation](../../../lib/jido_ai/reasoning/chain_of_draft/strategy.ex),

@@ -174,7 +174,7 @@ authorization check.
 
 ## Baseline evidence and simplification checks
 
-Source: [Agent macro](../../../lib/jido_ai/authoring/agent.ex),
+Source: [Agent macro](../../../lib/jido_ai/agent/definition.ex),
 [direct API](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a68443f03bc6a198c5a2/lib/jido_ai.ex),
 [tool adapter](../../../lib/jido_ai/tool_adapter.ex),
 [reasoning helper](../../../lib/jido_ai/reasoning/helpers.ex),

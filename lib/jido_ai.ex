@@ -2,14 +2,12 @@ defmodule Jido.AI do
   @moduledoc """
   AI integration layer for the Jido ecosystem.
 
-  Jido.AI provides a unified interface for AI interactions, built on ReqLLM and
-  integrated with the Jido action framework.
+  Jido.AI adds AI authoring and runtime behavior to normal Jido Agents.
+  ReqLLM and LLMDB remain the native model APIs.
 
   ## Features
 
   - Model aliases for semantic model references
-  - Lightweight app-configured LLM defaults
-  - Thin ReqLLM generation facades
   - Action-based AI workflows
   - Splode-based error handling
 
@@ -42,23 +40,6 @@ defmodule Jido.AI do
 
   A broad list of provider/model IDs is available at: https://llmcatalog.dev
 
-  ## LLM Defaults
-
-  Configure small, role-based defaults for top-level generation helpers:
-
-      config :jido_ai,
-        llm_defaults: %{
-          text: %{model: :fast, temperature: 0.2, max_tokens: 1024},
-          object: %{model: :thinking, temperature: 0.0, max_tokens: 1024},
-          stream: %{model: :fast, temperature: 0.2, max_tokens: 1024}
-        }
-
-  Then call the facade directly:
-
-      {:ok, response} = Jido.AI.generate_text("Summarize this in one sentence.")
-      {:ok, json} = Jido.AI.generate_object("Extract fields", schema)
-      {:ok, stream} = Jido.AI.stream_text("Stream this response")
-
   ## Runtime Tool Management
 
   Register and unregister tools dynamically with running agents:
@@ -82,10 +63,12 @@ defmodule Jido.AI do
   import Kernel, except: [inspect: 1]
 
   alias Jido.AI.Models
-  alias Jido.AI.Turn
 
   @doc "Builds one canonical, validated AI profile."
   def profile(attrs, opts \\ []), do: Jido.AI.Profile.new(attrs, opts)
+
+  @doc "Builds one canonical AI profile or raises its Splode validation error."
+  def profile!(attrs, opts \\ []), do: Jido.AI.Profile.new!(attrs, opts)
 
   @doc "Returns a safe canonical view of an Agent's AI profiles."
   def inspect(source, opts \\ []), do: Jido.AI.Portable.inspect(source, opts)
@@ -99,23 +82,13 @@ defmodule Jido.AI do
   @doc "Imports a versioned map, JSON, or YAML document through explicit registries."
   def import(input, opts \\ []), do: Jido.AI.Portable.import(input, opts)
 
-  @type model_alias ::
-          :fast | :capable | :thinking | :reasoning | :planning | :image | :embedding | atom()
+  @type model_alias :: atom()
   @type model_spec :: String.t()
   @type model_input :: model_alias() | ReqLLM.model_input()
-  @type llm_kind :: :text | :object | :stream
-  @type llm_generation_opts :: %{
-          optional(:model) => model_input(),
-          optional(:system_prompt) => String.t(),
-          optional(:max_tokens) => non_neg_integer(),
-          optional(:temperature) => number(),
-          optional(:timeout) => pos_integer()
-        }
-
   @doc """
-  Returns all configured model aliases merged with defaults.
+  Returns all configured model aliases.
 
-  User overrides from `config :jido_ai, :model_aliases` are merged on top of built-in defaults.
+  Application aliases are merged over the package baseline from `config/config.exs`.
 
   ## Examples
 
@@ -124,21 +97,7 @@ defmodule Jido.AI do
       true
   """
   @spec model_aliases() :: %{model_alias() => ReqLLM.model_input()}
-  def model_aliases, do: Models.model_aliases()
-
-  @doc """
-  Returns configured LLM generation defaults merged with built-in defaults.
-
-  Configure under `config :jido_ai, :llm_defaults`.
-  """
-  @spec llm_defaults() :: %{llm_kind() => llm_generation_opts()}
-  def llm_defaults, do: Models.llm_defaults()
-
-  @doc """
-  Returns defaults for a specific generation kind: `:text`, `:object`, or `:stream`.
-  """
-  @spec llm_defaults(llm_kind()) :: llm_generation_opts()
-  def llm_defaults(kind), do: Models.llm_defaults(kind)
+  def model_aliases, do: Models.aliases()
 
   @doc """
   Resolves a model alias or passes through a direct ReqLLM model input.
@@ -171,61 +130,7 @@ defmodule Jido.AI do
       # raises ArgumentError with unknown alias message
   """
   @spec resolve_model(model_input()) :: ReqLLM.model_input()
-  def resolve_model(model), do: Models.resolve_model(model)
-
-  @doc """
-  Returns a stable human-readable label for a model input.
-  """
-  @spec model_label(model_input()) :: String.t()
-  def model_label(model), do: Models.model_label(model)
-
-  @doc false
-  @spec model_fingerprint_segment(model_input()) :: String.t()
-  def model_fingerprint_segment(model), do: Models.model_fingerprint_segment(model)
-
-  @doc false
-  @spec provider_opt_keys(model_input()) :: %{optional(String.t()) => atom()}
-  def provider_opt_keys(model), do: Models.provider_opt_keys(model)
-
-  @doc """
-  Thin facade for `ReqLLM.Generation.generate_text/3`.
-
-  `opts` supports:
-
-  - `:model` - model alias or direct model spec
-  - `:system_prompt` - optional system prompt
-  - `:max_tokens`, `:temperature`, `:timeout`
-  - Any other ReqLLM options (e.g. `:tools`, `:tool_choice`) as pass-through options
-  """
-  @spec generate_text(term(), keyword()) :: {:ok, term()} | {:error, term()}
-  def generate_text(input, opts \\ []) when is_list(opts), do: Models.generate_text(input, opts)
-
-  @doc """
-  Thin facade for `ReqLLM.Generation.generate_object/4`.
-
-  `opts` has the same behavior as `generate_text/2`.
-  """
-  @spec generate_object(term(), term(), keyword()) :: {:ok, term()} | {:error, term()}
-  def generate_object(input, object_schema, opts \\ []) when is_list(opts),
-    do: Models.generate_object(input, object_schema, opts)
-
-  @doc """
-  Thin facade for `ReqLLM.stream_text/3`.
-
-  Returns ReqLLM stream response directly.
-  """
-  @spec stream_text(term(), keyword()) :: {:ok, term()} | {:error, term()}
-  def stream_text(input, opts \\ []) when is_list(opts), do: Models.stream_text(input, opts)
-
-  @doc """
-  Convenience helper that returns extracted response text.
-  """
-  @spec ask(term(), keyword()) :: {:ok, String.t()} | {:error, term()}
-  def ask(input, opts \\ []) when is_list(opts) do
-    with {:ok, response} <- generate_text(input, opts) do
-      {:ok, Turn.extract_text(response)}
-    end
-  end
+  def resolve_model(model), do: Models.resolve(model)
 
   alias Jido.AI.Configuration
 

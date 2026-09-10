@@ -90,7 +90,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
   @spec new(map() | keyword()) :: t()
   def new(opts \\ %{}) do
     opts_map = normalize_opts(opts)
-    resolved_model = opts_map |> get_opt(:model, @default_model) |> Jido.AI.Models.resolve_model()
+    resolved_model = opts_map |> get_opt(:model, @default_model) |> Jido.AI.Models.resolve()
     provider_opt_keys_by_string = provider_opt_keys_by_string(resolved_model)
 
     tools =
@@ -187,7 +187,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
 
     parts = [
       "v#{config.version}",
-      Jido.AI.Models.model_fingerprint_segment(config.model),
+      Jido.AI.Runtime.ModelCall.fingerprint_segment(config.model),
       config.system_prompt || "",
       Integer.to_string(config.max_iterations),
       to_string(config.streaming),
@@ -470,7 +470,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
     end
   end
 
-  defp provider_opt_keys_by_string(model_spec), do: Jido.AI.Models.provider_opt_keys(model_spec)
+  defp provider_opt_keys_by_string(model_spec), do: Jido.AI.Runtime.ModelCall.provider_option_keys(model_spec)
 
   defp maybe_merge_llm_opts(opts, llm_opts) when is_list(llm_opts) do
     if llm_opts == [] do

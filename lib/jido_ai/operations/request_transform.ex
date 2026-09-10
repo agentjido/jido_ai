@@ -50,7 +50,7 @@ defmodule Jido.AI.Runtime.RequestTransform do
              "request_transformer"
            ),
          model =
-           if(overrides[:model], do: Models.resolve_model(overrides.model), else: request.model),
+           if(overrides[:model], do: Models.resolve(overrides.model), else: request.model),
          {:ok, selected} <- select(catalog, overrides[:tools], state, context),
          llm_opts = Config.merge_llm_opts(config, request.options, overrides[:llm_opts], model),
          raw_messages = overrides[:messages] || input.messages,

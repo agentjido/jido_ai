@@ -135,7 +135,7 @@ core feature through an AI wrapper.
 ## Starting evidence
 
 - [Current package surface](../../guides/user/package_overview.md)
-- [Agent implementation](../../lib/jido_ai/authoring/agent.ex)
+- [Agent implementation](../../lib/jido_ai/agent/definition.ex)
 - [ReAct Strategy](../../lib/jido_ai/reasoning/react/strategy.ex)
 - [ReAct runner](../../lib/jido_ai/operations/react_runner.ex)
 - [Request lifecycle](../../guides/user/request_lifecycle_and_concurrency.md)

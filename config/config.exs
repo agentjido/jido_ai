@@ -1,5 +1,16 @@
 import Config
 
+config :jido_ai,
+  model_aliases: %{
+    fast: "anthropic:claude-haiku-4-5",
+    capable: "anthropic:claude-sonnet-4-20250514",
+    thinking: "anthropic:claude-sonnet-4-20250514",
+    reasoning: "anthropic:claude-sonnet-4-20250514",
+    planning: "anthropic:claude-sonnet-4-20250514",
+    image: "openai:gpt-image-1",
+    embedding: "openai:text-embedding-3-small"
+  }
+
 config :logger, :default_formatter,
   metadata: [:jido_ai, :tool_name, :exception_message, :exception_type, :stacktrace, :reason]
 

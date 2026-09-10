@@ -225,7 +225,7 @@ defmodule Jido.AI.Directive.LLMGenerate.Execution do
 
     messages = Helpers.build_directive_messages(context, system_prompt)
 
-    case Jido.AI.Models.request(:text, model, messages, opts) do
+    case Jido.AI.Runtime.ModelCall.request(:text, model, messages, opts) do
       {:ok, response} ->
         turn = Turn.from_response(response, model: model)
 

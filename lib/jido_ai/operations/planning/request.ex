@@ -14,7 +14,7 @@ defmodule Jido.AI.Actions.Planning.Request do
     params = Jido.AI.ActionInput.apply_defaults(schema, params, context, @defaults, [:planning])
 
     with {:ok, params} <- Zoi.parse(schema, params),
-         model = Jido.AI.Models.resolve_model(params[:model] || :planning),
+         model = Jido.AI.Models.resolve(params[:model] || :planning),
          {:ok, options} <- options(params, context) do
       {:ok, params, model, options}
     end

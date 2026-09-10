@@ -360,12 +360,12 @@ defmodule Jido.AI.Integration.FoundationPhase1Test do
 
     test "custom model alias configuration" do
       Application.put_env(:jido_ai, :model_aliases, %{
-        custom_test: "test:custom-model"
+        custom_test: "openai:gpt-4o-mini"
       })
 
       on_exit(fn -> Application.delete_env(:jido_ai, :model_aliases) end)
 
-      assert Jido.AI.resolve_model(:custom_test) == "test:custom-model"
+      assert Jido.AI.resolve_model(:custom_test) == "openai:gpt-4o-mini"
 
       # Default aliases still work
       assert is_binary(Jido.AI.resolve_model(:fast))

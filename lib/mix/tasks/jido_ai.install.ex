@@ -65,10 +65,7 @@ if Code.ensure_loaded?(Igniter) do
         "config.exs",
         :jido_ai,
         [:model_aliases],
-        %{
-          fast: "anthropic:claude-haiku-4-5",
-          capable: "anthropic:claude-sonnet-4-20250514"
-        }
+        Map.take(Jido.AI.Models.aliases(), [:fast, :capable])
       )
       |> Igniter.add_notice("""
       Jido AI installed successfully!

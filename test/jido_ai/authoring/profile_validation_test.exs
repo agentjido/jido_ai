@@ -48,6 +48,16 @@ defmodule Jido.AI.Authoring.ProfileValidationTest do
     assert profile.controls.timeout == 60_000
   end
 
+  test "new! and validate use the same Splode validation contract" do
+    profile = Profile.new!(%{id: :support, result: %{into: :answer}})
+
+    assert {:ok, ^profile} = Profile.validate(profile)
+
+    assert_raise Jido.AI.Error.Validation.Invalid, fn ->
+      Profile.new!(%{id: nil, result: %{into: :answer}})
+    end
+  end
+
   test "application model and instruction defaults apply only when the profile omits them" do
     previous = Application.get_env(:jido_ai, :agent_defaults)
     Application.put_env(:jido_ai, :agent_defaults, %{model: :fast, instructions: "Configured"})

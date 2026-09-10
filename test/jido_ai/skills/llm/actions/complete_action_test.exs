@@ -69,13 +69,13 @@ defmodule Jido.AI.Actions.LLM.CompleteTest do
 
       params = %{
         prompt: "hello",
-        model: "custom:model",
+        model: "openai:gpt-4o-mini",
         max_tokens: 42,
         temperature: 0.1
       }
 
       expect(ReqLLM.Generation, :generate_text, fn model, _messages, opts ->
-        assert model == "custom:model"
+        assert model == "openai:gpt-4o-mini"
         assert opts[:max_tokens] == 42
         assert opts[:temperature] == 0.1
 
@@ -83,7 +83,7 @@ defmodule Jido.AI.Actions.LLM.CompleteTest do
       end)
 
       assert {:ok, result} = Complete.run(params, context)
-      assert result.model == "custom:model"
+      assert result.model == "openai:gpt-4o-mini"
       assert result.text == "overridden"
     end
 

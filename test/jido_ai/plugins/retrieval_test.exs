@@ -66,7 +66,10 @@ defmodule Jido.AI.Plugins.RetrievalTest do
   for key <- [:disable_retrieval, "disable_retrieval"] do
     test "live admission keeps the request when #{key |> inspect()} is true" do
       cmd = command(Map.put(%{prompt: "Tokyo weather"}, unquote(key), true))
-      assert {:ok, ^cmd} = Retrieval.AgentServer.admit(nil, cmd, [])
+      assert {:ok, admitted} = Retrieval.AgentServer.admit(nil, cmd, [])
+      assert admitted.signal == cmd.signal
+      assert admitted.context.retrieval_store == Store
+      assert admitted.context.jido_ai_retrieval_capability == nil
     end
   end
 

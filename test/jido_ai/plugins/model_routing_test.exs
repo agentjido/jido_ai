@@ -16,17 +16,11 @@ defmodule Jido.AI.Plugins.ModelRoutingTest do
   end
 
   defp prepare(command) do
-    with {:ok, command, _specs, _inputs} <-
-           Jido.Plugin.prepare_evaluation(
-             command,
-             command.signal,
-             command.agent.plugins
-           ) do
-      {:ok, command}
-    end
+    with {:ok, specs} <- Jido.Plugin.normalize_all(command.agent.plugins),
+         do: Jido.Plugin.admit(command, specs, %{})
   end
 
-  describe "prepare/2 routing" do
+  describe "live admission routing" do
     test "applies the built-in default route from declared state" do
       signal = Signal.new!("chat.simple", %{prompt: "hello"}, source: "/test")
 

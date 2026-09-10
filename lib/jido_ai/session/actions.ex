@@ -146,7 +146,7 @@ defmodule Jido.AI.Session.Start do
 
           with {:ok, candidate} <- start_history(context, profile, record) do
             changes = context_changes(context, candidate, profile, record)
-            candidate = Jido.AI.Agent.StateProjection.apply(candidate, record, context)
+            candidate = Jido.AI.Session.StateProjection.apply(candidate, record, context)
             {:ok, candidate, [%Change{operation: :start, record: record} | changes]}
           end
         end
@@ -236,7 +236,7 @@ defmodule Jido.AI.Session.Settle do
                  candidate =
                    candidate
                    |> Map.put(profile.result.into, result)
-                   |> Jido.AI.Agent.StateProjection.apply(completed, context),
+                   |> Jido.AI.Session.StateProjection.apply(completed, context),
                  {:ok, _} <- domain(candidate, context) do
               {candidate,
                %{
@@ -269,7 +269,7 @@ defmodule Jido.AI.Session.Settle do
       record =
         Jido.AI.Session.Inspection.complete(record, completion[:inspection], candidate, context)
 
-      candidate = Jido.AI.Agent.StateProjection.apply(candidate, record, context)
+      candidate = Jido.AI.Session.StateProjection.apply(candidate, record, context)
 
       with {:ok, candidate, changes} <-
              Jido.AI.Context.Operations.finish(candidate, record, context),
@@ -285,7 +285,7 @@ defmodule Jido.AI.Session.Settle do
         result
 
       {:error, errors} ->
-        if Jido.AI.Authoring.state_size_error?(errors),
+        if Jido.AI.Runtime.StateSize.error?(errors),
           do: {:error, :state_size},
           else: {:error, :invalid_domain_result}
     end
@@ -339,7 +339,7 @@ defmodule Jido.AI.Session.Cancel do
             context
           )
 
-        candidate = Jido.AI.Agent.StateProjection.apply(context.agent_state, record, context)
+        candidate = Jido.AI.Session.StateProjection.apply(context.agent_state, record, context)
 
         with {:ok, candidate, changes} <-
                Jido.AI.Context.Operations.finish(candidate, record, context),

@@ -1291,9 +1291,9 @@ The first implementation pass should use these current source areas:
 | Source area | Required refinement |
 | --- | --- |
 | `lib/jido_ai/authoring/dsl.ex` | Add the target entities, shorthand forms, inline Action hosts, and formatter-facing macro arities |
-| `lib/jido_ai/authoring/profile.ex` | Make one constructor own normalization, defaults, compatibility checks, and structured errors |
+| `lib/jido_ai/profile.ex` | Make one constructor own normalization, defaults, compatibility checks, and Splode errors |
 | `lib/jido_ai/authoring/authoring.ex` | Lower normalized profiles into normal Jido configuration and AI route targets |
-| `lib/jido_ai/authoring/agent.ex` | Install the extension and expose the small generated module API |
+| `lib/jido_ai/agent.ex` and `lib/jido_ai/agent/definition.ex` | Install the extension through a small public facade and keep macro support private |
 | `lib/jido_ai/authoring/capability.ex` | Validate Agent state destinations and extension capabilities |
 | `lib/jido_ai/operations/runtime.ex` | Resolve instructions, models, reasoning, controls, tools, and result contracts for one request |
 | `lib/jido_ai/operations/run.ex` | Keep final state commit atomic and write the selected result value |

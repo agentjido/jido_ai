@@ -1,39 +1,5 @@
-defmodule Jido.AI.Agent do
-  @moduledoc """
-  Builds a v3 Agent from the existing AI Agent options.
-
-  The option adapter uses `Jido.AI.Authoring` and the same profile, core Flow,
-  and session Plugin as the `agent do` AI extension. `ask/3` returns a handle
-  after admission commits. `await/2` reads the committed result. `ask_stream/3`
-  adds the canonical request event stream.
-
-  The request Plugin owns `state.requests`. The domain has `model`,
-  `last_request_id`, `last_query`, `last_answer`, `last_result`, `completed`, and
-  `messages`. `last_answer` retains the text view; `last_result` holds the typed
-  value. Core `new/1` returns `{:ok, agent}`; use `new!/1` for a direct value.
-
-  This port is in progress. Unsupported authoring options raise an error.
-  Skills, lifecycle Signals, standalone execution and v2 checkpoint conversion
-  still require their migration slices. Session streams support idle timeouts
-  and optional tool keepalives through one event owner.
-  Native v3 checkpoints use the core checkpoint and restore functions.
-  """
-
-  @doc """
-  Builds a v3 instance from application initial state and an optional AI Context.
-
-  `source` is an Agent module or neutral definition. Options are `:id` and
-  `:profile`. The selected profile must declare history when the state contains
-  `:context`. A saved prompt replaces that profile's prompt; nil keeps its
-  configured prompt. Other fields must belong to the Agent's domain schema.
-
-  This imports conversation data before Server startup. It does not resume an
-  old worker, convert Plugin state, or decode an old Agent checkpoint. Keep
-  native checkpoint restore separate. No model or tool runs during import.
-  """
-  def from_initial_state(source, state, opts \\ []) do
-    Jido.AI.Agent.InitialState.import(source, state, opts)
-  end
+defmodule Jido.AI.Agent.Definition do
+  @moduledoc false
 
   @doc false
   def expand_aliases_in_ast(ast, caller_env) do
@@ -242,7 +208,7 @@ defmodule Jido.AI.Agent do
                              unquote(routes_ast)
                            ),
                            :system_prompt,
-                           case Jido.AI.Agent.normalize_system_prompt_value(
+                           case Jido.AI.Agent.Definition.normalize_system_prompt_value(
                                   unquote(prompt_ast),
                                   __ENV__.file,
                                   unquote(prompt_line)
@@ -260,11 +226,11 @@ defmodule Jido.AI.Agent do
 
         import Jido.AI.Agent, only: [tools_from_skills: 1]
         @behaviour Jido.AI.ToolInterceptor
-        @before_compile Jido.AI.Agent
+        @before_compile Jido.AI.Agent.Definition
 
         @doc "Admits a request and returns its handle."
         def ask(server, query, opts \\ []) when is_binary(query) or is_list(query) do
-          with {:ok, opts} <- Jido.AI.Agent.request_options(opts, %{}) do
+          with {:ok, opts} <- Jido.AI.Agent.Definition.request_options(opts, %{}) do
             Jido.AI.Request.create_and_send(
               server,
               query,
@@ -319,7 +285,20 @@ defmodule Jido.AI.Agent do
               Keyword.put_new(opts, :source, @jido_ai_source)
             )
 
-        defoverridable ask: 3, ask_stream: 3, await: 2, ask_sync: 3, cancel: 2, steer: 3, inject: 3
+        @impl Jido.Agent
+        def checkpoint(agent, context) do
+          sanitized = %{agent | state: Jido.AI.Checkpoint.sanitize_state(agent.state)}
+          Jido.Agent.default_checkpoint(sanitized, context)
+        end
+
+        defoverridable ask: 3,
+                       ask_stream: 3,
+                       await: 2,
+                       ask_sync: 3,
+                       cancel: 2,
+                       steer: 3,
+                       inject: 3,
+                       checkpoint: 2
       end
     end
   end
@@ -379,115 +358,39 @@ defmodule Jido.AI.Agent do
 
       @doc "Runs one request with the selected AI profile."
       def ask(server, query, opts \\ []),
-        do: Jido.AI.Agent.ask_request(__MODULE__, server, query, opts)
+        do: Jido.AI.Agent.Interface.ask(__MODULE__, server, query, opts)
 
       @doc "Runs one request and waits for a completed result when needed."
       def ask_sync(server, query, opts \\ []),
-        do: Jido.AI.Agent.ask_sync_request(__MODULE__, server, query, opts)
+        do: Jido.AI.Agent.Interface.ask_sync(__MODULE__, server, query, opts)
 
       @doc "Runs one streaming session request."
       def ask_stream(server, query, opts \\ []),
-        do: Jido.AI.Agent.ask_stream_request(__MODULE__, server, query, opts)
+        do: Jido.AI.Agent.Interface.ask_stream(__MODULE__, server, query, opts)
 
       @doc "Waits for one admitted session request."
       def await(request, opts \\ []), do: Jido.AI.Request.await(request, opts)
 
       @doc "Cancels one active session request."
-      def cancel(server, opts \\ []), do: Jido.AI.Agent.cancel_request(server, opts)
+      def cancel(server, opts \\ []), do: Jido.AI.Agent.Interface.cancel(server, opts)
 
       @doc "Queues visible input for an active session request."
       def steer(server, content, opts \\ []), do: Jido.AI.steer(server, content, opts)
 
-      defoverridable ask: 3, ask_sync: 3, ask_stream: 3, await: 2, cancel: 2, steer: 3
-    end
-  end
-
-  @doc "Returns all declared AI profiles from an Agent module or definition."
-  def profiles(module) when is_atom(module), do: profiles(module.definition())
-
-  def profiles(%Jido.Agent{} = agent) do
-    case Jido.AI.Configuration.options(agent) do
-      {:ok, options} -> Keyword.fetch!(options, :profiles)
-      {:error, _} -> %{}
-    end
-  end
-
-  @doc "Returns one declared AI profile or nil."
-  def profile(source, id), do: Map.get(profiles(source), id)
-
-  @doc false
-  def ask_request(module, server, query, opts) do
-    with {:ok, profile, route} <- request_route(module, opts) do
-      case profile.requests.mode do
-        :session ->
-          Jido.AI.Request.create_and_send(
-            server,
-            query,
-            Keyword.merge(opts, signal_type: route.path, source: "/jido/ai/agent")
-          )
-
-        :turn ->
-          signal = Jido.Signal.new!(route.path, %{query: query}, source: "/jido/ai/agent")
-
-          with {:ok, agent} <- Jido.AgentServer.call(server, signal, timeout: opts[:timeout] || 30_000),
-               do: {:ok, Map.fetch!(agent.state, profile.result.into)}
-      end
-    end
-  end
-
-  @doc false
-  def ask_sync_request(module, server, query, opts) do
-    with {:ok, profile, _route} <- request_route(module, opts),
-         {:ok, result} <- ask_request(module, server, query, opts) do
-      if profile.requests.mode == :session,
-        do: Jido.AI.Request.await(result, opts),
-        else: {:ok, result}
-    end
-  end
-
-  @doc false
-  def ask_stream_request(module, server, query, opts) do
-    with {:ok, profile, _route} <- request_route(module, opts),
-         true <- profile.requests.mode == :session and profile.requests.streaming,
-         {:ok, request} <- ask_request(module, server, query, Keyword.put(opts, :stream_to, {:pid, self()})) do
-      {:ok, %{request: request, events: Jido.AI.Request.Stream.events(request, opts)}}
-    else
-      false -> Jido.AI.Profile.error("requests.streaming", "Select a streaming session profile")
-      error -> error
-    end
-  end
-
-  @doc false
-  def cancel_request(server, opts) do
-    data = %{request_id: opts[:request_id], reason: Keyword.get(opts, :reason, :user_cancelled)}
-    signal = Jido.Signal.new!(Jido.AI.Session.cancel_type(), data, source: "/jido/ai/agent")
-    Jido.AgentServer.cast(server, signal)
-  end
-
-  defp request_route(module, opts) do
-    profiles = profiles(module)
-    id = opts[:profile]
-
-    profile =
-      cond do
-        not is_nil(id) -> Map.get(profiles, id)
-        map_size(profiles) == 1 -> profiles |> Map.values() |> hd()
-        true -> nil
+      @impl Jido.Agent
+      def checkpoint(agent, context) do
+        sanitized = %{agent | state: Jido.AI.Checkpoint.sanitize_state(agent.state)}
+        Jido.Agent.default_checkpoint(sanitized, context)
       end
 
-    route =
-      if profile do
-        Enum.find(module.routes(), fn route ->
-          {target, defaults} = Jido.Agent.Authoring.split_target(route.target)
-
-          target in [Jido.AI.Runtime.Run, Jido.AI.Session.Start] and
-            is_map(defaults) and defaults[:profile_id] == profile.id
-        end)
-      end
-
-    if profile && route,
-      do: {:ok, profile, route},
-      else: Jido.AI.Profile.error("profile", "Select one routed AI profile")
+      defoverridable ask: 3,
+                     ask_sync: 3,
+                     ask_stream: 3,
+                     await: 2,
+                     cancel: 2,
+                     steer: 3,
+                     checkpoint: 2
+    end
   end
 
   @doc false
@@ -595,26 +498,5 @@ defmodule Jido.AI.Agent do
                      after_tool_call: 3,
                      checkpoint: 2
     end
-  end
-
-  @doc """
-  Extract tool action modules from skills.
-
-  Useful when you want to use skill actions as agent tools.
-
-  ## Example
-
-      @skills [MyApp.WeatherSkill, MyApp.LocationSkill]
-
-      use Jido.AI.Agent,
-        name: "weather_agent",
-        tools: Jido.AI.Agent.tools_from_skills(@skills),
-        skills: Enum.map(@skills, & &1.skill_spec(%{}))
-  """
-  @spec tools_from_skills([module()]) :: [module()]
-  def tools_from_skills(skill_modules) when is_list(skill_modules) do
-    skill_modules
-    |> Enum.flat_map(& &1.actions())
-    |> Enum.uniq()
   end
 end

@@ -1,8 +1,12 @@
 defmodule JidoAI.Examples.ActiveSelection.Observer do
-  use Jido.Plugin
+  use Jido.Plugin, agent_server: JidoAI.Examples.ActiveSelection.Observer.AgentServer
+end
+
+defmodule JidoAI.Examples.ActiveSelection.Observer.AgentServer do
+  use Jido.AgentServer.Plugin
 
   @impl true
-  def prepare(command, _) do
+  def admit(_runtime_ref, command, _opts) do
     if command.signal.type == Jido.AI.Session.progress_type() do
       send(command.context.observer, {:selection_commit, command.signal})
 

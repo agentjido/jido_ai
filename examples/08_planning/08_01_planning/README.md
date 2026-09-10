@@ -42,7 +42,7 @@ The three Actions retain their public names, schemas, category, tags and version
 Their sources moved from `actions/planning` to `operations/planning`. The common
 request helper replaces repeated model/default/provider preparation. Prompts
 and method parsers remain in their Actions. No alternate model transport is
-present; requests pass through `Jido.AI.Models.request/5`.
+present; requests pass through `Jido.AI.Runtime.ModelCall.request/5`.
 
 Action defaults remain 4,096 tokens, with temperatures 0.7 for Plan, 0.6 for
 Decompose and 0.5 for Prioritize. The Planning Plugin keeps its shared 0.7

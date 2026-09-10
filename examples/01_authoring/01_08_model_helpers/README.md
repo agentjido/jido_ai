@@ -1,19 +1,19 @@
-# 01_08 — Shared public model helpers
+# 01_08 — Model aliases with native ReqLLM calls
 
-- [Shared implementation](../../../lib/jido_ai/models.ex)
-- [Public delegates](../../../lib/jido_ai.ex)
+- [Alias implementation](../../../lib/jido_ai/models.ex)
 - [Example tests](../../../test/examples/01_authoring/01_08_model_helpers/01_08_model_helpers_test.exs)
 
-Six cases test the shared implementation now called by the public model helpers:
-per-kind defaults, caller/nested option precedence, prompt normalization, text,
-objects, SSE, actual gateway headers, usage, rich model identity and tagged
-errors. They use the same HTTP/SSE mock as the Agent examples.
+`Jido.AI.Models` has one job. It maps application names such as `:fast`,
+`:capable`, and `:example` to native ReqLLM model inputs.
 
-The header cases have the `HIST-01/stream-headers` tag and supply partial evidence
-for issue 212 and commits `8f669705` and `26bb4106`. They do not yet prove the
-legacy ReAct option path, Finch hook ordering or final dependency/installer QA.
+```elixir
+model = Jido.AI.Models.resolve(:fast)
+{:ok, response} = ReqLLM.generate_text(model, "Summarize this change.")
+```
 
-The later [03_01 example](../../03_tools/03_01_dynamic_catalog/README.md) compiles the complete
-`Jido.AI` facade from the production shared directory and tests its public
-text, object, stream and `ask` calls. The facade now uses v3 tool, prompt and
-history APIs. Full root package and consumer checks remain separate gates.
+The examples test text, structured, and streaming calls through the public
+ReqLLM API. Jido AI does not wrap provider calls or own generation defaults.
+ReqLLM keeps its response, stream, option, header, usage, and error contracts.
+
+The header cases have the `HIST-01/stream-headers` tag. They give partial
+evidence for issue 212 and commits `8f669705` and `26bb4106`.
