@@ -7,7 +7,7 @@ model server as the other v3 examples.
 
 ## Execution and ownership
 
-The public module now compiles from `lib/jido_ai/shared/react.ex`. The Runner
+The public module now compiles from `lib/jido_ai/reasoning/react.ex`. The Runner
 now compiles from `lib/jido_ai/operations/react_runner.ex`. Its old model/tool
 loop is removed. The new adapter starts a private Agent at enumeration time,
 submits one Session request, forwards canonical events, and stops the Agent.

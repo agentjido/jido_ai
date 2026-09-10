@@ -148,12 +148,12 @@ requiring another AI runtime or model mock.
 ## Baseline evidence
 
 Source: [lifecycle helper](../../../lib/jido_ai/reasoning/request_lifecycle.ex),
-[AoT](../../../lib/jido_ai/shared/aot_strategy.ex),
-[CoT](../../../lib/jido_ai/shared/cot_strategy.ex),
-[GoT](../../../lib/jido_ai/shared/got_strategy.ex),
-[TRM](../../../lib/jido_ai/shared/trm_strategy.ex),
-[TRM machine](../../../lib/jido_ai/shared/trm_machine.ex), and
-[direct tools](../../../lib/jido_ai/shared/turn.ex).
+[AoT](../../../lib/jido_ai/reasoning/algorithm_of_thoughts/strategy.ex),
+[CoT](../../../lib/jido_ai/reasoning/chain_of_thought/strategy.ex),
+[GoT](../../../lib/jido_ai/reasoning/graph_of_thoughts/strategy.ex),
+[TRM](../../../lib/jido_ai/reasoning/trm/strategy.ex),
+[TRM machine](../../../lib/jido_ai/reasoning/trm/machine.ex), and
+[direct tools](../../../lib/jido_ai/turn.ex).
 
 Tests: [lifecycle parity](../../../test/jido_ai/integration/request_lifecycle_parity_test.exs),
 [lifecycle helper](../../../test/jido_ai/reasoning/request_lifecycle_test.exs),

@@ -15,8 +15,8 @@ Proven means that current source and a direct executable test assertion exist. I
 ## Inputs And Evidence
 
 - Target design: design.md.
-- Model resolution and direct helpers: lib/jido_ai/shared/models.ex:87-268.
-- Alias registry: lib/jido_ai/shared/model_aliases.ex.
+- Model resolution and direct helpers: lib/jido_ai/models.ex:87-268.
+- Alias registry: lib/jido_ai/model_aliases.ex.
 - Routing: lib/jido_ai/operations/model_router.ex.
 - Request transformation: lib/jido_ai/operations/request_transform.ex.
 - Execution and repair: lib/jido_ai/operations/runtime.ex:324-405 and lib/jido_ai/operations/runtime.ex:733-766.

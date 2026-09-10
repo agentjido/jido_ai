@@ -207,7 +207,7 @@ Source: [integration](../../../lib/jido_ai/skill/agent_integration.ex),
 [provider](../../../lib/jido_ai/skill/resource_provider.ex),
 [resources](../../../lib/jido_ai/skill/resources.ex),
 [resource Action](../../../lib/jido_ai/actions/skill/load_resource.ex),
-[Turn](../../../lib/jido_ai/shared/turn.ex), and
+[Turn](../../../lib/jido_ai/turn.ex), and
 [runner](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a68443f03bc6a198c5a2/lib/jido_ai/reasoning/react/runner.ex).
 Tests: [provider](../../../test/jido_ai/skill/resource_provider_test.exs),
 [resource Action](../../../test/jido_ai/skills/skill/actions/load_resource_test.exs),

@@ -167,15 +167,15 @@ remain three separate contracts.
 ## Baseline evidence and simplification gates
 
 Source: [runner](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a68443f03bc6a198c5a2/lib/jido_ai/reasoning/react/runner.ex),
-[Turn](../../../lib/jido_ai/shared/turn.ex),
+[Turn](../../../lib/jido_ai/turn.ex),
 [ReAct projection](../../../lib/jido_ai/reasoning/react/strategy.ex),
-[CoT projection](../../../lib/jido_ai/shared/cot_strategy.ex),
+[CoT projection](../../../lib/jido_ai/reasoning/chain_of_thought/strategy.ex),
 [delta Signal](../../../lib/jido_ai/signals/llm_delta.ex),
-[request](../../../lib/jido_ai/shared/request.ex),
-[request stream](../../../lib/jido_ai/shared/request_stream.ex),
+[request](../../../lib/jido_ai/request.ex),
+[request stream](../../../lib/jido_ai/request/stream.ex),
 [checkpoint](../../../lib/jido_ai/checkpoint.ex),
 [Agent persistence wrapper](../../../lib/jido_ai/authoring/agent.ex), and
-[tool adapter](../../../lib/jido_ai/shared/tool_adapter.ex).
+[tool adapter](../../../lib/jido_ai/tool_adapter.ex).
 
 Tests: [incomplete Agent response](../../../test/jido_ai/integration/react_incomplete_response_test.exs),
 [runtime runner](../../../test/jido_ai/react/runtime_runner_test.exs),

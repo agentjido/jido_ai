@@ -85,8 +85,8 @@ The port also fixes node-limit overshoot: a generated batch cannot add more
 nodes than the remaining capacity. Branch limits now bound returned thoughts,
 including a provider response with too many entries.
 
-The [Machine](../../../lib/jido_ai/shared/tot_machine.ex) and
-[Result](../../../lib/jido_ai/shared/tot_result.ex) keep their module names.
+The [Machine](../../../lib/jido_ai/reasoning/tree_of_thoughts/machine.ex) and
+[Result](../../../lib/jido_ai/reasoning/tree_of_thoughts/result.ex) keep their module names.
 Finite transitions replace Fsmx. Usage uses the shared nested-metadata merge.
 The compatibility Machine still emits its legacy telemetry by default; the
 native adapter disables it and uses the common observation path.

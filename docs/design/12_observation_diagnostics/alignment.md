@@ -15,8 +15,8 @@ Proven means that current source and a direct executable test assertion exist. I
 ## Inputs And Evidence
 
 - Target design: design.md.
-- Runtime observation: lib/jido_ai/shared/observe.ex and lib/jido_ai/shared/observe_sanitize.ex.
-- Runtime events: lib/jido_ai/shared/runtime_event.ex.
+- Runtime observation: lib/jido_ai/observe.ex and lib/jido_ai/observe/sanitize.ex.
+- Runtime events: lib/jido_ai/runtime/event.ex.
 - Typed signals: lib/jido_ai/signals.
 - Session inspection: lib/jido_ai/session/session.ex and lib/jido_ai/session/runtime.ex.
 - Telemetry tests: test/jido_ai/observe_test.exs:159-330.

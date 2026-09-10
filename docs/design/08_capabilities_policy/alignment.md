@@ -18,8 +18,8 @@ Proven means that current source and a direct executable test assertion exist. I
 - Plugin stack composition: lib/jido_ai/authoring/plugin_stack.ex.
 - Capability Action execution: lib/jido_ai/authoring/capability.ex:10-36.
 - Policy, model routing, retrieval, and quota plugins: lib/jido_ai/authoring/plugins.
-- Retrieval store: lib/jido_ai/shared/retrieval/store.ex.
-- Quota store and reservation logic: lib/jido_ai/shared/quota/store.ex:141-177.
+- Retrieval store: lib/jido_ai/retrieval/store.ex.
+- Quota store and reservation logic: lib/jido_ai/quota/store.ex:141-177.
 - Runtime capability dispatch: lib/jido_ai/operations/runtime.ex:1-120.
 - Relevant V3 authoring and request examples under examples/v3/test/examples.
 

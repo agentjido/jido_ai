@@ -27,7 +27,7 @@ has generated Action metadata and validation to preserve.
 
 ## Facade and direct tool management
 
-The source is [Jido.AI](../../lib/jido_ai/shared/facade.ex). Default-argument arities are
+The source is [Jido.AI](../../lib/jido_ai.ex). Default-argument arities are
 listed in the inventory. Keep tagged errors and each public result shape.
 
 | Surface | Contract and required acceptance |
@@ -135,10 +135,10 @@ tool callbacks in other reasoning methods and command callbacks remain open.
 
 | Surface | Required acceptance |
 | --- | --- |
-| [Request](../../lib/jido_ai/shared/request.ex): `create_and_send/3`, `send_and_await/3`, `await/1,2`, `await_many/1,2` | `API/request-handles`: accepted and rejected work, request correlation, errors and caller timeout. Await requests from independent Agents with reversed completion order; results keep input order, including a failure and timeout. No caller timeout implicitly cancels work. |
+| [Request](../../lib/jido_ai/request.ex): `create_and_send/3`, `send_and_await/3`, `await/1,2`, `await_many/1,2` | `API/request-handles`: accepted and rejected work, request correlation, errors and caller timeout. Await requests from independent Agents with reversed completion order; results keep input order, including a failure and timeout. No caller timeout implicitly cancels work. |
 | `Request.Handle.new/3`, `complete/2`, `fail/2`; request inspection/state helpers | Preserve handle fields and result/error meaning. A caller-owned handle can contain a live Server reference. It must not be copied into portable Agent state without conversion. Validate request retention and unknown IDs. |
-| [Request.Stream](../../lib/jido_ai/shared/request_stream.ex): `events/1,2`, sink normalization, message/terminal helpers | Real PID sink delivery, stream enumeration, exactly one terminal event, receiver exit and worker cleanup. Preserve event shape and accepted partial content rules. |
-| [ReAct](../../lib/jido_ai/shared/react.ex): `stream/2,3`, `stream_from_state/2,3`, `run/2,3`, `collect_stream/1` | `API/standalone-react`: stream is an Enumerable; `run` and `collect_stream` return aggregate maps. Prove actual tools and ordered events, not just a final mock answer. Preserve result, usage, trace and termination meaning. |
+| [Request.Stream](../../lib/jido_ai/request/stream.ex): `events/1,2`, sink normalization, message/terminal helpers | Real PID sink delivery, stream enumeration, exactly one terminal event, receiver exit and worker cleanup. Preserve event shape and accepted partial content rules. |
+| [ReAct](../../lib/jido_ai/reasoning/react.ex): `stream/2,3`, `stream_from_state/2,3`, `run/2,3`, `collect_stream/1` | `API/standalone-react`: stream is an Enumerable; `run` and `collect_stream` return aggregate maps. Prove actual tools and ordered events, not just a final mock answer. Preserve result, usage, trace and termination meaning. |
 | ReAct `start/2,3`, `continue/2,3`, `collect/3`, `cancel/2,3`, `build_config/1` | Start/continue return tagged runtime maps. `collect/3` accepts an event stream or a token. Test `run_until_terminal?: false` without model work. Token cancellation returns a replacement token; it is separate from live Agent cancellation. Test invalid, incompatible and restored tokens. |
 | [ReAct Actions](../../lib/jido_ai/operations/react_actions/start.ex): Start, Continue, Collect, Cancel | Run each public Action through v3 Exec. Preserve schemas, defaults, context configuration, tagged results and resource ownership. Keep one implementation behind Actions and direct functions. |
 

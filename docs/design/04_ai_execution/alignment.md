@@ -18,7 +18,7 @@ Proven means that current source and a direct executable test assertion exist. I
 - Canonical Flow construction: lib/jido_ai/authoring/authoring.ex:231-243.
 - Model, decision, tool, and final stages: lib/jido_ai/operations/runtime.ex:324-985.
 - Standalone compatibility runner: lib/jido_ai/operations/react_runner.ex.
-- Stream sequence and terminal kinds: lib/jido_ai/shared/request_stream.ex:13-144.
+- Stream sequence and terminal kinds: lib/jido_ai/request/stream.ex:13-144.
 - Session stream projection: lib/jido_ai/session/runtime.ex:830-864.
 - V3 examples: 01_02_tool_flow_test.exs, 01_05_streaming_test.exs, 02_13_tool_limits_test.exs, 02_14_stream_activity_test.exs, 02_20_call_counts_test.exs, and 02_24_stream_usage_test.exs.
 - Runtime correlation test: test/jido_ai/react/runtime_runner_test.exs:394-417.

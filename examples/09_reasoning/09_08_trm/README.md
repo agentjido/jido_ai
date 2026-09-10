@@ -99,11 +99,11 @@ and a later request. These cases prove current interruption, not durable phase
 resumption. Rejected admission still has the shared method-identity gap listed
 in [09_07](../09_07_got_api/README.md).
 
-The [Machine](../../../lib/jido_ai/shared/trm_machine.ex),
-[ACT](../../../lib/jido_ai/shared/trm_act.ex),
-[Reasoning](../../../lib/jido_ai/shared/trm_reasoning.ex),
-[Supervision](../../../lib/jido_ai/shared/trm_supervision.ex) and
-[Helpers](../../../lib/jido_ai/shared/trm_helpers.ex) retain their module names.
+The [Machine](../../../lib/jido_ai/reasoning/trm/machine.ex),
+[ACT](../../../lib/jido_ai/reasoning/trm/act.ex),
+[Reasoning](../../../lib/jido_ai/reasoning/trm/reasoning.ex),
+[Supervision](../../../lib/jido_ai/reasoning/trm/supervision.ex) and
+[Helpers](../../../lib/jido_ai/reasoning/trm/helpers.ex) retain their module names.
 Finite transitions replace Fsmx. Usage uses the shared nested merge and adds
 missing totals when both token counters are present. All 204 retained tests
 for these five modules pass on v3 dependencies. The added Machine cases check

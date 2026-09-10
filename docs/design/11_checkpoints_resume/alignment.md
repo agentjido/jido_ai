@@ -16,8 +16,8 @@ Proven means that current source and a direct executable test assertion exist. I
 
 - Target design: design.md.
 - Agent checkpoint hooks: lib/jido_ai/authoring/agent.ex:507-548.
-- ReAct checkpoint and token values: lib/jido_ai/shared/react_checkpoint.ex and lib/jido_ai/shared/react_token.ex.
-- State migration: lib/jido_ai/shared/react_migration.ex and lib/jido_ai/shared/react_state.ex.
+- ReAct checkpoint and token values: lib/jido_ai/reasoning/react/checkpoint.ex and lib/jido_ai/reasoning/react/token.ex.
+- State migration: lib/jido_ai/reasoning/react/migration.ex and lib/jido_ai/reasoning/react/state.ex.
 - Session recovery: lib/jido_ai/session/runtime.ex.
 - Checkpoint examples: examples/v3/test/examples/14_checkpoints.
 - Current resume identity behavior: examples/v3/test/examples/14_resume/14_09_state_migration_test.exs:30.

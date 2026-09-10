@@ -94,8 +94,8 @@ and image parts with binary data. It does not implement a general proof that
 every metadata value is JSON-safe. Transport sanitization has later audit rows;
 do not claim this one fix covers every arbitrary binary value.
 
-Baseline evidence: [tool result formatting](../../../lib/jido_ai/shared/turn.ex),
-[Context](../../../lib/jido_ai/shared/context.ex),
+Baseline evidence: [tool result formatting](../../../lib/jido_ai/turn.ex),
+[Context](../../../lib/jido_ai/context.ex),
 [tool result tests](../../../test/jido_ai/turn_test.exs),
 [executor tests](../../../test/jido_ai/executor_test.exs), and
 [context tests](../../../test/jido_ai/thread_test.exs).
@@ -131,7 +131,7 @@ Inspect the AI context or request-transformer input for those refs, and inspect
 HTTP for the supported provider content. Do not move refs into prompt text just
 to make a wire assertion pass.
 
-Baseline evidence: [Request](../../../lib/jido_ai/shared/request.ex),
+Baseline evidence: [Request](../../../lib/jido_ai/request.ex),
 [ReAct projection and event refs](../../../lib/jido_ai/reasoning/react/strategy.ex),
 [Context refs tests](../../../test/jido_ai/context_refs_test.exs),
 [request tests](../../../test/jido_ai/request_test.exs), and
@@ -194,9 +194,9 @@ for restored or resumed input. Include `ask`, `ask_stream`, `ask_sync`, direct
 ReAct, and Start/Continue/Collect Actions where supported. Preserve full input
 for the model while keeping image/file summaries in the applicable event fields.
 
-Baseline evidence: [Query](../../../lib/jido_ai/shared/query.ex),
+Baseline evidence: [Query](../../../lib/jido_ai/query.ex),
 [generated Agent helpers](../../../lib/jido_ai/authoring/agent.ex),
-[Request](../../../lib/jido_ai/shared/request.ex),
+[Request](../../../lib/jido_ai/request.ex),
 [worker startup](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a68443f03bc6a198c5a2/lib/jido_ai/reasoning/react/worker/strategy.ex),
 [Query tests](../../../test/jido_ai/query_test.exs),
 [request tests](../../../test/jido_ai/request_test.exs),
@@ -228,7 +228,7 @@ a content-part delta, and Context could wrap a whole content list as one text
 value. Add those HIST-04 variants when that full source review is complete.
 Do not mark generated-media parity proved by the JSON text/thinking case.
 
-Baseline evidence: [Context extraction/projection](../../../lib/jido_ai/shared/context.ex)
+Baseline evidence: [Context extraction/projection](../../../lib/jido_ai/context.ex)
 and [JSON/invalid-thinking regressions](../../../test/jido_ai/thread_test.exs).
 
 ## One mock server, several required provider formats

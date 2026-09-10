@@ -1051,9 +1051,10 @@ profile before request admission. Core directives validate and commit live
 changes. Direct helpers validate complete Agent values without Server calls.
 Ordinary Actions must use configuration directives for the protected key.
 
-The public `Jido.AI` module moved from `lib/jido_ai.ex` to
-`lib/jido_ai/shared/facade.ex`, so the actual facade now compiles with the
-v3 acceptance project. Its generation delegates stay shared with Models.
+The public `Jido.AI` module was temporarily placed in the migration source
+group so the facade compiled with the V3 acceptance project. It now uses the
+conventional `lib/jido_ai.ex` location. Its generation delegates stay shared
+with Models.
 Tool/prompt APIs no longer use Strategy state or the old Server-state call.
 Configuration and history getters provide the documented effective-profile
 and committed-history views. The active private worker buffer and full old
@@ -1305,10 +1306,11 @@ files. It does not contain a copy of the AI runtime.
 
 ## Source moves and first simplification pass
 
-Six existing helpers moved into `lib/jido_ai/shared`: ModelAliases, Output,
-Error, Error.Sanitize, Observe.Sanitize and Usage. Their module names remain
-unchanged. This lets the acceptance project compile the shared code against v3
-before the full root dependency change. The root still compiles all of `lib`.
+Six existing helpers temporarily moved into the migration source group:
+ModelAliases, Output, Error, Error.Sanitize, Observe.Sanitize and Usage. Their
+module names remained unchanged. This let the acceptance project compile the
+code against v3 before the full root dependency change. These modules now use
+paths that match their namespaces under `lib/jido_ai`.
 
 Output now calls the pure sanitizer directly. A new regression test found that
 the sanitizer tried to enumerate provider structs; it now converts structs to
@@ -1583,12 +1585,13 @@ use bounded repair. This result is a policy outcome, not a fabricated provider
 response. Native profiles retain their explicit model-call limit and limit
 failure rules. The outer deadline still bounds each path.
 
-ToolAdapter and ReAct.ToolSelection moved to `lib/jido_ai/shared` with module
-names preserved. ToolAdapter uses Zoi's public export and ReqLLM JSON schemas
-instead of the removed `Jido.Action.Schema`. Tests showed that ReqLLM's direct
-Zoi conversion closes every object. The adapter therefore exports Zoi first
-to preserve non-strict open fields. Strict conversion closes them explicitly.
-The native ToolCatalog uses this same converter and honors a tool's strict?
+ToolAdapter and ReAct.ToolSelection temporarily moved into the migration source
+group with module names preserved. They now use paths that match their
+namespaces. ToolAdapter uses Zoi's public export and ReqLLM JSON schemas instead
+of the removed `Jido.Action.Schema`. Tests showed that ReqLLM's direct Zoi
+conversion closes every object. The adapter therefore exports Zoi first to
+preserve non-strict open fields. Strict conversion closes them explicitly. The
+native ToolCatalog uses this same converter and honors a tool's strict?
 callback. Fresh compile validation waits for tool modules instead of checking
 only modules that are already loaded.
 

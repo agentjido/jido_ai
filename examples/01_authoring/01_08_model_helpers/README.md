@@ -1,7 +1,7 @@
 # 01_08 — Shared public model helpers
 
-- [Shared implementation](../../../lib/jido_ai/shared/models.ex)
-- [Public delegates](../../../lib/jido_ai/shared/facade.ex)
+- [Shared implementation](../../../lib/jido_ai/models.ex)
+- [Public delegates](../../../lib/jido_ai.ex)
 - [Example tests](../../../test/examples/01_authoring/01_08_model_helpers/01_08_model_helpers_test.exs)
 
 Six cases test the shared implementation now called by the public model helpers:

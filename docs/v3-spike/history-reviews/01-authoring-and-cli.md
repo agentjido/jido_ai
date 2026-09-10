@@ -75,8 +75,8 @@ and 14 for token compatibility. Extend one model fixture and the shared mock.
 Do not build separate adapters in each example.
 
 Baseline evidence: [public model helpers](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a68443f03bc6a198c5a2/lib/jido_ai.ex),
-[alias validation](../../../lib/jido_ai/shared/model_aliases.ex),
-[Action helper](../../../lib/jido_ai/shared/actions/helpers.ex),
+[alias validation](../../../lib/jido_ai/model_aliases.ex),
+[Action helper](../../../lib/jido_ai/actions/helpers.ex),
 [core helper tests](../../../test/jido_ai/jido_ai_core_test.exs),
 [Action helper tests](../../../test/jido_ai/actions/helpers_test.exs),
 [Agent tests](../../../test/jido_ai/agent_test.exs),
@@ -133,8 +133,8 @@ its own source review.
 
 Baseline evidence: [Agent normalization](../../../lib/jido_ai/authoring/agent.ex),
 [ReAct normalization](../../../lib/jido_ai/reasoning/react/strategy.ex),
-[CoT normalization](../../../lib/jido_ai/shared/cot_strategy.ex),
-[CoD delegation](../../../lib/jido_ai/shared/cod_strategy.ex),
+[CoT normalization](../../../lib/jido_ai/reasoning/chain_of_thought/strategy.ex),
+[CoD delegation](../../../lib/jido_ai/reasoning/chain_of_draft/strategy.ex),
 [Agent tests](../../../test/jido_ai/agent_test.exs),
 [CoT Agent tests](../../../test/jido_ai/cot_agent_test.exs),
 [CoD Agent tests](../../../test/jido_ai/cod_agent_test.exs),
@@ -160,7 +160,7 @@ Do not purge a shared application module to construct this case.
 
 Use catalog 03 and 16. The later Plugin-route loading fix and strict/open schema
 fix are separate HIST-05 variants. Baseline evidence:
-[ToolAdapter](../../../lib/jido_ai/shared/tool_adapter.ex) and
+[ToolAdapter](../../../lib/jido_ai/tool_adapter.ex) and
 [its tests](../../../test/jido_ai/tool_adapter_test.exs).
 
 ## HIST-18: installation preserves the host formatter

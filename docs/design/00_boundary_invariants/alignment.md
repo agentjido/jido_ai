@@ -19,7 +19,7 @@ Proven means that current source and a direct executable test assertion exist. I
 - Neutral Agent construction and Flow construction: lib/jido_ai/authoring/authoring.ex:43-57 and lib/jido_ai/authoring/authoring.ex:231-243.
 - Runtime execution boundary: lib/jido_ai/operations/runtime.ex:106, lib/jido_ai/operations/runtime.ex:405, and lib/jido_ai/operations/runtime.ex:798-846.
 - Signal boundary: lib/jido_ai/signals/definition.ex and lib/jido_ai/signals/signal.ex.
-- Host-owned stores: lib/jido_ai/shared/retrieval/store.ex:1-18 and lib/jido_ai/shared/quota/store.ex:1-20.
+- Host-owned stores: lib/jido_ai/retrieval/store.ex:1-18 and lib/jido_ai/quota/store.ex:1-20.
 - Current parity evidence: examples/v3/test/examples/01_authoring/01_06_ai_extension_test.exs:14-89.
 - Current compile evidence: mix compile --warnings-as-errors fails because Jido.Thread and Jido.Thread.Entry are not available to context_operations.ex.
 - Historical input only: docs/v3-spike. It is not proof of current behavior.

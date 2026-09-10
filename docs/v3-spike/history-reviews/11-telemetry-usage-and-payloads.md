@@ -186,12 +186,12 @@ server only for provider wire shapes these cases actually need.
 
 ## Baseline evidence
 
-Source: [usage](../../../lib/jido_ai/shared/usage.ex),
-[Action helpers](../../../lib/jido_ai/shared/actions/helpers.ex),
+Source: [usage](../../../lib/jido_ai/usage.ex),
+[Action helpers](../../../lib/jido_ai/actions/helpers.ex),
 [automatic tools](../../../lib/jido_ai/operations/tool_calling/call_with_tools.ex),
-[Turn](../../../lib/jido_ai/shared/turn.ex),
-[Observe](../../../lib/jido_ai/shared/observe.ex),
-[sanitizer](../../../lib/jido_ai/shared/observe_sanitize.ex),
+[Turn](../../../lib/jido_ai/turn.ex),
+[Observe](../../../lib/jido_ai/observe.ex),
+[sanitizer](../../../lib/jido_ai/observe/sanitize.ex),
 [reasoning fallback](../../../lib/jido_ai/reasoning/helpers.ex),
 [ReAct runner](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a68443f03bc6a198c5a2/lib/jido_ai/reasoning/react/runner.ex), and
 [CoT worker](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a68443f03bc6a198c5a2/lib/jido_ai/reasoning/chain_of_thought/worker/strategy.ex).

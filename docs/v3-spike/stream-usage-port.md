@@ -1,7 +1,7 @@
 # Stream usage fallback port
 
 The shared native model operation now uses
-[`Jido.AI.Usage.Stream`](../../lib/jido_ai/shared/usage/stream.ex) to process a
+[`Jido.AI.Usage.Stream`](../../lib/jido_ai/usage/stream.ex) to process a
 ReqLLM stream. Core Exec still owns the operation and its deadline. ReqLLM
 still decodes and materializes provider content. No model server, executor or
 provider parser was added.

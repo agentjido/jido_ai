@@ -67,7 +67,7 @@ configured prompt options. Native v3 now honors explicit prompts. The connection
 example checks all three phase prompts at the provider. This is an explicit
 correction to the old option behavior.
 
-The [Machine](../../../lib/jido_ai/shared/got_machine.ex) keeps its module name
+The [Machine](../../../lib/jido_ai/reasoning/graph_of_thoughts/machine.ex) keeps its module name
 and data helpers. Finite transitions replace Fsmx. All 41 retained Machine tests
 run unchanged on v3 dependencies. Extra examples cover a diamond, a disconnected
 node, root/leaf traversal and a cycle without duplicate reachable IDs. A cycle

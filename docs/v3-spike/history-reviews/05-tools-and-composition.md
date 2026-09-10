@@ -176,12 +176,12 @@ authorization check.
 
 Source: [Agent macro](../../../lib/jido_ai/authoring/agent.ex),
 [direct API](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a68443f03bc6a198c5a2/lib/jido_ai.ex),
-[tool adapter](../../../lib/jido_ai/shared/tool_adapter.ex),
+[tool adapter](../../../lib/jido_ai/tool_adapter.ex),
 [reasoning helper](../../../lib/jido_ai/reasoning/helpers.ex),
-[tool interceptor](../../../lib/jido_ai/shared/tool_interceptor.ex),
+[tool interceptor](../../../lib/jido_ai/tool_interceptor.ex),
 [ReAct runner](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a68443f03bc6a198c5a2/lib/jido_ai/reasoning/react/runner.ex),
-[ToT strategy](../../../lib/jido_ai/shared/tot_strategy.ex), and
-[prompt validation](../../../lib/jido_ai/shared/validation.ex).
+[ToT strategy](../../../lib/jido_ai/reasoning/tree_of_thoughts/strategy.ex), and
+[prompt validation](../../../lib/jido_ai/validation.ex).
 
 Tests: [Agent composition](../../../test/jido_ai/agent_test.exs),
 [direct API](../../../test/jido_ai/jido_ai_core_test.exs),

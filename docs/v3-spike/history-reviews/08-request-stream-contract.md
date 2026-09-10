@@ -169,13 +169,13 @@ behavior even though the primary commit purpose was streaming.
 ## Baseline evidence and simplification gates
 
 Source: [Agent stream helper](../../../lib/jido_ai/authoring/agent.ex),
-[request dispatch](../../../lib/jido_ai/shared/request.ex),
-[public enumerable](../../../lib/jido_ai/shared/request_stream.ex),
-[canonical event](../../../lib/jido_ai/shared/runtime_event.ex),
+[request dispatch](../../../lib/jido_ai/request.ex),
+[public enumerable](../../../lib/jido_ai/request/stream.ex),
+[canonical event](../../../lib/jido_ai/runtime/event.ex),
 [deprecated delegate](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a68443f03bc6a198c5a2/lib/jido_ai/reasoning/react/event.ex),
 [runner](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a68443f03bc6a198c5a2/lib/jido_ai/reasoning/react/runner.ex),
-[config](../../../lib/jido_ai/shared/react_config.ex),
-[GoT traversal](../../../lib/jido_ai/shared/got_machine.ex), and
+[config](../../../lib/jido_ai/reasoning/react/config.ex),
+[GoT traversal](../../../lib/jido_ai/reasoning/graph_of_thoughts/machine.ex), and
 [current type exceptions](../../../dialyzer.ignore-warnings).
 
 Tests: [request](../../../test/jido_ai/request_test.exs),

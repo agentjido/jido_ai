@@ -155,15 +155,15 @@ Executable test evidence:
 
 The following source is implemented:
 
-- `lib/jido_ai/shared/facade.ex` exposes the model generation facade and dynamic configuration.
-- `lib/jido_ai/shared/models.ex` resolves models and performs text, object, and stream requests through ReqLLM.
-- `lib/jido_ai/shared/query.ex` defines text, content, and file-reference queries.
-- `lib/jido_ai/shared/context.ex` defines conversation entries and model-message projection.
-- `lib/jido_ai/shared/turn.ex` normalizes model responses, content, tool calls, and tool execution data.
-- `lib/jido_ai/shared/output.ex` validates, parses, repairs, fingerprints, and annotates structured output.
-- `lib/jido_ai/shared/usage.ex` normalizes and merges usage values.
+- `lib/jido_ai.ex` exposes the model generation facade and dynamic configuration.
+- `lib/jido_ai/models.ex` resolves models and performs text, object, and stream requests through ReqLLM.
+- `lib/jido_ai/query.ex` defines text, content, and file-reference queries.
+- `lib/jido_ai/context.ex` defines conversation entries and model-message projection.
+- `lib/jido_ai/turn.ex` normalizes model responses, content, tool calls, and tool execution data.
+- `lib/jido_ai/output.ex` validates, parses, repairs, fingerprints, and annotates structured output.
+- `lib/jido_ai/usage.ex` normalizes and merges usage values.
 - `lib/jido_ai/operations/tool_catalog.ex:2` defines the validated catalog for provider tools and core Actions.
-- `lib/jido_ai/shared/tool_adapter.ex`, `lib/jido_ai/shared/tool_result.ex`, and `lib/jido_ai/shared/tool_interceptor.ex` define provider conversion, tool results, and callback behavior.
+- `lib/jido_ai/tool_adapter.ex`, `lib/jido_ai/tool_result.ex`, and `lib/jido_ai/tool_interceptor.ex` define provider conversion, tool results, and callback behavior.
 
 Executable test evidence:
 
@@ -191,7 +191,7 @@ The current implementation already uses core Flow for important execution shapes
 - `lib/jido_ai/session/actions.ex:195-275` settles an AI result into a candidate Agent and Directives.
 - `lib/jido_ai/session/actions.ex:277-331` defines AI cancellation semantics.
 - `lib/jido_ai/session/plugin.ex:2` owns portable request records and starts work only after admission commit.
-- `lib/jido_ai/shared/request.ex:1-154` defines request handles and public send and await calls.
+- `lib/jido_ai/request.ex:1-154` defines request handles and public send and await calls.
 - `lib/jido_ai/operations/react_runner.ex:2-8` implements the standalone request stream with a private V3 Agent and the shared Flow.
 
 The current tree also contains implemented capability Plugins, retrieval and quota store contracts, reasoning modules, typed AI Signals, skill modules, error normalization, and observation helpers.
@@ -373,7 +373,7 @@ Suggested requirements: `BND-REQ-001` and later.
 | Owner | `Jido.AI.Query`, `Jido.AI.Context`, `Jido.AI.Turn`, `Jido.AI.Output`, `Jido.AI.Usage`, and `Jido.AI.Error` maintainers |
 | Scope | Define portable input, content, conversation, model-turn, output, usage, metadata, and error contracts. Define validation, redaction, serialization, and version rules. |
 | Non-goals | No provider call, process, store, Flow scheduling, request admission, or Agent commit. |
-| Current implementation | `lib/jido_ai/shared/query.ex`, `lib/jido_ai/shared/context.ex`, `lib/jido_ai/shared/turn.ex`, `lib/jido_ai/shared/output.ex`, `lib/jido_ai/shared/usage.ex`, and `lib/jido_ai/shared/error.ex`; tests in `test/jido_ai/context_refs_test.exs:9-105`, `test/jido_ai/turn_test.exs:46-833`, `test/jido_ai/output_test.exs:34-156`, and `test/jido_ai/usage_test.exs:4-133`. |
+| Current implementation | `lib/jido_ai/query.ex`, `lib/jido_ai/context.ex`, `lib/jido_ai/turn.ex`, `lib/jido_ai/output.ex`, `lib/jido_ai/usage.ex`, and `lib/jido_ai/error.ex`; tests in `test/jido_ai/context_refs_test.exs:9-105`, `test/jido_ai/turn_test.exs:46-833`, `test/jido_ai/output_test.exs:34-156`, and `test/jido_ai/usage_test.exs:4-133`. |
 | Planned target | One stable value layer that all model, tool, session, checkpoint, and authoring seams use. Process-local provider terms stay at adapters. |
 | Public contracts | Constructors, schemas, normalization, projection to provider-neutral messages, result tuples, usage merge, error codes, and safe inspection. |
 | Dependencies | Seam 00 only. |
@@ -388,7 +388,7 @@ Suggested requirements: `VAL-REQ-001` and later.
 | Owner | `Jido.AI`, `Jido.AI.Models`, model Actions, model routing, and request-transform maintainers |
 | Scope | Resolve model aliases, validate provider options, build ReqLLM requests, perform text/object/stream calls, normalize responses, and expose model capabilities. |
 | Non-goals | No Agent lifecycle, tool execution, generic retry scheduler, Flow engine, credential store, or provider-client supervisor. |
-| Current implementation | `lib/jido_ai/shared/facade.ex`, `lib/jido_ai/shared/models.ex`, model-routing capability modules, and the model-call part of `lib/jido_ai/operations/runtime.ex:324-555`. |
+| Current implementation | `lib/jido_ai.ex`, `lib/jido_ai/models.ex`, model-routing capability modules, and the model-call part of `lib/jido_ai/operations/runtime.ex:324-555`. |
 | Planned target | One provider-neutral gateway with explicit request data and explicit host-bound provider resources. Streaming and non-streaming calls share normalization rules. |
 | Public contracts | Model reference, model selection, generation options, request transforms, response and stream event normalization, usage, and provider error conversion. |
 | Dependencies | Seams 00 and 01. |
@@ -403,7 +403,7 @@ Suggested requirements: `MDL-REQ-001` and later.
 | Owner | Tool catalog, adapter, result, interceptor, and AI effect-policy maintainers |
 | Scope | Convert approved Jido Actions to provider tools, validate tool calls, bind tool context, run one tool attempt through `Jido.Exec`, normalize results, and propose Agent state and Directives. |
 | Non-goals | No generic graph execution, retry scheduler, TaskSupervisor, browser adapter, business transaction, or Agent commit. |
-| Current implementation | `lib/jido_ai/operations/tool_catalog.ex`, `lib/jido_ai/shared/tool_adapter.ex`, `lib/jido_ai/shared/tool_result.ex`, `lib/jido_ai/shared/tool_interceptor.ex`, and `lib/jido_ai/operations/runtime.ex:782-872`. Tests include `test/jido_ai/tool_adapter_test.exs:99-328`, `test/jido_ai/tool_interceptor_test.exs:67-153`, and `test/jido_ai/operations/tool_result_test.exs:8-63`. |
+| Current implementation | `lib/jido_ai/operations/tool_catalog.ex`, `lib/jido_ai/tool_adapter.ex`, `lib/jido_ai/tool_result.ex`, `lib/jido_ai/tool_interceptor.ex`, and `lib/jido_ai/operations/runtime.ex:782-872`. Tests include `test/jido_ai/tool_adapter_test.exs:99-328`, `test/jido_ai/tool_interceptor_test.exs:67-153`, and `test/jido_ai/operations/tool_result_test.exs:8-63`. |
 | Planned target | A small provider-tool bridge. It runs each selected Action through public Exec contracts and returns portable AI result and effect data. Flow owns batches and continuations. |
 | Public contracts | Tool catalog entry, provider schema, call identity, context binding, attempt result, interceptor callbacks, effect-policy result, and AI retry classification. |
 | Dependencies | Seams 00 and 01; it consumes Action and Exec public contracts. |
@@ -463,7 +463,7 @@ Suggested requirements: `INT-REQ-001` and later.
 | Owner | Session, Request, PendingInput, and public request API maintainers |
 | Scope | Define request identity, admission policy, portable request records, status, await, stream, sync, cancellation, steering, settlement, and active-input correlation. |
 | Non-goals | No general job queue, private AgentServer protocol, durable workflow, provider transport, or custom process registry. |
-| Current implementation | `lib/jido_ai/session/session.ex`, `lib/jido_ai/session/actions.ex:64-331`, `lib/jido_ai/session/plugin.ex`, and `lib/jido_ai/shared/request.ex:1-154`. Tests include `test/jido_ai/request_test.exs:72-548` and `examples/v3/test/examples/02_requests/02_01_session_test.exs:38-569`. |
+| Current implementation | `lib/jido_ai/session/session.ex`, `lib/jido_ai/session/actions.ex:64-331`, `lib/jido_ai/session/plugin.ex`, and `lib/jido_ai/request.ex:1-154`. Tests include `test/jido_ai/request_test.exs:72-548` and `examples/v3/test/examples/02_requests/02_01_session_test.exs:38-569`. |
 | Planned target | One request lifecycle for authored Agents and standalone use. Core Jido owns process and commit mechanics. Seam 04 owns bounded execution. This seam owns AI request policy and user controls. |
 | Public contracts | Request handle, request ID, status, result, timeout, cancel result, steering input, pending-input contract, busy and duplicate errors, and settlement events. |
 | Dependencies | Seams 00, 01, 04, and 06. |
@@ -478,7 +478,7 @@ Suggested requirements: `SES-REQ-001` and later.
 | Owner | Chat, planning, reasoning, model-routing, policy, retrieval, and quota capability maintainers |
 | Scope | Provide composable AI Plugins and policy modules, including retrieval enrichment, model selection, limits, and usage admission. Define explicit external store interfaces. |
 | Non-goals | No second Plugin platform, authoritative billing ledger, durable memory service, application supervision tree, or generic workflow engine. |
-| Current implementation | Capability Plugins under `lib/jido_ai/authoring/plugins`, store contracts at `lib/jido_ai/shared/retrieval/store.ex` and `lib/jido_ai/shared/quota/store.ex`, and Plugin stack assembly in `lib/jido_ai/authoring/plugin_stack.ex:2-102`. Evidence includes `examples/v3/test/examples/07_retrieval/07_01_memory_test.exs:11-500`, `examples/v3/test/examples/13_policy/13_01_quota_test.exs:11-716`, and `examples/v3/test/examples/16_capabilities/16_04_plugin_stack_test.exs:29-500`. |
+| Current implementation | Capability Plugins under `lib/jido_ai/authoring/plugins`, store contracts at `lib/jido_ai/retrieval/store.ex` and `lib/jido_ai/quota/store.ex`, and Plugin stack assembly in `lib/jido_ai/authoring/plugin_stack.ex:2-102`. Evidence includes `examples/v3/test/examples/07_retrieval/07_01_memory_test.exs:11-500`, `examples/v3/test/examples/13_policy/13_01_quota_test.exs:11-716`, and `examples/v3/test/examples/16_capabilities/16_04_plugin_stack_test.exs:29-500`. |
 | Planned target | Each capability has one owned Plugin state key, pure pre-commit logic, explicit post-commit effects, and host-supplied resources. Capabilities compose without order-dependent hidden state. |
 | Public contracts | Capability options, Plugin state schema, request hooks, model and tool policy decisions, store behavior, usage decision, and failure policy. |
 | Dependencies | Seams 00, 01, 02, 03, 04, 05, 06, and 07 as applicable to each capability. |
@@ -523,7 +523,7 @@ Suggested requirements: `AUT-REQ-001` and later.
 | Owner | AI checkpoint, ReAct checkpoint, token, migration, and resume maintainers; core Jido owns Agent checkpoint integration |
 | Scope | Define versioned portable AI phase, domain data, effect data, remaining AI work, bindings, sanitization, migration, and conversion to a fresh request execution. |
 | Non-goals | No persisted PID, task, monitor, stream process, anonymous function, provider client, secret, live `Jido.Exec` state, durable queue, or exactly-once guarantee. |
-| Current implementation | `lib/jido_ai/shared/react_checkpoint.ex:6-37` defines AI-only checkpoint data and rejects Exec execution state. `lib/jido_ai/checkpoint.ex:2-8` provides legacy sanitization. Checkpoint-resume examples exist at `examples/v3/test/examples/14_resume/14_03_checkpoint_resume_test.exs:9-431`. The root checkpoint test currently does not compile. |
+| Current implementation | `lib/jido_ai/reasoning/react/checkpoint.ex:6-37` defines AI-only checkpoint data and rejects Exec execution state. `lib/jido_ai/checkpoint.ex:2-8` provides legacy sanitization. Checkpoint-resume examples exist at `examples/v3/test/examples/14_resume/14_03_checkpoint_resume_test.exs:9-431`. The root checkpoint test currently does not compile. |
 | Planned target | Core Jido checkpoints the Agent through public contracts. Jido AI stores only versioned AI data. Resume creates new live execution and states its duplicate-effect limits. |
 | Public contracts | AI checkpoint schema and version, export, validation, migration, resume input, binding reattachment, sanitization errors, and compatibility window. |
 | Dependencies | Seams 00, 01, 04, 06, 07, and 09. It also depends on the approved core Agent checkpoint contract. |
@@ -538,7 +538,7 @@ Suggested requirements: `RES-REQ-001` and later.
 | Owner | AI observation, telemetry, usage-event, and diagnostic maintainers |
 | Scope | Define AI event names, measurements, metadata, correlation IDs, redaction, safe inspection, failure reporting, and links between requests, model calls, tool calls, and Signals. |
 | Non-goals | No telemetry backend, log storage, Signal bus, provider dashboard, request control channel, or secret capture. |
-| Current implementation | `lib/jido_ai/shared/observe.ex`, typed AI Signal modules, runtime event emission, and `test/jido_ai/observe_test.exs:6-310`. |
+| Current implementation | `lib/jido_ai/observe.ex`, typed AI Signal modules, runtime event emission, and `test/jido_ai/observe_test.exs:6-310`. |
 | Planned target | One safe observation vocabulary across authored Agents and standalone requests. It composes core observation and Signal transport without duplicate event meaning. |
 | Public contracts | Event name, lifecycle phase, correlation fields, duration and usage measurements, safe metadata, redaction rules, and error event shape. |
 | Dependencies | Seams 00 through 11 for the events that each seam exposes. Core observe and `jido_signal` transport are external prerequisites. |

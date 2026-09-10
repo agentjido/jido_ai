@@ -15,8 +15,8 @@ Proven means that current source and a direct executable test assertion exist. I
 ## Inputs And Evidence
 
 - Target design: design.md.
-- Values: lib/jido_ai/shared/query.ex, context.ex, turn.ex, turn_content.ex, output.ex, usage.ex, and error.ex.
-- Sanitization: lib/jido_ai/shared/error_sanitize.ex:21-64.
+- Values: lib/jido_ai/query.ex, context.ex, turn.ex, turn_content.ex, output.ex, usage.ex, and error.ex.
+- Sanitization: lib/jido_ai/error/sanitize.ex:21-64.
 - Query tests: test/jido_ai/query_test.exs:7-156.
 - Turn tests: test/jido_ai/turn_test.exs:46-345.
 - Output tests: test/jido_ai/output_test.exs:38-178.

@@ -47,7 +47,7 @@ available entry. Scores below the simple threshold prefer CoD/CoT; scores above
 the complex threshold prefer AoT/ToT/GoT; the inclusive middle prefers ReAct.
 Length, sentence structure, keywords and constraints contribute to the score.
 
-The [selector](../../../lib/jido_ai/shared/adaptive_selection.ex) contains the
+The [selector](../../../lib/jido_ai/reasoning/adaptive/selection.ex) contains the
 extracted algorithm. The old Strategy delegates its analysis helper to it.
 [16 transferred analysis tests](../../../test/jido_ai/adaptive/selection_test.exs)
 retain the baseline checks. Inert legacy analysis still falls back to ReAct for

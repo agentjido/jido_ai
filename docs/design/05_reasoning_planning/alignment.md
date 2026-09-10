@@ -15,7 +15,7 @@ Proven means that current source and a direct executable test assertion exist. I
 ## Inputs And Evidence
 
 - Target design: design.md.
-- Method selection and options: lib/jido_ai/shared/reasoning.ex and lib/jido_ai/shared/adaptive_selection.ex.
+- Method selection and options: lib/jido_ai/reasoning.ex and lib/jido_ai/reasoning/adaptive/selection.ex.
 - Shared Flow lowering: lib/jido_ai/authoring/authoring.ex:231-243.
 - Current method implementations: lib/jido_ai/reasoning.
 - Planning Actions: lib/jido_ai/planning.

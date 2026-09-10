@@ -104,8 +104,8 @@ on replay. Provider-specific omission does not justify nesting or losing other
 parts. For stored binary media, use the supported storage representation;
 do not assume raw non-UTF-8 bytes can round-trip through ordinary JSON.
 
-Baseline evidence: [Turn](../../../lib/jido_ai/shared/turn.ex),
-[Context](../../../lib/jido_ai/shared/context.ex),
+Baseline evidence: [Turn](../../../lib/jido_ai/turn.ex),
+[Context](../../../lib/jido_ai/context.ex),
 [ReAct runner](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a68443f03bc6a198c5a2/lib/jido_ai/reasoning/react/runner.ex),
 [CoT worker](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a68443f03bc6a198c5a2/lib/jido_ai/reasoning/chain_of_thought/worker/strategy.ex),
 [policy](../../../lib/jido_ai/authoring/plugins/policy.ex),
@@ -184,10 +184,10 @@ wrapped errors are handled before generic `{type, message}` tuples, and nil
 messages receive the fallback text. Use that final behavior. The maintenance
 commit still needs its own complete source review across its other files.
 
-Baseline evidence: [Error](../../../lib/jido_ai/shared/error.ex),
-[Turn](../../../lib/jido_ai/shared/turn.ex),
+Baseline evidence: [Error](../../../lib/jido_ai/error.ex),
+[Turn](../../../lib/jido_ai/turn.ex),
 [instruction helpers](../../../lib/jido_ai/reasoning/helpers.ex),
-[Request](../../../lib/jido_ai/shared/request.ex),
+[Request](../../../lib/jido_ai/request.ex),
 [error tests](../../../test/jido_ai/error/model_test.exs),
 [tool execution tests](../../../test/jido_ai/executor_test.exs),
 [raw failure tests](../../../test/jido_ai/integration/raw_error_propagation_test.exs),
@@ -228,7 +228,7 @@ inspection surface. This field describes the current or most recent ReAct run;
 it is not the durable business record. Domain data needs its normal persistence
 or an allowed state update. Final assistant content stays the canonical answer.
 
-Baseline evidence: [Request](../../../lib/jido_ai/shared/request.ex),
+Baseline evidence: [Request](../../../lib/jido_ai/request.ex),
 [ReAct inspection](../../../lib/jido_ai/reasoning/react/strategy.ex),
 [request tests](../../../test/jido_ai/request_test.exs),
 [Agent tests](../../../test/jido_ai/agent_test.exs), and

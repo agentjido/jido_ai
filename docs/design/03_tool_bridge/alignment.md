@@ -17,8 +17,8 @@ Proven means that current source and a direct executable test assertion exist. I
 - Target design: design.md.
 - Catalog and admission: lib/jido_ai/operations/tool_catalog.ex:6-86 and 213-260.
 - Tool sources: lib/jido_ai/authoring/tool_source.ex.
-- Result normalization: lib/jido_ai/shared/tool_result.ex:7-139.
-- Effects policy and applier: lib/jido_ai/shared/effects_policy.ex and lib/jido_ai/shared/effects_applier.ex.
+- Result normalization: lib/jido_ai/tool_result.ex:7-139.
+- Effects policy and applier: lib/jido_ai/effects/policy.ex and lib/jido_ai/effects/applier.ex.
 - Tool execution: lib/jido_ai/operations/runtime.ex:798-846.
 - Tool Flow lowering: lib/jido_ai/operations/runtime.ex:957-971.
 - Adapter tests: test/jido_ai/tool_adapter_test.exs:256-328.

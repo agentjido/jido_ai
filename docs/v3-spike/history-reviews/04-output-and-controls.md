@@ -72,10 +72,10 @@ the validator path, not the model answer. [PR 337](https://github.com/agentjido/
 adds that conversion. [PR 319](https://github.com/agentjido/jido_ai/pull/319)
 restores acceptance of string-keyed imported schemas.
 
-Baseline evidence: [Output](../../../lib/jido_ai/shared/output.ex),
-[ReAct config](../../../lib/jido_ai/shared/react_config.ex),
+Baseline evidence: [Output](../../../lib/jido_ai/output.ex),
+[ReAct config](../../../lib/jido_ai/reasoning/react/config.ex),
 [runner finalization](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a68443f03bc6a198c5a2/lib/jido_ai/reasoning/react/runner.ex),
-[request metadata](../../../lib/jido_ai/shared/request.ex),
+[request metadata](../../../lib/jido_ai/request.ex),
 [output tests](../../../test/jido_ai/output_test.exs), and
 [runner tests](../../../test/jido_ai/react/runtime_runner_test.exs).
 
@@ -182,7 +182,7 @@ Keep that focused check where useful, and add the real execution case above.
 A tool that returns immediately cannot expose the original failure.
 
 Baseline evidence: [runner preflight](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a68443f03bc6a198c5a2/lib/jido_ai/reasoning/react/runner.ex),
-[request option forwarding](../../../lib/jido_ai/shared/request.ex),
+[request option forwarding](../../../lib/jido_ai/request.ex),
 [tool execution](../../../lib/jido_ai/directive/tool_exec.ex),
 [runtime tests](../../../test/jido_ai/react/runtime_runner_test.exs),
 [request tests](../../../test/jido_ai/request_test.exs),
@@ -246,12 +246,12 @@ Use their final contract, including the error cases in
 own full reviews. Simplification can remove repeated conversions after the
 boundary tests pass; a lint result alone is not behavior evidence.
 
-Baseline evidence: [Output options](../../../lib/jido_ai/shared/output.ex),
-[retrieval input](../../../lib/jido_ai/shared/retrieval/store.ex),
-[GoT input](../../../lib/jido_ai/shared/got_strategy.ex),
-[TRM input](../../../lib/jido_ai/shared/trm_strategy.ex),
+Baseline evidence: [Output options](../../../lib/jido_ai/output.ex),
+[retrieval input](../../../lib/jido_ai/retrieval/store.ex),
+[GoT input](../../../lib/jido_ai/reasoning/graph_of_thoughts/strategy.ex),
+[TRM input](../../../lib/jido_ai/reasoning/trm/strategy.ex),
 [Agent restore](../../../lib/jido_ai/authoring/agent.ex),
-[usage helper](../../../lib/jido_ai/shared/actions/helpers.ex), and
+[usage helper](../../../lib/jido_ai/actions/helpers.ex), and
 [packaged skill test](../../../test/jido_ai/skill/runtime_contracts_test.exs).
 
 ## Refined implementation order

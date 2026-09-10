@@ -158,11 +158,11 @@ and credentials through the existing preparation path. Reuse the repair checks
 from review 04; do not add another request transformer or session scheduler.
 
 Source: [runner](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a68443f03bc6a198c5a2/lib/jido_ai/reasoning/react/runner.ex),
-[configuration](../../../lib/jido_ai/shared/react_config.ex),
-[transformer](../../../lib/jido_ai/shared/react_request_transformer.ex),
+[configuration](../../../lib/jido_ai/reasoning/react/config.ex),
+[transformer](../../../lib/jido_ai/reasoning/react/request_transformer.ex),
 [projection](../../../lib/jido_ai/reasoning/react/strategy.ex),
-[state](../../../lib/jido_ai/shared/react_state.ex),
-[Turn](../../../lib/jido_ai/shared/turn.ex), and
+[state](../../../lib/jido_ai/reasoning/react/state.ex),
+[Turn](../../../lib/jido_ai/turn.ex), and
 [model helpers](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a68443f03bc6a198c5a2/lib/jido_ai.ex).
 
 Tests: [runtime runner](../../../test/jido_ai/react/runtime_runner_test.exs),

@@ -15,7 +15,7 @@ Proven means that current source and a direct executable test assertion exist. I
 ## Inputs And Evidence
 
 - Target design: design.md.
-- Public request and handle API: lib/jido_ai/shared/request.ex.
+- Public request and handle API: lib/jido_ai/request.ex.
 - Portable request records and state Actions: lib/jido_ai/session/actions.ex.
 - Admission and retention: lib/jido_ai/session/plugin.ex:20-180.
 - Live runtime resources and settlement: lib/jido_ai/session/runtime.ex.

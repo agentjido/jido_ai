@@ -92,7 +92,7 @@ defmodule Jido.AI.AgentTest do
       name: "agent_with_agent_skills",
       tools: [TestCalculator],
       system_prompt: "Base instructions.",
-      agent_skills: [".agents/skills"]
+      agent_skills: ["priv/skills"]
   end
 
   defmodule AgentWithRuntimeAgentSkills do
@@ -530,7 +530,7 @@ defmodule Jido.AI.AgentTest do
       profile = Agent.profile(agent, :assistant)
 
       assert profile.instructions == "Base instructions."
-      assert profile.skills.paths == [".agents/skills"]
+      assert profile.skills.paths == ["priv/skills"]
       assert Jido.AI.list_tools(agent) == [TestCalculator]
 
       server = start_agent(agent)
@@ -538,9 +538,10 @@ defmodule Jido.AI.AgentTest do
       assert {:ok, %{specs: specs, index: index, diagnostics: diagnostics}} =
                Session.skill_catalog(server)
 
-      assert [%Jido.AI.Skill.Spec{name: "hex-release"}] = specs
-      assert index =~ "**hex-release**"
-      refute index =~ "# Hex Release"
+      assert Enum.map(specs, & &1.name) == ["code-review", "unit-converter"]
+      assert index =~ "**code-review**"
+      assert index =~ "**unit-converter**"
+      refute index =~ "# Code Review"
       assert %Jido.AI.Skill.Diagnostics{} = diagnostics
     end
 

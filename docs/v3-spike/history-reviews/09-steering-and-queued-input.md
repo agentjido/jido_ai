@@ -126,7 +126,7 @@ portable history and rebuild resources without replaying undrained input.
 
 ## Baseline evidence
 
-Source: [queue](../../../lib/jido_ai/shared/pending_input_server.ex),
+Source: [queue](../../../lib/jido_ai/pending_input_server.ex),
 [control API](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a68443f03bc6a198c5a2/lib/jido_ai/reasoning/react.ex),
 [control helper](../../../lib/jido_ai/reasoning/react/pending_input.ex),
 [runner](https://github.com/agentjido/jido_ai/blob/fc5bc1434ddb69493fe8a68443f03bc6a198c5a2/lib/jido_ai/reasoning/react/runner.ex),

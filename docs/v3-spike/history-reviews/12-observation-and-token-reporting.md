@@ -164,9 +164,9 @@ PR 312 reports a broad historical test run and a smaller smoke run with many
 excluded tests. It also reports existing warnings under warnings-as-errors.
 These reports do not replace fresh v3 checks or make excluded cases pass.
 
-Source: [Observe](../../../lib/jido_ai/shared/observe.ex),
-[Usage](../../../lib/jido_ai/shared/usage.ex),
-[Action helpers](../../../lib/jido_ai/shared/actions/helpers.ex),
+Source: [Observe](../../../lib/jido_ai/observe.ex),
+[Usage](../../../lib/jido_ai/usage.ex),
+[Action helpers](../../../lib/jido_ai/actions/helpers.ex),
 [Embed](../../../lib/jido_ai/operations/llm/embed.ex),
 [directive helpers](../../../lib/jido_ai/directive/helpers.ex),
 [tool execution](../../../lib/jido_ai/directive/tool_exec.ex),
