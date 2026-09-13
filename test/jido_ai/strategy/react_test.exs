@@ -134,6 +134,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert route_map["jido.agent.child.exit"] == {:strategy_cmd, :ai_react_worker_child_exit}
 
       assert route_map["ai.llm.response"] == Jido.Actions.Control.Noop
+      assert route_map["ai.tool.started"] == Jido.Actions.Control.Noop
       assert route_map["ai.tool.result"] == Jido.Actions.Control.Noop
       assert route_map["ai.llm.delta"] == Jido.Actions.Control.Noop
     end

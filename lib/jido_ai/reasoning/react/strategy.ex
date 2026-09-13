@@ -355,6 +355,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       {"jido.agent.child.exit", {:strategy_cmd, @worker_child_exit}},
       {"ai.llm.delta", Jido.Actions.Control.Noop},
       {"ai.llm.response", Jido.Actions.Control.Noop},
+      {"ai.tool.started", Jido.Actions.Control.Noop},
       {"ai.tool.result", Jido.Actions.Control.Noop},
       {"ai.request.started", Jido.Actions.Control.Noop},
       {"ai.request.completed", Jido.Actions.Control.Noop},

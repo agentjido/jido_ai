@@ -520,6 +520,32 @@ defmodule Jido.AI.AgentTest do
       assert server_state.agent.state.patched_by_signal == true
     end
 
+    @tag :stable_smoke
+    test "AgentServer accepts tool started signals without changing agent state" do
+      suffix = System.unique_integer([:positive, :monotonic])
+      registry = Module.concat(__MODULE__, :"ToolStartedRegistry#{suffix}")
+      start_supervised!({Registry, keys: :unique, name: registry})
+
+      pid =
+        start_supervised!({Jido.AgentServer, agent: BasicAgent, id: "tool-started-agent-#{suffix}", registry: registry})
+
+      assert {:ok, before_state} = Jido.AgentServer.state(pid)
+
+      signal =
+        Jido.AI.Signal.ToolStarted.new!(%{
+          call_id: "tool_call_1",
+          tool_name: "calculator",
+          arguments: %{"operation" => "add", "a" => 2, "b" => 2},
+          metadata: %{request_id: "req_1", strategy: :react}
+        })
+
+      assert {:ok, agent} = Jido.AgentServer.call(pid, signal)
+      assert agent.state == before_state.agent.state
+
+      assert {:ok, after_state} = Jido.AgentServer.state(pid)
+      assert after_state.agent.state == before_state.agent.state
+    end
+
     test "raises when module attribute system_prompt does not resolve to a binary" do
       module_name = Module.concat(__MODULE__, :"InvalidPromptAgent#{System.unique_integer([:positive, :monotonic])}")
 
