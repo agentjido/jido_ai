@@ -233,6 +233,7 @@ defmodule Jido.AI.Turn do
   """
   @spec execute(String.t(), map(), map(), execute_opts()) :: execute_result()
   def execute(tool_name, params, context, opts \\ []) when is_binary(tool_name) do
+    opts = Keyword.validate!(opts, [:timeout, :tools, :telemetry_metadata])
     context = normalize_context(context)
     timeout = Keyword.get(opts, :timeout, @default_timeout)
     exec_opts = opts |> Keyword.delete(:timeout) |> Keyword.delete(:telemetry_metadata)
@@ -266,6 +267,7 @@ defmodule Jido.AI.Turn do
   """
   @spec execute_module(module(), map(), map(), execute_opts()) :: execute_result()
   def execute_module(module, params, context, opts \\ []) do
+    opts = Keyword.validate!(opts, [:timeout, :tools, :telemetry_metadata])
     context = normalize_context(context)
     timeout = Keyword.get(opts, :timeout, @default_timeout)
     exec_opts = opts |> Keyword.delete(:timeout) |> Keyword.delete(:telemetry_metadata)
@@ -578,9 +580,8 @@ defmodule Jido.AI.Turn do
     schema = module.schema()
     normalized_params = normalize_params(params, schema)
 
-    # Registry and AI observation options do not belong to core Exec. V3 Exec
-    # does not log Action input values through the old per-run log_level option.
-    run_opts = timeout_opts(timeout) ++ Keyword.drop(exec_opts, [:tools, :log_level])
+    # Registry and AI observation options do not belong to core Exec.
+    run_opts = timeout_opts(timeout) ++ Keyword.delete(exec_opts, :tools)
 
     result =
       Jido.Exec.run(module, normalized_params, context, run_opts)

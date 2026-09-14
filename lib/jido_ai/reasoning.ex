@@ -221,5 +221,5 @@ defmodule Jido.AI.Reasoning do
 
   def raw(%ReqLLM.Response{} = value), do: ReqLLM.Response.text(value)
   def raw(value) when is_binary(value), do: value
-  def raw(value), do: Jido.AI.Request.compat_text(value)
+  def raw(value), do: inspect(value)
 end

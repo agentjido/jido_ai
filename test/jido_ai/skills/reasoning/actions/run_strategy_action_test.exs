@@ -106,7 +106,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyTest do
         strategy: :adaptive,
         prompt: "Choose the best reasoning approach",
         timeout: 750,
-        options: %{default_strategy: :cot, available_strategies: [:cot]}
+        options: %{available_strategies: [:cot]}
       }
 
       assert_strategy_response(RunStrategy.run(params, %{}), :adaptive)

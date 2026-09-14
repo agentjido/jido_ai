@@ -6,7 +6,7 @@ After this guide, you can use `run/3`, `stream/3`, `start/3`, `continue/3`, `col
 
 ## Prerequisites
 
-- A configured LLM provider (API key set, model resolvable via `Jido.AI.resolve_model/1`)
+- A configured LLM provider (API key set, model resolvable via `Jido.AI.Models.resolve/1`)
 - At least one `Jido.Action` module to use as a tool
 - A token secret configured for checkpoint persistence (see [Configuration](#configuration-via-config))
 
@@ -70,8 +70,6 @@ config = Jido.AI.Reasoning.ReAct.build_config(%{
 
   # Trace capture
   capture_deltas?: true,
-  capture_thinking?: true,
-  capture_messages?: true,
 
   # Checkpoint tokens
   token_secret: "my-32-byte-minimum-secret-here!!", # required for cross-process resume
@@ -229,13 +227,13 @@ result = ReAct.run("What is 19 + 23?", config)
 #   termination_reason: :final_answer,
 #   usage: %{input_tokens: 120, output_tokens: 45},
 #   final_token: "rt2.eyJhbGci...",
-#   trace: [%Jido.AI.Reasoning.ReAct.Event{...}, ...]
+#   trace: [%Jido.AI.Runtime.Event{...}, ...]
 # }
 ```
 
 ## Streaming
 
-`stream/3` returns a lazy `Enumerable` of `Jido.AI.Reasoning.ReAct.Event` structs. Process events as they arrive, then reduce the stream with `collect_stream/1` if you need the terminal result.
+`stream/3` returns a lazy `Enumerable` of `Jido.AI.Runtime.Event` structs. Process events as they arrive, then reduce the stream with `collect_stream/1` if you need the terminal result.
 
 ```elixir
 alias Jido.AI.Reasoning.ReAct
@@ -327,10 +325,10 @@ Attempting to `continue/3` a cancelled token will restore a state with `status: 
 
 ## Event Stream Item Shapes
 
-Every event is a `Jido.AI.Reasoning.ReAct.Event` struct:
+Every event is a `Jido.AI.Runtime.Event` struct:
 
 ```elixir
-%Jido.AI.Reasoning.ReAct.Event{
+%Jido.AI.Runtime.Event{
   id: "evt_abc123",
   seq: 1,
   at_ms: 1740268800000,
@@ -388,14 +386,13 @@ Every event is a `Jido.AI.Reasoning.ReAct.Event` struct:
 - `tool_concurrency` default: `4`
 - `token_ttl_ms` default: `nil` (no expiry)
 - `token_compress?` default: `false`
-- Checkpoint token format is `rt2.` (`v2` payload); legacy `rt1`/`thread` payloads are rejected
+- Checkpoint token format is `rt2.` with token envelope version 2
 - Observability flags (`emit_signals?`, `emit_telemetry?`, `redact_tool_args?`) default: `true`
-- Trace flags (`capture_deltas?`, `capture_thinking?`, `capture_messages?`) default: `true`
+- `capture_deltas?` default: `true`
 
 `capture_deltas?` controls delta events and the captured text and thinking
-fields. `capture_thinking?` and `capture_messages?` are accepted legacy options;
-they do not independently filter thinking or message data. Complete model
-responses and execution history remain available when delta capture is off.
+fields. Complete model responses and execution history remain available when
+delta capture is off.
 
 `redact_tool_args?` hides sensitive keys in `tool_started` event arguments.
 It does not filter model-completion tool calls or checkpoint execution data.
@@ -423,9 +420,8 @@ Pending tools finish before the model receives the appended query.
 
 Native checkpoint data version 2 separates reasoning iteration from model-call
 count. Output repair can increase calls without increasing reasoning iteration.
-Earlier native checkpoint version 1 still resumes. The token envelope remains
-`rt2` with payload version 2. This does not convert all released v2 State or
-failed/cancelled continuations. See the
+The token envelope uses `rt2` with envelope version 2. Failed and cancelled
+continuations are not supported. See the
 [query append example](../../examples/14_resume/14_08_query_append/README.md).
 
 ## Failure Mode: Config Fingerprint Mismatch On Resume
@@ -467,7 +463,7 @@ Symptom:
 - `ArgumentError`: "insecure ReAct token secret rejected"
 
 Fix:
-- You are using the legacy default secret. Replace it with a real secret (at least 32 bytes recommended).
+- You are using a known insecure default secret. Replace it with a real secret (at least 32 bytes recommended).
 
 ## Next
 
@@ -475,21 +471,6 @@ Fix:
 - [Tool Calling With Actions](tool_calling_with_actions.md)
 - [Request Lifecycle And Concurrency](request_lifecycle_and_concurrency.md)
 - [Strategy Selection Playbook](strategy_selection_playbook.md)
-
-## Explicit State conversion on the v3 spike
-
-Use `Jido.AI.Reasoning.ReAct.State.migrate(saved, config, evidence)` for saved
-standalone State without native continuation data. First decode an old signed
-token with its matching Config and secret. Supply the saved phase, separate
-reasoning/model/tool counters, reconciled domain state and remaining time.
-These fields are required because old State does not fully store them.
-
-The returned State uses the normal native stream and token APIs. Conversion
-executes no work and leaves the original value intact. Complete tool results
-are retained; unresolved or partly executed tools need reconciliation. New input
-uses the retained budget and current Config. See the
-[State migration example](../../examples/14_resume/14_09_state_migration/README.md)
-for the full contract and remaining Agent persistence scope.
 
 ## Reasoning position on native v3
 

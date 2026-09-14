@@ -15,7 +15,7 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.CLIAdapter do
   @impl true
   def submit(pid, query, config) do
     agent_module = config.agent_module
-    agent_module.draft(pid, query)
+    agent_module.ask(pid, query)
   end
 
   @impl true
@@ -45,26 +45,15 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.CLIAdapter do
     model = config[:model] || @default_model
     system_prompt = config[:system_prompt]
 
-    contents =
-      if system_prompt do
-        quote do
-          use Jido.AI.CoDAgent,
-            name: "cli_cod_agent",
-            description: "CLI ephemeral CoD agent",
-            model: unquote(model),
-            system_prompt: unquote(system_prompt)
-        end
-      else
-        quote do
-          use Jido.AI.CoDAgent,
-            name: "cli_cod_agent",
-            description: "CLI ephemeral CoD agent",
-            model: unquote(model)
-        end
-      end
-
-    Module.create(module_name, contents, Macro.Env.location(__ENV__))
-    module_name
+    Jido.AI.CLI.EphemeralAgent.create(module_name,
+      method: :chain_of_draft,
+      name: "cli_cod_agent",
+      description: "CLI ephemeral CoD agent",
+      model: model,
+      instructions: system_prompt,
+      max_iterations: 10,
+      max_model_calls: 10
+    )
   end
 
   defp poll_loop(pid, deadline, interval) do
@@ -76,12 +65,7 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.CLIAdapter do
       case Jido.AI.CLI.Adapter.status(pid) do
         {:ok, status} ->
           if status.snapshot.done? do
-            answer =
-              case status.snapshot.result do
-                nil -> format_cli_answer(Map.get(status.raw_state, :last_result, ""))
-                "" -> format_cli_answer(Map.get(status.raw_state, :last_result, ""))
-                result -> format_cli_answer(result)
-              end
+            answer = format_cli_answer(status.snapshot.result)
 
             {:ok, %{answer: answer, meta: extract_meta(status)}}
           else

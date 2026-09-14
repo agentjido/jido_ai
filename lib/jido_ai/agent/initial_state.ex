@@ -52,17 +52,16 @@ defmodule Jido.AI.Agent.InitialState do
   defp definition(_), do: error("Expected an Agent module or neutral definition")
 
   defp domain(state, definition) do
-    # Plugin-owned state requires its own versioned conversion. Core still
-    # validates each admitted domain field, its defaults, and the final size.
+    # Core validates each admitted domain field, its defaults, and the final size.
     Profile.fields(state, [:context | Keyword.keys(definition.schema.fields)], "initial_state")
   end
 
-  defp thread_key(%{thread: %Context{}}), do: legacy_thread_error()
-  defp thread_key(%{"thread" => %Context{}}), do: legacy_thread_error()
+  defp thread_key(%{thread: %Context{}}), do: unsupported_thread_error()
+  defp thread_key(%{"thread" => %Context{}}), do: unsupported_thread_error()
   defp thread_key(_), do: :ok
 
-  defp legacy_thread_error,
-    do: error("initial_state[:thread] is no longer supported for AI context; use :context")
+  defp unsupported_thread_error,
+    do: error("initial_state[:thread] cannot contain an AI context; use :context")
 
   defp context(%{context: input} = state, profile) do
     with true <- profile.memory.history != nil,

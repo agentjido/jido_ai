@@ -44,8 +44,8 @@ The example proves these cases:
   answer can be loaded, but the pending Directives were not dispatched and AI
   did not repeat the tool or completion write. Await on the stopped PID reports
   `:agent_server_unavailable`.
-- An earlier pending v3 record without the reserve field can be parsed and
-  marked interrupted during activation. This is not v2 state conversion.
+- A pending record without a reservation is marked interrupted during
+  activation.
 
 When the owner observes an unknown call or storage result before it stops, its
 failure is `{:completion_uncertain, reason}` with `committed?: :unknown`.
@@ -60,7 +60,6 @@ revision. The tests prove that the difference is one and that the completion
 attempt is not repeated.
 
 The storage adapter is an in-memory fault fixture. It exercises the real core
-storage protocol; it is not durable disk storage. Full recovery, fresh-process
-conversion, sink recovery, all cancellation/storage failures and durable
-post-commit work remain open. The full migration cannot be inferred from these
-completion checks.
+storage protocol; it is not durable disk storage. This example does not cover
+full recovery, sink recovery, every cancellation and storage failure, or
+durable post-commit work.

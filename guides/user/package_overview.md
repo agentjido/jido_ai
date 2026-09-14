@@ -8,12 +8,12 @@ After this guide, you should be able to explain the package in a prioritized way
 
 `jido_ai` is an AI runtime layer for Jido agents with:
 
-1. Agent macros with built-in reasoning strategies
+1. One Agent DSL with built-in reasoning methods
 2. Tool-calling orchestration over `Jido.Action` modules
 3. Strategy-agnostic skills loading and registry
 4. Plugin-based capability mixins for reusable runtime features
-5. Action APIs for direct AI workflows outside agent macros
-6. First-class observability via signals, directives, and telemetry
+5. Action APIs for direct AI workflows outside `Jido.AI.Agent`
+6. First-class observability via runtime events, signals, and telemetry
 7. Public ExUnit helpers for deterministic ReAct tests without ReqLLM stubs
 
 ## Portable Interaction Values
@@ -25,61 +25,55 @@ own a process, runtime server, storage adapter, or live model request.
 `Jido.Session` is separate from `Jido.AI.Session`. The first is portable data.
 The second is the live request API for an AI agent process.
 
-## Priority 1: `Jido.AI.Agent` (Default ReAct Agent)
+## Priority 1: `Jido.AI.Agent`
 
 `Jido.AI.Agent` is the anchor feature.
 
-- It is the generic AI agent macro.
-- Under the hood it uses `Jido.AI.Reasoning.ReAct.Strategy`.
-- It is built for tool use through a ReAct loop (reason, call tool, continue).
+- It adds the Spark-based Jido AI DSL to a core Agent.
+- It lowers each `ai` block into an inert `Jido.AI.Profile`.
+- It supports all built-in reasoning methods through one authoring form.
 - It supports request handles and async orchestration (`ask/await/ask_sync`).
 - ReAct requests can narrow tools per run with `allowed_tools` or fully override them with `tools`.
 - It uses standardized lifecycle and runtime contracts (`ai.request.*`, `ai.llm.*`, `ai.tool.*`).
 
-If your production workload needs reliable tool-calling agents, this is the default entry point.
+This is the only public AI Agent authoring macro.
 
-## Priority 2: Multi-Strategy Agent Macros
+## Priority 2: Reasoning Methods
 
-`jido_ai` ships specialized agent macros for different reasoning patterns:
+Select a method in the Agent's `reasoning` DSL block:
 
-- `Jido.AI.CoDAgent` -> `Jido.AI.Reasoning.ChainOfDraft.Strategy`
-- `Jido.AI.CoTAgent` -> `Jido.AI.Reasoning.ChainOfThought.Strategy`
-- `Jido.AI.AoTAgent` -> `Jido.AI.Reasoning.AlgorithmOfThoughts.Strategy`
-- `Jido.AI.ToTAgent` -> `Jido.AI.Reasoning.TreeOfThoughts.Strategy`
-- `Jido.AI.GoTAgent` -> `Jido.AI.Reasoning.GraphOfThoughts.Strategy`
-- `Jido.AI.TRMAgent` -> `Jido.AI.Reasoning.TRM.Strategy`
-- `Jido.AI.AdaptiveAgent` -> `Jido.AI.Reasoning.Adaptive.Strategy`
+- `:react`
+- `:chain_of_draft`
+- `:chain_of_thought`
+- `:algorithm_of_thoughts`
+- `:tree_of_thoughts`
+- `:graph_of_thoughts`
+- `:trm`
+- `:adaptive`
 
-Supported strategy family:
+```elixir
+ai :assistant do
+  models do
+    model(:answer, :fast)
+  end
 
-- ReAct
-- Chain-of-Draft
-- Chain-of-Thought
-- Algorithm-of-Thoughts
-- Tree-of-Thoughts
-- Graph-of-Thoughts
-- TRM
-- Adaptive
+  reasoning :tree_of_thoughts do
+    model(:answer)
+    options(branching_factor: 3, max_depth: 4, top_k: 3)
+  end
 
-Use these when reasoning policy is part of the product requirement, not just a model prompt detail.
+  requests do
+    mode(:session)
+  end
 
-### Tree-of-Thoughts Runtime Contract (Production)
+  result(nil, into: :answer)
+end
+```
 
-`Jido.AI.ToTAgent` now returns a structured result contract (hard switch), not a plain string:
-
-- `best`: best-ranked candidate
-- `candidates`: top-K ranked leaves
-- `termination`: reason/status/depth/node-count/duration
-- `tree`: traversal and search-shape metadata
-- `usage`: accumulated token usage
-- `diagnostics`: parser mode/retries, convergence, tool-round diagnostics
-
-ToT flexibility controls exposed at the agent macro level:
-
-- `top_k`, `min_depth`, `max_nodes`, `max_duration_ms`, `beam_width`
-- `early_success_threshold`, `convergence_window`, `min_score_improvement`
-- `max_parse_retries`
-- `tools`, `tool_context`, `request_transformer`, `tool_timeout_ms`, `tool_max_retries`, `tool_retry_backoff_ms`, `max_tool_round_trips`
+Tree of Thoughts returns a structured result with `best`, `candidates`,
+`termination`, `tree`, `usage`, and `diagnostics` fields. Configure method
+options in the reasoning block. Configure shared limits in the `controls`
+block.
 
 ## Priority 3: Skills System (`SKILL.md` / skills.io-aligned workflow)
 
@@ -87,7 +81,7 @@ Skills are reusable instruction/capability units loaded at runtime:
 
 - `Jido.AI.Skill.Loader` parses skill files.
 - `Jido.AI.Skill.Registry` stores specs and session-scoped activations.
-- `Jido.AI.Agent` accepts `agent_skills: true`, trusted paths, bounded discovery options, or runtime `%Jido.AI.Skill.Spec{}` values.
+- The `skills` DSL block accepts skill modules and bounded discovery sources.
 - Agents receive a compact catalog and load full instructions only when needed.
 - Runtime specs can use a host `resource_provider` callback for fresh, policy-bounded resources.
 - Activated skill content is retained across ReAct context compaction.
@@ -121,11 +115,6 @@ Recommended plugin set (target production surface):
    - guardrails and safety policy
    - memory/retrieval enrichment
    - cost/quota/rate limiting
-
-Non-goal for public plugin surface:
-
-- `TaskSupervisor` should not be treated as a primary user-facing capability plugin.
-- Async execution infrastructure should be handled by Jido runtime/Jido.Exec primitives and internal runtime wiring.
 
 Where plugins fit:
 
@@ -171,8 +160,8 @@ Finalized standalone action set (recommended):
    - `Jido.AI.Actions.Skill.LoadResource` (bounded text loading from an activated skill)
 6. Dedicated strategy orchestration
    - `Jido.AI.Actions.Reasoning.RunStrategy` (isolated strategy execution for `:cod | :cot | :aot | :tot | :got | :trm | :adaptive`)
-7. Compatibility convenience
-   - `Jido.AI.Actions.LLM.Complete` (simple completion path; overlaps with `Chat` and can remain as convenience)
+7. Text generation convenience
+   - `Jido.AI.Actions.LLM.Complete` for a simple completion request
 
 Not part of standalone action surface:
 
@@ -181,7 +170,7 @@ Not part of standalone action surface:
 
 Pragmatically:
 
-- Agent macros are the primary production surface for long-lived agent orchestration.
+- `Jido.AI.Agent` is the primary authoring surface for long-lived agent orchestration.
 - Direct actions are the flexible lower-level surface for pipelines, jobs, and custom runtime composition.
 
 ## Testing Surface
@@ -199,13 +188,13 @@ These helpers replace only the model decision boundary. The application still ex
 
 ```text
 User/App Query
-  -> Agent Macro (Jido.AI.Agent or strategy-specific agent)
-  -> Strategy (ReAct/CoD/CoT/AoT/ToT/GoT/TRM/Adaptive)
-  -> Directives (LLM, tool, control intents)
-  -> Runtime Execution (ReqLLM + tool execution)
-  -> Signals (ai.request.*, ai.llm.*, ai.tool.*, ai.usage)
-  -> Strategy state updates
-  -> Request completion/await result
+  -> Jido.AI.Agent route and Profile
+  -> Jido.AI.Session admission
+  -> Reasoning Flow and Actions
+  -> ReqLLM and Jido.Exec
+  -> Session events and public Signals
+  -> validated Agent candidate
+  -> request completion and await result
 ```
 
 ## Observability Guarantees
@@ -213,7 +202,7 @@ User/App Query
 Observability is a core part of the package, not an add-on:
 
 - Typed signal contracts for lifecycle, LLM, tool, and usage events
-- Directive-level execution boundaries
+- Action and Session execution boundaries
 - Telemetry events for request, LLM, and tool phases
 - Request IDs and run IDs for correlation across async boundaries
 
@@ -226,7 +215,7 @@ When describing `jido_ai` for production, the concise version is:
 3. A reusable skills layer for domain behavior packaging.
 4. A plugin layer for mountable capability mixins and policy controls.
 5. A lower-level actions API for strategy-independent AI workflows.
-6. Full runtime observability through directives, signals, and telemetry.
+6. Full runtime observability through events, signals, and telemetry.
 
 ## Next
 

@@ -32,8 +32,8 @@ publish its partial text. A blank failed response fails without a successful
 model-completed event. Non-empty incomplete content remains accepted.
 
 The tests cover admission, busy and duplicate rejection, awaits, cancellation,
-SSE, usage on success/failure/cancellation, source-format parity, real tool
-results, route binding, state validation, retention and shutdown cleanup. A
+SSE, usage on success/failure/cancellation, real tool results, route binding,
+state validation, retention and shutdown cleanup. A
 fresh OS runtime loads a generated Action from a temporary BEAM file, then
 executes it through the mock and the production session.
 
@@ -42,10 +42,5 @@ them failed with `stream_interrupted` or `request_interrupted`. The next request
 gets new resources. This proves runtime reconstruction within one Agent
 activation. It does not prove durable checkpoint conversion or stream replay.
 The old sink is lost with a crashed Plugin; delivery of a terminal event to that
-old sink remains open. `await` can read the committed interruption failure.
-
-Still required: steering/injection and history, early tool fragments, keepalives,
-all legacy request options, public Agent macro helpers, full observation and
-accounting, standalone methods, durable conversion and cross-runtime restore.
-The root package still uses v2 dependencies. This example does not close the
-live-request migration milestone.
+old sink is not available. `await` can read the committed interruption failure.
+This example does not cover cross-runtime restore or durable stream replay.

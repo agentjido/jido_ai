@@ -27,12 +27,10 @@ defmodule Jido.AI.Plugins.ModelRouting do
   Declare `plugin Jido.AI.Plugins.ModelRouting, config: [routes: routes]`
   inside `agent do`. Configuration is keyword data. Explicit request model
   values win. Exact routes precede wildcard matches; overlapping wildcard
-  patterns use lexical order. The Plugin prepares Signal input through core.
+  patterns use lexical order. The Plugin prepares a model choice for the Action.
   """
 
-  use Jido.Plugin,
-    agent: Jido.AI.Plugins.ModelRouting.Agent,
-    agent_server: Jido.AI.Plugins.ModelRouting.AgentServer
+  use Jido.Plugin, agent: Jido.AI.Plugins.ModelRouting.Agent
 
   def name, do: "model_routing"
   def description, do: "Routes model selection by signal intent"
@@ -69,21 +67,30 @@ defmodule Jido.AI.Plugins.ModelRouting do
     do: Zoi.object(%{routes: Zoi.map() |> Zoi.default(routes)}) |> Zoi.default(%{routes: routes})
 
   @doc false
-  def prepare_command(command) do
-    signal = command.signal
+  def prepare_input(preparation) do
+    signal = preparation.signal
     data = signal.data
-    routes = command.agent.state.model_routing.routes
-
-    request_override? =
-      explicit_model?(Map.get(command.context, :jido_ai_request, %{}))
+    routes = preparation.plugin_state.routes
 
     model =
-      if is_map(data) and not explicit_model?(data) and not request_override?,
+      if is_map(data) and not explicit_model?(data),
         do: route_model(signal.type, routes)
 
-    if is_nil(model),
-      do: {:ok, command},
-      else: {:ok, %{command | signal: %{signal | data: Map.put(data, :model, model)}}}
+    {:ok, model}
+  end
+
+  @doc false
+  def selected_for_agent(agent, signal) do
+    if Enum.any?(agent.plugins, &(elem(&1, 0) == __MODULE__)) do
+      case Map.get(agent.state, state_key()) do
+        %{routes: routes} ->
+          {:ok, model} = prepare_input(%{signal: signal, plugin_state: %{routes: routes}})
+          model
+
+        _ ->
+          nil
+      end
+    end
   end
 
   defp route_model(type, routes) when is_binary(type) and is_map(routes) do
@@ -142,12 +149,7 @@ defmodule Jido.AI.Plugins.ModelRouting.Agent do
 
   @impl Jido.Agent.Plugin
   def state_spec(opts), do: Jido.AI.Plugins.ModelRouting.agent_state_spec(opts)
-end
 
-defmodule Jido.AI.Plugins.ModelRouting.AgentServer do
-  @moduledoc false
-  use Jido.AgentServer.Plugin
-
-  @impl Jido.AgentServer.Plugin
-  def admit(_runtime, command, _opts), do: Jido.AI.Plugins.ModelRouting.prepare_command(command)
+  @impl Jido.Agent.Plugin
+  def prepare(preparation, _opts), do: Jido.AI.Plugins.ModelRouting.prepare_input(preparation)
 end

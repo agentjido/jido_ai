@@ -140,13 +140,7 @@ This pattern is the clean way to implement "show only the IDs the model has seen
 ## Optional: Set Tool Context At Runtime
 
 ```elixir
-signal = Jido.Signal.new!(
-  "ai.react.set_tool_context",
-  %{tool_context: %{tenant_id: "acme"}},
-  source: "/docs/example"
-)
-
-:ok = Jido.AgentServer.cast(pid, signal)
+{:ok, _agent} = Jido.AI.set_tool_context(pid, %{tenant_id: "acme"})
 ```
 
 ## Optional: Set System Prompt At Runtime
@@ -214,8 +208,8 @@ context =
 
 A nil `context.system_prompt` uses the Agent's configured prompt. A saved prompt
 overrides it. Use `profile: :review` to select another AI profile. This imports
-conversation data; it does not resume an old worker or convert a full v2 Agent
-checkpoint. Use native checkpoint restore for state saved after the v3 import.
+conversation data; it does not resume execution. Use native checkpoint restore
+for current V3 state.
 See the [initial-state examples](../../examples/14_resume/14_11_initial_state/README.md).
 
 ## Note: Retrieval And ReAct
@@ -252,4 +246,4 @@ Do not use this approach when:
 
 - [Request Lifecycle And Concurrency](request_lifecycle_and_concurrency.md)
 - [Tool Calling With Actions](tool_calling_with_actions.md)
-- [Directives Runtime Contract](../developer/directives_runtime_contract.md)
+- [Architecture And Runtime Flow](../developer/architecture_and_runtime_flow.md)

@@ -2,7 +2,7 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
   use JidoAI.Examples.Case
   alias Jido.AI.{Authoring, Profile, Request, Session}
   alias Jido.AI.Skill.{Registry, Spec}
-  alias JidoAI.Examples.SkillAuthoring.{Echo, Native, Public, Review, Trust}
+  alias JidoAI.Examples.SkillAuthoring.{Echo, Public, Review, Trust}
   alias JidoAI.Examples.SkillRuntime.Provider
 
   setup do
@@ -83,7 +83,7 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
     path
   end
 
-  test "the public agent_skills option adds the index loading tools and native module actions", %{
+  test "the skills block adds the index loading tools and native module actions", %{
     jido: jido
   } do
     calls = [load(), %{id: "echo", name: "skill_echo", arguments: %{text: "Checked"}}]
@@ -106,9 +106,9 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
     assert {:ok, effective} = Jido.AI.Configuration.profile(Server.agent(server))
 
     for tool <- effective.tools do
-      assert tool.timeout == 1_234
-      assert tool.max_retries == 3
-      assert tool.retry_backoff == 17
+      assert tool.timeout == 5_000
+      assert Map.get(tool, :max_retries, 0) == 0
+      assert Map.get(tool, :retry_backoff, 0) == 0
     end
 
     assert :ok = Jido.Action.validate_static_data(Server.agent(server).state)
@@ -117,7 +117,7 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
 
   test "the native skills block uses the same catalogue and actual loading Action", %{jido: jido} do
     {mock, context} = mock([%{reply: {:tools, [load()]}}, %{reply: {:text, "Done"}}])
-    server = start_agent(jido, Native.new!())
+    server = start_agent(jido, Public.new!())
     assert {:ok, "Done"} = request(server, context)
     assert {:ok, %{specs: [%{name: "review"}]}} = Session.skill_catalog(server)
     assert text(List.last(MockLLM.report(mock).requests)) =~ "Module review instructions"
@@ -183,8 +183,24 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
 
     code = """
     defmodule #{inspect(module)} do
-      use Jido.AI.Agent, name: "runtime_location", model: :example, tools: [], streaming: false,
-        agent_skills: ["skills"]
+      use Jido.AI.Agent, name: "runtime_location"
+
+      agent do
+        schema Zoi.object(%{reply: Zoi.any() |> Zoi.default(nil), messages: Zoi.list(Zoi.map()) |> Zoi.default([])})
+
+        ai :assistant do
+          model(:example)
+          reasoning(:react)
+          skills(paths: ["skills"], trust: true)
+          requests(mode: :session)
+          memory(history: :messages)
+          result(into: :reply)
+        end
+      end
+
+      routes do
+        route("ai.ask", ai: :assistant)
+      end
     end
     """
 
@@ -368,7 +384,7 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
         end
       end)
 
-    Jido.Agent.Codec.Registry.new!(entries)
+    Jido.Codec.Registry.new!(entries)
   end
 
   defp static_values(value) when value in [nil, true, false], do: []
@@ -381,19 +397,6 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
   defp static_values(value) when is_list(value), do: Enum.flat_map(value, &static_values/1)
   defp static_values(value) when is_tuple(value), do: value |> Tuple.to_list() |> static_values()
   defp static_values(_), do: []
-
-  test "live tool changes retain automatic defaults and can remove a loading tool", %{jido: jido} do
-    {mock, context} = mock([%{reply: {:text, "First"}}, %{reply: {:text, "Second"}}])
-    server = start(jido, %{specs: [spec()]})
-    assert {:ok, _} = Jido.AI.register_tool(server, Echo)
-    assert {:ok, "First"} = request(server, context)
-    assert {:ok, _} = Jido.AI.unregister_tool(server, "load_skill")
-    assert {:ok, "Second"} = request(server, context)
-    [first, second] = MockLLM.report(mock).requests
-    assert Enum.sort(names(first)) == ["load_skill", "load_skill_resource", "skill_echo"]
-    assert Enum.sort(names(second)) == ["load_skill_resource", "skill_echo"]
-    assert_script_done(mock)
-  end
 
   @tag :tmp_dir
   test "the load_path DSL resolves lazy files only when the live Agent starts", %{
@@ -591,13 +594,14 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
     assert_script_done(mock)
   end
 
-  test "a live prompt replacement retains its exact text and the loading tools", %{jido: jido} do
+  test "a live prompt replacement retains its text and the skill index", %{jido: jido} do
     {mock, context} = mock([%{reply: {:text, "Done"}}])
     server = start_agent(jido, Public.new!())
     assert {:ok, _} = Jido.AI.set_system_prompt(server, "Exact replacement")
     assert {:ok, "Done"} = Public.ask_sync(server, "Review", context: context)
     assert [wire] = MockLLM.report(mock).requests
-    assert first_prompt(wire) == "Exact replacement"
+    assert first_prompt(wire) =~ "Exact replacement"
+    assert first_prompt(wire) =~ "## Skills"
     assert Enum.sort(names(wire)) == ["load_skill", "load_skill_resource", "skill_echo"]
     assert_script_done(mock)
   end

@@ -27,12 +27,10 @@ time and worker PID. These process identifiers never enter stored Agent state.
 A Session restart can make the live sample unavailable; the committed view
 remains usable. The API does not make the two samples atomic.
 
-Details expose phase, reasoning position, started model calls, model label, model-call ID,
-usage, output metadata, stream text/thinking, per-call thinking, active tools,
-completed tool results, duration and cancellation reason. Configuration and
-conversation use the selected request's profile, as proved by
-[02_23](../02_23_context_operations/README.md). They are current Agent data, not copies
-of an older request's configuration or private prompt.
+Details expose phase, reasoning position, started model calls, model label,
+model-call ID, usage, output metadata, stream text/thinking, per-call thinking,
+active tools, completed tool results, duration, and cancellation reason.
+Configuration and conversation use the selected request's current profile.
 The request's final result and raw stored failure remain in `view.request`.
 
 ## Trace and commit rules
@@ -59,8 +57,8 @@ this port adds no per-event persistence loop. Durable completion storage is
 covered with a lost reply and a new Agent Server. If the durable store refuses
 the completion commit, the Agent Server stops and the caller gets
 `:agent_server_unavailable`. The durable request stays pending and no false
-completed event is stored. Offline v2 Agent conversion, other pending-work
-storage failures and guaranteed terminal delivery remain open.
+completed event is stored. This example does not cover all pending-work storage
+failures or guaranteed terminal delivery.
 
 If the Agent's byte limit cannot hold trace data, the stored trace is omitted
 and marked truncated. A compact terminal failure can also omit trace details.
@@ -97,10 +95,8 @@ Review exposed the cancellation race. The simpler design stores the observed
 prefix and the committed outcome separately. It reuses the existing live event
 publisher. It adds no runtime owner, queue, executor or DSL term.
 
-Old `Strategy.snapshot/2` callbacks and the removed core Snapshot type are not
-restored. CLI adapters, method-specific active tree/graph inspection, context
-lanes, operation deduplication, skill compaction and the full root package still
-need their migration checks.
+CLI adapters, method-specific active tree and graph inspection, context lanes,
+operation deduplication, and skill compaction are outside this example.
 
 Run from the repository root:
 

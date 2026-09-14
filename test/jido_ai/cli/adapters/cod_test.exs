@@ -9,17 +9,13 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.CLIAdapterTest do
   setup :set_mimic_from_context
 
   defmodule StubCoDAgent do
-    def draft(pid, query) do
+    def ask(pid, query) do
       send(self(), {:cod_submit_called, pid, query})
       {:ok, :submitted}
     end
   end
 
   defmodule FixtureCoDAgent do
-    use Jido.AI.CoDAgent,
-      name: "fixture_cod_agent",
-      description: "Fixture CoD agent for adapter resolution tests"
-
     def cli_adapter, do: CoDAdapter
   end
 
@@ -33,7 +29,7 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.CLIAdapterTest do
   describe "create_ephemeral_agent/1" do
     test "creates ephemeral agent module with default config", %{default_module: module} do
       assert is_atom(module)
-      assert function_exported?(module, :draft, 2)
+      assert function_exported?(module, :ask, 2)
       assert function_exported?(module, :name, 0)
       assert module.name() == "cli_cod_agent"
     end
@@ -47,21 +43,18 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.CLIAdapterTest do
     end
 
     test "uses custom model from config", %{model_module: module} do
-      opts = module.strategy_opts()
-      assert opts[:model] == "openai:gpt-4"
+      assert profile(module).models.answer.model == "openai:gpt-4"
     end
 
     test "uses custom system_prompt from config", %{prompt_module: module} do
-      opts = module.strategy_opts()
-      assert opts[:system_prompt] == "Draft minimally."
+      assert profile(module).instructions == "Draft minimally."
     end
 
     test "uses default values when not specified", %{default_module: module} do
-      opts = module.strategy_opts()
-
-      assert opts[:model] == :fast
-      assert is_binary(opts[:system_prompt])
-      assert opts[:system_prompt] != ""
+      agent_profile = profile(module)
+      assert agent_profile.models.answer.model == :fast
+      assert is_binary(agent_profile.instructions)
+      assert agent_profile.instructions != ""
     end
   end
 
@@ -77,7 +70,7 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.CLIAdapterTest do
   end
 
   describe "adapter wiring" do
-    test "submit delegates to configured CoD agent draft/2 function" do
+    test "submit delegates to configured Agent ask/2 function" do
       assert {:ok, :submitted} = CoDAdapter.submit(self(), "Keep it short", %{agent_module: StubCoDAgent})
       assert_received {:cod_submit_called, pid, "Keep it short"}
       assert pid == self()
@@ -95,9 +88,8 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.CLIAdapterTest do
     test "await returns completed result with CoD metadata" do
       status =
         AdapterTestSupport.status(
-          result: nil,
-          details: %{steps_count: 2, phase: :complete, duration_ms: 45},
-          raw_state: %{last_result: "CoD answer"}
+          result: "CoD answer",
+          details: %{steps_count: 2, phase: :complete, duration_ms: 45}
         )
 
       expect(Jido.AI.CLI.Adapter, :status, fn _pid -> {:ok, status} end)
@@ -123,5 +115,10 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.CLIAdapterTest do
     test "fixture CoD agent resolves to CoD adapter" do
       assert {:ok, CoDAdapter} = Adapter.resolve(nil, FixtureCoDAgent)
     end
+  end
+
+  defp profile(module) do
+    {:ok, profile} = Jido.AI.Configuration.profile(module.definition())
+    profile
   end
 end

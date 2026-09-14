@@ -527,10 +527,7 @@ defmodule JidoAI.Examples.TypedSignalsTest do
 
   test "direct Turn tools use core validation timeout cleanup and canonical effect results" do
     assert {:ok, %{echo: "direct"}, []} =
-             Turn.execute("echo", %{"value" => "direct"}, %{observer: self()},
-               tools: [Echo],
-               log_level: :warning
-             )
+             Turn.execute("echo", %{"value" => "direct"}, %{observer: self()}, tools: [Echo])
 
     assert_receive {:echo_executed, "direct"}
     assert {:error, _, []} = Turn.execute_module(Echo, %{}, %{observer: self()})

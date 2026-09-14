@@ -18,23 +18,7 @@ defmodule JidoAI.Examples.AIExtensionTest do
 
     assert [
              %{path: "ai.ask", target: {target, %{profile_id: :assistant}}},
-             %{path: "jido.ai.configure", target: Jido.AI.Configuration.Apply},
-             %{
-               path: "ai.react.register_tool",
-               target: {Jido.AI.Configuration.Apply, %{operation: :register}}
-             },
-             %{
-               path: "ai.react.unregister_tool",
-               target: {Jido.AI.Configuration.Apply, %{operation: :unregister}}
-             },
-             %{
-               path: "ai.react.set_tool_context",
-               target: {Jido.AI.Configuration.Apply, %{operation: :tool_context}}
-             },
-             %{
-               path: "ai.react.set_system_prompt",
-               target: {Jido.AI.Configuration.Apply, %{operation: :prompt}}
-             }
+             %{path: "jido.ai.configure", target: Jido.AI.Configuration.Apply}
            ] = definition.routes
 
     assert {:ok, _} = Jido.Executable.resolve(target)

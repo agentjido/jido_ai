@@ -1,7 +1,7 @@
 # Adaptive selection through the shared Flow
 
 The [Agent example](agent.ex) and
-[28 example cases](../../../test/examples/09_reasoning/09_10_adaptive/09_10_adaptive_test.exs)
+[22 example cases](../../../test/examples/09_reasoning/09_10_adaptive/09_10_adaptive_test.exs)
 select and run all seven existing methods. Selection uses the existing keyword
 and complexity rules. It does not call a model. The selected profile then runs
 through the same Flow and Session as a fixed method.
@@ -48,12 +48,8 @@ the complex threshold prefer AoT/ToT/GoT; the inclusive middle prefers ReAct.
 Length, sentence structure, keywords and constraints contribute to the score.
 
 The [selector](../../../lib/jido_ai/reasoning/adaptive/selection.ex) contains the
-extracted algorithm. The old Strategy delegates its analysis helper to it.
-[16 transferred analysis tests](../../../test/jido_ai/adaptive/selection_test.exs)
-retain the baseline checks. Inert legacy analysis still falls back to ReAct for
-an empty list; executable native profiles reject that list. The baseline stores
-`default_strategy` but does not use it in selection. Native options omit this
-unused field. Its public compatibility mapping remains an explicit open item.
+algorithm. Focused selector tests retain the rule checks. Executable profiles
+reject an empty available-method list.
 
 Each new request selects again. Repair and tool rounds keep that choice. An
 override records score 0.5 and task type `:manual_override`. The common call,
@@ -94,24 +90,12 @@ Actual phase IDs and model-call IDs come from the selected method and common
 runtime. Selection adds no provider usage or extra model call. This explicit
 outer/selected distinction replaces reliance on an old delegated Strategy name.
 
-## Recovery and remaining gates
+## Recovery
 
 The cases cover failure during selected TRM improvement, model limits, output
 rejection, cancellation, a deadline, owner loss and a different later choice.
 They verify provider cleanup, busy rejection, prior usage and domain commit
 behavior. These are current interruption checks, not durable phase resumption.
 
-The public AdaptiveAgent macro, namespace/Strategy inspection, printable legacy
-failure mapping, custom hooks, old command/phase-input and state conversion,
-runtime overrides, active inspection, CLI/capability APIs, full media/provider
-contracts and durable recovery remain required. The shared rejected-admission
-method-identity gap also remains open. Root dependency, package, consumer,
-minimum-runtime, migration and rollback gates remain open.
-
-## Public API follow-up
-
-The [09_11 example](../09_11_adaptive_api/README.md) now supplies the public wrapper,
-retained namespace/Strategy inspection, printable result/error fields and public
-tool callbacks. It records the unused default_strategy mapping and the shared
-call-budget rule. Active inspection, old command/state conversion, runtime
-overrides and package gates remain open.
+Durable phase resumption is outside this example. Restore a V3 Session or start
+a new request through the same Agent profile.

@@ -23,7 +23,6 @@ defmodule Jido.AI.ActionMetadataTest do
       Jido.AI.Actions.ToolCalling.CallWithTools,
       Jido.AI.Actions.ToolCalling.ExecuteTool,
       Jido.AI.Actions.ToolCalling.ListTools,
-      Jido.AI.Actions.Reasoning.RunStrategy,
       Jido.AI.Reasoning.ReAct.Actions.Cancel,
       Jido.AI.Reasoning.ReAct.Actions.Collect,
       Jido.AI.Reasoning.ReAct.Actions.Continue,

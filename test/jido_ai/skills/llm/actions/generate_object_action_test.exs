@@ -35,7 +35,7 @@ defmodule Jido.AI.Actions.LLM.GenerateObjectTest do
       assert {:ok, result} =
                GenerateObject.run(%{prompt: "Generate a person", object_schema: schema}, %{})
 
-      assert result.model == Jido.AI.resolve_model(:fast)
+      assert result.model == Jido.AI.Models.resolve(:fast)
       assert is_map(result.object)
       assert result.object[:name] == "stubbed"
       assert result.usage.total_tokens == result.usage.input_tokens + result.usage.output_tokens
@@ -79,7 +79,7 @@ defmodule Jido.AI.Actions.LLM.GenerateObjectTest do
       }
 
       expect(ReqLLM.Generation, :generate_object, fn model, messages, req_schema, opts ->
-        assert model == Jido.AI.resolve_model(:capable)
+        assert model == Jido.AI.Models.resolve(:capable)
         assert req_schema == schema
         assert opts[:max_tokens] == 321
         assert opts[:temperature] == 0.11
@@ -94,7 +94,7 @@ defmodule Jido.AI.Actions.LLM.GenerateObjectTest do
 
       params = %{prompt: "Generate person data", object_schema: schema}
       assert {:ok, result} = GenerateObject.run(params, context)
-      assert result.model == Jido.AI.resolve_model(:capable)
+      assert result.model == Jido.AI.Models.resolve(:capable)
       assert result.object == %{name: "alice"}
     end
 

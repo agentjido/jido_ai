@@ -436,31 +436,6 @@ defmodule JidoAI.Examples.QuotaTest do
     assert [%{id: "new", status: :complete}] = Store.ledger("clocked", store)
   end
 
-  test "legacy rows import atomically and retain counters without inventing call records" do
-    now = System.system_time(:millisecond)
-
-    assert :ok =
-             Store.import_rows([
-               {"tuple", now, 3, 12},
-               {"map", %{"window_started_at_ms" => now, "requests" => 2, "total_tokens" => 9}}
-             ])
-
-    assert %{requests: 3, total_tokens: 12} = Store.get("tuple")
-    assert %{accounting: %{unattributed_calls: 3}} = Store.status("tuple", %{}, 60_000)
-    assert [] = Store.ledger("tuple")
-    assert %{requests: 3, total_tokens: 13} = Store.add_usage("map", 4, 60_000)
-    assert {:error, :scope_exists} = Store.import_rows([{"new", now, 1, 1}, {"tuple", now, 0, 0}])
-
-    assert {:error, :invalid_quota_row} =
-             Store.import_rows([{"new", now, 1, 1}, {"bad", now, -1, 0}])
-
-    assert {:error, :duplicate_scope} =
-             Store.import_rows([{"new", now, 1, 1}, {"new", now, 1, 1}])
-
-    assert %{requests: 0} = Store.get("new")
-    assert %{requests: 3, total_tokens: 12} = Store.get("tuple")
-  end
-
   test "disabled enforcement and unbudgeted embedding calls still record usage", %{jido: jido} do
     {mock, context} = mock([%{reply: {:text, "Reviewed"}}, %{reply: {:embeddings, [[0.1, 0.2]]}}])
     assert {:ok, disabled} = Example.definition(enabled: false, max_requests: 0)
@@ -484,31 +459,6 @@ defmodule JidoAI.Examples.QuotaTest do
 
     assert {:ok, _} = Server.call(server, Example.signal("case.note", %{}))
     assert %{requests: 2, total_tokens: 20} = Store.get("team")
-    assert_script_done(mock)
-  end
-
-  test "pure Agent commands enforce the same provider budget and reject forged context" do
-    {mock, context} = mock([%{reply: {:text, "Reviewed"}}])
-    assert {:ok, definition} = Example.definition(max_requests: 1)
-    agent = Jido.Agent.instantiate!(definition)
-
-    context =
-      Map.merge(context, %{
-        quota_store: :missing_store,
-        jido_ai_quota: %{enabled: false},
-        jido_ai_quota_call_id: "forged"
-      })
-
-    assert {:ok, agent, _} =
-             Jido.Agent.cmd(agent, Example.signal("case.review", %{query: "Review"}), context: context)
-
-    assert agent.state.result == "Reviewed"
-
-    assert {:error, _} =
-             Jido.Agent.cmd(agent, Example.signal("case.review", %{query: "Again"}), context: context)
-
-    assert [%{id: id}] = Store.ledger("team")
-    refute id == "forged"
     assert_script_done(mock)
   end
 

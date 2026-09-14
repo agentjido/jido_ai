@@ -15,7 +15,7 @@ defmodule Jido.AI.Effects.PolicyTest do
 
     assert Policy.allowed?(policy, %State{state: %{flag: true}})
     assert Policy.allowed?(policy, %Directive.Emit{signal: %{type: "ai.test"}})
-    refute Policy.allowed?(policy, %Directive.SpawnAgent{agent: __MODULE__, tag: :child})
+    refute Policy.allowed?(policy, %Directive.SpawnChild{agent: __MODULE__, tag: :child})
   end
 
   test "dispatch constraints compare adapters safely without dynamic atom creation" do
@@ -165,7 +165,7 @@ defmodule Jido.AI.Effects.PolicyTest do
 
   test "filters lists and single effects while preserving order" do
     state = %State{state: %{value: 1}}
-    spawn = %Directive.SpawnAgent{agent: __MODULE__, tag: :child}
+    spawn = %Directive.SpawnChild{agent: __MODULE__, tag: :child}
 
     assert Policy.filter(nil, [state, spawn, state]) == {[state, state], [spawn]}
     assert Policy.filter(%{mode: :deny_all}, state) == {[], [state]}

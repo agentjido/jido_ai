@@ -391,20 +391,6 @@ defmodule JidoAI.Examples.RetrievalTest do
     assert_script_done(mock)
   end
 
-  test "pure command preparation does not read an external store", %{jido: _jido} do
-    {mock, context} = mock([%{reply: {:text, "Reviewed"}}])
-    assert {:ok, definition} = Example.definition(store: :missing_memory_store)
-    agent = Jido.Agent.instantiate!(definition)
-
-    assert {:ok, candidate, []} =
-             Jido.Agent.cmd(agent, Example.signal("case.review", %{query: "Tokyo weather"}), context: context)
-
-    assert candidate.state.result == "Reviewed"
-    assert [request] = MockLLM.report(mock).requests
-    assert List.last(request.body["messages"])["content"] == "Tokyo weather"
-    assert_script_done(mock)
-  end
-
   test "configured store and namespace cannot be replaced by forged caller state", %{jido: jido} do
     assert {:ok, definition} = Example.definition()
     server = start_agent(jido, definition)

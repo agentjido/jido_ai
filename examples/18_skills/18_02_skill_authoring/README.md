@@ -3,22 +3,12 @@
 [Agents](agent.ex) and
 [21 example cases](../../../test/examples/18_skills/18_02_skill_authoring/18_02_skill_authoring_test.exs)
 use the real loading Actions, the existing Session/Flow path, and the shared
-HTTP mock. The public Agent option, native DSL, source data, Builder, and JSON
-produce the same runtime behavior.
+HTTP mock. The native DSL, source data, Builder, and JSON produce the same
+runtime behavior.
 
 ## Declare the source
 
-The public Agent accepts `agent_skills`. For example:
-
-```elixir
-use Jido.AI.Agent,
-  name: "reviewer",
-  model: :fast,
-  tools: [],
-  agent_skills: [modules: [MyApp.Skills.Review]]
-```
-
-Inside a native `ai` profile, use:
+Declare skills inside an `ai` profile:
 
 ```elixir
 skills do
@@ -36,18 +26,16 @@ Agent is in the linked example. A source map uses `skills: %{modules: [...],
 paths: [...], trust: true}`. A JSON source uses the existing host Registry for
 trusted module, callback and static value references. JSON does not import code.
 
-`nil`, `false`, and `[]` disable automatic skills. `true` selects the standard
-trusted roots. A list of paths trusts those roots. A keyword list or source map
-requires explicit trust for file discovery. Repeated `load_path` declarations
-imply trust unless the block sets it. Do not combine `paths` and `load_path`.
+An omitted block disables automatic skills. Each `load_path` trusts that
+declared root. A `paths` value in source data requires explicit trust for file
+discovery. Do not combine `paths` and `load_path`.
 A source with `paths: []` stays enabled with a closed empty catalogue. Module
 or runtime Spec sources default to no filesystem scan.
 
 Static declarations accept boolean trust or an exported `{Module, function,
 args}` callback. The callback receives the path before its extra arguments.
-Runtime provider callbacks use the existing MFA contract. Stored definitions
-cannot contain closures. The manual `AgentIntegration.prepare/1` API retains
-its runtime callback forms.
+Runtime provider callbacks use the MFA contract. Stored definitions cannot
+contain closures. `AgentIntegration.prepare/1` is the low-level host API.
 
 ## Prepare once per live owner
 
@@ -92,10 +80,3 @@ It sends no model request by itself. Old provider handles and activation state
 are not serialized. The existing activation and resource bounds in 18_01 apply.
 Pure Session admission with automatic skills returns an error because it has no
 live owner for discovery and activation.
-
-## Remaining package work
-
-These cases do not close standalone skill continuation, installed resource and
-CLI checks, complete Agent state conversion, or root package and consumer
-validation. Root dependency files still use v2. All history rows remain pending
-until their complete acceptance requirements pass.

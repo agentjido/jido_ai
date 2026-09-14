@@ -3,18 +3,10 @@ defmodule Jido.AI.Reasoning.ChainOfDraft do
   CoD method selection, prompts and stored result inspection.
 
   Use `method/0` in a v3 AI profile. Core Agent and Flow own execution.
-  Legacy Strategy modules retain result getters only.
+  The method namespace provides result inspection.
   """
 
-  alias Jido.AI.Reasoning.ChainOfDraft.Strategy
   alias Jido.AI.Reasoning.ChainOfThought
-
-  @doc """
-  Returns the legacy result-inspection module. It is not a v3 executor.
-  """
-  @deprecated "Use method/0 for AI profile selection and namespace result getters for inspection"
-  @spec strategy_module() :: module()
-  def strategy_module, do: Strategy
 
   @doc "Returns the method value accepted by the shared AI profile."
   def method, do: :chain_of_draft

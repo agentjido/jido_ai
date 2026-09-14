@@ -10,17 +10,30 @@ defmodule Jido.AI.OutputTest do
           })
 
   defmodule StructuredOutputAgent do
-    use Jido.AI.Agent,
-      name: "structured_output_test_agent",
-      tools: [],
-      output: [
-        schema:
+    use Jido.AI.Agent, name: "structured_output_test_agent"
+
+    agent do
+      schema Zoi.object(%{last_result: Zoi.any() |> Zoi.default(nil)})
+
+      ai :assistant do
+        model(:fast)
+        reasoning(:react)
+        requests(mode: :session)
+
+        result(
           Zoi.object(%{
             category: Zoi.enum([:billing, :technical, :account]),
             confidence: Zoi.float(),
             summary: Zoi.string()
-          })
-      ]
+          }),
+          into: :last_result
+        )
+      end
+    end
+
+    routes do
+      route("ai.react.query", ai: :assistant)
+    end
   end
 
   defmodule RepairCallback do

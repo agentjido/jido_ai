@@ -69,7 +69,7 @@ defmodule Jido.AI.Reasoning.ReAct.RequestTransformer do
   def validate(_other), do: {:error, :invalid_request_transformer}
 
   @doc """
-  Fingerprint a validated transformer for checkpoint compatibility.
+  Fingerprints a validated transformer for checkpoint binding validation.
   """
   @spec fingerprint(module() | nil) :: String.t()
   def fingerprint(nil), do: ""

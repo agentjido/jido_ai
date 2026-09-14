@@ -1,24 +1,6 @@
 defmodule Jido.AI.Reasoning.EntrypointsTest do
   use ExUnit.Case, async: true
 
-  @strategy_modules [
-    {Jido.AI.Reasoning.Adaptive, Jido.AI.Reasoning.Adaptive.Strategy},
-    {Jido.AI.Reasoning.AlgorithmOfThoughts, Jido.AI.Reasoning.AlgorithmOfThoughts.Strategy},
-    {Jido.AI.Reasoning.ChainOfDraft, Jido.AI.Reasoning.ChainOfDraft.Strategy},
-    {Jido.AI.Reasoning.ChainOfThought, Jido.AI.Reasoning.ChainOfThought.Strategy},
-    {Jido.AI.Reasoning.GraphOfThoughts, Jido.AI.Reasoning.GraphOfThoughts.Strategy},
-    {Jido.AI.Reasoning.TreeOfThoughts, Jido.AI.Reasoning.TreeOfThoughts.Strategy},
-    {Jido.AI.Reasoning.TRM, Jido.AI.Reasoning.TRM.Strategy}
-  ]
-
-  describe "strategy_module/0 delegation" do
-    for {entrypoint, strategy} <- @strategy_modules do
-      test "#{inspect(entrypoint)} returns canonical strategy module" do
-        assert unquote(entrypoint).strategy_module() == unquote(strategy)
-      end
-    end
-  end
-
   describe "delegated helper contracts" do
     test "Adaptive.analyze_prompt/2 returns strategy metadata tuple" do
       assert {strategy, score, task_type} = Jido.AI.Reasoning.Adaptive.analyze_prompt("What is 2 + 2?", %{})

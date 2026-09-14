@@ -16,5 +16,5 @@ concurrency, cancellation and child cleanup, a blocked-control deadline,
 provider errors, route defaults, and malformed definitions. A separate case
 checks redaction of provider structs in output errors.
 
-This is one-Turn execution. It does not claim the legacy request/session,
-streaming, steering, approval or recovery APIs are ported.
+This is one-Turn execution. Session requests, streaming, steering, approval,
+and recovery use their own profiles and examples.

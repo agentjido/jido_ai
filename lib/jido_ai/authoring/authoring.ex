@@ -126,7 +126,10 @@ defmodule Jido.AI.Authoring do
               ]
 
       skill_sources = Map.new(Enum.filter(sessions, &(&1.skills != nil)), &{&1.id, &1.skills})
-      session_opts = if map_size(skill_sources) == 0, do: [], else: [skills: skill_sources]
+      session_opts = [profiles: Map.new(sessions, &{&1.id, &1}), routes: routes]
+
+      session_opts =
+        if map_size(skill_sources) == 0, do: session_opts, else: Keyword.put(session_opts, :skills, skill_sources)
 
       plugins =
         if sessions == [],

@@ -2,7 +2,7 @@ defmodule Jido.AI.Reasoning.ReAct.TokenTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Reasoning.ReAct.{Config, State, Token}
-  @legacy_insecure_secret "jido_ai_react_default_secret_change_me"
+  @insecure_default_secret "jido_ai_react_default_secret_change_me"
 
   defmodule TransformerA do
     def transform_request(request, _state, _config, _context), do: {:ok, request}
@@ -15,7 +15,7 @@ defmodule Jido.AI.Reasoning.ReAct.TokenTest do
   test "defaults omitted model to resolved :fast alias" do
     config = Config.new(%{tools: %{}})
 
-    assert config.model == Jido.AI.resolve_model(:fast)
+    assert config.model == Jido.AI.Models.resolve(:fast)
   end
 
   test "issues and decodes checkpoint tokens" do
@@ -102,9 +102,9 @@ defmodule Jido.AI.Reasoning.ReAct.TokenTest do
     assert {:error, :token_expired} = Token.decode(token, config)
   end
 
-  test "rejects insecure legacy default token secret" do
+  test "rejects the known insecure default token secret" do
     assert_raise ArgumentError, ~r/insecure ReAct token secret rejected/, fn ->
-      Config.new(%{model: :capable, tools: %{}, token_secret: @legacy_insecure_secret})
+      Config.new(%{model: :capable, tools: %{}, token_secret: @insecure_default_secret})
     end
   end
 
@@ -114,42 +114,7 @@ defmodule Jido.AI.Reasoning.ReAct.TokenTest do
 
     assert is_binary(config_a.token.secret)
     assert config_a.token.secret == config_b.token.secret
-    refute config_a.token.secret == @legacy_insecure_secret
-  end
-
-  test "rejects legacy token state payloads that still include thread key" do
-    config = Config.new(%{model: :capable, tools: %{}, token_secret: "secret-a"})
-    state = State.new("hello", nil, request_id: "req_legacy", run_id: "run_legacy")
-    now = System.system_time(:millisecond)
-
-    payload = %{
-      v: 2,
-      iss: "jido_ai/react",
-      run_id: state.run_id,
-      request_id: state.request_id,
-      iat_ms: now,
-      exp_ms: nil,
-      config_fingerprint: Config.fingerprint(config),
-      state: %{
-        context: state.context,
-        thread: state.context
-      }
-    }
-
-    token = forge_token(payload, config.token.secret)
-    assert {:error, :legacy_token_state} = Token.decode(token, config)
-  end
-
-  test "state checkpoint restore hard-fails for legacy thread shape" do
-    context = Jido.AI.Context.new() |> Jido.AI.Context.append_user("hello")
-
-    assert {:error, :legacy_thread_checkpoint} =
-             State.from_checkpoint_map(%{
-               run_id: "run_legacy",
-               request_id: "req_legacy",
-               status: :running,
-               thread: context
-             })
+    refute config_a.token.secret == @insecure_default_secret
   end
 
   test "mark_cancelled replaces incompatible terminal data and keeps the reason" do
@@ -170,15 +135,5 @@ defmodule Jido.AI.Reasoning.ReAct.TokenTest do
     assert cancelled.result == nil
     assert cancelled.error == :user_cancelled
     assert cancelled.termination_reason == :cancelled
-  end
-
-  defp forge_token(payload, secret) do
-    payload_bin = :erlang.term_to_binary(payload)
-    signature = :crypto.mac(:hmac, :sha256, secret, payload_bin)
-
-    "rt2." <>
-      Base.url_encode64(payload_bin, padding: false) <>
-      "." <>
-      Base.url_encode64(signature, padding: false)
   end
 end

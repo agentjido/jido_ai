@@ -49,14 +49,32 @@ defmodule Jido.AI.Live.RequestStreamLiveTest do
   defmodule LiveAgent do
     alias Jido.AI.Live.RequestStreamLiveTest.EchoTool
 
-    use Jido.AI.Agent,
-      name: "live_request_stream_agent",
-      model: :fast,
-      tools: [EchoTool],
-      max_iterations: 2,
-      max_tokens: 64,
-      streaming: true,
-      stream_timeout_ms: 60_000
+    use Jido.AI.Agent, name: "live_request_stream_agent"
+
+    agent do
+      schema Zoi.object(%{last_result: Zoi.any() |> Zoi.default(nil), messages: Zoi.list(Zoi.map()) |> Zoi.default([])})
+
+      ai :assistant do
+        model :answer, :fast, max_tokens: 64
+        reasoning(:react, model: :answer)
+
+        controls do
+          max_iterations(2)
+        end
+
+        tools do
+          action(EchoTool)
+        end
+
+        requests(mode: :session, streaming: true)
+        memory(history: :messages)
+        result(into: :last_result)
+      end
+    end
+
+    routes do
+      route("ai.react.query", ai: :assistant)
+    end
   end
 
   setup_all do

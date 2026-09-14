@@ -48,18 +48,4 @@ defmodule Jido.AI.Quota.StoreTest do
       other -> flunk("unexpected ensure_table result: #{inspect(other)}")
     end)
   end
-
-  test "add_usage retains imported legacy map counters without loss" do
-    scope = unique_scope("quota_legacy")
-    Store.ensure_table!()
-    now = System.system_time(:millisecond)
-
-    :ok = Store.import_rows([{scope, %{window_started_at_ms: now, requests: 2, total_tokens: 9}}])
-
-    usage = Store.add_usage(scope, 3, 60_000)
-    assert usage.requests == 3
-    assert usage.total_tokens == 12
-
-    assert %{requests: 3, total_tokens: 12} = Store.get(scope)
-  end
 end

@@ -11,7 +11,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
   @default_model :fast
   @default_max_iterations 10
   @default_max_tokens 4_096
-  @legacy_insecure_token_secret "jido_ai_react_default_secret_change_me"
+  @insecure_token_secret "jido_ai_react_default_secret_change_me"
   @ephemeral_secret_key {:jido_ai, __MODULE__, :ephemeral_token_secret}
   @ephemeral_secret_warned_key {:jido_ai, __MODULE__, :ephemeral_token_secret_warned}
   @reqllm_generation_opt_keys_by_string ReqLLM.Provider.Options.all_generation_keys()
@@ -41,9 +41,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
                         })
 
   @trace_schema Zoi.object(%{
-                  capture_deltas?: Zoi.boolean() |> Zoi.default(true),
-                  capture_thinking?: Zoi.boolean() |> Zoi.default(true),
-                  capture_messages?: Zoi.boolean() |> Zoi.default(true)
+                  capture_deltas?: Zoi.boolean() |> Zoi.default(true)
                 })
 
   @token_schema Zoi.object(%{
@@ -103,7 +101,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
       |> get_opt(:output, nil)
       |> Output.new!()
 
-    llm_timeout = get_opt(opts_map, :llm_timeout_ms, get_opt(opts_map, :timeout_ms, nil))
+    llm_timeout = get_opt(opts_map, :llm_timeout_ms, nil)
 
     llm = %{
       max_tokens:
@@ -132,9 +130,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
     }
 
     trace = %{
-      capture_deltas?: normalize_boolean(get_opt(opts_map, :capture_deltas?, true), true),
-      capture_thinking?: normalize_boolean(get_opt(opts_map, :capture_thinking?, true), true),
-      capture_messages?: normalize_boolean(get_opt(opts_map, :capture_messages?, true), true)
+      capture_deltas?: normalize_boolean(get_opt(opts_map, :capture_deltas?, true), true)
     }
 
     token_secret =
@@ -306,7 +302,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
   end
 
   defp resolve_stream_timeout_ms(opts_map) when is_map(opts_map) do
-    get_opt(opts_map, :stream_timeout_ms, get_opt(opts_map, :stream_receive_timeout_ms, 0))
+    get_opt(opts_map, :stream_timeout_ms, 0)
   end
 
   defp normalize_boolean(value, _default) when is_boolean(value), do: value
@@ -326,7 +322,7 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
   defp normalize_float(_value, default), do: default
 
   defp normalize_token_secret(secret) when is_binary(secret) and secret != "" do
-    if secret == @legacy_insecure_token_secret do
+    if secret == @insecure_token_secret do
       raise ArgumentError,
             "insecure ReAct token secret rejected; configure :jido_ai, :react_token_secret or pass :token_secret explicitly"
     else

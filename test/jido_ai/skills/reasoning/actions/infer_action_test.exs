@@ -33,7 +33,7 @@ defmodule Jido.AI.Actions.Reasoning.InferTest do
 
       assert {:ok, result} = Infer.run(params, %{})
 
-      assert result.model == Jido.AI.resolve_model(:reasoning)
+      assert result.model == Jido.AI.Models.resolve(:reasoning)
       assert result.result =~ "Premises:"
       assert result.reasoning == result.result
       assert Map.has_key?(result, :confidence)

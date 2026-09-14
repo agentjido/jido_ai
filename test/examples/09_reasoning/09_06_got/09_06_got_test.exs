@@ -235,7 +235,7 @@ defmodule JidoAI.Examples.GoTTest do
   test "the retained Machine still emits its legacy lifecycle telemetry" do
     id = "got_machine_#{System.unique_integer([:positive])}"
     names = for phase <- [:start, :complete, :error], do: [:jido, :ai, :got, phase]
-    :ok = :telemetry.attach_many(id, names, &JidoAI.Examples.Linear.Telemetry.handle/4, self())
+    :ok = :telemetry.attach_many(id, names, &JidoAI.Examples.Telemetry.handle/4, self())
     on_exit(fn -> :telemetry.detach(id) end)
     {machine, _} = Machine.update(Machine.new(max_depth: 1), {:start, "Complete", "legacy"})
 
@@ -432,7 +432,7 @@ defmodule JidoAI.Examples.GoTTest do
       [:jido, :ai, :got, :complete]
     ]
 
-    :ok = :telemetry.attach_many(id, names, &JidoAI.Examples.Linear.Telemetry.handle/4, self())
+    :ok = :telemetry.attach_many(id, names, &JidoAI.Examples.Telemetry.handle/4, self())
     on_exit(fn -> :telemetry.detach(id) end)
     {mock, context} = mock(GoT.script())
     server = start(jido)

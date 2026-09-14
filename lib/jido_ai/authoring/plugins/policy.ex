@@ -5,8 +5,8 @@ defmodule Jido.AI.Plugins.Policy do
   Enforce mode returns a canonical non-retryable policy error before execution.
   It retains request correlation and does not rewrite the Signal to another
   route. Monitor mode and `block_on_validation_error: false` permit input.
-  Native AI bindings and legacy AI request namespaces share this policy.
-  Model/tool results and text deltas retain the existing normalization rules.
+  Native AI bindings and declared request routes share this policy. Model/tool
+  results and text deltas retain the existing normalization rules.
   """
   use Jido.Plugin,
     agent: Jido.AI.Plugins.Policy.Agent,
@@ -29,15 +29,7 @@ defmodule Jido.AI.Plugins.Policy do
     "chat.message",
     "chat.simple",
     "chat.complete",
-    "chat.generate_object",
-    "ai.react.query",
-    "ai.cod.query",
-    "ai.aot.query",
-    "ai.cot.query",
-    "ai.tot.query",
-    "ai.got.query",
-    "ai.trm.query",
-    "ai.adaptive.query"
+    "chat.generate_object"
   ]
 
   @doc false
@@ -62,33 +54,38 @@ defmodule Jido.AI.Plugins.Policy do
   end
 
   @doc false
-  def prepare_command(command) do
-    state = command.agent.state.policy
-    signal = command.signal
+  def prepare_input(preparation) do
+    state = preparation.plugin_state
+    signal = preparation.signal
 
-    cond do
-      signal.type == "ai.llm.delta" ->
-        {:ok, %{command | signal: sanitize_llm_delta(signal, state.max_delta_chars)}}
-
-      signal.type in ["ai.llm.response", "ai.tool.result"] ->
-        {:ok, %{command | signal: normalize_result_signal(signal)}}
-
-      state.mode == :enforce and state.block_on_validation_error and
-          command_violation?(command) ->
-        {:error, policy_error(signal)}
-
-      true ->
-        {:ok, command}
-    end
+    if state.mode == :enforce and state.block_on_validation_error and violation?(signal),
+      do: {:error, policy_error(signal)},
+      else: {:ok, nil}
   end
 
-  defp command_violation?(command) do
-    signal = command.signal
+  @doc false
+  def admit_input(admission) do
+    state = admission.plugin_state
+    binding = Jido.AI.Runtime.Plugin.native_binding(admission)
 
-    case Jido.AI.Runtime.Binding.request(command.agent, signal) do
-      %{input: input} -> policy_violation?(%{signal | data: input})
-      nil -> violation?(signal)
-    end
+    signal =
+      if binding, do: %{admission.signal | data: binding.input}, else: admission.signal
+
+    if binding && state.mode == :enforce && state.block_on_validation_error &&
+         policy_violation?(signal),
+       do: {:error, policy_error(signal)},
+       else: {:ok, nil}
+  end
+
+  def prepare_dispatch(signal, state) do
+    prepared =
+      cond do
+        signal.type == "ai.llm.delta" -> sanitize_llm_delta(signal, state.max_delta_chars)
+        signal.type in ["ai.llm.response", "ai.tool.result"] -> normalize_result_signal(signal)
+        true -> signal
+      end
+
+    {:ok, prepared}
   end
 
   defp violation?(signal),
@@ -121,6 +118,7 @@ defmodule Jido.AI.Plugins.Policy do
 
   defp enforceable_request_signal?(type) when is_binary(type) do
     type in @enforceable_request_signals or
+      (String.starts_with?(type, "ai.") and String.ends_with?(type, ".query")) or
       (String.starts_with?(type, "reasoning.") and String.ends_with?(type, ".run"))
   end
 
@@ -178,6 +176,9 @@ defmodule Jido.AI.Plugins.Policy.Agent do
 
   @impl Jido.Agent.Plugin
   def state_spec(opts), do: Jido.AI.Plugins.Policy.agent_state_spec(opts)
+
+  @impl Jido.Agent.Plugin
+  def prepare(preparation, _opts), do: Jido.AI.Plugins.Policy.prepare_input(preparation)
 end
 
 defmodule Jido.AI.Plugins.Policy.AgentServer do
@@ -185,5 +186,9 @@ defmodule Jido.AI.Plugins.Policy.AgentServer do
   use Jido.AgentServer.Plugin
 
   @impl Jido.AgentServer.Plugin
-  def admit(_runtime, command, _opts), do: Jido.AI.Plugins.Policy.prepare_command(command)
+  def admit(_runtime, admission, _opts), do: Jido.AI.Plugins.Policy.admit_input(admission)
+
+  @impl Jido.AgentServer.Plugin
+  def prepare_dispatch(_runtime, signal, context, _opts),
+    do: Jido.AI.Plugins.Policy.prepare_dispatch(signal, context.plugin_state)
 end

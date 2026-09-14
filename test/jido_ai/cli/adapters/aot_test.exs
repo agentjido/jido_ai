@@ -8,7 +8,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.CLIAdapterTest do
   setup :set_mimic_from_context
 
   defmodule StubAoTAgent do
-    def explore(pid, query) do
+    def ask(pid, query) do
       send(self(), {:aot_submit_called, pid, query})
       {:ok, :submitted}
     end
@@ -31,7 +31,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.CLIAdapterTest do
   describe "create_ephemeral_agent/1" do
     test "creates ephemeral agent module with default config", %{default_module: module} do
       assert is_atom(module)
-      assert function_exported?(module, :explore, 2)
+      assert function_exported?(module, :ask, 2)
       assert function_exported?(module, :name, 0)
       assert module.name() == "cli_aot_agent"
     end
@@ -44,24 +44,22 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.CLIAdapterTest do
     end
 
     test "uses custom AoT options from config", %{custom_module: module} do
-      opts = module.strategy_opts()
-      assert opts[:model] == "openai:gpt-4.1"
-      assert opts[:profile] == :long
-      assert opts[:search_style] == :bfs
-      assert opts[:temperature] == 0.3
-      assert opts[:max_tokens] == 4096
-      assert opts[:require_explicit_answer] == false
+      agent_profile = profile(module)
+      assert agent_profile.models.answer.model == "openai:gpt-4.1"
+      assert agent_profile.reasoning.options.profile == :long
+      assert agent_profile.reasoning.options.search_style == :bfs
+      assert agent_profile.models.answer.generation[:temperature] == 0.3
+      assert agent_profile.models.answer.generation[:max_tokens] == 4096
+      assert agent_profile.reasoning.options.require_explicit_answer == false
     end
 
     test "uses expected defaults when options are omitted", %{default_module: module} do
-      opts = module.strategy_opts()
-
-      assert opts[:model] == :fast
-      assert opts[:profile] == :standard
-      assert opts[:search_style] == :dfs
-      assert opts[:temperature] == 0.0
-      assert opts[:max_tokens] == 2048
-      assert opts[:require_explicit_answer] == true
+      agent_profile = profile(module)
+      assert agent_profile.models.answer.model == :fast
+      assert agent_profile.reasoning.options.profile == :standard
+      assert agent_profile.reasoning.options.search_style == :dfs
+      assert agent_profile.models.answer.generation[:max_tokens] == 2048
+      assert agent_profile.reasoning.options.require_explicit_answer == true
     end
   end
 
@@ -77,7 +75,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.CLIAdapterTest do
   end
 
   describe "adapter wiring" do
-    test "submit delegates to configured AoT agent explore/2 function" do
+    test "submit delegates to configured Agent ask/2 function" do
       assert {:ok, :submitted} = AoTAdapter.submit(self(), "Explore this", %{agent_module: StubAoTAgent})
       assert_received {:aot_submit_called, pid, "Explore this"}
       assert pid == self()
@@ -108,12 +106,10 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.CLIAdapterTest do
       assert meta.termination == :final_answer
       assert meta.usage == %{total_tokens: 11}
     end
+  end
 
-    test "await falls back to raw state answer when snapshot result is empty" do
-      status = AdapterTestSupport.status(result: nil, raw_state: %{last_result: %{answer: "fallback answer"}})
-      expect(Jido.AI.CLI.Adapter, :status, fn _pid -> {:ok, status} end)
-
-      assert {:ok, %{answer: "fallback answer"}} = AoTAdapter.await(self(), 100, %{})
-    end
+  defp profile(module) do
+    {:ok, profile} = Jido.AI.Configuration.profile(module.definition())
+    profile
   end
 end

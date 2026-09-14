@@ -8,7 +8,7 @@ defmodule Jido.AI.Reasoning.TRM.CLIAdapterTest do
   setup :set_mimic_from_context
 
   defmodule StubTRMAgent do
-    def reason(pid, query) do
+    def ask(pid, query) do
       send(self(), {:trm_submit_called, pid, query})
       {:ok, :submitted}
     end
@@ -28,7 +28,7 @@ defmodule Jido.AI.Reasoning.TRM.CLIAdapterTest do
   describe "create_ephemeral_agent/1" do
     test "creates ephemeral agent module with default config", %{default_module: module} do
       assert is_atom(module)
-      assert function_exported?(module, :reason, 2)
+      assert function_exported?(module, :ask, 2)
       assert function_exported?(module, :name, 0)
       assert module.name() == "cli_trm_agent"
     end
@@ -42,25 +42,22 @@ defmodule Jido.AI.Reasoning.TRM.CLIAdapterTest do
     end
 
     test "uses custom model from config", %{custom_module: module} do
-      opts = module.strategy_opts()
-      assert opts[:model] == "openai:gpt-4"
+      assert profile(module).models.answer.model == "openai:gpt-4"
     end
 
     test "uses custom max_supervision_steps from config", %{custom_module: module} do
-      opts = module.strategy_opts()
-      assert opts[:max_supervision_steps] == 10
+      assert profile(module).reasoning.options.max_supervision_steps == 10
     end
 
     test "uses custom act_threshold from config", %{custom_module: module} do
-      opts = module.strategy_opts()
-      assert opts[:act_threshold] == 0.95
+      assert profile(module).reasoning.options.act_threshold == 0.95
     end
 
     test "uses default values when not specified", %{default_module: module} do
-      opts = module.strategy_opts()
-      assert opts[:model] == :fast
-      assert opts[:max_supervision_steps] == 5
-      assert opts[:act_threshold] == 0.9
+      agent_profile = profile(module)
+      assert agent_profile.models.answer.model == :fast
+      assert agent_profile.reasoning.options.max_supervision_steps == 5
+      assert agent_profile.reasoning.options.act_threshold == 0.9
     end
   end
 
@@ -76,7 +73,7 @@ defmodule Jido.AI.Reasoning.TRM.CLIAdapterTest do
   end
 
   describe "adapter wiring" do
-    test "submit delegates to configured TRM agent reason/2 function" do
+    test "submit delegates to configured Agent ask/2 function" do
       assert {:ok, :submitted} = TRMAdapter.submit(self(), "Reason recursively", %{agent_module: StubTRMAgent})
       assert_received {:trm_submit_called, pid, "Reason recursively"}
       assert pid == self()
@@ -94,9 +91,8 @@ defmodule Jido.AI.Reasoning.TRM.CLIAdapterTest do
     test "await returns completed result with TRM metadata" do
       status =
         AdapterTestSupport.status(
-          result: nil,
-          details: %{supervision_step: 3, best_score: 0.91, act_triggered: true},
-          raw_state: %{last_result: "TRM answer"}
+          result: "TRM answer",
+          details: %{supervision_step: 3, best_score: 0.91, act_triggered: true}
         )
 
       expect(Jido.AI.CLI.Adapter, :status, fn _pid -> {:ok, status} end)
@@ -107,5 +103,10 @@ defmodule Jido.AI.Reasoning.TRM.CLIAdapterTest do
       assert meta.best_score == 0.91
       assert meta.act_triggered == true
     end
+  end
+
+  defp profile(module) do
+    {:ok, profile} = Jido.AI.Configuration.profile(module.definition())
+    profile
   end
 end

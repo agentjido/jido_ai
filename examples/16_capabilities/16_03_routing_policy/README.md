@@ -25,9 +25,8 @@ plugin Jido.AI.Plugins.Policy,
 ```
 
 Both Plugins retain their module names, catalog functions, state keys and
-schema functions. Keyword configuration replaces map configuration. Core
-`state_spec/1` replaces `mount/2`; `prepare/2` replaces `handle_signal/2`.
-Core Agent declarations replace the generated v2 `plugin_spec/1` manifest.
+schema functions. Use keyword configuration. Core initializes state with
+`state_spec/1` and prepares commands with `prepare/2`.
 Both Plugins have empty Action catalogs and do not add routes.
 
 Preparation reads committed Plugin state from the core Command. Caller context
@@ -84,11 +83,11 @@ Successful two- and three-element result tuples retain their values and effects.
 Malformed envelopes use the shared error format. Complete typed image content
 parts survive delta preparation; text length limits do not truncate image data.
 
-Legacy AI request namespaces retain their prompt checks. Native AI requests
-check the query selected by the actual route, including declared input defaults
-and custom Signal names. A harmless `prompt` field cannot mask a rejected
-native `query`. Multimodal query checks read text parts and leave image parts
-intact. Ordinary domain routes keep their own input contract.
+Native AI requests check the query selected by the actual route, including
+declared input defaults and custom Signal names. A harmless `prompt` field
+cannot mask a rejected native `query`. Multimodal query checks read text parts
+and leave image parts intact. Ordinary domain routes keep their own input
+contract.
 
 ## Mock protocol and evidence limits
 
@@ -105,7 +104,5 @@ switch within one active loop, Fireworks/xAI formats, or WebSocket continuation.
 Those PR 295 requirements remain open. The typed image case proves Policy
 preparation, not the complete provider-generated image stream from PR 340.
 
-Default PluginStack insertion, Retrieval, Quota, dynamic configuration, all
-source formats, legacy state conversion, durable recovery and root package
-cutover remain required. The baseline inventory is unchanged. All 126 history
-statuses and the full migration goal remain open.
+This example does not cover dynamic configuration, durable recovery, or every
+provider transport format.

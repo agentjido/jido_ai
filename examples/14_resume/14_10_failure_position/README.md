@@ -2,8 +2,8 @@
 
 [Example](agent.ex) and
 [tests](../../../test/examples/14_resume/14_10_failure_position/14_10_failure_position_test.exs) use the real
-standalone Agent, Session, tools and shared MockLLM. The 18 example cases
-are excluded by default.
+standalone Agent, Session, tools and shared MockLLM. The example cases are
+excluded by default.
 
 ## Counter contract
 
@@ -48,29 +48,16 @@ without starting another model. Existing ReAct/CoT worker tests also send a
 wrong-run position update and prove it cannot change the current request.
 Successful repair checks that terminal metadata and State still agree.
 
-An initial fixture had a nil boolean and used the wrong cancellation and callback
-forms. These were corrected before the valid red run. All 16 valid initial
-cases then failed. After the port, 15 passed; the successful path exposed a
-missing terminal metadata field. Adding that field made 83 focused checks pass.
-Two more cases and the wrong-run check passed in the 40-check refinement set.
-The first full run passed 1,018 of 1,019 tests. The remaining case proved that
-early tool activity must keep its three-field payload. Position metadata was
-limited to boundary events; that existing test remains unchanged.
-Full validation is in [implementation](../../../docs/v3-spike/implementation.md).
+Position metadata is limited to boundary events. Early tool activity keeps its
+three-field payload.
 
 ## Scope and next work
 
 This is a counter correction. It does not turn an interrupted tool into safe
-retry work or restore a lost Session owner. Failed standalone tokens still need
-[explicit State conversion](../14_09_state_migration/README.md) and external evidence for
-missing counters/domain data. Old active Agent state, sink fields and custom
-persistence still need their migration paths. Complete owner-loss and durable
-recovery gates remain open.
+retry work or restore a lost Session owner. V3 checkpoint data must contain the
+required counters and domain data. Complete owner-loss and durable recovery
+remain separate concerns.
 
-The next parent port must cover the old inspection data, bounded per-request
-traces, context replacement/switching, operation deduplication, compaction and
-skill/resource entries. Core `AgentServer.snapshot/2` returns the committed
-Agent and revision; it is not the old Strategy Snapshot. Add AI inspection
-through the common Session/record model and keep live process references out
-of stored state. Root package, consumer, minimum-runtime and rollback checks
-remain required.
+Bounded per-request traces, context replacement, operation deduplication,
+compaction, and skill/resource entries use the common Session record model.
+Live process references must stay out of stored state.

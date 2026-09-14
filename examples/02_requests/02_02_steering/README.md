@@ -12,7 +12,6 @@ add visible user text to the existing `PendingInputServer` queue. A Handle
 supplies an expected request ID. Each result contains a control ID, input ID,
 request ID, kind, status and time. Rejections also contain a reason. A queued
 result means acceptance by the queue, not model consumption or durable delivery.
-The legacy Agent/ReAct wrappers still need to call this common implementation.
 
 The queue keeps its 64-item default, FIFO order, text trimming and atomic
 `seal_if_empty` operation. Its process monitors the session owner. Completion,
@@ -30,18 +29,15 @@ its final candidate and leaves it unchanged on rejection.
 
 History uses the existing `Jido.AI.Context` projection, followed by ReqLLM
 normalization. This preserves real tool-call/result pairs when another request
-uses that history. Caller message refs retain their compatibility precedence;
-event request/run IDs keep their actual runtime identity. Both steering kinds
-have user role. Source markers do not grant a system role.
+uses that history. Event request/run IDs keep their actual runtime identity.
+Both steering kinds have user role. Source markers do not grant a system role.
 
 The 13 tests prove held model and tool cases, consumed versus queued history,
 both close orders, repair closure, guards, the 64-item bound, queue loss,
 cancellation, hard limits, timeout uncertainty, history reuse, one-Turn state
 preservation and authoring errors. The default test command excludes them.
 
-Still open: legacy wrapper and generated-helper parity; source JSON execution
-with an enabled history policy; interruption in every history/tool state;
-compaction and context edits; queue loss at every boundary; durable conversion;
-and full observation/event compatibility. A control timeout can leave input in
-the queue. There is no automatic retry or durable input receipt. A process crash
-can lose queued input or a staged history batch before its commit.
+A control timeout can leave input in the queue. There is no automatic retry or
+durable input receipt. A process crash can lose queued input or a staged history
+batch before its commit. This example does not cover every interruption point,
+compaction, or cross-runtime recovery.

@@ -28,9 +28,9 @@ It preserves unrelated fields. Provider failure preserves committed state.
 The shared capability helper uses the prepared Plugin binding; caller payloads
 cannot select another Action or result field.
 
-`Jido.AI.Plugins.Chat` retains its name, description, category, tags, version,
-state key, action list, schema and signal-pattern helpers. Replace v2 map config
-and `mount/2` with keyword config and core `state_spec/1`. Declare the routes
+`Jido.AI.Plugins.Chat` provides its name, description, category, tags, version,
+state key, action list, schema and Signal-pattern helpers. Use keyword config
+and core `state_spec/1`. Declare the routes
 returned by `signal_routes/1`, which now target `Actions.Chat.RunCapability`.
 The old pass-through `handle_signal/2`, `transform_result/3` and `plugin_spec/1`
 are replaced by the core Plugin lifecycle and Agent definition.
@@ -45,8 +45,8 @@ filter is also not an execution policy.
 
 Explicit Action parameters win, including values equal to schema defaults and
 `auto_execute: false`. Caller defaults precede Plugin defaults. Known string
-parameter keys are converted before core validation. Current Agent structs work
-as legacy default sources. Planning now shares this input/default helper.
+parameter keys are converted before core validation. Current Agent structs can
+supply defaults. Planning shares this input/default helper.
 Generation parameters override top-level provider options. ReqLLM retains its
 own precedence for nested transport options. Caller `model_options` must be a
 keyword list. Completion discards system prompt input and defaults.
@@ -85,7 +85,7 @@ callable Action's distinct contract:
   an error-shaped value as a successful Agent result.
 - Names used for advertisement, filtering and lookup agree, including aliases.
   A registered core Flow can be a tool. Returned tool effects are not applied
-  to the host by these legacy callable Actions.
+  to the host by these standalone callable Actions.
 
 Actual next-request checks prove OpenAI Responses continuation IDs and decoded
 reasoning details. Two tool rounds prove message order, options, call IDs and
@@ -102,22 +102,20 @@ embedding tokens, rather than a fabricated zero. Empty embedding results and
 invalid inputs no longer crash telemetry calculation.
 
 `Jido.AI.Actions.Helpers` and `Jido.AI.Validation` retain their public functions.
-Default callback execution now uses core Exec without `Jido.TaskSupervisor`.
+Default callback execution uses core Exec without a separate task supervisor.
 Explicit caller Task supervisors remain supported. Tests prove arbitrary return
 values, bounded execution, failure and worker cleanup. Existing multiline
 validation cases from PR 290 remain, with an HTTP example for accepted input.
 
 ## Remaining limits
 
-This slice does not complete the root dependency cutover, CLI, legacy test
-transfer, all provider formats, runtime tool catalog mutation or durable
-recovery. The root package still selects v2 dependencies. Direct callable
+This example does not cover all provider formats, runtime tool catalog mutation,
+or durable recovery. Direct callable
 Actions do not add native session history, approval controls or tool lifecycle
 Signals. Callable error metadata and descriptive `tool_policy` need explicit
 consumer guidance at cutover. Invalid structured output retains completed provider usage in Action error
 telemetry and leaves the Agent result unchanged. Other failed-request, quota
 and recovery accounting cases remain required.
 
-The full migration goal and all 126 history statuses remain open. Four native
-Chat contract tests and the 50 retained Helper/Validation tests supplement the
-integration examples; default exclusion is not a passing integration run.
+Four native Chat contract tests and the Helper and Validation tests supplement
+the example suite.

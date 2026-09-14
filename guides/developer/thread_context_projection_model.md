@@ -96,12 +96,10 @@ Compaction is represented as a normal context operation:
 
 The session thread remains append-only.
 
-## Compatibility Break
+## Checkpoint boundary
 
-Old ReAct runtime/checkpoint payloads remain context-only:
-- the old private runtime `thread` key is not restored
-- token payload version bumped (`v2`, `rt2.` prefix)
-- legacy private runtime payloads with `thread` are rejected
+ReAct runtime and checkpoint data uses the current V3 context format and the
+`rt2.` token envelope. Other formats are not accepted.
 
 This rule does not reject the new portable `Jido.Thread` value in declared
 Agent state. Native Agent checkpoints can retain `Jido.Session` and its thread.

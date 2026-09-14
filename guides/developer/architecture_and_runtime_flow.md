@@ -1,31 +1,29 @@
 # Architecture And Runtime Flow
 
-You need a mental model of how a query moves through strategy, directives, signals, and runtime execution.
-
-After this guide, you can trace one request end-to-end and debug failures at the correct layer.
+This guide shows how one AI request moves through Jido AI V3.
 
 ## Runtime Flow
 
-1. Agent receives query signal (for example `ai.react.query`).
-2. Strategy (`Jido.AI.Reasoning.*.Strategy`) translates instruction into machine message.
-3. Machine emits directives (`Jido.AI.Directive.*`).
-4. Runtime executes directives (LLM, tools, embedding, emits lifecycle signals).
-5. Signals (`Jido.AI.Signal.*`) route back into strategy commands.
-6. Strategy updates state and eventually completes request.
+1. An Agent receives a routed query signal.
+2. The AI route selects one validated `Jido.AI.Profile`.
+3. `Jido.AI.Session` admits the request and stores its request record.
+4. The common reasoning Flow runs the selected method.
+5. AI Actions call ReqLLM and execute declared tools through `Jido.Exec`.
+6. The Session records model, tool, usage, and terminal events.
+7. The final candidate Agent state passes core validation and commits once.
 
-## Key Boundaries
+There is no private Jido AI Directive executor in V3. Core Jido Directives are
+still valid for post-commit effects. Model and tool work that must finish before
+the Agent commit runs through Actions and Flows.
 
-- Strategy: pure state transitions and orchestration policy
-- Tool action: reusable execution unit that may be pure or effectful when the current reasoning loop needs its result
-- Directive: runtime-owned side-effect intent only
-- Runtime: directive execution, tool execution, retries, timeouts, and signal emission
-- Signal: typed contract between runtime and strategy
+## Main Boundaries
 
-The practical rule is: use an effectful tool action when the model or workflow
-needs the result now to continue a ReAct/tool-calling loop. Use a directive,
-signal, or runtime integration when the workflow has already decided on an
-outbound effect and wants runtime policy to own delivery, retry, and
-observability.
+- `Jido.AI.Models` resolves optional application model aliases.
+- `Jido.AI.Profile`, `Jido.AI.DSL`, and `Jido.AI.Authoring` define inert AI configuration.
+- `Jido.AI.Session` owns live request admission, work, events, and completion.
+- `Jido.AI.Reasoning` selects and runs one reasoning method.
+- `Jido.AI.Actions.*` owns model, tool, planning, retrieval, and quota operations.
+- `Jido.AI.Signal.*` owns typed public event data.
 
 ## Minimal Trace Setup
 
@@ -45,65 +43,30 @@ observability.
 )
 ```
 
-## Failure Mode: Fixing Bugs In The Wrong Layer
+## Failure Triage
 
-Symptom:
-- strategy logic changed to fix provider/network behavior
+- Fix model selection and provider options at the ReqLLM request boundary.
+- Fix tool input and output behavior in the Action or `Jido.Exec` call path.
+- Fix request ownership, cancellation, and completion in `Jido.AI.Session`.
+- Fix domain state validation and commit behavior in the Agent boundary.
+- Fix reasoning policy in the selected method implementation.
 
-Fix:
-- keep strategy pure and orchestration-focused
-- fix provider behavior at the direct `ReqLLM` call-site
-- fix execution semantics in directive runtime path
+## Compile-Cycle Triage
 
-## Defaults You Should Know
-
-- strategies store internal data in `agent.state.__strategy__`
-- request lifecycle signals are standardized under `ai.request.*`
-- canonical signal contracts are defined by `Jido.AI.Signal` and strategy routes
-
-## Compile-Cycle Triage With `mix xref`
-
-Use `mix xref` whenever recompilation feels wider than expected:
+Use `mix xref` when one change recompiles more code than expected:
 
 ```bash
-# Show compile-connected strongly connected components (SCCs)
 mix xref graph --format cycles --label compile-connected
-
-# Show cycle counts and graph stats
 mix xref graph --format stats --label compile-connected
-
-# Trace a dependency path between files
 mix xref graph --source lib/path_a.ex --sink lib/path_b.ex
-
-# Show direct compile edges from one file
 mix xref graph --label compile --source lib/path_a.ex
 ```
 
-Interpretation:
-
-- `compile` edges have the highest recompilation impact.
-- `export` edges recompile dependents when a module public API changes.
-- `runtime` edges have the lowest compile-time impact.
-- Prioritize removing SCCs that include at least one `compile` edge.
-
-## Registry Lifecycle Guarantees
-
-`Jido.AI.Skill.Registry` supports:
-
-- explicit supervised startup via `start_link/1`
-- lazy startup via `ensure_started/0` for call-site safety
-- startup-order independence for library consumers
-
-## When To Use / Not Use
-
-Use this guide when:
-- you are debugging execution flow or extending runtime behavior
-
-Do not use this guide when:
-- you only need to build and run an agent quickly
+Compile edges have the highest rebuild cost. Runtime edges have the lowest
+compile-time cost.
 
 ## Next
 
 - [Strategy Internals](strategy_internals.md)
-- [Directives Runtime Contract](directives_runtime_contract.md)
 - [Signals, Namespaces, Contracts](signals_namespaces_contracts.md)
+- [Plugins And Actions Composition](plugins_and_actions_composition.md)

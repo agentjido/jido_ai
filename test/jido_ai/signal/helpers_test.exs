@@ -1,7 +1,6 @@
 defmodule Jido.AI.Signal.HelpersTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Error
   alias Jido.AI.Signal.Helpers
 
   describe "correlation_id/1" do
@@ -37,40 +36,6 @@ defmodule Jido.AI.Signal.HelpersTest do
     test "uses the default bound and passes through non-text deltas" do
       assert byte_size(Helpers.sanitize_delta(String.duplicate("x", 5_000))) == 4_000
       assert Helpers.sanitize_delta(%{type: :image}, 10) == %{type: :image}
-    end
-  end
-
-  describe "error compatibility delegates" do
-    test "forward to Jido.AI.Error" do
-      assert apply(Helpers, :error_envelope, [:execution_error, "boom", %{}, false]) ==
-               Error.error_envelope(:execution_error, "boom")
-
-      assert apply(Helpers, :normalize_error, [:timeout, :execution_error, "failed", %{}]) ==
-               Error.normalize(:timeout, :execution_error, "failed")
-
-      assert apply(Helpers, :normalize_result, [{:error, :timeout}, :tool_error, "failed"]) ==
-               Error.normalize_result({:error, :timeout}, :tool_error, "failed")
-
-      assert apply(Helpers, :retryable?, [:timeout])
-    end
-
-    test "default delegate arguments preserve the canonical behavior" do
-      assert apply(Helpers, :error_envelope, [:execution_error, "boom"]) ==
-               Error.error_envelope(:execution_error, "boom")
-
-      assert apply(Helpers, :normalize_error, [:timeout]) == Error.normalize(:timeout)
-
-      assert apply(Helpers, :normalize_error, [:timeout, :tool_error]) ==
-               Error.normalize(:timeout, :tool_error)
-
-      assert apply(Helpers, :normalize_error, [:timeout, :tool_error, "tool failed"]) ==
-               Error.normalize(:timeout, :tool_error, "tool failed")
-
-      assert apply(Helpers, :normalize_result, [{:ok, :done}]) ==
-               Error.normalize_result({:ok, :done})
-
-      assert apply(Helpers, :normalize_result, [{:ok, :done}, :tool_error]) ==
-               Error.normalize_result({:ok, :done}, :tool_error)
     end
   end
 end

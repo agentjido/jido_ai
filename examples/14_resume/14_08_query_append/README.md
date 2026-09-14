@@ -3,7 +3,7 @@
 [Example](agent.ex) and
 [tests](../../../test/examples/14_resume/14_08_query_append/14_08_query_append_test.exs) use the public
 standalone API, its native Agent and Session, real tools and the shared MockLLM.
-The 15 cases are example tests excluded by default.
+These example tests are excluded by default.
 
 ## Continue a conversation
 
@@ -45,10 +45,8 @@ Appending input therefore retains domain changes without applying old effects
 again. The internal transfer field is removed from public stream event data;
 the signed checkpoint token is the public continuation value.
 
-Existing native checkpoint data version 1 still resumes. New writes use
-version 2. Unsupported versions, inconsistent outer/native counters and
-non-user pending queries are rejected. This is compatibility with earlier
-native spike tokens, not general conversion of released v2 Agent State.
+Native checkpoint data uses version 2. Unsupported versions, inconsistent
+outer/native counters, and non-user pending queries are rejected.
 
 | Saved position | State iteration |
 | --- | --- |
@@ -71,17 +69,14 @@ The initial fixture used buffered Chat Completions, which ReqLLM rejects for
 PDF attachments; it was corrected to the supported wire format. No live model
 service is used.
 
-The focused set passes 58 checks. Run from the repository root:
+Run from the repository root:
 
 ```sh
 mix test --include example --seed 0 test/examples/14_resume/14_08_query_append/14_08_query_append_test.exs test/examples/14_resume/14_03_checkpoint_resume/14_03_checkpoint_resume_test.exs test/examples/14_resume/14_06_trace_and_cycles/14_06_trace_and_cycles_test.exs test/examples/14_resume/14_07_standalone_input/14_07_standalone_input_test.exs
 ```
 
 See the [implementation record](../../../docs/v3-spike/implementation.md) for
-full checks. Released v2 progressed State, old terminal tokens without native
-continuation data, and restart after failure/cancellation still need conversion.
-Failure-phase counter projection also needs its full matrix. Tokens remain
-caller-owned and replayable; this does not prove durable exactly-once work.
-Parent inspection, context lanes/compaction, skills/resources, provider and
-recovery variants, root package, consumer, minimum-runtime, migration and
-rollback gates remain open.
+design history. Restart after failure or cancellation is not supported. Tokens
+remain caller-owned and replayable; this does not prove durable exactly-once
+work. Parent inspection, context lanes and compaction, provider variants, and
+durable recovery are outside this example.

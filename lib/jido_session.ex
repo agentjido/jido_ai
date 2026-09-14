@@ -193,7 +193,6 @@ defmodule Jido.Session do
   defp document_version(map) do
     case {field(map, :type), field(map, :version)} do
       {"jido.session", @version} -> :ok
-      {nil, @version} -> :ok
       _ -> {:error, :unsupported_version}
     end
   end

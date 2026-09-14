@@ -303,7 +303,12 @@ defmodule Jido.AI.Session.HistoryAction do
 
   alias Jido.AI.Session.Change
 
-  def run(%{request_id: id, batch_id: batch_id}, context) do
+  def run(params, context) do
+    with {:ok, context} <- Jido.AI.Session.Plugin.context(context),
+         do: execute(params, context)
+  end
+
+  defp execute(%{request_id: id, batch_id: batch_id}, context) do
     with %{status: :pending, run_id: run_id} = record <- context.agent_state.requests[id],
          %{run_id: ^run_id, entries: entries} = batch <- context[:jido_ai_history_batch] do
       profile = context.jido_ai_profiles[record.profile_id]
@@ -342,7 +347,8 @@ defmodule Jido.AI.Session.ControlAction do
       })
 
   def run(input, context) do
-    with :ok <- Jido.Action.validate_static_data(input),
+    with {:ok, context} <- Jido.AI.Session.Plugin.context(context),
+         :ok <- Jido.Action.validate_static_data(input),
          %{status: :queued, request_id: id} = result <-
            GenServer.call(context.jido_ai_session_runtime, {:control, input}) do
       record = Map.put(context.agent_state.requests[id], :last_control, result)

@@ -1,6 +1,18 @@
 defmodule Jido.AI.Context.Operations.Change do
   @moduledoc false
+  use Jido.Agent.Directive
   defstruct [:profile_id, :value]
+
+  @impl Jido.Agent.Directive
+  def validate(%__MODULE__{profile_id: id, value: value} = change)
+      when is_atom(id) and not is_nil(id) and is_map(value) do
+    case Jido.Action.validate_static_data(value) do
+      :ok -> {:ok, change}
+      error -> error
+    end
+  end
+
+  def validate(_), do: {:error, :invalid_context_change}
 end
 
 defmodule Jido.AI.Context.Operations do
@@ -15,34 +27,13 @@ defmodule Jido.AI.Context.Operations do
   def type, do: @signal_type
 
   def routes do
-    [
-      {@signal_type, __MODULE__.Apply},
-      {"ai.react.context.modify", {__MODULE__.Apply, %{legacy?: true}}}
-    ]
+    [{@signal_type, __MODULE__.Apply}]
   end
 
   def active_ref(state, id), do: get_in(state, [@key, id, :active_context_ref]) || "default"
 
   @doc false
   def session_id(state, profile, agent_id), do: value(state, profile, agent_id).session.id
-
-  @doc false
-  def migrate_state(state, agent_id) when is_map(state) do
-    case Map.get(state, @key) do
-      values when is_map(values) ->
-        migrated =
-          Map.new(values, fn {profile_id, lane} ->
-            {profile_id, migrate_value(lane, agent_id, profile_id)}
-          end)
-
-        Map.put(state, @key, migrated)
-
-      _ ->
-        state
-    end
-  end
-
-  def migrate_state(state, _agent_id), do: state
 
   def live(server, operation, opts \\ []) do
     signal =
@@ -119,7 +110,7 @@ defmodule Jido.AI.Context.Operations do
   defp value(state, profile, agent_id) do
     case get_in(state, [@key, profile.id]) do
       nil -> new_value(agent_id, profile.id)
-      value -> migrate_value(value, agent_id, profile.id)
+      value -> value
     end
   end
 
@@ -133,58 +124,6 @@ defmodule Jido.AI.Context.Operations do
       session: Session.new(id: id, thread: Thread.new(id: "#{id}:thread"))
     }
   end
-
-  defp migrate_value(%{session: %Session{}} = value, _agent_id, _profile_id), do: value
-
-  defp migrate_value(value, agent_id, profile_id) when is_map(value) do
-    cond do
-      lane_shape?(value, :session) ->
-        case Session.decode(field(value, :session)) do
-          {:ok, session} -> canonical_lane(value, session)
-          {:error, _} -> value
-        end
-
-      lane_shape?(value, :thread) ->
-        migrate_thread(value, field(value, :thread), agent_id, profile_id)
-
-      lane_shape?(value, :log) ->
-        migrate_thread(value, field(value, :log), agent_id, profile_id)
-
-      true ->
-        value
-    end
-  end
-
-  defp migrate_value(value, _agent_id, _profile_id), do: value
-
-  defp migrate_thread(value, source, agent_id, profile_id) do
-    case Thread.decode(source) do
-      {:ok, thread} ->
-        canonical_lane(value, Session.from_thread(thread, id: session_id(agent_id, profile_id)))
-
-      {:error, _} ->
-        value
-    end
-  end
-
-  defp canonical_lane(value, session) do
-    %{
-      active_context_ref: field(value, :active_context_ref),
-      pending_context_op: field(value, :pending_context_op),
-      applied_context_ops: field(value, :applied_context_ops),
-      session: session
-    }
-  end
-
-  defp lane_shape?(value, owner) do
-    fields = [:active_context_ref, :pending_context_op, :applied_context_ops, owner]
-    allowed = fields ++ Enum.map(fields, &Atom.to_string/1)
-
-    map_size(value) == 4 and Map.keys(value) -- allowed == [] and
-      Enum.all?(fields, &has_field?(value, &1))
-  end
-
-  defp has_field?(map, key), do: Map.has_key?(map, key) or Map.has_key?(map, Atom.to_string(key))
 
   defp session_id(agent_id, profile_id), do: "ai:#{agent_id}:#{profile_id}"
 
@@ -467,7 +406,7 @@ defmodule Jido.AI.Context.Operations do
   def validate_state(values, profiles, _) when is_map(values) do
     valid =
       Enum.all?(values, fn {id, value} ->
-        Map.has_key?(profiles, id) and valid_value?(migrate_value(value, "restored", id))
+        Map.has_key?(profiles, id) and valid_value?(value)
       end)
 
     if valid and Jido.Action.validate_static_data(values) == :ok,

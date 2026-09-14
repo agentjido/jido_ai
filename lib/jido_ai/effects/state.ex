@@ -40,7 +40,11 @@ defmodule Jido.AI.Effects.Candidate do
           Jido.Agent.Directive.validate(directive)
 
         owner = Jido.Plugin.directive_owner(specs, directive) ->
-          Jido.Plugin.validate_directive(owner, directive)
+          if owner.agent.legacy? do
+            Jido.Plugin.validate_directive(owner, directive)
+          else
+            Jido.Agent.Directive.validate(directive)
+          end
 
         true ->
           {:error, {:unowned_tool_directive, directive}}
@@ -52,8 +56,7 @@ defmodule Jido.AI.Effects.Candidate do
     with :ok <- Jido.Action.validate_static_data(proposed),
          {:ok, specs} <- Jido.Plugin.normalize_all(agent.plugins),
          agent_specs = Jido.Agent.Plugin.specs(specs),
-         {:ok, _, []} <-
-           Jido.Agent.Plugin.Pipeline.run({:ok, proposed, []}, base, agent_specs) do
+         :ok <- protect_plugin_state(base, proposed, agent_specs) do
       changed =
         Enum.filter(
           Enum.uniq(Map.keys(base) ++ Map.keys(proposed)),
@@ -80,4 +83,24 @@ defmodule Jido.AI.Effects.Candidate do
   end
 
   defp merge(_base, _current, _proposed, _agent), do: {:error, :invalid_tool_state}
+
+  defp protect_plugin_state(base, proposed, specs) do
+    changed =
+      for %{state_key: key} <- specs,
+          not is_nil(key),
+          Map.fetch(base, key) != Map.fetch(proposed, key),
+          do: key
+
+    if changed == [] do
+      :ok
+    else
+      {:error,
+       Jido.Plugin.Error.execution(
+         "Agent executable changed Plugin-owned state",
+         :core,
+         Jido.Agent.Plugin.Pipeline,
+         %{keys: changed, code: :plugin_state_owner_violation}
+       )}
+    end
+  end
 end

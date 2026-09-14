@@ -4,7 +4,7 @@ defmodule JidoAI.Examples.SkillRuntimeTest do
   alias Jido.AI.Actions.Skill.{LoadSkill, RuntimeContext}
   alias Jido.Thread
   alias Jido.AI.Skill.{Activation, AgentIntegration, Registry, Spec}
-  alias JidoAI.Examples.SkillRuntime.{Agent, Imposter, Native, Provider}
+  alias JidoAI.Examples.SkillRuntime.{Agent, Imposter, Interceptor, Provider}
 
   setup do
     start_supervised!(Registry)
@@ -61,7 +61,7 @@ defmodule JidoAI.Examples.SkillRuntimeTest do
     assert entry.refs.kind == :skill_activation
     assert entry.refs.skill_name == "review"
     assert payload(entry)["result"]["instructions"] == "Original instructions"
-    request = Server.agent(server).state.last_request_id
+    assert {:ok, %{request: %{id: request}}} = Session.snapshot(server)
     assert entry.refs.request_id == request
     assert {:ok, _} = compact(server)
     assert [^entry] = tool_entries(server)
@@ -289,7 +289,7 @@ defmodule JidoAI.Examples.SkillRuntimeTest do
         script([
           skill(),
           resource("file", %{relative_path: "references/guide.txt"}),
-          resource("escape", %{path: "../outside"})
+          resource("escape", %{relative_path: "../outside"})
         ])
       )
 
@@ -353,7 +353,7 @@ defmodule JidoAI.Examples.SkillRuntimeTest do
 
   test "the native Agent DSL runs the same real activation and resource flow", %{jido: jido} do
     {mock, context} = mock(script([skill(), resource()]))
-    server = start_agent(jido, Native.new!())
+    server = start_agent(jido, Agent.new!())
 
     assert {:ok, request} =
              Request.create_and_send(server, "Load",
@@ -374,7 +374,7 @@ defmodule JidoAI.Examples.SkillRuntimeTest do
     server = start_agent(jido, Agent.new!())
     context = bind_catalog(context) |> Map.put(:approval, :halt)
 
-    assert {:error, {:tool_interceptor, :after_tool_call, Agent, :callback_failed}} =
+    assert {:error, {:tool_interceptor, :after_tool_call, Interceptor, :callback_failed}} =
              Agent.ask_sync(server, "Load", context: context)
 
     assert tool_entries(server) == []

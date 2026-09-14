@@ -43,7 +43,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.HelpersTest do
       context = %{model: :fast, tools: [ToolB], react_token_secret: "context-secret"}
       config = Helpers.build_config(params, context)
 
-      assert config.model == Jido.AI.resolve_model(:capable)
+      assert config.model == Jido.AI.Models.resolve(:capable)
       assert config.max_iterations == 4
       assert config.llm.timeout_ms == 1_234
       assert config.llm.llm_opts == [thinking: %{type: :enabled, budget_tokens: 512}]
@@ -66,7 +66,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.HelpersTest do
 
       config = Helpers.build_config(params, context)
 
-      assert config.model == Jido.AI.resolve_model(:fast)
+      assert config.model == Jido.AI.Models.resolve(:fast)
       assert config.tools == %{ToolB.name() => ToolB}
       assert config.max_iterations == 10
       assert config.llm.max_tokens == 4_096
@@ -94,16 +94,6 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.HelpersTest do
       assert_raise ArgumentError, ~r/unknown ReAct allowed_tools: missing_tool/, fn ->
         Helpers.build_config(%{allowed_tools: ["missing_tool"]}, %{tools: [ToolA]})
       end
-    end
-
-    test "respects legacy timeout_ms fallback into llm timeout" do
-      config = Helpers.build_config(%{timeout_ms: 999}, %{})
-      assert config.llm.timeout_ms == 999
-    end
-
-    test "accepts stream_receive_timeout_ms alias into runtime config" do
-      config = Helpers.build_config(%{stream_receive_timeout_ms: 1_234}, %{})
-      assert config.stream_timeout_ms == 1_234
     end
 
     test "forwards stream_timeout_ms into runtime config" do

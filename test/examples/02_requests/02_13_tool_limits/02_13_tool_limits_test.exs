@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.ToolLimitsTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Authoring, Request, Session}
+  alias Jido.AI.{Authoring, Request}
   alias JidoAI.Examples.ToolLimits.{Agent, Probe}
 
   defp call(id, n, name \\ "timed_probe"), do: %{id: id, name: name, arguments: %{n: n}}
@@ -13,9 +13,6 @@ defmodule JidoAI.Examples.ToolLimitsTest do
         context: context,
         stream_to: self()
       )
-
-  defp events(request),
-    do: request |> Request.Stream.events(stream_event_timeout_ms: 2_000) |> Enum.to_list()
 
   defp context(context),
     do: Map.put(context, :counter, start_supervised!({Elixir.Agent, fn -> %{} end}))
@@ -42,75 +39,16 @@ defmodule JidoAI.Examples.ToolLimitsTest do
   end
 
   for mode <- [:error, :interrupt] do
-    @tag history_case: "HIST-08/preflight-batch"
-    test "legacy #{mode} on the second prepared call stops the complete batch", %{jido: jido} do
-      {mock, ctx} = mock([%{reply: {:tools, [call("one", 1), call("two", 2)]}}])
-      observer = self()
-
-      callback = fn input ->
-        send(observer, {:legacy_preflight, input})
-        if input.tool_call_id == "two", do: {unquote(mode), :approval_required}, else: :ok
-      end
-
-      ctx = context(ctx) |> Map.merge(%{rewrite: true, __tool_guardrail_callback__: callback})
-      server = start(jido)
-      assert {:ok, request} = request(server, ctx)
-
-      expected =
-        if unquote(mode) == :interrupt,
-          do: {:interrupt, :approval_required},
-          else: :approval_required
-
-      assert {:error, ^expected} = Request.await(request)
-
-      assert_receive {:legacy_preflight,
-                      %{
-                        tool_call_id: "one",
-                        tool_name: "timed_probe",
-                        arguments: %{"n" => 2},
-                        validated_arguments: %{n: 2}
-                      }}
-
-      assert_receive {:legacy_preflight,
-                      %{
-                        tool_call_id: "two",
-                        arguments: %{"n" => 3},
-                        validated_arguments: %{n: 3},
-                        context: %{request_id: id}
-                      }}
-
-      assert id == request.id
-      refute_receive {:probe_started, _, _, _, _}, 20
-      received = events(request)
-
-      refute Enum.any?(
-               received,
-               &(&1.kind in [:tool_started, :tool_completed, :request_completed])
-             )
-
-      assert List.last(received).data.error_type == :tool_guardrail
-      assert Server.agent(server).state.reply == ""
-      assert :ok = Jido.Action.validate_static_data(Server.agent(server).state)
-      assert_script_done(mock)
-    end
-  end
-
-  for mode <- [:error, :interrupt] do
-    test "native operation #{mode} stops the batch before legacy callbacks or tools", %{
+    test "native operation #{mode} stops the batch before tools", %{
       jido: jido
     } do
       {mock, ctx} = mock([%{reply: {:tools, [call("one", 1), call("two", 2)]}}])
-      observer = self()
 
       ctx =
         context(ctx)
         |> Map.merge(%{
           native_block: "two",
-          native_result: unquote(mode),
-          __tool_guardrail_callback__: fn _ ->
-            send(observer, :unexpected_legacy)
-            :ok
-          end
+          native_result: unquote(mode)
         })
 
       server = start(jido)
@@ -121,100 +59,10 @@ defmodule JidoAI.Examples.ToolLimitsTest do
         do: assert(match?({:interrupt, %{kind: :approval}}, reason)),
         else: assert(reason == :native_blocked)
 
-      refute_receive :unexpected_legacy, 20
       refute_receive {:probe_started, _, _, _, _}, 20
       assert record(server, request).status == :failed
       assert_script_done(mock)
     end
-  end
-
-  test "an allowed preflight batch executes once and the callback is request scoped", %{
-    jido: jido
-  } do
-    {mock, ctx} =
-      mock([
-        %{reply: {:tools, [call("one", 1), call("two", 2)]}},
-        %{reply: {:text, "Done"}},
-        %{reply: {:tools, [call("next", 3)]}},
-        %{reply: {:text, "Next"}}
-      ])
-
-    observer = self()
-    ctx = context(ctx)
-    server = start(jido)
-
-    assert {:ok, first} =
-             request(
-               server,
-               Map.put(ctx, :__tool_guardrail_callback__, fn input ->
-                 send(observer, {:checked, input.tool_call_id})
-                 :ok
-               end)
-             )
-
-    assert {:ok, "Done"} = Request.await(first)
-    assert_receive {:checked, "one"}
-    assert_receive {:checked, "two"}
-    assert_receive {:probe_started, 1, 1, _, _}
-    assert_receive {:probe_started, 2, 1, _, _}
-    assert {:ok, next} = request(server, ctx)
-    assert {:ok, "Next"} = Request.await(next)
-    refute_receive {:checked, _}, 20
-    assert_script_done(mock)
-  end
-
-  for mode <- [:invalid, :raise, :throw, :exit] do
-    test "legacy preflight #{mode} produces a controlled failure without tool execution", %{
-      jido: jido
-    } do
-      {mock, ctx} = mock([%{reply: {:tools, [call("bad", 1)]}}])
-
-      callback =
-        case unquote(mode) do
-          :invalid -> fn _ -> :invalid end
-          :raise -> fn _ -> raise "Guardrail failed" end
-          :throw -> fn _ -> throw(:guardrail_failed) end
-          :exit -> fn _ -> exit(:guardrail_failed) end
-        end
-
-      server = start(jido)
-
-      assert {:ok, request} =
-               request(server, Map.put(context(ctx), :__tool_guardrail_callback__, callback))
-
-      assert {:error, reason} = Request.await(request)
-      refute reason in [nil, :timeout]
-      assert inspect(reason) =~ "tool_guardrail"
-      assert List.last(events(request)).data.error_type == :tool_guardrail
-      refute_receive {:probe_started, _, _, _, _}, 20
-      assert_script_done(mock)
-    end
-  end
-
-  test "cancellation stops a held preflight callback before any tool starts", %{jido: jido} do
-    {mock, ctx} = mock([%{reply: {:tools, [call("held", 1)]}}])
-    observer = self()
-
-    callback = fn _ ->
-      send(observer, {:preflight_waiting, self()})
-
-      receive do
-        :release -> :ok
-      end
-    end
-
-    server = start(jido)
-
-    assert {:ok, request} =
-             request(server, Map.put(context(ctx), :__tool_guardrail_callback__, callback))
-
-    assert_receive {:preflight_waiting, worker}, 2_000
-    monitor = Process.monitor(worker)
-    assert :ok = Session.cancel(request)
-    assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 2_000
-    assert {:error, :cancelled} = Request.await(request)
-    refute_receive {:probe_started, _, _, _, _}, 20
-    assert_script_done(mock)
   end
 
   for name <- ["timed_probe", "timed_flow"] do
@@ -292,55 +140,6 @@ defmodule JidoAI.Examples.ToolLimitsTest do
     assert record(server, request).status == :failed
     assert Server.agent(server).state.reply == ""
     refute_receive {:probe_started, 1, 2, _, _}, 20
-    assert_script_done(mock)
-  end
-
-  test "the request deadline stops a held legacy preflight callback", %{jido: jido} do
-    {mock, ctx} = mock([%{reply: {:tools, [call("deadline", 1)]}}])
-    observer = self()
-
-    callback = fn _ ->
-      send(observer, {:preflight_waiting, self()})
-
-      receive do
-        :release -> :ok
-      end
-    end
-
-    server = start(jido, %{controls: Map.put(source().controls, :timeout, 500)})
-
-    assert {:ok, request} =
-             request(server, Map.put(context(ctx), :__tool_guardrail_callback__, callback))
-
-    assert_receive {:preflight_waiting, worker}, 2_000
-    monitor = Process.monitor(worker)
-    assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 2_000
-    assert {:error, _} = Request.await(request)
-    refute_receive {:probe_started, _, _, _, _}, 20
-    assert_script_done(mock)
-  end
-
-  test "invalid or wrong-arity legacy callback values retain the old no-op contract", %{
-    jido: jido
-  } do
-    {mock, ctx} =
-      mock(
-        Enum.flat_map(1..2, fn n ->
-          [%{reply: {:tools, [call("noop-#{n}", n)]}}, %{reply: {:text, "Done"}}]
-        end)
-      )
-
-    ctx = context(ctx)
-    server = start(jido)
-
-    for callback <- [:invalid, fn _, _ -> :error end] do
-      assert {:ok, request} =
-               request(server, Map.put(ctx, :__tool_guardrail_callback__, callback))
-
-      assert {:ok, "Done"} = Request.await(request)
-      assert :ok = Jido.Action.validate_static_data(Server.agent(server).state)
-    end
-
     assert_script_done(mock)
   end
 

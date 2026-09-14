@@ -128,6 +128,9 @@ defmodule Jido.ThreadValueTest do
     assert {:error, :invalid_thread} = Thread.validate(:invalid)
     assert {:error, :invalid_thread} = Thread.decode(%{document | "entries" => :invalid})
 
+    assert {:error, :unsupported_version} =
+             document |> Map.delete("type") |> Thread.decode()
+
     assert {:error, :invalid_thread} =
              Thread.decode(%{document | "entries" => [%{"bad" => true}]})
   end
@@ -205,8 +208,8 @@ defmodule Jido.ThreadValueTest do
     assert {:ok, %{status: :closed}} = Session.decode(%{document | "status" => :closed})
     assert {:ok, %{status: :closed}} = Session.decode(%{document | "status" => "closed"})
 
-    legacy_document = document |> Map.delete("type")
-    assert {:ok, _session} = Session.decode(legacy_document)
+    assert {:error, :unsupported_version} =
+             document |> Map.delete("type") |> Session.decode()
   end
 
   test "builds a Session around an existing Thread" do
@@ -231,61 +234,13 @@ defmodule Jido.ThreadValueTest do
     end
   end
 
-  test "migrates earlier context lane Thread and log fields into a Session" do
-    thread =
-      Thread.new(id: "old-thread", now: 10)
-      |> Thread.append(%{id: "entry", at: 20, kind: :ai_message, payload: %{context_ref: "default"}})
-
-    base = %{
-      active_context_ref: "default",
-      pending_context_op: nil,
-      applied_context_ops: []
-    }
-
-    legacy_thread =
-      thread
-      |> Map.from_struct()
-      |> Map.delete(:version)
-      |> Map.update!(:entries, &Enum.map(&1, fn entry -> entry |> Map.from_struct() end))
-
-    for lane <- [Map.put(base, :thread, legacy_thread), Map.put(base, :log, Map.from_struct(thread))] do
-      state = %{Operations.key() => %{assistant: lane}}
-      migrated = Operations.migrate_state(state, "agent")
-      migrated_lane = migrated[Operations.key()].assistant
-
-      assert migrated_lane.session.id == "ai:agent:assistant"
-      assert migrated_lane.session.thread == thread
-
-      assert Map.keys(migrated_lane) |> Enum.sort() ==
-               [:active_context_ref, :applied_context_ops, :pending_context_op, :session]
-    end
-  end
-
-  test "context operation helpers preserve invalid migration inputs" do
+  test "context operation helpers expose keys and active refs" do
     assert Operations.key() == :jido_ai_contexts
     assert Operations.type() == "jido.ai.context.modify"
     assert Operations.active_ref(%{}, :assistant) == "default"
 
     assert Operations.active_ref(%{Operations.key() => %{assistant: %{active_context_ref: "saved"}}}, :assistant) ==
              "saved"
-
-    assert Operations.migrate_state(%{other: true}, "agent") == %{other: true}
-    assert Operations.migrate_state(:invalid, "agent") == :invalid
-
-    base = %{
-      active_context_ref: "default",
-      pending_context_op: nil,
-      applied_context_ops: []
-    }
-
-    for owner <- [:session, :thread, :log] do
-      lane = Map.put(base, owner, :invalid)
-      state = %{Operations.key() => %{assistant: lane}}
-      assert Operations.migrate_state(state, "agent") == state
-    end
-
-    state = %{Operations.key() => %{assistant: %{unexpected: true}, reviewer: :invalid}}
-    assert Operations.migrate_state(state, "agent") == state
   end
 
   test "context operation validation handles valid, invalid, and exceptional saved values" do

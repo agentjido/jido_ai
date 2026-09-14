@@ -245,7 +245,7 @@ defmodule Jido.AI.Session.Delivery do
   defp next(%{active: nil, pending: [_ | _]} = state) do
     {items, rest} = Enum.split(state.pending, state.opts.batch_size)
     id = Jido.Signal.ID.generate!()
-    ticket = make_ref()
+    ticket = Jido.Signal.ID.generate!()
     server = state.server
     timeout = state.opts.timeout
 
@@ -383,7 +383,13 @@ end
 
 defmodule Jido.AI.Session.DeliveryReceipt do
   @moduledoc false
-  @schema Zoi.struct(__MODULE__, %{batch_id: Zoi.string()}, coerce: true)
+  use Jido.Agent.Directive
+
+  @schema Zoi.struct(
+            __MODULE__,
+            %{batch_id: Zoi.string(), ticket: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil)},
+            coerce: true
+          )
   defstruct Zoi.Struct.struct_fields(@schema)
   def schema, do: @schema
 end
@@ -392,11 +398,16 @@ defmodule Jido.AI.Session.Publish do
   @moduledoc false
   use Jido.Action, name: "ai_session_publish", schema: Zoi.object(%{batch_id: Zoi.string()})
 
-  def run(%{batch_id: id}, context) do
+  def run(params, context) do
+    with {:ok, context} <- Jido.AI.Session.Plugin.context(context),
+         do: execute(params, context)
+  end
+
+  defp execute(%{batch_id: id}, context) do
     with %{id: ^id, owner: owner, ticket: ticket} <- context[:jido_ai_delivery_grant],
          {:ok, signals} <- Jido.AI.Session.Delivery.consume(owner, id, ticket) do
       directives = Enum.map(signals, &%Jido.Agent.Directive.Emit{signal: &1})
-      {:ok, context.agent_state, directives ++ [%Jido.AI.Session.DeliveryReceipt{batch_id: id}]}
+      {:ok, context.agent_state, directives ++ [%Jido.AI.Session.DeliveryReceipt{batch_id: id, ticket: ticket}]}
     else
       _ -> {:error, :invalid_delivery_grant}
     end

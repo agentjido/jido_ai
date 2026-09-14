@@ -26,10 +26,10 @@ context, separate from the portable definition. The native ToolCatalog owns
 the provider tool schema. Config's own `reqllm_tools/1` now also retains public
 names, including two aliases that target the same Action.
 
-The internal caller must supply `timeout` and `max_tool_calls`. Old Config has
-no total request deadline or total tool-call bound. This step does not invent
-a new public default. The Runner port must select and test those controls,
-including existing long-tool behavior and the legacy iteration-limit result.
+The internal caller must supply `timeout` and `max_tool_calls`. The standalone
+Config has no total request deadline or total tool-call bound. The runtime
+selects and tests those controls, including long-tool behavior and the
+iteration-limit result.
 The native concurrency range is 1 through 64; larger Config values fail this
 conversion explicitly.
 

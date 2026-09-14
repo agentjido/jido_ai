@@ -42,7 +42,7 @@ end
 {:ok, result} = MyApp.MathAgent.await(request)
 ```
 
-The enumerable yields `%Jido.AI.Reasoning.ReAct.Event{}` values and stops after
+The enumerable yields `%Jido.AI.Runtime.Event{}` values and stops after
 `:request_completed`, `:request_failed`, or `:request_cancelled`.
 
 For mailbox-oriented integrations, pass a pid sink directly:
@@ -54,7 +54,7 @@ For mailbox-oriented integrations, pass a pid sink directly:
   )
 
 receive do
-  {:jido_ai_request_event, %Jido.AI.Reasoning.ReAct.Event{} = event} ->
+  {:jido_ai_request_event, %Jido.AI.Runtime.Event{} = event} ->
     IO.inspect(event.kind)
 end
 ```
@@ -121,7 +121,7 @@ Important:
 - `Jido.AI.Turn`: normalized response shape and assistant/tool message projection.
 - `Jido.AI.Context`: conversation accumulation and context projection for follow-up turns.
 - `Jido.AI.steer/3` and `Jido.AI.inject/3`: explicit control path for active ReAct runs.
-- Directive runtime behavior is documented in [Directives Runtime Contract](../developer/directives_runtime_contract.md).
+- AI model and tool work runs through Actions and the Session runtime.
 
 ## Await Many
 
@@ -169,9 +169,8 @@ Each request is tracked with status like:
 - `:pending`
 - `:completed`
 - `:failed`
-- `:timeout`
 
-Agent state keeps request maps and compatibility fields (`last_query`, `last_answer`, etc.).
+Agent state keeps one bounded map of request records.
 
 Completed request records may also include normalized `meta` when the runtime
 has it available. Common keys are:
@@ -183,10 +182,8 @@ has it available. Common keys are:
 Example:
 
 ```elixir
-{:ok, status} = Jido.AgentServer.status(pid)
-request_id = status.raw_state[:last_request_id]
-
-get_in(status.raw_state, [:requests, request_id, :meta])
+{:ok, status} = Jido.AI.Session.snapshot(pid)
+status.request.meta
 # %{usage: %{...}, reasoning_details: [...], ...}
 ```
 
@@ -194,10 +191,10 @@ The status snapshot separates the final assistant answer from completed tool
 outputs:
 
 ```elixir
-{:ok, status} = Jido.AgentServer.status(pid)
+{:ok, status} = Jido.AI.Session.snapshot(pid)
 
-answer = status.snapshot.result
-tool_results = status.snapshot.details[:tool_results] || []
+answer = status.request.result
+tool_results = status.details[:tool_results] || []
 ```
 
 `tool_results` is scoped to the current or most recent ReAct run and is meant

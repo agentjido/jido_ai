@@ -15,9 +15,9 @@ defmodule Jido.AI.Reasoning.ReAct.PublicApiTest do
 
   describe "build_config/1" do
     test "builds config from map and passes through config struct" do
-      built = ReAct.build_config(%{model: :fast, stream_receive_timeout_ms: 12_345})
+      built = ReAct.build_config(%{model: :fast, stream_timeout_ms: 12_345})
       assert %Config{} = built
-      assert built.model == Jido.AI.resolve_model(:fast)
+      assert built.model == Jido.AI.Models.resolve(:fast)
       assert built.stream_timeout_ms == 12_345
 
       passthrough = ReAct.build_config(built)
@@ -40,7 +40,7 @@ defmodule Jido.AI.Reasoning.ReAct.PublicApiTest do
       Mimic.stub(Runner, :stream, fn query, config, opts ->
         assert query == "hello"
         assert %Config{} = config
-        assert config.model == Jido.AI.resolve_model(:fast)
+        assert config.model == Jido.AI.Models.resolve(:fast)
         assert opts[:request_id] == "req_1"
         [%{kind: :request_started}]
       end)

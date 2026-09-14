@@ -30,7 +30,7 @@ defmodule Jido.AI.Actions.Reasoning.ExplainTest do
                Explain.run(%{topic: "Recursion", detail_level: :basic, include_examples: false}, %{})
 
       assert result.detail_level == :basic
-      assert result.model == Jido.AI.resolve_model(:reasoning)
+      assert result.model == Jido.AI.Models.resolve(:reasoning)
       assert result.result =~ "Stubbed response for: Explain: Recursion"
       assert_usage(result.usage)
     end

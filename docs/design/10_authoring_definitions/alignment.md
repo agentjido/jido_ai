@@ -18,7 +18,7 @@ Proven means that current source and a direct executable test assertion exist. T
 - Profile definition and validation: lib/jido_ai/profile.ex.
 - Spark extension DSL: lib/jido_ai/authoring/dsl.ex.
 - Neutral Agent and Flow lowering: lib/jido_ai/authoring/authoring.ex:43-243.
-- Compatibility macro: lib/jido_ai/agent/definition.ex:70-102 and 507-548.
+- Canonical Agent macro: lib/jido_ai/agent/definition.ex.
 - Profile codec and portable authoring tests: test/jido_ai/authoring.
 - Full specification parity: test/jido_ai/authoring/full_spec_parity_test.exs:218-291.
 - Validation examples: examples/v3/test/examples/01_authoring/01_06_ai_extension_test.exs:14-89.
@@ -30,28 +30,27 @@ Proven means that current source and a direct executable test assertion exist. T
 - Keep neutral core Agent construction followed by AI extension.
 - Keep duplicate profile, field, and route validation with source locations.
 - Keep Flow.Builder for reasoning Flow construction.
-- Keep Jido.AI.Agent as a compatibility wrapper.
+- Keep Jido.AI.Agent as the canonical convenience form for Jido.Agent with the AI extension.
 
 ## Gap Register
 
 | Gap | Requirement | Current evidence | Difference | Disposition |
 | --- | --- | --- | --- | --- |
-| AUT-GAP-001 | AUT-REQ-010 | lib/jido_ai/agent/definition.ex | The compatibility macro uses the lowerer, but complete V2 option and behavior coverage is not proved. | Publish a V2-to-V3 option matrix and add fixtures. |
+| AUT-GAP-001 | AUT-REQ-010 | lib/jido_ai/agent/definition.ex | Resolved: V2 option authoring was removed. | Keep compile-time rejection tests. |
 | AUT-GAP-002 | AUT-REQ-013 | inline Action support and core schemas | Ordinary named Actions work, but the full inline Action input, output, and context validation contract is not proved. | Add focused inline Action compile and runtime tests. |
 | AUT-GAP-003 | AUT-REQ-020 | authoring validation | Local duplicate and field checks are strong, but full Plugin, directive, and route collisions depend on the active sibling core contract. | Add conformance tests after core Plugin approval. |
-| AUT-GAP-004 | AUT-REQ-026, AUT-REQ-027 | generated APIs and compatibility wrapper | Public surface and deprecation metadata are incomplete for every legacy helper. | Define the approved API list, since version, and removal plan. |
+| AUT-GAP-004 | AUT-REQ-026, AUT-REQ-027 | generated APIs | The stable public surface still needs a final inventory. | Define the approved V3 API list. |
 | AUT-GAP-005 | Compile and test gate | package compile and test output | Resolved: warnings-as-errors compile, full default tests, and selected authoring examples pass. | Keep these checks as the authoring gate. |
 
 ## High-Level Work Sequence
 
 This sequence defines outcomes and gates. Detailed implementation planning comes after design approval.
 
-1. Approve Profile, extension, generated API, and compatibility surface.
-2. Complete the V2-to-V3 option and behavior matrix.
+1. Approve Profile, extension, and generated API surfaces.
+2. Reject V2 option authoring.
 3. Add inline Action schema and source-location tests.
 4. Align collision validation with the approved core Plugin contract.
-5. Add deprecation metadata and migration guidance.
-6. Compile with warnings as errors and run authoring, parity, and example tests.
+5. Compile with warnings as errors and run authoring, parity, and example tests.
 
 ## Acceptance Matrix
 
@@ -66,7 +65,7 @@ This sequence defines outcomes and gates. Detailed implementation planning comes
 | AUT-REQ-007 | duplicate profiles fail | Passing duplicate tests | Proven |
 | AUT-REQ-008 | field conflicts fail | Passing field conflict tests | Proven |
 | AUT-REQ-009 | route conflicts fail locally | Passing route tests | Proven |
-| AUT-REQ-010 | compatibility macro uses lowerer | Complete V2 behavior matrix | Partial |
+| AUT-REQ-010 | V3-only Agent macro | Compile-time rejection tests | Proven |
 | AUT-REQ-011 | source locations are reported | Passing compile error tests | Proven |
 | AUT-REQ-012 | named Actions are supported | Passing Action authoring tests | Proven |
 | AUT-REQ-013 | inline support is incomplete | Full schema validation tests | Partial |
@@ -83,17 +82,16 @@ This sequence defines outcomes and gates. Detailed implementation planning comes
 | AUT-REQ-024 | invalid limits fail | Passing finite limit tests | Proven |
 | AUT-REQ-025 | full spec parity tests exist | Passing parity suite | Proven |
 | AUT-REQ-026 | generated APIs exist | Approved stable API inventory | Partial |
-| AUT-REQ-027 | some deprecations exist | Complete metadata and removal plan | Partial |
+| AUT-REQ-027 | V3 inspection exists | Approved stable API inventory | Partial |
 | AUT-REQ-028 | docs and examples use extension | Passing documentation examples | Proven |
 | AUT-REQ-029 | lowerer output is deterministic | Passing repeated compile tests | Proven |
 | AUT-REQ-030 | extension state is portable | Passing snapshot checks | Proven |
 
-## Migration And Compatibility
+## V3 authoring policy
 
-- Keep Jido.AI.Agent as a thin wrapper around the canonical extension lowerer.
-- Keep legacy option names only through explicit mappings and warnings.
-- Do not add behavior to the compatibility wrapper that the extension path does not have.
-- Give each deprecated API a replacement, since version, and planned removal release.
+- Keep Jido.AI.Agent as the canonical convenience form around the extension lowerer.
+- Do not accept V2 keyword formats or reasoning-specific Agent macros.
+- Keep all authoring forms inert and lower them through one Profile contract.
 
 ## Assumptions And Blockers
 
@@ -103,7 +101,7 @@ This sequence defines outcomes and gates. Detailed implementation planning comes
 
 ## Completion Criteria
 
-- One lowerer serves the extension path and every compatibility path.
+- One lowerer serves every V3 authoring form.
 - Invalid profiles, fields, routes, Actions, models, tools, and limits fail with source locations.
-- The V2-to-V3 mapping and deprecation plan cover every retained legacy entry point.
+- Unsupported V2 authoring forms fail instead of starting a second path.
 - All authoring and parity tests pass with warnings as errors.

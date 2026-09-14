@@ -170,32 +170,6 @@ defmodule JidoAI.Examples.ReasoningToolTest do
     assert_script_done(mock)
   end
 
-  test "the public Agent macro can use the same raw reasoning Action", %{jido: jido} do
-    call = %{
-      reply:
-        {:tools,
-         [
-           %{
-             id: "public",
-             name: "reasoning_run_strategy",
-             arguments: %{strategy: "cot", prompt: "Explain", request_policy: "reject"}
-           }
-         ]}
-    }
-
-    {mock, context} =
-      mock([call, %{reply: {:text, "Conclusion: Four"}}, %{reply: {:text, "Reviewed"}}])
-
-    server = start_agent(jido, Example.PublicAgent.new!())
-
-    assert {:ok, request} =
-             Example.PublicAgent.ask(server, "Review", context: Map.put(context, :jido, jido))
-
-    assert {:ok, "Reviewed"} = Request.await(request)
-    assert Server.agent(server).state.last_answer == "Reviewed"
-    assert_script_done(mock)
-  end
-
   test "nested raw reasoning calls use the outer quota and cannot bypass its limit", %{jido: jido} do
     alias Jido.AI.Quota.Store
     start_supervised!({Store, []})

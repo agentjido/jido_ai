@@ -1,7 +1,6 @@
 defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
   use Jido.AI.Test.ReasoningCase, async: false
   alias Jido.AI.Reasoning.ChainOfThought
-  alias Jido.AI.Reasoning.ChainOfThought.Machine
   alias ReqLLM.Message.ContentPart
 
   # Each removed Strategy case has a native replacement in linear-test-transfer.md.
@@ -17,7 +16,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
 
   test "uses the default model when not specified" do
     assert {:ok, profile} = Configuration.profile(definition(:chain_of_thought))
-    assert Jido.AI.resolve_model(profile.models.answer.model) == Jido.AI.resolve_model(:fast)
+    assert Jido.AI.Models.resolve(profile.models.answer.model) == Jido.AI.Models.resolve(:fast)
   end
 
   test "resolves a model alias before the provider request", %{jido: jido} do
@@ -49,7 +48,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
   for {name, opts} <- [{"not provided", []}, {"false", [system_prompt: false]}, {"nil", [system_prompt: nil]}] do
     test "uses the default prompt when #{name}" do
       assert {:ok, profile} = Configuration.profile(definition(:chain_of_thought, unquote(opts)))
-      assert profile.instructions == Machine.default_system_prompt()
+      assert profile.instructions == ChainOfThought.default_system_prompt()
     end
   end
 
@@ -90,7 +89,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
     assert %{id: :assistant, mode: :session} = Jido.AI.Authoring.request_binding(Server.agent(server), signal)
     assert Jido.AI.Authoring.request_method(Server.agent(server), signal) == :chain_of_thought
     assert {:ok, router} = Jido.Signal.Router.new(Server.agent(server).routes)
-    assert {:ok, _} = Jido.Signal.Router.route(router, %{signal | type: "ai.cot.cancel"})
+    assert {:ok, _} = Jido.Signal.Router.route(router, %{signal | type: Session.cancel_type()})
   end
 
   test "start commits the prompt and request before a worker runs", %{jido: jido} do

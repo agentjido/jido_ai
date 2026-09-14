@@ -376,7 +376,7 @@ defmodule JidoAI.Examples.AdaptiveTest do
       :telemetry.attach(
         id,
         [:jido, :ai, :llm, :complete],
-        &JidoAI.Examples.Linear.Telemetry.handle/4,
+        &JidoAI.Examples.Telemetry.handle/4,
         self()
       )
 

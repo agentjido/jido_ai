@@ -26,7 +26,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.CLIAdapter do
   @impl true
   def submit(pid, query, config) do
     agent_module = config.agent_module
-    agent_module.explore(pid, query)
+    agent_module.ask(pid, query)
   end
 
   @impl true
@@ -62,23 +62,21 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.CLIAdapter do
     max_nodes = config[:max_nodes] || @default_max_nodes
     tools = config[:tools] || []
 
-    contents =
-      quote do
-        use Jido.AI.ToTAgent,
-          name: "cli_tot_agent",
-          description: "CLI ephemeral ToT agent",
-          model: unquote(model),
-          branching_factor: unquote(branching_factor),
-          max_depth: unquote(max_depth),
-          traversal_strategy: unquote(traversal_strategy),
-          top_k: unquote(top_k),
-          min_depth: unquote(min_depth),
-          max_nodes: unquote(max_nodes),
-          tools: unquote(tools)
-      end
-
-    Module.create(module_name, contents, Macro.Env.location(__ENV__))
-    module_name
+    Jido.AI.CLI.EphemeralAgent.create(module_name,
+      method: :tree_of_thoughts,
+      name: "cli_tot_agent",
+      description: "CLI ephemeral ToT agent",
+      model: model,
+      tools: tools,
+      reasoning_options: %{
+        branching_factor: branching_factor,
+        max_depth: max_depth,
+        traversal_strategy: traversal_strategy,
+        top_k: top_k,
+        min_depth: min_depth,
+        max_nodes: max_nodes
+      }
+    )
   end
 
   defp poll_loop(pid, deadline, interval) do
@@ -90,7 +88,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.CLIAdapter do
       case Jido.AI.CLI.Adapter.status(pid) do
         {:ok, status} ->
           if status.snapshot.done? do
-            answer = extract_answer(status.snapshot.result, status.raw_state)
+            answer = extract_answer(status.snapshot.result)
 
             {:ok, %{answer: answer, meta: extract_meta(status)}}
           else
@@ -118,15 +116,8 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.CLIAdapter do
     }
   end
 
-  defp extract_answer(%{best: %{content: content}}, _raw_state) when is_binary(content), do: content
-  defp extract_answer(%{best: _best}, _raw_state), do: ""
-  defp extract_answer(result, _raw_state) when is_binary(result), do: result
-
-  defp extract_answer(_result, raw_state) do
-    case Map.get(raw_state, :last_result) do
-      %{best: %{content: content}} when is_binary(content) -> content
-      value when is_binary(value) -> value
-      _ -> ""
-    end
-  end
+  defp extract_answer(%{best: %{content: content}}) when is_binary(content), do: content
+  defp extract_answer(%{best: _best}), do: ""
+  defp extract_answer(result) when is_binary(result), do: result
+  defp extract_answer(_result), do: ""
 end

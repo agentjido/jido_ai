@@ -56,11 +56,6 @@ defmodule Jido.AI.Quota.Store do
   @doc false
   def progress(store, ticket, tokens), do: GenServer.call(store, {:progress, ticket, tokens})
 
-  @doc "Imports v2 tuple or map rows into unused scopes. The whole batch is validated first."
-  def import_rows(rows, store \\ __MODULE__) when is_list(rows) do
-    with {:ok, rows} <- normalize_rows(rows), do: GenServer.call(store, {:import, rows})
-  end
-
   @impl GenServer
   def init(opts),
     do:
@@ -87,19 +82,6 @@ defmodule Jido.AI.Quota.Store do
 
   def handle_call({:status, scope, limits, window}, _, state) do
     {:reply, status_map(current(state, scope, window), scope, limits, window), state}
-  end
-
-  def handle_call({:import, rows}, _, state) do
-    if Enum.any?(rows, fn {scope, _} -> Map.has_key?(state.rows, scope) end) do
-      {:reply, {:error, :scope_exists}, state}
-    else
-      next =
-        Enum.reduce(rows, state.rows, fn {scope, usage}, acc ->
-          Map.put(acc, scope, %{fresh(usage.window_started_at_ms) | usage: usage})
-        end)
-
-      {:reply, :ok, %{state | rows: next}}
-    end
   end
 
   def handle_call({:report, scope, id, tokens, window}, _, state) do
@@ -287,33 +269,4 @@ defmodule Jido.AI.Quota.Store do
   defp exhausted?(limit, used), do: is_integer(limit) and limit >= 0 and used >= limit
   defp remaining(nil, _), do: nil
   defp remaining(limit, used), do: max(limit - used, 0)
-
-  defp normalize_rows(rows) do
-    Enum.reduce_while(rows, {:ok, %{}}, fn value, {:ok, acc} ->
-      case normalize_row(value) do
-        {scope, %{window_started_at_ms: at, requests: requests, total_tokens: tokens} = usage}
-        when is_binary(scope) and is_integer(at) and at >= 0 and
-               is_integer(requests) and requests >= 0 and is_integer(tokens) and tokens >= 0 ->
-          if Map.has_key?(acc, scope),
-            do: {:halt, {:error, :duplicate_scope}},
-            else: {:cont, {:ok, Map.put(acc, scope, usage)}}
-
-        _ ->
-          {:halt, {:error, :invalid_quota_row}}
-      end
-    end)
-  end
-
-  defp normalize_row({scope, at, requests, tokens}),
-    do: {scope, %{window_started_at_ms: at, requests: requests, total_tokens: tokens}}
-
-  defp normalize_row({scope, usage}) when is_map(usage),
-    do:
-      {scope,
-       Map.new(
-         [:window_started_at_ms, :requests, :total_tokens],
-         &{&1, Map.get(usage, &1, Map.get(usage, Atom.to_string(&1)))}
-       )}
-
-  defp normalize_row(_), do: nil
 end

@@ -36,10 +36,7 @@ were missing failure type and two rejected partial images. All 16 now pass.
 
 ## Limits
 
-The original root wrapper tests still require the legacy
-`{:failed, :error, cause}` envelope. Five such tests remain failing because the
-current generated Agent helper returns the raw cause. This pass does not change
-those tests or claim their API contract is preserved. Exact Responses status
+The generated Agent helper returns the raw failure cause. Exact Responses status
 handling, typed partial-output validation and failed transport continuation
 remain separate required checks in [history review 07](../../../docs/v3-spike/history-reviews/07-streams-and-checkpoints.md).
 No history row is closed by this example.

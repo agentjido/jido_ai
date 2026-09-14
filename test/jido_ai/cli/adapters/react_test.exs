@@ -144,13 +144,12 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapterTest do
     test "await returns completed result with usage metadata" do
       status =
         AdapterTestSupport.status(
-          result: nil,
+          result: "ReAct answer",
           details: %{
             model: "openai:gpt-4o",
             iteration: 2,
             usage: %{input_tokens: 10, output_tokens: 5}
-          },
-          raw_state: %{last_answer: "ReAct answer"}
+          }
         )
 
       expect(Jido.AI.CLI.Adapter, :status, fn _pid -> {:ok, status} end)

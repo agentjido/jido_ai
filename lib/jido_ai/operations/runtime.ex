@@ -256,7 +256,7 @@ defmodule Jido.AI.Runtime.CallModel do
        do: execute(Map.delete(state, :checkpoint_phase), context)
 
   defp execute(state, context) do
-    if state.profile.reasoning.method == :react && context[:jido_ai_legacy_iteration_result] &&
+    if state.profile.reasoning.method == :react && context[:jido_ai_iteration_limit_result] &&
          state.repairs == 0 &&
          state.iterations >= state.profile.controls.max_iterations do
       {:ok,

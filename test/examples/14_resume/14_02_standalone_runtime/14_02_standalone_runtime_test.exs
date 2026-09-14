@@ -319,13 +319,6 @@ defmodule JidoAI.Examples.StandaloneRuntimeTest do
     test "standalone context binds #{inspect(callback)} to the native tool profile", %{jido: jido} do
       call = %{id: "hook", name: "add", arguments: %{a: 2, b: 3}}
       {mock, _} = mock([%{reply: {:tools, [call]}}, %{reply: {:text, "Done"}}])
-      observer = self()
-
-      guard = fn input ->
-        send(observer, {:standalone_guard, input.arguments, input.validated_arguments})
-        :ok
-      end
-
       config = config(mock, tools: [Add])
 
       result =
@@ -336,8 +329,7 @@ defmodule JidoAI.Examples.StandaloneRuntimeTest do
             context: %{
               jido: jido,
               observer: self(),
-              agent_module: unquote(callback),
-              __tool_guardrail_callback__: guard
+              agent_module: unquote(callback)
             }
           )
         )
@@ -351,7 +343,6 @@ defmodule JidoAI.Examples.StandaloneRuntimeTest do
       end
 
       b = if unquote(before?), do: 8, else: 3
-      assert_receive {:standalone_guard, %{"a" => 2, "b" => ^b}, %{a: 2, b: ^b}}
       assert_receive {:standalone_add, _, 2, ^b}
       raw_sum = 2 + b
 

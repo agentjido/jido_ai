@@ -92,23 +92,6 @@ defmodule JidoAI.Examples.TraceAndCyclesTest do
     end
   end
 
-  test "legacy thinking and message flags keep their existing no-op behavior", %{jido: jido} do
-    {mock, _} = mock([stream()])
-    config = config(mock, streaming: true, capture_thinking?: false, capture_messages?: false)
-    result = ReAct.run("Stream", config, opts(jido))
-    assert {:ok, saved, _} = Token.decode_state(result.final_token, config)
-    assert saved.streaming_thinking == "Synthetic thought"
-    assert Enum.any?(saved.context.entries, &(&1.thinking == "Synthetic thought"))
-    assert Enum.any?(result.trace, &(&1.kind == :llm_delta && &1.data.chunk_type == :thinking))
-
-    assert Enum.any?(
-             saved.context.entries,
-             &(&1.role == :assistant && &1.content == "First second")
-           )
-
-    assert_script_done(mock)
-  end
-
   test "a model checkpoint retains captured streams without provider replay", %{jido: jido} do
     {mock, _} = mock([stream()])
     config = config(mock, streaming: true)

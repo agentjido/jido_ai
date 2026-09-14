@@ -90,7 +90,7 @@ defmodule JidoAI.Examples.AIRuntimeTest do
       end)
 
     registry =
-      Jido.Agent.Codec.Registry.new!(%{
+      Jido.Codec.Registry.new!(%{
         "agents/core" => {:agent, Jido.Agent},
         "schemas/domain" => {:schema, definition.schema},
         "plugins/audit" => {:plugin, AIRuntime.Audit},
@@ -377,10 +377,10 @@ defmodule JidoAI.Examples.AIRuntimeTest do
     assert %{target: {Jido.AI.Runtime.Run, %{query: "Default", profile_id: :assistant}}} =
              Enum.find(lowered.routes, &(&1.path == "ai.ask"))
 
-    assert length(lowered.routes) == 6
+    assert length(lowered.routes) == 2
 
-    assert %{target: {Jido.AI.Configuration.Apply, %{operation: :tool_context}}} =
-             Enum.find(lowered.routes, &(&1.path == "ai.react.set_tool_context"))
+    assert %{target: Jido.AI.Configuration.Apply} =
+             Enum.find(lowered.routes, &(&1.path == "jido.ai.configure"))
 
     assert {:error, _} = Authoring.lower(agent, [Map.put(profile, :routes, ["ai.ask"])])
   end
@@ -488,6 +488,6 @@ defmodule JidoAI.Examples.AIRuntimeTest do
         "models/answer-v1" => {:value, profile.models.answer.model}
       })
 
-    Jido.Agent.Codec.Registry.new!(entries)
+    Jido.Codec.Registry.new!(entries)
   end
 end

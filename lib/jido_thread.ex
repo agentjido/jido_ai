@@ -284,7 +284,7 @@ defmodule Jido.Thread do
     }
   end
 
-  @doc "Decodes a Thread struct, versioned map, or compatible earlier Thread map."
+  @doc "Decodes a Thread struct or a versioned Thread map."
   @spec decode(t() | map()) :: {:ok, t()} | {:error, :invalid_thread | :unsupported_version}
   def decode(%__MODULE__{} = thread) do
     if Map.has_key?(thread, :version), do: validate(thread), else: decode(Map.from_struct(thread))
@@ -362,8 +362,7 @@ defmodule Jido.Thread do
 
   defp document_version(map) do
     case {field(map, :type), field(map, :version)} do
-      {type, @version} when type in [nil, "jido.thread"] -> :ok
-      {nil, nil} -> :ok
+      {"jido.thread", @version} -> :ok
       _ -> {:error, :unsupported_version}
     end
   end

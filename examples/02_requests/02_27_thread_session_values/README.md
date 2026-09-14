@@ -64,9 +64,10 @@ stored in declared Agent state. `Jido.AI.Session` is a different module. It owns
 live request operations such as inspection, steering, cancellation, and context
 changes on an AgentServer.
 
-See [02_01](../02_01_session/README.md) for live request ownership and
-[02_23](../02_23_context_operations/README.md) for the way Jido AI stores one
-portable Session and Thread per history-enabled profile.
+See [02_01](../02_01_session/README.md) for live request ownership. The
+[thread and context guide](../../../guides/user/thread_context_and_message_projection.md)
+explains how Jido AI stores one portable Session and Thread per
+history-enabled profile.
 
 Run the checked example:
 

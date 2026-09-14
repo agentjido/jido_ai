@@ -3,7 +3,17 @@ defmodule Jido.AI.Quota do
   alias Jido.AI.Quota.Store
 
   def track(context, fun) do
-    case if(is_map(context), do: Map.get(context, :jido_ai_quota)) do
+    binding =
+      if is_map(context) do
+        Map.get(context, :jido_ai_quota) ||
+          case get_in(context, [:plugin_inputs, Jido.AI.Plugins.Quota]) do
+            %Jido.Plugin.Input{runtime: %{binding: binding}} -> binding
+            %Jido.Plugin.Input{prepared: %{binding: binding}} -> binding
+            _ -> nil
+          end
+      end
+
+    case binding do
       nil -> invoke(fun, fn _ -> :ok end)
       binding -> Jido.AI.Error.capture(fn -> tracked(binding, context, fun) end)
     end

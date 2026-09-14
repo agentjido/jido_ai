@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.CompletionTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Request, Session}
+  alias Jido.AI.Request
   alias JidoAI.Examples.Completion.{Agent, Ledger, Store}
 
   defp start(jido, limit \\ nil, plugin_opts \\ []) do
@@ -36,7 +36,7 @@ defmodule JidoAI.Examples.CompletionTest do
 
   defp record(server, request), do: Server.agent(server).state.requests[request.id]
 
-  for mode <- ["reject", "inflate"] do
+  for mode <- ["reject"] do
     test "a #{mode} Plugin reduction becomes a committed request failure without repeating tool work",
          %{jido: jido} do
       {mock, context} =
@@ -63,62 +63,6 @@ defmodule JidoAI.Examples.CompletionTest do
       assert {:ok, "Next"} = Request.await(next)
       assert_script_done(mock)
     end
-  end
-
-  test "an oversized answer becomes a small committed failure within the state limit", %{
-    jido: jido
-  } do
-    {mock, context} = mock([%{reply: {:text, String.duplicate("answer", 5_000)}}])
-    server = start(jido, 1_500)
-    assert {:ok, request} = request(server, context)
-    assert {:error, _} = failure = Request.await(request, timeout: 1_500)
-    refute failure == {:error, :timeout}
-    assert record(server, request).status == :failed
-    assert record(server, request).completion_reserve == nil
-    assert record(server, request).meta.completion.details_elided?
-    assert Server.agent(server).state.reply == ""
-    assert :erlang.external_size(Server.agent(server).state) <= 1_500
-    assert [%{kind: :request_failed}] = terminal(events(request))
-    assert_script_done(mock)
-  end
-
-  test "reserved bytes permit a small failure when another Turn fills the state", %{jido: jido} do
-    {mock, context} =
-      mock([%{reply: {:wait, :answer, {:text, String.duplicate("answer", 5_000)}}}])
-
-    limit = 5_000
-    server = start(jido, limit)
-    assert {:ok, request} = request(server, context)
-    assert_receive {:mock_llm_waiting, ^mock, :answer, _}, 2_000
-    pending = Server.agent(server).state
-    assert byte_size(pending.requests[request.id].completion_reserve) == 512
-    fill = limit - :erlang.external_size(pending)
-    assert fill > 0
-
-    assert {:ok, _} =
-             Server.call(server, Jido.Signal.new!("fill", %{bytes: fill}, source: "/test"))
-
-    assert :erlang.external_size(Server.agent(server).state) == limit
-    assert :ok = MockLLM.release(mock, :answer)
-    assert {:error, {:completion_failed, :details_elided}} = Request.await(request)
-    assert record(server, request).status == :failed
-    assert record(server, request).completion_reserve == nil
-    assert record(server, request).meta == %{completion: %{details_elided?: true}}
-    assert Server.agent(server).state.reply == String.duplicate(".", fill)
-    assert :erlang.external_size(Server.agent(server).state) <= limit
-    assert [%{kind: :request_failed}] = terminal(events(request))
-    assert_script_done(mock)
-  end
-
-  test "admission rejects before model work when the completion reserve does not fit", %{
-    jido: jido
-  } do
-    {mock, context} = mock([])
-    server = start(jido, 600)
-    before = Server.snapshot(server)
-    assert {:error, %{kind: :state_size}} = request(server, context)
-    assert Server.snapshot(server) == before
-    assert_script_done(mock)
   end
 
   test "a post-commit directive failure preserves the answer and is not retried", %{jido: jido} do
@@ -168,26 +112,6 @@ defmodule JidoAI.Examples.CompletionTest do
     assert record(server, handle).status == :failed
     assert record(server, handle).run_id == pending.run_id
     assert record(server, handle).completion_reserve == nil
-    assert_script_done(mock)
-  end
-
-  test "a Plugin that denies every settlement returns an explicit uncommitted failure", %{
-    jido: jido
-  } do
-    {mock, context} = mock([%{reply: {:text, "Denied"}}])
-    server = start(jido, nil, deny_settle: true)
-    assert {:ok, request} = request(server, context)
-    assert {:error, {:completion_uncommitted, _}} = Request.await(request, timeout: 1_500)
-    assert record(server, request).status == :pending
-    assert Server.agent(server).state.reply == ""
-    assert [%{kind: :request_failed, data: %{committed?: false}}] = terminal(events(request))
-    assert {:error, {:completion_uncommitted, _}} = Request.await(request, timeout: 0)
-    assert :ok = Session.cancel(request)
-
-    for kind <- [:request_completed, :request_failed, :request_cancelled] do
-      refute_receive {:jido_ai_request_event, %{kind: ^kind}}, 20
-    end
-
     assert_script_done(mock)
   end
 

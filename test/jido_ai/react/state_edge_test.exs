@@ -62,10 +62,11 @@ defmodule Jido.AI.Reasoning.ReAct.StateEdgeTest do
 
   test "rejects malformed checkpoint shapes and required fields" do
     assert {:error, :invalid_checkpoint_state} = State.from_checkpoint_map(:invalid)
-    assert {:error, :legacy_thread_checkpoint} = State.from_checkpoint_map(%{thread: %{}})
-    assert {:error, {:missing_field, :run_id}} = State.from_checkpoint_map(%{})
+    assert {:error, {:missing_field, :version}} = State.from_checkpoint_map(%{})
+    assert {:error, :checkpoint_version_mismatch} = State.from_checkpoint_map(%{version: 2})
+    assert {:error, {:missing_field, :run_id}} = State.from_checkpoint_map(%{version: 3})
 
-    base = %{run_id: "run", request_id: "req", context: Jido.AI.Context.new()}
+    base = %{version: 3, run_id: "run", request_id: "req", context: Jido.AI.Context.new()}
 
     assert {:error, :invalid_status} = State.from_checkpoint_map(Map.put(base, :status, :unknown))
     assert {:error, :invalid_status} = State.from_checkpoint_map(Map.put(base, :status, "unknown"))

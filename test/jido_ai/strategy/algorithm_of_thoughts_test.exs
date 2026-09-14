@@ -5,7 +5,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.StrategyTest do
   # See docs/v3-spike/aot-test-transfer.md for the old case map.
   test "initializes the native profile and default generation settings", %{jido: jido} do
     assert {:ok, profile} = Configuration.profile(definition(Method.method()))
-    assert Jido.AI.resolve_model(profile.models.answer.model) == Jido.AI.resolve_model(:fast)
+    assert Jido.AI.Models.resolve(profile.models.answer.model) == Jido.AI.Models.resolve(:fast)
     assert %{profile: :standard, search_style: :dfs, require_explicit_answer: true} = profile.reasoning.options
     mock = mock([%{reply: {:text, "answer: 24"}}])
     server = start_reasoning(jido, Method.method())
@@ -163,7 +163,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.StrategyTest do
     agent = definition(Method.method())
     assert {:ok, router} = Jido.Signal.Router.new(agent.routes)
 
-    for type <- ["ai.aot.query", "ai.aot.cancel"] do
+    for type <- ["ai.aot.query", Session.cancel_type()] do
       assert {:ok, _} = Jido.Signal.Router.route(router, Jido.Signal.new!(type, %{}, source: "/test"))
     end
 

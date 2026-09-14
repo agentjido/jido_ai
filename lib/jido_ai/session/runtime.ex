@@ -56,6 +56,7 @@ defmodule Jido.AI.Session.Runtime do
 
   @impl true
   def handle_call(:ready, _, state), do: {:reply, :ok, state}
+  def handle_call(:agent_server, _, state), do: {:reply, state.init.agent_server, state}
   def handle_call(:skill_catalogs, _, state), do: {:reply, state.skills, state}
 
   def handle_call({:delivery_status, id}, _, state),
@@ -773,7 +774,6 @@ defmodule Jido.AI.Session.Runtime do
       |> Map.put(:agent_state, context.jido_ai_snapshot)
       |> Map.put(:state, context.jido_ai_snapshot)
       |> Map.put(:jido_ai_profiles, context.jido_ai_profiles)
-      |> Map.put(:jido_ai_legacy_agent_profile, context[:jido_ai_legacy_agent_profile])
       |> Map.put(:jido_ai_session, true)
       |> Map.put(:jido_ai_events, {runtime, record.id, record.run_id})
       |> Map.put(:jido_ai_server, server)

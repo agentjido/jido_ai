@@ -41,16 +41,6 @@ defmodule JidoAI.Examples.ReasoningTool.Agent do
   end
 end
 
-defmodule JidoAI.Examples.ReasoningTool.PublicAgent do
-  use Jido.AI.Agent,
-    name: "public_reasoning_tool",
-    tools: [Jido.AI.Actions.Reasoning.RunStrategy],
-    model: :fast,
-    streaming: false,
-    tool_timeout_ms: 8_000,
-    max_iterations: 3
-end
-
 defmodule JidoAI.Examples.ReasoningTool.Labels do
   use Jido.Action,
     name: "reasoning_labels",

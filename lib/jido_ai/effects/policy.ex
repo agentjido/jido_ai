@@ -23,8 +23,8 @@ defmodule Jido.AI.Effects.Policy do
   @default_allowed [State, Directive.Emit, Send, Schedule]
 
   @default_denied [
-    Directive.Spawn,
-    Directive.SpawnAgent,
+    Directive.SpawnProcess,
+    Directive.SpawnChild,
     Directive.Stop,
     Directive.StopChild,
     Jido.Plugin.Scheduler.Cron,

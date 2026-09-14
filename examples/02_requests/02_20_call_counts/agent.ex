@@ -19,6 +19,14 @@ defmodule JidoAI.Examples.CallCounts.Model do
   def check(_, _), do: :ok
 end
 
+defmodule JidoAI.Examples.CallCounts.Echo do
+  use Jido.Action,
+    name: "scope_echo",
+    schema: Zoi.object(%{value: Zoi.integer()})
+
+  def run(%{value: value}, _context), do: {:ok, %{value: value}}
+end
+
 defmodule JidoAI.Examples.CallCounts.Agent do
   use Jido.Agent, name: "call_counts", extensions: [Jido.AI.DSL]
 
@@ -45,7 +53,7 @@ defmodule JidoAI.Examples.CallCounts.Agent do
       end
 
       tools do
-        action JidoAI.Examples.RequestScope.Echo, as: :scope_echo
+        action JidoAI.Examples.CallCounts.Echo, as: :scope_echo
       end
 
       result(nil, into: :reply)

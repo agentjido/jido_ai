@@ -8,7 +8,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.CLIAdapterTest do
   setup :set_mimic_from_context
 
   defmodule StubToTAgent do
-    def explore(pid, query) do
+    def ask(pid, query) do
       send(self(), {:tot_submit_called, pid, query})
       {:ok, :submitted}
     end
@@ -29,7 +29,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.CLIAdapterTest do
   describe "create_ephemeral_agent/1" do
     test "creates ephemeral agent module with default config", %{default_module: module} do
       assert is_atom(module)
-      assert function_exported?(module, :explore, 2)
+      assert function_exported?(module, :ask, 2)
       assert function_exported?(module, :name, 0)
       assert module.name() == "cli_tot_agent"
     end
@@ -43,34 +43,30 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.CLIAdapterTest do
     end
 
     test "uses custom model from config", %{custom_module: module} do
-      opts = module.strategy_opts()
-      assert opts[:model] == "openai:gpt-4"
+      assert profile(module).models.answer.model == "openai:gpt-4"
     end
 
     test "uses custom branching_factor from config", %{custom_module: module} do
-      opts = module.strategy_opts()
-      assert opts[:branching_factor] == 5
+      assert profile(module).reasoning.options.branching_factor == 5
     end
 
     test "uses custom max_depth from config", %{custom_module: module} do
-      opts = module.strategy_opts()
-      assert opts[:max_depth] == 10
+      assert profile(module).reasoning.options.max_depth == 10
     end
 
     test "uses custom traversal_strategy from config", %{custom_module: module} do
-      opts = module.strategy_opts()
-      assert opts[:traversal_strategy] == :dfs
+      assert profile(module).reasoning.options.traversal_strategy == :dfs
     end
 
     test "uses default values when not specified", %{default_module: module} do
-      opts = module.strategy_opts()
-      assert opts[:model] == :fast
-      assert opts[:branching_factor] == 3
-      assert opts[:max_depth] == 3
-      assert opts[:traversal_strategy] == :best_first
-      assert opts[:top_k] == 3
-      assert opts[:min_depth] == 2
-      assert opts[:max_nodes] == 100
+      agent_profile = profile(module)
+      assert agent_profile.models.answer.model == :fast
+      assert agent_profile.reasoning.options.branching_factor == 3
+      assert agent_profile.reasoning.options.max_depth == 3
+      assert agent_profile.reasoning.options.traversal_strategy == :best_first
+      assert agent_profile.reasoning.options.top_k == 3
+      assert agent_profile.reasoning.options.min_depth == 2
+      assert agent_profile.reasoning.options.max_nodes == 100
     end
   end
 
@@ -86,7 +82,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.CLIAdapterTest do
   end
 
   describe "adapter wiring" do
-    test "submit delegates to configured ToT agent explore/2 function" do
+    test "submit delegates to configured Agent ask/2 function" do
       assert {:ok, :submitted} = ToTAdapter.submit(self(), "Explore tree", %{agent_module: StubToTAgent})
       assert_received {:tot_submit_called, pid, "Explore tree"}
       assert pid == self()
@@ -118,5 +114,10 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.CLIAdapterTest do
       assert meta.usage == %{total_tokens: 5}
       assert meta.tot_result == %{best: %{content: "ToT answer"}, usage: %{total_tokens: 5}}
     end
+  end
+
+  defp profile(module) do
+    {:ok, profile} = Jido.AI.Configuration.profile(module.definition())
+    profile
   end
 end

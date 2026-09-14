@@ -8,16 +8,19 @@ defmodule Jido.AI.Actions.Reasoning.RunCapability do
   """
   use Jido.Action, name: "reasoning_run_capability", schema: Zoi.map()
 
-  def run(
-        params,
-        %{jido_ai_reasoning_capability: %{strategy: strategy} = binding, agent_state: _} = context
-      ) do
-    Jido.AI.Capability.run(
-      Jido.AI.Actions.Reasoning.RunStrategy,
-      Map.put(params, :strategy, strategy),
-      context,
-      binding
-    )
+  def run(params, %{agent_state: _} = context) do
+    case Jido.AI.Capability.prepared_reasoning(context) do
+      %{strategy: strategy} = binding ->
+        Jido.AI.Capability.run(
+          Jido.AI.Actions.Reasoning.RunStrategy,
+          Map.put(params, :strategy, strategy),
+          context,
+          binding
+        )
+
+      _ ->
+        {:error, :reasoning_capability_not_bound}
+    end
   end
 
   def run(_, _), do: {:error, :reasoning_capability_not_bound}

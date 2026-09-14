@@ -209,7 +209,7 @@ Tool execution envelopes are canonical triples:
 - `{:ok, result, effects}`
 - `{:error, reason, effects}`
 
-Legacy 2-tuples (`{:ok, result}` / `{:error, reason}`) are normalized at runtime boundaries.
+Two-tuples (`{:ok, result}` / `{:error, reason}`) are normalized at runtime boundaries.
 Use triple pattern-matching in new code.
 
 ## ReAct Agent Tool Results

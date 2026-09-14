@@ -21,9 +21,6 @@ defmodule Jido.AI.Actions.Skill.LoadResourceTest do
                  name: "resource-skill",
                  relative_path: "references/guide.md"
                })
-
-      assert {:ok, %{name: "resource-skill", path: "references/guide.md"}} =
-               Zoi.parse(LoadResource.schema(), %{name: "resource-skill", path: "references/guide.md"})
     end
 
     test "rejects missing resource selector with a useful selector error" do
@@ -36,10 +33,7 @@ defmodule Jido.AI.Actions.Skill.LoadResourceTest do
 
     test "rejects multiple resource selectors" do
       selector_sets = [
-        %{resource_id: "opaque-id", relative_path: "references/guide.md"},
-        %{resource_id: "opaque-id", path: "references/guide.md"},
-        %{relative_path: "references/guide.md", path: "references/guide.md"},
-        %{resource_id: "opaque-id", relative_path: "references/guide.md", path: "references/guide.md"}
+        %{resource_id: "opaque-id", relative_path: "references/guide.md"}
       ]
 
       for selectors <- selector_sets do
@@ -73,14 +67,14 @@ defmodule Jido.AI.Actions.Skill.LoadResourceTest do
 
       assert {:error, %{type: :skill_not_activated}} =
                LoadResource.run(
-                 %{name: "resource-skill", path: "references/guide.md"},
+                 %{name: "resource-skill", relative_path: "references/guide.md"},
                  %{agent_id: "agent-b"}
                )
     end
 
     test "requires prior skill activation", %{tmp_dir: _tmp_dir} do
       assert {:error, error} =
-               LoadResource.run(%{name: "inactive", path: "guide.md"}, %{agent_id: "agent-a"})
+               LoadResource.run(%{name: "inactive", relative_path: "guide.md"}, %{agent_id: "agent-a"})
 
       assert error.type == :skill_not_activated
       assert error.skill == "inactive"
@@ -91,16 +85,16 @@ defmodule Jido.AI.Actions.Skill.LoadResourceTest do
       context = %{agent_id: "safe-agent"}
 
       assert {:error, %{type: :invalid_resource_path}} =
-               LoadResource.run(%{name: "safe-skill", path: "../outside.txt"}, context)
+               LoadResource.run(%{name: "safe-skill", relative_path: "../outside.txt"}, context)
 
       assert {:error, %{type: :invalid_resource_path}} =
-               LoadResource.run(%{name: "safe-skill", path: "SKILL.md"}, context)
+               LoadResource.run(%{name: "safe-skill", relative_path: "SKILL.md"}, context)
 
       assert {:error, %{type: :invalid_resource_path}} =
-               LoadResource.run(%{name: "safe-skill", path: "./SKILL.md"}, context)
+               LoadResource.run(%{name: "safe-skill", relative_path: "./SKILL.md"}, context)
 
       assert {:error, %{type: :resource_not_found}} =
-               LoadResource.run(%{name: "safe-skill", path: "missing.txt"}, context)
+               LoadResource.run(%{name: "safe-skill", relative_path: "missing.txt"}, context)
     end
 
     test "returns structured oversized and binary errors", %{tmp_dir: tmp_dir} do
@@ -111,7 +105,7 @@ defmodule Jido.AI.Actions.Skill.LoadResourceTest do
       context = %{agent_id: "bounded-agent"}
 
       assert {:error, oversized} =
-               LoadResource.run(%{name: "bounded-skill", path: "large.txt"}, context)
+               LoadResource.run(%{name: "bounded-skill", relative_path: "large.txt"}, context)
 
       assert oversized.type == :resource_too_large
       assert oversized.limit_kind == :text
@@ -119,10 +113,10 @@ defmodule Jido.AI.Actions.Skill.LoadResourceTest do
       assert oversized.limit == 4
 
       assert {:error, %{type: :binary_resource}} =
-               LoadResource.run(%{name: "bounded-skill", path: "binary.bin"}, context)
+               LoadResource.run(%{name: "bounded-skill", relative_path: "binary.bin"}, context)
 
       assert {:error, %{type: :binary_resource}} =
-               LoadResource.run(%{name: "bounded-skill", path: "nul.bin"}, context)
+               LoadResource.run(%{name: "bounded-skill", relative_path: "nul.bin"}, context)
     end
 
     test "uses the agent integration policy after load_skill activation", %{tmp_dir: tmp_dir} do
@@ -148,7 +142,7 @@ defmodule Jido.AI.Actions.Skill.LoadResourceTest do
       assert Enum.map(loaded.resources.resources, & &1.relative_path) == ["custom/data.txt"]
 
       assert {:error, %{type: :resource_too_large, limit: 4}} =
-               LoadResource.run(%{name: "integrated-skill", path: "custom/data.txt"}, context)
+               LoadResource.run(%{name: "integrated-skill", relative_path: "custom/data.txt"}, context)
     end
 
     test "loads runtime spec resources through the provider with fresh reads and forwarded context" do
@@ -393,11 +387,10 @@ defmodule Jido.AI.Actions.Skill.LoadResourceTest do
       assert_receive {:provider_resource_id, ^resource_id}
     end
 
-    test "loads filesystem resources through action execution with relative_path and legacy path", %{tmp_dir: tmp_dir} do
+    test "loads filesystem resources through action execution with relative_path", %{tmp_dir: tmp_dir} do
       activate_skill(tmp_dir, "tool-filesystem", "tool-filesystem-agent")
       File.mkdir_p!(Path.join(tmp_dir, "references"))
       File.write!(Path.join(tmp_dir, "references/guide.md"), "Guide text")
-      File.write!(Path.join(tmp_dir, "legacy.txt"), "Legacy text")
       context = %{agent_id: "tool-filesystem-agent"}
 
       assert {:ok, relative_result} =
@@ -410,17 +403,6 @@ defmodule Jido.AI.Actions.Skill.LoadResourceTest do
       assert relative_result[:skill] == "tool-filesystem"
       assert relative_result[:path] == "references/guide.md"
       assert relative_result[:content] == "Guide text"
-
-      assert {:ok, path_result} =
-               Jido.Exec.run(
-                 LoadResource,
-                 %{"name" => "tool-filesystem", "path" => "legacy.txt"},
-                 context
-               )
-
-      assert path_result[:skill] == "tool-filesystem"
-      assert path_result[:path] == "legacy.txt"
-      assert path_result[:content] == "Legacy text"
     end
 
     test "surfaces provider listing failures through load_skill" do
@@ -476,19 +458,21 @@ defmodule Jido.AI.Actions.Skill.LoadResourceTest do
       assert {:ok, _loaded} = LoadSkill.run(%{name: "runtime-safe"}, context)
 
       assert {:error, %{type: :invalid_resource_id, reason: :invalid_provider_selector}} =
-               LoadResource.run(%{name: "runtime-safe", path: "../secret.txt"}, context)
+               LoadResource.run(%{name: "runtime-safe", relative_path: "../secret.txt"}, context)
 
       refute_received :load_invoked
     end
 
     test "rejects invalid parameters", %{tmp_dir: tmp_dir} do
       assert {:error, %{type: :invalid_params}} = LoadResource.run([], %{})
-      assert {:error, %{type: :invalid_skill_name}} = LoadResource.run(%{path: "file.txt"}, %{})
+
+      assert {:error, %{type: :invalid_skill_name}} =
+               LoadResource.run(%{relative_path: "file.txt"}, %{})
 
       activate_skill(tmp_dir, "valid-name", "invalid-param-agent")
 
       assert {:error, %{type: :invalid_resource_path}} =
-               LoadResource.run(%{name: "valid-name", path: ""}, %{agent_id: "invalid-param-agent"})
+               LoadResource.run(%{name: "valid-name", relative_path: ""}, %{agent_id: "invalid-param-agent"})
     end
   end
 
@@ -508,7 +492,7 @@ defmodule Jido.AI.Actions.Skill.LoadResourceTest do
   end
 
   defp selector_error?(errors) do
-    error_message?(errors, "exactly one of resource_id, relative_path, or path is required")
+    error_message?(errors, "exactly one of resource_id or relative_path is required")
   end
 
   defp error_message?(errors, message) do

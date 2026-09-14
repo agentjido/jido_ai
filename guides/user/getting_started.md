@@ -36,7 +36,7 @@ config :jido_ai,
   }
 ```
 
-Use `Jido.AI.resolve_model/1` when you need to confirm runtime resolution.
+Use `Jido.AI.Models.resolve/1` when you need to confirm runtime resolution.
 
 ## 3. Define a First Agent
 
@@ -110,7 +110,7 @@ use Jido.AI.Agent,
 
 ## Defaults You Should Know
 
-- ReAct model default alias: `:fast` (resolved at runtime via `Jido.AI.resolve_model/1`)
+- ReAct model default alias: `:fast` (resolved at runtime via `Jido.AI.Models.resolve/1`)
 - ReAct max iterations default: `10`
 - ReAct max tokens default: `4096`
 - Request await timeout default: `30_000ms`

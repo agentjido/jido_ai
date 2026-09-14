@@ -11,8 +11,7 @@ defmodule Jido.AI.TestSupport.CLIAdapter do
         done?: Keyword.get(opts, :done?, true),
         result: Keyword.get(opts, :result),
         details: Keyword.get(opts, :details, %{})
-      },
-      raw_state: Keyword.get(opts, :raw_state, %{})
+      }
     }
   end
 end

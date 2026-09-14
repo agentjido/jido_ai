@@ -248,7 +248,7 @@ defmodule Jido.AI.Skill.Resources do
   defp filename_mime(_name), do: nil
 
   @doc """
-  Lists all resources and keeps conventional groups for compatibility.
+  Lists all resources and includes the conventional resource groups.
 
   This function uses the default policy. Use `list_all/2` for custom limits.
   """

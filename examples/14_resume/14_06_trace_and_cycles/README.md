@@ -3,7 +3,7 @@
 [Agent](agent.ex) and
 [tests](../../../test/examples/14_resume/14_06_trace_and_cycles/14_06_trace_and_cycles_test.exs) use the real
 native Flow, Session, provider decoder and tools. The shared MockLLM server
-supplies all model responses. The 13 cases are example tests, excluded by
+supplies all model responses. The 10 cases are example tests, excluded by
 default and run with `--include example`.
 
 ## Trace and tool events
@@ -16,10 +16,8 @@ and `streaming_thinking` accumulate decoded deltas and reset at each model
 start. A saved model checkpoint retains those fields. Resume can finish an
 already decoded answer without a new model request.
 
-The old Runner accepted `capture_thinking?` and `capture_messages?` but never
-used them to filter data. The port keeps that behavior and documents it.
-These fields are not independent privacy controls. There is no standalone
-State `thinking_trace` field; parent Agent metadata has a separate trace API.
+There is no standalone State `thinking_trace` field. Parent Agent metadata has
+a separate trace API.
 
 `redact_tool_args?` becomes `observability.redact_tool_args?`, default true.
 The native Agent DSL accepts that flag in its existing observation map.
@@ -66,8 +64,6 @@ mix test --include example --seed 0 test/examples/14_resume/14_06_trace_and_cycl
 ```
 
 The focused set passes 82 checks. See the
-[implementation record](../../../docs/v3-spike/implementation.md) for the full
-suite results. Parent Strategy trace retention and inspection, context lanes
-and compaction, query append, old state conversion, skills/resources, provider
-variants and durable recovery remain required. Root package and dependency,
-consumer, minimum-runtime, migration and rollback gates remain open.
+[implementation record](../../../docs/v3-spike/implementation.md) for design
+history. Parent trace retention and inspection, context lanes and compaction,
+provider variants, and durable recovery are outside this example.

@@ -5,7 +5,6 @@ defmodule Jido.AI.ToolApiTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI
-  alias Jido.AI.Reasoning.ReAct.Strategy, as: ReAct
 
   # Test action modules
   defmodule Calculator do
@@ -34,10 +33,35 @@ defmodule Jido.AI.ToolApiTest do
 
   # Test agent
   defmodule TestAgent do
-    use Jido.AI.Agent,
-      name: "test_tool_api_agent",
-      description: "Agent for testing tool API",
-      tools: [Calculator, Search]
+    use Jido.AI.Agent, name: "test_tool_api_agent", description: "Agent for testing tool API"
+
+    agent do
+      schema Zoi.object(%{last_result: Zoi.any() |> Zoi.default(nil), messages: Zoi.list(Zoi.map()) |> Zoi.default([])})
+
+      ai :assistant do
+        model(:fast)
+        reasoning(:react)
+
+        tools do
+          action(Calculator)
+          action(Search)
+        end
+
+        requests do
+          mode(:session)
+        end
+
+        memory do
+          history(:messages)
+        end
+
+        result(into: :last_result)
+      end
+    end
+
+    routes do
+      route("ai.react.query", ai: :assistant)
+    end
   end
 
   # Not a tool - for validation tests
@@ -107,10 +131,10 @@ defmodule Jido.AI.ToolApiTest do
     end
   end
 
-  describe "ReAct.list_tools/1 direct access" do
+  describe "Jido.AI.list_tools/1" do
     test "returns tool modules from agent" do
       agent = TestAgent.new!()
-      tools = ReAct.list_tools(agent)
+      tools = AI.list_tools(agent)
 
       assert Calculator in tools
       assert Search in tools

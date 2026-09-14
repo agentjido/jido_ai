@@ -14,7 +14,7 @@ defmodule Jido.AI.CLI.Adapter do
   ## Built-in Adapters
 
   - `Jido.AI.Reasoning.ReAct.CLIAdapter` - For `Jido.AI.Agent` modules
-  - `Jido.AI.Reasoning.AlgorithmOfThoughts.CLIAdapter` - For `Jido.AI.AoTAgent` agents
+  - `Jido.AI.Reasoning.AlgorithmOfThoughts.CLIAdapter` - For Algorithm-of-Thoughts profiles
   - `Jido.AI.Reasoning.ChainOfDraft.CLIAdapter` - For Chain-of-Draft agents
   - `Jido.AI.Reasoning.TreeOfThoughts.CLIAdapter` - For Tree-of-Thoughts agents
   - `Jido.AI.Reasoning.ChainOfThought.CLIAdapter` - For Chain-of-Thought agents
@@ -108,7 +108,6 @@ defmodule Jido.AI.CLI.Adapter do
       {:ok,
        %{
          agent_id: view.agent.id,
-         raw_state: view.agent.state,
          snapshot: %{
            status:
              case phase do

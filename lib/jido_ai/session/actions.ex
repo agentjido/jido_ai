@@ -49,6 +49,8 @@ end
 
 defmodule Jido.AI.Session.Change do
   @moduledoc false
+  use Jido.Agent.Directive
+
   @schema Zoi.struct(
             __MODULE__,
             %{
@@ -71,7 +73,12 @@ defmodule Jido.AI.Session.Start do
   alias Jido.AI.{Profile, Request}
   alias Jido.AI.Session.Change
 
-  def run(%{request_id: id, query: query}, context) do
+  def run(params, context) do
+    with {:ok, context} <- Jido.AI.Session.Plugin.context(context),
+         do: execute(Jido.AI.Plugins.Retrieval.apply_input(params, context), context)
+  end
+
+  defp execute(%{request_id: id, query: query}, context) do
     profile_id = context.jido_ai_admission_profile
     records = context.agent_state.requests
     profile = context.jido_ai_profiles[profile_id]
@@ -146,7 +153,6 @@ defmodule Jido.AI.Session.Start do
 
           with {:ok, candidate} <- start_history(context, profile, record) do
             changes = context_changes(context, candidate, profile, record)
-            candidate = Jido.AI.Session.StateProjection.apply(candidate, record, context)
             {:ok, candidate, [%Change{operation: :start, record: record} | changes]}
           end
         end
@@ -207,7 +213,12 @@ defmodule Jido.AI.Session.Settle do
   use Jido.Action, name: "ai_session_settle", schema: Zoi.object(%{request_id: Zoi.string()})
   alias Jido.AI.Session.Change
 
-  def run(%{request_id: id}, context) do
+  def run(params, context) do
+    with {:ok, context} <- Jido.AI.Session.Plugin.context(context),
+         do: execute(params, context)
+  end
+
+  defp execute(%{request_id: id}, context) do
     with %{status: :pending, run_id: run_id} = record <- context.agent_state.requests[id],
          %{run_id: ^run_id, outcome: outcome, meta: failure_meta} = completion <-
            context[:jido_ai_completion] do
@@ -219,24 +230,13 @@ defmodule Jido.AI.Session.Settle do
             content = Map.get(outcome, :content, Jido.AI.Runtime.OutputState.content(result))
             value = Map.get(outcome, :value, if(profile.result.schema, do: result, else: nil))
 
-            completed =
-              Map.merge(record, %{
-                status: :completed,
-                result: result,
-                content: content,
-                value: value
-              })
-
             with {:ok, candidate} <-
                    Jido.AI.Effects.Candidate.assemble(
                      context.agent_state,
                      plan,
                      context.jido_ai_agent
                    ),
-                 candidate =
-                   candidate
-                   |> Map.put(profile.result.into, result)
-                   |> Jido.AI.Session.StateProjection.apply(completed, context),
+                 candidate = Map.put(candidate, profile.result.into, result),
                  {:ok, _} <- domain(candidate, context) do
               {candidate,
                %{
@@ -268,8 +268,6 @@ defmodule Jido.AI.Session.Settle do
 
       record =
         Jido.AI.Session.Inspection.complete(record, completion[:inspection], candidate, context)
-
-      candidate = Jido.AI.Session.StateProjection.apply(candidate, record, context)
 
       with {:ok, candidate, changes} <-
              Jido.AI.Context.Operations.finish(candidate, record, context),
@@ -309,7 +307,12 @@ defmodule Jido.AI.Session.Cancel do
 
   alias Jido.AI.Session.Change
 
-  def run(%{request_id: id, reason: reason}, context) do
+  def run(params, context) do
+    with {:ok, context} <- Jido.AI.Session.Plugin.context(context),
+         do: execute(params, context)
+  end
+
+  defp execute(%{request_id: id, reason: reason}, context) do
     id =
       id ||
         Enum.find_value(context.agent_state.requests, fn {id, r} ->
@@ -339,10 +342,8 @@ defmodule Jido.AI.Session.Cancel do
             context
           )
 
-        candidate = Jido.AI.Session.StateProjection.apply(context.agent_state, record, context)
-
         with {:ok, candidate, changes} <-
-               Jido.AI.Context.Operations.finish(candidate, record, context),
+               Jido.AI.Context.Operations.finish(context.agent_state, record, context),
              do: {:ok, candidate, [%Change{operation: :finish, record: record} | changes]}
 
       nil ->

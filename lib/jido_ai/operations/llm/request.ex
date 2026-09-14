@@ -13,6 +13,12 @@ defmodule Jido.AI.Actions.LLM.Request do
   def run(kind, action, params, context) do
     context = ActionInput.context(context)
 
+    provided =
+      case context[:provided_params] do
+        keys when is_list(keys) -> keys
+        _ -> Map.get(params, :__jido_ai_action_provided__, Map.keys(params))
+      end
+
     keys =
       case kind do
         :embed -> [:model]
@@ -25,6 +31,16 @@ defmodule Jido.AI.Actions.LLM.Request do
         :chat,
         :llm
       ])
+
+    routed_model = Jido.AI.Capability.prepared(context, Jido.AI.Plugins.ModelRouting)
+
+    params =
+      if routed_model && not (:model in provided or "model" in provided) &&
+           is_nil(get_in(context, [:jido_ai_request, :model])) do
+        Map.put(params, :model, routed_model)
+      else
+        params
+      end
 
     obs = context[:observability] || %{}
 

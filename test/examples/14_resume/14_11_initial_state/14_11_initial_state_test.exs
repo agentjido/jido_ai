@@ -25,19 +25,14 @@ defmodule JidoAI.Examples.InitialStateTest do
     )
   end
 
-  for {module, streaming?, native?} <- [
-        {InitialState.Buffered, false, true},
-        {InitialState.Streamed, true, true},
-        {InitialState.PublicBuffered, false, false},
-        {InitialState.PublicStreamed, true, false}
+  for {module, streaming?} <- [
+        {InitialState.Buffered, false},
+        {InitialState.Streamed, true}
       ] do
     test "#{module} imports history before startup and restores later native state without tool replay", %{jido: jido} do
       old = saved_context("Saved prompt")
 
-      state =
-        if unquote(native?),
-          do: %{context: old, count: 9, thread: %{id: "application-thread", rev: 2}},
-          else: %{context: old}
+      state = %{context: old, count: 9, thread: %{id: "application-thread", rev: 2}}
 
       assert {:ok, agent} = Agent.from_initial_state(unquote(module), state, id: "imported")
       assert Jido.AI.get_strategy_context(agent).entries == old.entries
@@ -45,7 +40,7 @@ defmodule JidoAI.Examples.InitialStateTest do
       assert Jido.AI.get_strategy_context(agent).id == "imported:assistant"
       assert agent.state.requests == %{}
       refute Map.has_key?(agent.state, :context)
-      if unquote(native?), do: assert(agent.state.count == 9 and agent.state.thread == state.thread)
+      assert agent.state.count == 9 and agent.state.thread == state.thread
       {mock, context} = mock([%{reply: {:text, "Continued"}}, %{reply: {:text, "Again"}}])
       assert MockLLM.report(mock).requests == []
       server = start_agent(jido, agent)

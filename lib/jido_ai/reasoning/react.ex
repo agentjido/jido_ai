@@ -4,7 +4,6 @@ defmodule Jido.AI.Reasoning.ReAct do
 
   This module provides streaming execution for actions and strategies. Native
   checkpoints can resume after a model response or a complete tool round.
-  Progressed legacy state must be converted before it can resume on v3.
   """
 
   alias Jido.AI.Reasoning.ReAct.{Config, Runner, State, Token}

@@ -32,7 +32,7 @@ defmodule Jido.AI.Reasoning.ReAct.Authoring do
       plugins =
         Enum.map(agent.plugins, fn
           {Jido.AI.Runtime.Plugin, opts} ->
-            {Jido.AI.Runtime.Plugin, Keyword.merge(opts, legacy_iteration_result?: true, standalone_checkpoints?: true)}
+            {Jido.AI.Runtime.Plugin, Keyword.merge(opts, iteration_limit_result?: true, standalone_checkpoints?: true)}
 
           plugin ->
             plugin

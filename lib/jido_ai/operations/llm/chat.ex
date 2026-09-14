@@ -3,7 +3,7 @@ defmodule Jido.AI.Actions.LLM.Chat do
   A Jido.Action for chat-style LLM interactions with optional system prompts.
 
   This action uses ReqLLM directly to generate chat-style responses from
-  language models. It supports model aliases via `Jido.AI.resolve_model/1` and
+  language models. It supports model aliases via `Jido.AI.Models.resolve/1` and
   optional system prompts for conversation context.
 
   ## Parameters

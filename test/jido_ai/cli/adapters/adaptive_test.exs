@@ -20,7 +20,6 @@ defmodule Jido.AI.Reasoning.Adaptive.CLIAdapterTest do
      custom_module:
        AdaptiveAdapter.create_ephemeral_agent(%{
          model: "openai:gpt-4",
-         default_strategy: :cot,
          available_strategies: [:cot, :react]
        })}
   end
@@ -42,25 +41,25 @@ defmodule Jido.AI.Reasoning.Adaptive.CLIAdapterTest do
     end
 
     test "uses custom model from config", %{custom_module: module} do
-      opts = module.strategy_opts()
-      assert opts[:model] == "openai:gpt-4"
-    end
-
-    test "uses custom default_strategy from config", %{custom_module: module} do
-      opts = module.strategy_opts()
-      assert opts[:default_strategy] == :cot
+      assert profile(module).models.answer.model == "openai:gpt-4"
     end
 
     test "uses custom available_strategies from config", %{custom_module: module} do
-      opts = module.strategy_opts()
-      assert opts[:available_strategies] == [:cot, :react]
+      assert profile(module).reasoning.options.available_strategies == [:cot, :react]
     end
 
     test "uses default values when not specified", %{default_module: module} do
-      opts = module.strategy_opts()
-      assert opts[:model] == :fast
-      assert opts[:default_strategy] == :react
-      assert opts[:available_strategies] == [:cod, :cot, :react, :tot, :got, :trm]
+      agent_profile = profile(module)
+      assert agent_profile.models.answer.model == :fast
+
+      assert agent_profile.reasoning.options.available_strategies == [
+               :cod,
+               :cot,
+               :react,
+               :tot,
+               :got,
+               :trm
+             ]
     end
   end
 
@@ -96,11 +95,10 @@ defmodule Jido.AI.Reasoning.Adaptive.CLIAdapterTest do
     test "await returns completed result with adaptive metadata" do
       status =
         AdapterTestSupport.status(
-          result: nil,
-          details: %{available_strategies: [:cot, :react]},
-          raw_state: %{
-            last_result: "Adaptive answer",
-            __strategy__: %{strategy_type: :cot, complexity_score: 0.42, task_type: :reasoning}
+          result: "Adaptive answer",
+          details: %{
+            available_strategies: [:cot, :react],
+            adaptive: %{strategy: :cot, complexity_score: 0.42, task_type: :reasoning}
           }
         )
 
@@ -124,5 +122,10 @@ defmodule Jido.AI.Reasoning.Adaptive.CLIAdapterTest do
 
       assert meta.status == :failure
     end
+  end
+
+  defp profile(module) do
+    {:ok, profile} = Jido.AI.Configuration.profile(module.definition())
+    profile
   end
 end

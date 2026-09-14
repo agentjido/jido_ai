@@ -87,5 +87,5 @@ Do not use this guide when:
 ## Next
 
 - [Security And Validation](security_and_validation.md)
-- [Directives Runtime Contract](directives_runtime_contract.md)
+- [Architecture And Runtime Flow](architecture_and_runtime_flow.md)
 - [Observability Basics](../user/observability_basics.md)

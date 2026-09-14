@@ -304,7 +304,7 @@ defmodule JidoAI.Examples.ToTTest do
       [:jido, :ai, :tot, :complete]
     ]
 
-    :ok = :telemetry.attach_many(id, names, &JidoAI.Examples.Linear.Telemetry.handle/4, self())
+    :ok = :telemetry.attach_many(id, names, &JidoAI.Examples.Telemetry.handle/4, self())
     on_exit(fn -> :telemetry.detach(id) end)
     {mock, context} = mock(ToT.script())
     server = start(jido)

@@ -11,7 +11,6 @@ defmodule Jido.AI.PluginFacetsTest do
     Jido.AI.Plugins.Policy,
     Jido.AI.Plugins.Retrieval,
     Jido.AI.Plugins.Quota,
-    Jido.AI.Plugins.TaskSupervisor,
     Jido.AI.Plugins.Reasoning.ChainOfThought,
     Jido.AI.Plugins.Reasoning.ChainOfDraft,
     Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts,

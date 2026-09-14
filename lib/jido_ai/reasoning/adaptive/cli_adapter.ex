@@ -14,7 +14,6 @@ defmodule Jido.AI.Reasoning.Adaptive.CLIAdapter do
   @behaviour Jido.AI.CLI.Adapter
 
   @default_model :fast
-  @default_strategy :react
   @default_available_strategies [:cod, :cot, :react, :tot, :got, :trm]
 
   @impl true
@@ -53,21 +52,15 @@ defmodule Jido.AI.Reasoning.Adaptive.CLIAdapter do
     module_name = Module.concat([JidoAi, EphemeralAgent, :"Adaptive#{suffix}"])
 
     model = config[:model] || @default_model
-    default_strategy = config[:default_strategy] || @default_strategy
     available_strategies = config[:available_strategies] || @default_available_strategies
 
-    contents =
-      quote do
-        use Jido.AI.AdaptiveAgent,
-          name: "cli_adaptive_agent",
-          description: "CLI ephemeral Adaptive agent",
-          model: unquote(model),
-          default_strategy: unquote(default_strategy),
-          available_strategies: unquote(available_strategies)
-      end
-
-    Module.create(module_name, contents, Macro.Env.location(__ENV__))
-    module_name
+    Jido.AI.CLI.EphemeralAgent.create(module_name,
+      method: :adaptive,
+      name: "cli_adaptive_agent",
+      description: "CLI ephemeral Adaptive agent",
+      model: model,
+      reasoning_options: %{available_strategies: available_strategies}
+    )
   end
 
   defp poll_loop(pid, deadline, interval) do
@@ -79,12 +72,7 @@ defmodule Jido.AI.Reasoning.Adaptive.CLIAdapter do
       case Jido.AI.CLI.Adapter.status(pid) do
         {:ok, status} ->
           if status.snapshot.done? do
-            answer =
-              case status.snapshot.result do
-                nil -> format_cli_answer(Map.get(status.raw_state, :last_result, ""))
-                "" -> format_cli_answer(Map.get(status.raw_state, :last_result, ""))
-                result -> format_cli_answer(result)
-              end
+            answer = format_cli_answer(status.snapshot.result)
 
             {:ok, %{answer: answer, meta: extract_meta(status)}}
           else
@@ -100,13 +88,13 @@ defmodule Jido.AI.Reasoning.Adaptive.CLIAdapter do
 
   defp extract_meta(status) do
     details = status.snapshot.details || %{}
-    strategy_state = Map.get(status.raw_state, :__strategy__, %{})
+    selection = Map.get(details, :adaptive, %{})
 
     %{
       status: status.snapshot.status,
-      selected_strategy: Map.get(strategy_state, :strategy_type),
-      complexity_score: Map.get(strategy_state, :complexity_score),
-      task_type: Map.get(strategy_state, :task_type),
+      selected_strategy: Map.get(selection, :strategy),
+      complexity_score: Map.get(selection, :complexity_score),
+      task_type: Map.get(selection, :task_type),
       available_strategies: Map.get(details, :available_strategies, [])
     }
   end

@@ -5,9 +5,8 @@ defmodule Jido.AI.Actions.HelpersTest do
 
   describe "resolve_model/2" do
     test "resolves nil to default model" do
-      assert {:ok, model} = Helpers.resolve_model(nil, :fast)
-      assert is_binary(model)
-      assert String.contains?(model, "claude")
+      assert {:ok, "anthropic:claude-haiku-4-5"} =
+               Helpers.resolve_model(nil, "anthropic:claude-haiku-4-5")
     end
 
     test "resolves atom alias to model spec" do

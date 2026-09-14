@@ -86,7 +86,7 @@ them to recover structured tool payloads. For completed ReAct tool outputs, use
 
 Canonical strategy signal for context lifecycle:
 
-- `ai.react.context.modify`
+- `jido.ai.context.modify`
 
 Busy semantics in ReAct:
 

@@ -1,10 +1,6 @@
 defmodule Jido.AI.Request do
   @moduledoc """
-  Request tracking for AI agents with per-request isolation and correlation.
-
-  This module provides a standardized way to track requests and their results
-  in AI agents, solving the "single-slot overwrite" problem where concurrent
-  requests can overwrite each other's results.
+  Session request handles, correlation, waiting, and streaming.
 
   ## Pattern
 
@@ -19,9 +15,9 @@ defmodule Jido.AI.Request do
       # Or use sync convenience wrapper
       {:ok, result} = MyAgent.ask_sync(pid, "What is 2+2?")
 
-  ## Request Struct
+  ## Request handle
 
-  The `Request` struct contains:
+  A `Jido.AI.Request.Handle` contains:
   - `id` - Unique request identifier (UUID)
   - `server` - The agent server (pid or via tuple)
   - `query` - The original query/prompt
@@ -30,34 +26,20 @@ defmodule Jido.AI.Request do
   - `error` - Error details if failed
   - `inserted_at` - When the request was created
 
-  ## State Schema
-
-  Agents using request tracking should include in their state:
-
-      requests: %{request_id => Handle.t()}
-
-  This module provides helpers for managing this map.
-
-  ## Usage in Agent Macros
+  ## Agent API
 
   ```elixir
   defmodule MyAgent do
-    use Jido.AI.Agent, ...
+    use Jido.AI.Agent, name: "my_agent"
 
-    # ask/2 now returns {:ok, Handle.t()}
-    def ask(pid, query, opts \\\\ []) do
-      Jido.AI.Request.create_and_send(pid, query, opts,
-        signal_type: "ai.react.query",
-        source: "/ai/react/agent"
-      )
-    end
-
-    # await/2 waits for specific request
-    def await(request, opts \\\\ []) do
-      Jido.AI.Request.await(request, opts)
+    agent do
+      # Define a session AI profile and route here.
     end
   end
   ```
+
+  The generated `ask/3`, `ask_sync/3`, `ask_stream/3`, and `await/2`
+  functions use this module.
   """
 
   alias Jido.AI.Request.Stream, as: RequestStream
@@ -68,12 +50,6 @@ defmodule Jido.AI.Request do
   @type server :: pid() | atom() | {:via, module(), term()}
 
   @default_timeout 30_000
-  @default_max_requests 100
-  @stream_interrupted_error :stream_interrupted
-
-  # A request in one of these states will never emit another runtime event, so
-  # its stream sink is dropped rather than carried in agent state.
-  @terminal_statuses [:completed, :failed, :timeout]
 
   # ---------------------------------------------------------------------------
   # Handle Struct
@@ -170,8 +146,7 @@ defmodule Jido.AI.Request do
   - `:allowed_tools` - ReAct-only request-scoped allowlist of tool names
   - `:request_transformer` - ReAct-only module implementing per-turn request shaping
   - `:max_iterations` - ReAct-only request-scoped maximum reasoning iterations
-  - `:stream_timeout_ms` - ReAct-only request-scoped runtime inactivity timeout.
-    `:stream_receive_timeout_ms` is accepted as a compatibility alias.
+  - `:stream_timeout_ms` - ReAct-only request-scoped runtime inactivity timeout
   - `:tool_heartbeat_ms` - ReAct-only request-scoped tool-execution keepalive
     interval in ms (0 = off). Emits a `:keepalive` event while tools run.
   - `:req_http_options` - Per-request Req HTTP options forwarded to ReAct runtime
@@ -187,15 +162,15 @@ defmodule Jido.AI.Request do
 
   ## Signal Options (required)
 
-  - `:signal_type` - The signal type to create (e.g., "ai.react.query")
-  - `:source` - The signal source (e.g., "/ai/react/agent")
+  - `:signal_type` - The declared Agent route to call
+  - `:source` - The Signal source
 
   ## Examples
 
       {:ok, request} = Request.create_and_send(pid, "What is 2+2?",
         tool_context: %{actor: user},
-        signal_type: "ai.react.query",
-        source: "/ai/react/agent"
+        signal_type: "support.ask",
+        source: "/my_app/support"
       )
   """
   @spec create_and_send(server(), Query.t(), keyword()) ::
@@ -209,8 +184,7 @@ defmodule Jido.AI.Request do
     request_transformer = Keyword.get(opts, :request_transformer)
     max_iterations = Keyword.get(opts, :max_iterations)
 
-    stream_timeout_ms =
-      Keyword.get(opts, :stream_timeout_ms, Keyword.get(opts, :stream_receive_timeout_ms))
+    stream_timeout_ms = Keyword.get(opts, :stream_timeout_ms)
 
     tool_heartbeat_ms = Keyword.get(opts, :tool_heartbeat_ms)
     req_http_options = Keyword.get(opts, :req_http_options, [])
@@ -266,8 +240,8 @@ defmodule Jido.AI.Request do
 
       {:ok, result} = Request.send_and_await(pid, "What is 2+2?",
         timeout: 10_000,
-        signal_type: "ai.react.query",
-        source: "/ai/react/agent"
+        signal_type: "support.ask",
+        source: "/my_app/support"
       )
   """
   @spec send_and_await(server(), Query.t(), keyword()) ::
@@ -352,292 +326,6 @@ defmodule Jido.AI.Request do
   end
 
   # ---------------------------------------------------------------------------
-  # State Management Helpers
-  # ---------------------------------------------------------------------------
-
-  @doc """
-  Initializes request tracking state fields.
-
-  Call this when setting up agent state to add the `requests` map.
-
-  ## Options
-
-  - `:max_requests` - Maximum requests to keep (default: 100)
-
-  ## Examples
-
-      state = Request.init_state(%{})
-      # => %{requests: %{}, __request_tracking__: %{max_requests: 100}}
-  """
-  @spec init_state(map(), keyword()) :: map()
-  def init_state(state, opts \\ []) when is_map(state) do
-    max_requests = Keyword.get(opts, :max_requests, @default_max_requests)
-
-    state
-    |> Map.put_new(:requests, %{})
-    |> Map.put(:__request_tracking__, %{max_requests: max_requests})
-  end
-
-  @doc """
-  Records a new request in agent state.
-
-  Called in `on_before_cmd/2` when a request starts.
-
-  ## Stream sinks
-
-  When `:stream_to` is given, the sink is stored on the request record so the
-  strategy can route runtime events to it. The sink is a live pid, so it is
-  dropped again as soon as the request reaches a terminal state, and it is never
-  written to a checkpoint — see `Jido.AI.Checkpoint`.
-
-  ## Examples
-
-      def on_before_cmd(agent, {:ai_react_start, %{query: query, request_id: req_id}} = action) do
-        agent = Request.start_request(agent, req_id, query)
-        {:ok, agent, action}
-      end
-  """
-  @spec start_request(struct(), String.t(), Query.t(), keyword()) :: struct()
-  def start_request(agent, request_id, query, opts \\ [])
-      when is_binary(request_id) and (is_binary(query) or is_list(query)) do
-    stream_to = Keyword.get(opts, :stream_to)
-
-    request =
-      %{
-        query: query,
-        status: :pending,
-        result: nil,
-        error: nil,
-        inserted_at: System.system_time(:millisecond),
-        completed_at: nil
-      }
-      |> maybe_add_request_stream_to(stream_to)
-
-    state =
-      agent.state
-      |> put_in([:requests, request_id], request)
-      |> maybe_evict_old_requests()
-      # Also update convenience fields for backward compatibility
-      |> Map.put(:last_query, query)
-      |> Map.put(:last_request_id, request_id)
-      |> Map.put(:completed, false)
-      |> Map.put(:last_answer, "")
-
-    %{agent | state: state}
-  end
-
-  @doc """
-  Marks a request as completed with a result.
-
-  Called in `on_after_cmd/3` when a request finishes successfully.
-
-  ## Examples
-
-      def on_after_cmd(agent, {:ai_react_start, %{request_id: req_id}}, directives) do
-        snap = strategy_snapshot(agent)
-        if snap.done? do
-          agent = Request.complete_request(agent, req_id, snap.result)
-        end
-        {:ok, agent, directives}
-      end
-  """
-  @spec complete_request(struct(), String.t(), any(), keyword()) :: struct()
-  def complete_request(agent, request_id, result, opts \\ []) do
-    meta = Keyword.get(opts, :meta, %{})
-    last_answer = Keyword.get(opts, :last_answer, compat_text(result))
-
-    state =
-      agent.state
-      |> update_in([:requests, request_id], fn
-        nil ->
-          %{
-            status: :completed,
-            result: result,
-            meta: meta,
-            completed_at: System.system_time(:millisecond)
-          }
-
-        req ->
-          %{
-            req
-            | status: :completed,
-              result: result,
-              completed_at: System.system_time(:millisecond)
-          }
-          |> Map.put(:meta, Map.merge(Map.get(req, :meta, %{}), meta))
-          |> drop_stream_sink()
-      end)
-      |> Map.put(:last_answer, last_answer)
-      |> Map.put(:completed, true)
-
-    %{agent | state: state}
-  end
-
-  @doc false
-  @spec complete_request_from_snapshot(struct(), String.t(), map(), keyword()) :: struct()
-  def complete_request_from_snapshot(agent, request_id, %{result: result} = snapshot, opts \\ []) do
-    explicit_meta = Keyword.get(opts, :meta, %{})
-    meta = Jido.AI.Request.Metadata.from_snapshot(snapshot, explicit_meta)
-    complete_request(agent, request_id, result, Keyword.put(opts, :meta, meta))
-  end
-
-  @doc """
-  Marks a request as failed with an error.
-
-  Called when a request encounters an error. Cancellation is recorded through
-  this function with a `{:cancelled, reason}` error, so completed, failed, and
-  cancelled requests all drop their stream sink here.
-  """
-  @spec fail_request(struct(), String.t(), any()) :: struct()
-  def fail_request(agent, request_id, error) do
-    state =
-      agent.state
-      |> update_in([:requests, request_id], fn
-        nil ->
-          %{status: :failed, error: error, completed_at: System.system_time(:millisecond)}
-
-        %{status: :completed} = req ->
-          req
-
-        req ->
-          %{req | status: :failed, error: error, completed_at: System.system_time(:millisecond)}
-          |> drop_stream_sink()
-      end)
-      |> Map.put(:completed, true)
-
-    %{agent | state: state}
-  end
-
-  @doc false
-  @spec stream_sink(struct(), String.t()) :: RequestStream.sink() | nil
-  def stream_sink(agent, request_id) when is_binary(request_id) do
-    get_in(agent.state, [:requests, request_id, :stream_to])
-  end
-
-  def stream_sink(_agent, _request_id), do: nil
-
-  @doc false
-  @spec sanitize_requests(map()) :: map()
-  def sanitize_requests(state) when is_map(state) do
-    case Map.get(state, :requests) do
-      requests when is_map(requests) ->
-        Map.put(
-          state,
-          :requests,
-          Map.new(requests, fn {id, req} -> {id, sanitize_request(req)} end)
-        )
-
-      _absent ->
-        state
-    end
-  end
-
-  def sanitize_requests(state), do: state
-
-  defp sanitize_request(%{stream_to: _sink} = request) do
-    request
-    |> drop_stream_sink()
-    |> mark_interrupted_if_active()
-  end
-
-  defp sanitize_request(%{stream_interrupted: true} = request) do
-    mark_interrupted_if_active(request)
-  end
-
-  defp sanitize_request(request), do: request
-
-  defp mark_interrupted_if_active(%{status: status} = request)
-       when status in @terminal_statuses do
-    request
-  end
-
-  defp mark_interrupted_if_active(request) do
-    request
-    |> Map.put(:status, :failed)
-    |> Map.put(:error, @stream_interrupted_error)
-    |> Map.put(:stream_interrupted, true)
-  end
-
-  defp drop_stream_sink(request) when is_map(request), do: Map.delete(request, :stream_to)
-
-  @doc """
-  Gets a request by ID from agent state.
-
-  Returns `nil` if not found.
-  """
-  @spec get_request(struct(), String.t()) :: map() | nil
-  def get_request(agent, request_id) do
-    get_in(agent.state, [:requests, request_id])
-  end
-
-  @doc """
-  Gets the result of a request if completed.
-
-  Returns `{:ok, result}` if completed, `{:error, error}` if failed,
-  or `{:pending, request}` if still in progress.
-  """
-  @spec get_result(struct(), String.t()) ::
-          {:ok, any()} | {:error, any()} | {:pending, map()} | nil
-  def get_result(agent, request_id) do
-    case get_request(agent, request_id) do
-      nil -> nil
-      %{status: :completed, result: result} -> {:ok, result}
-      %{status: :failed, error: error} -> {:error, error}
-      %{status: :pending} = req -> {:pending, req}
-    end
-  end
-
-  @doc """
-  Extracts request_id from action params, generating one if not present.
-
-  Use this in signal routing or action preparation.
-  """
-  @spec ensure_request_id(map()) :: {String.t(), map()}
-  def ensure_request_id(%{request_id: request_id} = params) when is_binary(request_id) do
-    {request_id, params}
-  end
-
-  def ensure_request_id(params) when is_map(params) do
-    request_id = generate_id()
-    {request_id, Map.put(params, :request_id, request_id)}
-  end
-
-  # ---------------------------------------------------------------------------
-  # Schema Helpers for Agent Macros
-  # ---------------------------------------------------------------------------
-
-  @doc """
-  Returns the Zoi schema fields for request tracking.
-
-  Include this in your agent macro's schema definition.
-
-  ## Example
-
-      base_schema_ast = quote do
-        Zoi.object(Map.merge(
-          %{
-            model: Zoi.string() |> Zoi.default("..."),
-            # ... other fields
-          },
-          Jido.AI.Request.schema_fields()
-        ))
-      end
-  """
-  @spec schema_fields() :: map()
-  def schema_fields do
-    # Note: This returns a map suitable for Zoi.object
-    # The actual Zoi schema wrapping happens in the macro
-    %{
-      requests: quote(do: Zoi.map() |> Zoi.default(%{})),
-      last_request_id: quote(do: Zoi.string() |> Zoi.optional()),
-      # Backward compat fields
-      last_query: quote(do: Jido.AI.Query.schema() |> Zoi.default("")),
-      last_answer: quote(do: Zoi.string() |> Zoi.default("")),
-      completed: quote(do: Zoi.boolean() |> Zoi.default(false))
-    }
-  end
-
-  # ---------------------------------------------------------------------------
   # Private Helpers
   # ---------------------------------------------------------------------------
 
@@ -709,17 +397,6 @@ defmodule Jido.AI.Request do
 
   defp maybe_add_extra_refs(payload, _), do: payload
 
-  defp maybe_add_request_stream_to(request, nil), do: request
-
-  defp maybe_add_request_stream_to(request, stream_to),
-    do: Map.put(request, :stream_to, stream_to)
-
-  @doc false
-  @spec compat_text(any()) :: String.t()
-  def compat_text(nil), do: ""
-  def compat_text(value) when is_binary(value), do: value
-  def compat_text(value), do: inspect(value)
-
   defp normalize_await_result({:ok, %{status: :completed, result: result}}) do
     {:ok, result}
   end
@@ -745,22 +422,4 @@ defmodule Jido.AI.Request do
   end
 
   defp normalize_await_result({:error, _} = error), do: error
-
-  defp maybe_evict_old_requests(state) do
-    max = get_in(state, [:__request_tracking__, :max_requests]) || @default_max_requests
-    requests = Map.get(state, :requests, %{})
-
-    if map_size(requests) > max do
-      # Keep most recent requests by inserted_at
-      sorted =
-        requests
-        |> Enum.sort_by(fn {_id, req} -> req[:inserted_at] || 0 end, :desc)
-        |> Enum.take(max)
-        |> Map.new()
-
-      Map.put(state, :requests, sorted)
-    else
-      state
-    end
-  end
 end

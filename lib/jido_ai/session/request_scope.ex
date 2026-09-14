@@ -6,7 +6,7 @@ defmodule Jido.AI.Session.RequestScope do
   def profile(profile, resources, context) do
     with {:ok, tools} <- tools(profile.tools, resources, context),
          {:ok, result} <- result(profile.result, resources[:output]) do
-      controls = limits(profile.controls, result, resources[:max_iterations], context)
+      controls = limits(profile.controls, resources[:max_iterations])
 
       reasoning =
         if resources[:request_transformer],
@@ -25,7 +25,7 @@ defmodule Jido.AI.Session.RequestScope do
   end
 
   def stream_options(requests, resources) do
-    idle = Map.get(resources, :stream_timeout_ms, resources[:stream_receive_timeout_ms])
+    idle = Map.get(resources, :stream_timeout_ms)
 
     Enum.reduce([idle_timeout: idle, tool_heartbeat: resources[:tool_heartbeat_ms]], requests, fn
       {key, n}, acc when is_integer(n) and n >= 0 -> Map.put(acc, key, n)
@@ -62,24 +62,8 @@ defmodule Jido.AI.Session.RequestScope do
     end
   end
 
-  defp limits(base, result, value, context) when is_integer(value) and value > 0 do
-    controls = %{base | max_iterations: value}
+  defp limits(base, value) when is_integer(value) and value > 0,
+    do: %{base | max_iterations: value}
 
-    if context[:jido_ai_legacy_agent_profile],
-      do: %{controls | max_model_calls: value + result.max_repairs},
-      else: controls
-  end
-
-  defp limits(base, result, _, context) do
-    if context[:jido_ai_legacy_agent_profile],
-      do: %{
-        base
-        | max_model_calls:
-            if(base.max_iterations == :method_default,
-              do: :method_default,
-              else: base.max_iterations + result.max_repairs
-            )
-      },
-      else: base
-  end
+  defp limits(base, _), do: base
 end

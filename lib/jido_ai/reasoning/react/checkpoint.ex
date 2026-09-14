@@ -85,7 +85,7 @@ defmodule Jido.AI.Reasoning.ReAct.Checkpoint do
          true <-
            data.runtime.model_calls >= data.runtime.iterations,
          true <- data.phase in [:before_llm, :terminal] or data.runtime.iterations > 0,
-         true <- data.version == 1 or state.iteration == iteration(data),
+         true <- state.iteration == iteration(data),
          true <-
            not Map.has_key?(data.runtime, :output_meta) or Map.has_key?(data.runtime, :output_raw),
          true <- data.runtime.repairs == 0 or is_map(data.runtime[:repair_data]),
@@ -116,24 +116,6 @@ defmodule Jido.AI.Reasoning.ReAct.Checkpoint do
   end
 
   def validate_state(_), do: {:error, :invalid_react_checkpoint}
-
-  @doc false
-  def import_legacy(state, data, config) do
-    calls = pending(data.runtime, data.phase)
-    data = %{data | binding: binding(config, data.runtime.active_tools, [])}
-
-    state = %{
-      state
-      | checkpoint: data,
-        status: if(data.phase == :terminal, do: state.status, else: status(calls, data.phase)),
-        pending_tool_calls: calls,
-        iteration: iteration(data),
-        termination_reason: data.runtime[:termination_reason] || state.termination_reason,
-        active_tools: Map.new(data.runtime.active_tools, &{&1.name, &1.target})
-    }
-
-    with :ok <- validate_state(state), do: {:ok, state}
-  end
 
   def pause(native, phase, context) do
     if enabled?(context) do
@@ -198,8 +180,8 @@ defmodule Jido.AI.Reasoning.ReAct.Checkpoint do
     with :ok <- validate_state(saved), do: {:ok, saved}
   end
 
-  # A checkpoint is only made after a complete model response. Recover these
-  # legacy stream fields from that response; no second live accumulator is needed.
+  # A checkpoint is only made after a complete model response. Recover the
+  # stream fields from that response; no second live accumulator is needed.
   defp stream_field(nil, _, _), do: ""
 
   defp stream_field(response, %{streaming: true, trace: %{capture_deltas?: true}}, kind),
@@ -370,8 +352,6 @@ defmodule Jido.AI.Reasoning.ReAct.Checkpoint do
   end
 
   defp restore_messages(state, _, _), do: {:ok, state}
-
-  defp valid_phase?(%{version: 1, phase: phase}), do: phase in [:after_llm, :after_tools]
 
   defp valid_phase?(%{version: 2, phase: phase}),
     do: phase in [:before_llm, :after_llm, :after_tools, :terminal]

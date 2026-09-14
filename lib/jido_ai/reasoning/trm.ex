@@ -1,12 +1,9 @@
 defmodule Jido.AI.Reasoning.TRM do
   @moduledoc "TRM method selection and inspection of retained request data."
   alias Jido.AI.Reasoning.Linear
-  alias Jido.AI.Reasoning.TRM.{Machine, Reasoning, Strategy, Supervision}
+  alias Jido.AI.Reasoning.TRM.{Machine, Reasoning, Supervision}
 
   def method, do: :trm
-
-  @deprecated "Use method/0 for profile selection and namespace getters for retained requests"
-  def strategy_module, do: Strategy
 
   defdelegate generate_call_id(), to: Machine
   defdelegate default_reasoning_prompt(), to: Reasoning, as: :default_reasoning_system_prompt

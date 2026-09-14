@@ -22,7 +22,7 @@ defmodule Jido.AI.Reasoning.TRM.CLIAdapter do
   @impl true
   def submit(pid, query, config) do
     agent_module = config.agent_module
-    agent_module.reason(pid, query)
+    agent_module.ask(pid, query)
   end
 
   @impl true
@@ -53,18 +53,16 @@ defmodule Jido.AI.Reasoning.TRM.CLIAdapter do
     max_supervision_steps = config[:max_supervision_steps] || @default_max_supervision_steps
     act_threshold = config[:act_threshold] || @default_act_threshold
 
-    contents =
-      quote do
-        use Jido.AI.TRMAgent,
-          name: "cli_trm_agent",
-          description: "CLI ephemeral TRM agent",
-          model: unquote(model),
-          max_supervision_steps: unquote(max_supervision_steps),
-          act_threshold: unquote(act_threshold)
-      end
-
-    Module.create(module_name, contents, Macro.Env.location(__ENV__))
-    module_name
+    Jido.AI.CLI.EphemeralAgent.create(module_name,
+      method: :trm,
+      name: "cli_trm_agent",
+      description: "CLI ephemeral TRM agent",
+      model: model,
+      reasoning_options: %{
+        max_supervision_steps: max_supervision_steps,
+        act_threshold: act_threshold
+      }
+    )
   end
 
   defp poll_loop(pid, deadline, interval) do
@@ -76,12 +74,7 @@ defmodule Jido.AI.Reasoning.TRM.CLIAdapter do
       case Jido.AI.CLI.Adapter.status(pid) do
         {:ok, status} ->
           if status.snapshot.done? do
-            answer =
-              case status.snapshot.result do
-                nil -> Map.get(status.raw_state, :last_result, "")
-                "" -> Map.get(status.raw_state, :last_result, "")
-                result -> result
-              end
+            answer = status.snapshot.result || ""
 
             {:ok, %{answer: answer, meta: extract_meta(status)}}
           else

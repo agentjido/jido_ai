@@ -5,10 +5,6 @@ defmodule Jido.AI.StableSmokeTest do
   @moduletag :unit
 
   defmodule StableSmokeCoDAgent do
-    use Jido.AI.CoDAgent,
-      name: "stable_smoke_cod_agent",
-      description: "Stable smoke fixture for CLI adapter wiring"
-
     def cli_adapter, do: Jido.AI.Reasoning.ChainOfDraft.CLIAdapter
   end
 

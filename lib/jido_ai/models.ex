@@ -47,14 +47,6 @@ defmodule Jido.AI.Models do
 
   def resolve(model), do: raise(ArgumentError, invalid_model_message(model, :invalid_model_input))
 
-  @doc false
-  @deprecated "Use aliases/0"
-  def model_aliases, do: aliases()
-
-  @doc false
-  @deprecated "Use resolve/1"
-  def resolve_model(model), do: resolve(model)
-
   defp validate_alias!(name, model) do
     validate_native!(model)
   rescue

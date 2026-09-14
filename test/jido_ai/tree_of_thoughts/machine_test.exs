@@ -396,7 +396,6 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.MachineTest do
       assert String.starts_with?(Machine.generate_call_id(), "tot_")
       assert Machine.default_generation_prompt() =~ "thoughts"
       assert Machine.default_evaluation_prompt() =~ "scores"
-      assert {:ok, ^machine} = Machine.before_transition(machine, "idle", "generating")
       assert Machine.diagnostics(machine, "child").best_node_id == "child"
     end
   end

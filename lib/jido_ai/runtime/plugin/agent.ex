@@ -9,9 +9,8 @@ defmodule Jido.AI.Runtime.Plugin.Agent do
   def directives(_opts), do: [Jido.AI.Configuration.Change]
 
   @impl Jido.Agent.Plugin
-  def validate_directive(change, opts), do: Jido.AI.Configuration.validate(change, opts)
-
-  @impl Jido.Agent.Plugin
-  def update_state(state, directives, opts),
-    do: Jido.AI.Configuration.reduce(state, directives, opts)
+  def reduce(reduction, opts) do
+    changes = Enum.filter(reduction.directives, &match?(%Jido.AI.Configuration.Change{}, &1))
+    Jido.AI.Configuration.reduce(reduction.plugin_state, changes, opts)
+  end
 end

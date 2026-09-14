@@ -12,16 +12,14 @@ defmodule Jido.AI.Context.Operations.Plugin.Agent do
   def directives(_opts), do: [Ops.Change]
 
   @impl Jido.Agent.Plugin
-  def validate_directive(%Ops.Change{} = change, opts) do
-    with :ok <- Ops.validate_state(%{change.profile_id => change.value}, opts[:profiles], nil),
-         do: {:ok, change}
-  end
-
-  @impl Jido.Agent.Plugin
-  def update_state(state, directives, _opts) do
-    {:ok,
-     Enum.reduce(directives, state, fn change, current ->
-       Map.put(current, change.profile_id, change.value)
-     end)}
+  def reduce(reduction, opts) do
+    reduction.directives
+    |> Enum.filter(&match?(%Ops.Change{}, &1))
+    |> Enum.reduce_while({:ok, reduction.plugin_state}, fn change, {:ok, state} ->
+      case Ops.validate_state(%{change.profile_id => change.value}, opts[:profiles], nil) do
+        :ok -> {:cont, {:ok, Map.put(state, change.profile_id, change.value)}}
+        error -> {:halt, error}
+      end
+    end)
   end
 end

@@ -15,7 +15,7 @@ defmodule JidoAI.Examples.StableAoTLifecycleTest do
       :telemetry.attach_many(
         id,
         [Observe.request(:start), Observe.request(:complete)],
-        &JidoAI.Examples.Linear.Telemetry.handle/4,
+        &JidoAI.Examples.Telemetry.handle/4,
         self()
       )
 

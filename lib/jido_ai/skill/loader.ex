@@ -256,8 +256,8 @@ defmodule Jido.AI.Skill.Loader do
         body_ref: {:inline, body},
         actions: [],
         plugins: [],
-        vsn: file_version(metadata, frontmatter, lenient),
-        tags: file_tags(metadata, frontmatter, lenient),
+        vsn: file_version(metadata),
+        tags: file_tags(metadata),
         diagnostics: diagnostics
       }
 
@@ -641,26 +641,14 @@ defmodule Jido.AI.Skill.Loader do
   defp invalid_field_warning(:compatibility), do: :invalid_compatibility
   defp invalid_field_warning(:license), do: :invalid_license
 
-  defp file_tags(%{"jido_ai.tags" => tags}, _frontmatter, _lenient),
+  defp file_tags(%{"jido_ai.tags" => tags}),
     do: String.split(tags, ~r/\s+/, trim: true)
 
-  defp file_tags(_metadata, frontmatter, true), do: parse_legacy_tags(frontmatter["tags"])
-  defp file_tags(_metadata, _frontmatter, false), do: []
+  defp file_tags(_metadata), do: []
 
-  defp file_version(%{"jido_ai.version" => version}, _frontmatter, _lenient), do: version
+  defp file_version(%{"jido_ai.version" => version}), do: version
 
-  defp file_version(_metadata, frontmatter, true),
-    do: optional_string(frontmatter["vsn"] || frontmatter["version"])
-
-  defp file_version(_metadata, _frontmatter, false), do: nil
-
-  defp parse_legacy_tags(nil), do: []
-  defp parse_legacy_tags(tags) when is_list(tags), do: Enum.map(tags, &to_string/1)
-  defp parse_legacy_tags(tags) when is_binary(tags), do: [tags]
-  defp parse_legacy_tags(tag), do: [to_string(tag)]
-
-  defp optional_string(value) when is_binary(value), do: value
-  defp optional_string(_value), do: nil
+  defp file_version(_metadata), do: nil
 
   defp normalize_or_fallback_name(original, "", diagnostics, _warning_type, _message_prefix) do
     fallback = fallback_name()

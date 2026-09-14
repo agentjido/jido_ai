@@ -18,10 +18,129 @@ defmodule Jido.AI.Test.ReasoningCase do
   end
 
   def definition(method, opts \\ []) do
-    [name: "root_reasoning", reasoning: method, streaming: false]
-    |> Keyword.merge(opts)
-    |> Jido.AI.Agent.Options.lower!()
-    |> Jido.Agent.new!()
+    opts = Keyword.merge([name: "root_reasoning", streaming: false], opts)
+    model = Keyword.get(opts, :model, :fast)
+    output = Jido.AI.Output.new!(opts[:output])
+
+    generation =
+      opts
+      |> Keyword.get(:llm_opts, [])
+      |> Jido.AI.Reasoning.ReAct.Config.normalize_option_names()
+      |> Enum.into([])
+      |> then(fn values ->
+        values = if opts[:temperature], do: Keyword.put(values, :temperature, opts[:temperature]), else: values
+        values = if opts[:max_tokens], do: Keyword.put(values, :max_tokens, opts[:max_tokens]), else: values
+
+        values =
+          if opts[:llm_timeout_ms],
+            do: Keyword.put(values, :receive_timeout, opts[:llm_timeout_ms]),
+            else: values
+
+        if opts[:req_http_options],
+          do: Keyword.put(values, :req_http_options, opts[:req_http_options]),
+          else: values
+      end)
+
+    instructions =
+      case opts[:system_prompt] do
+        value when value in [nil, false, ""] -> default_instructions(method)
+        value -> value
+      end
+
+    tools =
+      Enum.map(Keyword.get(opts, :tools, []), fn target ->
+        %{
+          target: target,
+          forward_context: :all,
+          timeout: Keyword.get(opts, :tool_timeout_ms, 15_000),
+          max_retries: Keyword.get(opts, :tool_max_retries, 1),
+          retry_backoff: Keyword.get(opts, :tool_retry_backoff_ms, 200)
+        }
+      end)
+
+    result =
+      if output do
+        %{
+          schema: output.schema,
+          into: :last_result,
+          max_repairs: if(output.on_validation_error == :repair, do: output.retries, else: 0),
+          repair_fun: output.repair_fun,
+          on_validation_error: output.on_validation_error
+        }
+      else
+        %{schema: nil, into: :last_result}
+      end
+
+    requests = %{
+      mode: :session,
+      streaming: Keyword.get(opts, :streaming, false),
+      steering: method == :react,
+      on_busy: Keyword.get(opts, :request_policy, :reject)
+    }
+
+    requests =
+      if timeout = opts[:stream_timeout_ms],
+        do: Map.put(requests, :idle_timeout, timeout),
+        else: requests
+
+    profile =
+      Jido.AI.profile!(%{
+        id: :assistant,
+        instructions: instructions,
+        models: %{answer: %{model: model, generation: generation}},
+        reasoning: %{
+          method: method,
+          model: :answer,
+          options: Keyword.get(opts, :reasoning_options, %{}),
+          request_transformer: opts[:request_transformer],
+          effect_policy: Keyword.get(opts, :strategy_effect_policy, %{})
+        },
+        controls: %{
+          max_iterations: Keyword.get(opts, :max_iterations, 10),
+          max_model_calls: Keyword.get(opts, :max_model_calls, Keyword.get(opts, :max_iterations, 10)),
+          max_tool_calls: Keyword.get(opts, :max_tool_calls, 16),
+          timeout: Keyword.get(opts, :request_timeout_ms, 60_000)
+        },
+        requests: requests,
+        effect_policy: Keyword.get(opts, :effect_policy, %{}),
+        tool_context: Keyword.get(opts, :tool_context, %{}),
+        tools: tools,
+        result: result,
+        memory: %{history: if(method == :react, do: :messages, else: nil)}
+      })
+
+    schema =
+      Zoi.object(%{
+        model: Zoi.any() |> Zoi.default(model),
+        last_request_id: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),
+        last_query: Jido.AI.Query.schema() |> Zoi.default(""),
+        last_prompt: Jido.AI.Query.schema() |> Zoi.default(""),
+        last_result: Zoi.any() |> Zoi.default(nil),
+        completed: Zoi.boolean() |> Zoi.default(false),
+        messages: Zoi.list(Zoi.map()) |> Zoi.default([]),
+        selected_strategy: Zoi.atom() |> Zoi.nullable() |> Zoi.default(nil)
+      })
+
+    {:ok, definition} =
+      Jido.AI.Authoring.lower(
+        %{
+          name: opts[:name],
+          schema: schema,
+          plugins: [],
+          routes: [{"ai.#{Jido.AI.Reasoning.label(method)}.query", Jido.AI.Authoring.ai(:assistant)}]
+        },
+        [profile]
+      )
+
+    definition
+  end
+
+  defp default_instructions(method) do
+    cond do
+      Jido.AI.Reasoning.Linear.linear?(method) -> Jido.AI.Reasoning.Linear.default_prompt(method)
+      method == :react -> Jido.AI.Reasoning.react_prompt()
+      true -> nil
+    end
   end
 
   def start_reasoning(jido, method, opts \\ []) do

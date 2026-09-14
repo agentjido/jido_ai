@@ -36,17 +36,17 @@ that is already running. Cancel returns a replacement terminal token.
 
 ## Evidence and limits
 
-Seventeen example cases prove both boundaries, pending-tool permission,
-completed-tool history, new-process domain state, new HTTP transport, saved
+The example cases prove both boundaries, completed-tool history, new-process
+domain state, new HTTP transport, saved
 limits and usage, typed repair, invalid signed phase data, code binding,
 cancellation, exhausted time and expiry. One test launches a new operating-system
 VM with the same code and fresh runtime resources. It resumes after tools,
 produces the final answer and confirms that the completed tool does not run again.
 
-This is caller-owned checkpoint data. A copied or older token can still replay
+This is caller-owned checkpoint data. A copied token can still replay
 work. There is no durable single-consumer record or general exactly-once claim.
-Partial tool batches, old progressed-state conversion, query append and external
-pending-input queues remain open. Pending directives that contain live values
+Partial tool batches, query append, and external pending-input queues are
+outside this example. Pending directives that contain live values
 need a resource-rebinding contract before they can be saved.
 
 This does not prove the Agent persistence API, durable backup/restore, rollback,
@@ -56,15 +56,9 @@ checks, and the minimum supported runtime remain required.
 
 ## Validation
 
-The focused run passed 60 checks: 17 new cases, 30 earlier standalone cases,
-11 retained root Token cases and two retained PendingToolCall cases.
-
-The initial run passed 0 of 7. Tool responses first exposed provider callback
-handles in Context. Token signing then exposed a pending-call duration field
-that rejected its valid nil value. Signing errors now return through the Flow
-instead of crashing the Session owner. A saved repair response exposed missing
-validation input; the checkpoint now retains and checks that input. The new-VM
-fixture explicitly loads known application modules before safe token decoding.
+The focused run includes the example cases and the Token and PendingToolCall
+contract cases. The new-VM fixture loads known application modules before safe
+token decoding.
 
 Run from the repository root:
 
@@ -73,13 +67,12 @@ mix test test/examples/14_resume/14_03_checkpoint_resume/14_03_checkpoint_resume
 ```
 
 See the [implementation record](../../../docs/v3-spike/implementation.md) for
-the full acceptance, default exclusion, build and format results.
+design history.
 
 ## Later native continuation work
 
 [14_07](../14_07_standalone_input/README.md) adds caller-supplied input queues.
 [14_08](../14_08_query_append/README.md) adds query append for initial State and native
 checkpoints, including new terminal continuation data. Native checkpoint
-version 2 keeps reasoning iteration separate from model-call count; version 1
-native tokens still resume. Released v2 progressed State and restart from
-failure/cancellation remain separate conversion work.
+version 2 keeps reasoning iteration separate from model-call count. Restart
+from failure or cancellation is not supported.

@@ -49,8 +49,8 @@ The result retains `best`, ranked `candidates`, `termination`, `tree`, `usage`
 and `diagnostics`. Candidate paths include the original problem. Request
 metadata also retains nodes and the selected path. Output controls receive the
 whole result before a domain state write. Failure results retain diagnostics,
-structured causes and measured usage. The compatibility status strings remain
-`"completed"` and `"error"`.
+structured causes and measured usage. Status strings are `"completed"` and
+`"error"`.
 
 | Rule | Execution evidence |
 | --- | --- |
@@ -61,14 +61,14 @@ structured causes and measured usage. The compatibility status strings remain
 | Search duration | A held response reaches the search budget; evaluation returns the best candidate |
 | Request deadline | The common deadline stops the active transport; it is separate from the search stop rule |
 | Parser repair | One bounded model repair, no advertised tools, complete usage and failure diagnostics |
-| Legacy parsing | Numbered thoughts and default evaluation scores still work |
+| Text parsing | Numbered thoughts and default evaluation scores work |
 | Tools and callbacks | Before hook precedes validation; after hook transforms results; reverse completion preserves call order |
 | Request failure and recovery | No failed domain write; cancellation and owner loss allow a later request |
 | Authoring | DSL, data, Builder and registered source JSON produce the same definition; direct Flow returns the same result contract |
 
 ReqLLM can return streamed JSON as a decoded object with no text. The adapter
 reads that object. It does not turn an empty text field into a parser failure.
-The JSON-first parser retains the legacy numbered-text fallback and positional
+The JSON-first parser has a numbered-text fallback and positional
 `t1`, `t2` score keys. Unspecified scores still receive 0.5. This is the retained
 parser behavior; it is not strict score validation.
 
@@ -88,16 +88,15 @@ including a provider response with too many entries.
 The [Machine](../../../lib/jido_ai/reasoning/tree_of_thoughts/machine.ex) and
 [Result](../../../lib/jido_ai/reasoning/tree_of_thoughts/result.ex) keep their module names.
 Finite transitions replace Fsmx. Usage uses the shared nested-metadata merge.
-The compatibility Machine still emits its legacy telemetry by default; the
-native adapter disables it and uses the common observation path.
+The standalone Machine emits its lifecycle telemetry by default. The native
+adapter disables it and uses the common observation path.
 
 Current limits are explicit. Native ToT accepts text queries and rejects
 steering and a declared typed result schema. The later
 [09_05 example](../09_05_tot_api/README.md) ports public helpers, retained namespace
 getters, Strategy inspection mapping and the PR 347 alias workflow. CLI and
 capability entry points, live tree inspection, full provider failure variants,
-state conversion and checkpoint resume remain separate gates. The root package
-still has v2 dependencies.
+checkpoint resume are outside this example.
 
 Run `mix test --include example --seed 0 test/examples/09_reasoning/09_04_tot/09_04_tot_test.exs`
 from the repository root. The 26

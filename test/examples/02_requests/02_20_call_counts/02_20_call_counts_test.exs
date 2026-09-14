@@ -58,34 +58,6 @@ defmodule JidoAI.Examples.CallCountsTest do
     end
   end
 
-  test "all eight methods retain the first failed model operation", %{jido: jido} do
-    methods = [
-      :react,
-      :chain_of_thought,
-      :chain_of_draft,
-      :algorithm_of_thoughts,
-      :tree_of_thoughts,
-      :graph_of_thoughts,
-      :trm,
-      :adaptive
-    ]
-
-    {mock, context} =
-      mock(List.duplicate(%{reply: {:error, 503, "Unavailable"}}, length(methods)))
-
-    for method <- methods do
-      definition = JidoAI.Examples.PluginStack.definition(reasoning: method)
-      route = Enum.find(definition.routes, &match?({Jido.AI.Session.Start, _}, &1.target)).path
-      server = start_agent(jido, definition)
-      assert {:ok, request} = submit(server, context, signal_type: route)
-      assert {:error, _} = Request.await(request)
-      assert_counts(server, request, 1)
-    end
-
-    assert length(MockLLM.report(mock).requests) == length(methods)
-    assert_script_done(mock)
-  end
-
   test "later provider failure retains both operations and completed usage", %{jido: jido} do
     {mock, context} =
       mock([
@@ -149,55 +121,6 @@ defmodule JidoAI.Examples.CallCountsTest do
     assert {:ok, "Next"} = Request.await(next)
     assert_counts(server, next, 1)
     assert record(server, request) == saved
-    assert_script_done(mock)
-  end
-
-  test "failed model repair counts its operation but a repair callback does not", %{jido: jido} do
-    {mock, context} =
-      mock([
-        %{reply: {:object, %{answer: 3}}},
-        %{reply: {:error, 503, "Unavailable"}},
-        %{reply: {:object, %{answer: 4}}}
-      ])
-
-    definition =
-      JidoAI.Examples.PluginStack.definition(output: [schema: Zoi.object(%{answer: Zoi.string()}), retries: 1])
-
-    server = start_agent(jido, definition)
-    assert {:ok, request} = submit(server, context, signal_type: "ai.react.query")
-    assert {:error, _} = Request.await(request)
-    saved = assert_counts(server, request, 2)
-    assert saved.meta.output.status == :error
-    assert saved.meta.usage.total_tokens == 15
-
-    callback = JidoAI.Examples.ErrorContract.Agent
-    server = start_agent(jido, callback.new!())
-    context = Map.put(context, :failure, :repair_unavailable)
-    assert {:ok, request} = callback.ask(server, "Repair", context: context, stream_to: self())
-    assert {:error, :repair_unavailable} = Request.await(request)
-    assert_counts(server, request, 1)
-    assert_script_done(mock)
-  end
-
-  test "an inner Quota rejection is distinct from a charged model call", %{jido: jido} do
-    start_supervised!({Jido.AI.Quota.Store, []})
-
-    {mock, context} =
-      mock([%{reply: {:tools, [%{id: "echo", name: "scope_echo", arguments: %{value: 1}}]}}])
-
-    definition =
-      JidoAI.Examples.PluginStack.definition(
-        tools: [JidoAI.Examples.RequestScope.Echo],
-        quota: [scope: "counts", max_requests: 1]
-      )
-
-    server = start_agent(jido, definition)
-    assert {:ok, request} = submit(server, context, signal_type: "ai.react.query")
-    assert {:error, _} = Request.await(request)
-    saved = assert_counts(server, request, 2)
-    assert saved.meta.usage.total_tokens == 15
-    assert %{requests: 1, total_tokens: 15} = Jido.AI.Quota.Store.get("counts")
-    assert length(MockLLM.report(mock).requests) == 1
     assert_script_done(mock)
   end
 

@@ -276,30 +276,6 @@ defmodule JidoAI.Examples.QueryAppendTest do
     assert_script_done(mock)
   end
 
-  test "a version-one native checkpoint retains its old outer counter and resumes on version two",
-       %{jido: jido} do
-    {mock, _} = mock([tool(), %{reply: {:text, "Upgraded"}}])
-    config = config(mock, tools: [Add])
-    point = checkpoint(ReAct.stream("Sum", config, opts(jido)), :after_tools)
-    assert {:ok, saved, _} = Token.decode_state(point.data.token, config)
-
-    old = %{
-      saved
-      | iteration: saved.checkpoint.runtime.model_calls,
-        checkpoint: %{saved.checkpoint | version: 1}
-    }
-
-    token = Token.issue(old, config)
-    assert {:ok, next} = ReAct.continue(token, config, opts(jido))
-    result = ReAct.collect_stream(next.events)
-    assert result.result == "Upgraded"
-    assert {:ok, final, _} = Token.decode_state(result.final_token, config)
-    assert final.iteration == 2 and final.checkpoint.version == 2
-    assert_receive {:standalone_add, _, 2, 3}
-    refute_receive {:standalone_add, _, _, _}, 20
-    assert_script_done(mock)
-  end
-
   defp tool, do: %{reply: {:tools, [%{id: "sum", name: "add", arguments: %{a: 2, b: 3}}]}}
 
   defp checkpoint(events, phase),

@@ -2,8 +2,8 @@ defmodule Jido.AI.Plugins.Quota do
   @moduledoc """
   Quota configuration, live admission and correlated model accounting.
 
-  Supervise `Jido.AI.Quota.Store` before use. Keyword configuration replaces v2
-  mount configuration. Status/reset routes use a declared result field, default
+  Supervise `Jido.AI.Quota.Store` before use. Use keyword configuration.
+  Status/reset routes use a declared result field, default
   `:result`. Pure preparation binds policy; live admission checks current usage.
   Each guarded provider invocation rechecks the shared budget atomically and
   records known usage before the Agent commit. Failed or cancelled calls with no
@@ -83,42 +83,40 @@ defmodule Jido.AI.Plugins.Quota do
   end
 
   @doc false
-  def prepare_command(command, opts) do
-    state = effective_command_state(command)
-
-    context =
-      command.context
-      |> Map.put(:quota_store, Keyword.get(opts, :store, Store))
-      |> Map.put(:jido_ai_quota, binding(command, opts))
-      |> Map.delete(:jido_ai_quota_call_id)
+  def prepare_input(preparation, opts) do
+    state = effective_state(preparation.plugin_state, preparation.agent_id)
 
     capability =
-      if action = @routes[command.signal.type],
+      if action = @routes[preparation.signal.type],
         do: %{
           action: action,
           defaults: state,
           key: :quota,
+          store: Keyword.get(opts, :store, Store),
           into: Keyword.get(opts, :into, :result)
         }
 
-    Jido.AI.Capability.bind(
-      %{command | context: context},
-      :jido_ai_quota_capability,
-      capability
-    )
+    {:ok, %{binding: binding(preparation, opts), capability: capability}}
   end
 
   @doc false
-  def admit_command(command, opts) do
-    binding = binding(command, opts)
+  def admit_input(admission) do
+    prepared = admission.prepared_input.binding
+
+    binding = %{
+      prepared
+      | enabled:
+          admission.plugin_state.enabled and
+            (prepared.enabled or Jido.AI.Runtime.Plugin.native_request?(admission))
+    }
 
     cond do
-      command.signal.type == "ai.usage" and is_map(command.signal.data) ->
-        data = command.signal.data
+      admission.signal.type == "ai.usage" and is_map(admission.signal.data) ->
+        data = admission.signal.data
 
         id =
           Map.get(data, :call_id, Map.get(data, "call_id")) ||
-            Jido.AI.Signal.Helpers.correlation_id(data) || command.signal.id
+            Jido.AI.Signal.Helpers.correlation_id(data) || admission.signal.id
 
         _ =
           Store.record_usage(
@@ -129,37 +127,53 @@ defmodule Jido.AI.Plugins.Quota do
             binding.store
           )
 
-        {:ok, command}
+        {:ok, %{binding: binding}}
 
       binding.enabled and
           Store.status(binding.scope, binding, binding.window_ms, binding.store).over_budget? ->
         {:error, Jido.AI.Quota.error(binding)}
 
       true ->
-        {:ok, command}
+        {:ok, %{binding: binding}}
     end
   end
 
-  defp effective_command_state(command) do
-    state = command.agent.state.quota
-    %{state | scope: state.scope || command.agent.id || "default"}
+  @doc false
+  def binding_for_agent(%Jido.Agent{} = agent, signal) do
+    case Enum.find(agent.plugins, &(elem(&1, 0) == __MODULE__)) do
+      {__MODULE__, opts} ->
+        state = agent.state.quota
+        prepared = binding(%{plugin_state: state, agent_id: agent.id, signal: signal}, opts)
+
+        %{
+          prepared
+          | enabled:
+              state.enabled and
+                (prepared.enabled or not is_nil(Jido.AI.Runtime.Binding.request(agent, signal)))
+        }
+
+      nil ->
+        nil
+    end
   end
 
-  defp binding(command, opts) do
-    state = effective_command_state(command)
-    type = command.signal.type
+  defp effective_state(state, agent_id), do: %{state | scope: state.scope || agent_id || "default"}
+
+  defp binding(preparation, opts) do
+    state = effective_state(preparation.plugin_state, preparation.agent_id)
+    type = preparation.signal.type
 
     budgeted =
       type in @budgeted or
         (String.starts_with?(type, "reasoning.") and String.ends_with?(type, ".run")) or
-        not is_nil(Jido.AI.Runtime.Binding.request(command.agent, command.signal))
+        (String.starts_with?(type, "ai.") and String.ends_with?(type, ".query"))
 
     state
     |> Map.put(:enabled, state.enabled and budgeted)
     |> Map.put(:store, Keyword.get(opts, :store, Store))
     |> Map.put(
       :request_id,
-      Jido.AI.Signal.Helpers.correlation_id(command.signal.data) || command.signal.id
+      Jido.AI.Signal.Helpers.correlation_id(preparation.signal.data) || preparation.signal.id
     )
     |> Map.put(:signal_type, type)
   end
@@ -171,6 +185,9 @@ defmodule Jido.AI.Plugins.Quota.Agent do
 
   @impl Jido.Agent.Plugin
   def state_spec(opts), do: Jido.AI.Plugins.Quota.agent_state_spec(opts)
+
+  @impl Jido.Agent.Plugin
+  def prepare(preparation, opts), do: Jido.AI.Plugins.Quota.prepare_input(preparation, opts)
 end
 
 defmodule Jido.AI.Plugins.Quota.AgentServer do
@@ -178,8 +195,5 @@ defmodule Jido.AI.Plugins.Quota.AgentServer do
   use Jido.AgentServer.Plugin
 
   @impl Jido.AgentServer.Plugin
-  def admit(_runtime, command, opts) do
-    with {:ok, command} <- Jido.AI.Plugins.Quota.prepare_command(command, opts),
-         do: Jido.AI.Plugins.Quota.admit_command(command, opts)
-  end
+  def admit(_runtime, admission, _opts), do: Jido.AI.Plugins.Quota.admit_input(admission)
 end

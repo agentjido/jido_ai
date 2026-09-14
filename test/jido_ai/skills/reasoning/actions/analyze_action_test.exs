@@ -29,7 +29,7 @@ defmodule Jido.AI.Actions.Reasoning.AnalyzeTest do
                Analyze.run(%{input: "I loved this release.", analysis_type: :sentiment}, %{})
 
       assert result.analysis_type == :sentiment
-      assert result.model == Jido.AI.resolve_model(:reasoning)
+      assert result.model == Jido.AI.Models.resolve(:reasoning)
       assert result.result =~ "Stubbed response for: I loved this release."
       assert_usage(result.usage)
     end

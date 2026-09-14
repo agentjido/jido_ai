@@ -176,7 +176,7 @@ defmodule Jido.AI.Reasoning.TRM.Helpers do
   end
 
   @doc """
-  Creates the legacy printable error message.
+  Creates a printable error message.
 
   String messages are shortened and filtered. The function does not identify
   secrets in arbitrary strings. The canonical v3 error retains its own cause.

@@ -10,14 +10,14 @@ defmodule Jido.AI.Skill.AgentIntegration do
   bounds and a custom trust predicate. Keyword options do not trust any root
   unless `:trust` is explicitly set.
 
-  Hosts may also pass runtime `%Jido.AI.Skill.Spec{}` values with `source: nil`
-  and inline bodies:
+  Hosts can pass runtime `%Jido.AI.Skill.Spec{}` values with `source: nil` and
+  inline bodies:
 
-      agent_skills: [
+      Jido.AI.Skill.AgentIntegration.prepare(
         specs: runtime_specs,
         resource_provider: {MyApp.SkillResources, :handle},
         resource_policy: [max_text_bytes: 131_072]
-      ]
+      )
 
   Runtime specs are validated, preserved without filesystem discovery or
   filesystem roots, and added to the same scoped catalog as discovered skills.
@@ -27,8 +27,8 @@ defmodule Jido.AI.Skill.AgentIntegration do
   rejected. Module actions join the automatic tool catalog; module Plugins
   must be declared separately in the Agent definition.
 
-  Static AI profiles accept boolean or MFA trust callbacks. Direct calls to
-  this module also accept the existing runtime trust function.
+  Static AI profiles accept boolean or MFA trust callbacks. Direct calls can
+  also use a runtime trust function.
 
   The catalog contains metadata-only discovered specs. Full files are read and
   strictly validated only after the model selects a filesystem skill. Runtime
@@ -80,18 +80,18 @@ defmodule Jido.AI.Skill.AgentIntegration do
         prepare_options(paths: paths, trust: true)
 
       true ->
-        {:error, {:invalid_agent_skills_option, :paths}}
+        {:error, {:invalid_skill_source, :paths}}
     end
   end
 
-  def prepare(_value), do: {:error, {:invalid_agent_skills_option, :expected_boolean_paths_or_keyword}}
+  def prepare(_value), do: {:error, {:invalid_skill_source, :expected_boolean_paths_or_keyword}}
 
   @doc false
   @spec prepare!(false | nil | true | [String.t()] | keyword()) :: t()
   def prepare!(value \\ false) do
     case prepare(value) do
       {:ok, integration} -> integration
-      {:error, reason} -> raise ArgumentError, "invalid agent_skills configuration: #{inspect(reason)}"
+      {:error, reason} -> raise ArgumentError, "invalid skill source configuration: #{inspect(reason)}"
     end
   end
 
@@ -142,7 +142,7 @@ defmodule Jido.AI.Skill.AgentIntegration do
   defp discover(paths, opts) when is_list(paths),
     do: Discovery.discover_from_with_diagnostics(paths, opts)
 
-  defp discover(_paths, _opts), do: {:error, {:invalid_agent_skills_option, :paths}}
+  defp discover(_paths, _opts), do: {:error, {:invalid_skill_source, :paths}}
 
   defp catalog_specs(metadata) do
     Enum.reduce_while(metadata, {:ok, []}, fn item, {:ok, specs} ->
@@ -170,7 +170,7 @@ defmodule Jido.AI.Skill.AgentIntegration do
     end
   end
 
-  defp runtime_specs(_specs), do: {:error, {:invalid_agent_skills_option, :specs}}
+  defp runtime_specs(_specs), do: {:error, {:invalid_skill_source, :specs}}
 
   defp module_specs(modules) when is_list(modules) do
     Enum.reduce_while(modules, {:ok, []}, fn module, {:ok, specs} ->
@@ -181,12 +181,12 @@ defmodule Jido.AI.Skill.AgentIntegration do
            :ok <- Jido.Action.validate_static_data(spec) do
         {:cont, {:ok, specs ++ [spec]}}
       else
-        _ -> {:halt, {:error, {:invalid_agent_skills_option, :modules}}}
+        _ -> {:halt, {:error, {:invalid_skill_source, :modules}}}
       end
     end)
   end
 
-  defp module_specs(_), do: {:error, {:invalid_agent_skills_option, :modules}}
+  defp module_specs(_), do: {:error, {:invalid_skill_source, :modules}}
 
   defp unique_runtime_name(name, index, names) do
     case Map.fetch(names, name) do

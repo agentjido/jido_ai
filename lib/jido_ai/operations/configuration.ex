@@ -1,6 +1,31 @@
 defmodule Jido.AI.Configuration.Change do
   @moduledoc "A validated tool, prompt or base context change for one declared AI profile."
+  use Jido.Agent.Directive
   defstruct [:profile_id, :operation, :value]
+
+  @impl Jido.Agent.Directive
+  def validate(%__MODULE__{profile_id: id, operation: operation, value: value} = change) do
+    valid =
+      is_atom(id) and not is_nil(id) and
+        case operation do
+          :register -> is_atom(value) and not is_nil(value)
+          :tools -> is_list(value)
+          :tool_context -> is_map(value) and not is_struct(value)
+          op when op in [:unregister, :prompt] -> is_binary(value)
+          _ -> false
+        end
+
+    if valid do
+      case Jido.Action.validate_static_data(change) do
+        :ok -> {:ok, change}
+        error -> error
+      end
+    else
+      Jido.AI.Profile.error("configuration", "Invalid configuration change")
+    end
+  end
+
+  def validate(_), do: Jido.AI.Profile.error("configuration", "Expected a configuration directive")
 end
 
 defmodule Jido.AI.Configuration do
@@ -14,13 +39,7 @@ defmodule Jido.AI.Configuration do
   def type, do: @type_name
 
   def routes do
-    [
-      {@type_name, Jido.AI.Configuration.Apply},
-      {"ai.react.register_tool", {Jido.AI.Configuration.Apply, %{operation: :register}}},
-      {"ai.react.unregister_tool", {Jido.AI.Configuration.Apply, %{operation: :unregister}}},
-      {"ai.react.set_tool_context", {Jido.AI.Configuration.Apply, %{operation: :tool_context}}},
-      {"ai.react.set_system_prompt", {Jido.AI.Configuration.Apply, %{operation: :prompt}}}
-    ]
+    [{@type_name, Jido.AI.Configuration.Apply}]
   end
 
   def options(agent) do
@@ -42,7 +61,6 @@ defmodule Jido.AI.Configuration do
     profiles = Keyword.fetch!(opts, :profiles)
 
     cond do
-      opts[:legacy_agent_profile] -> select_id(opts, opts[:legacy_agent_profile])
       Map.has_key?(profiles, :assistant) -> {:ok, :assistant}
       map_size(profiles) == 1 -> {:ok, hd(Map.keys(profiles))}
       true -> Profile.error("profile", "Select a profile for this Agent")
@@ -71,25 +89,11 @@ defmodule Jido.AI.Configuration do
   def profiles(_, _), do: Profile.error("configuration", "Expected profile overrides")
 
   def validate(%Change{profile_id: id, operation: operation, value: value} = change, opts) do
-    valid =
-      not is_nil(id) and
-        case operation do
-          :register -> is_atom(value) and not is_nil(value)
-          :tools -> is_list(value)
-          :tool_context -> is_map(value) and not is_struct(value)
-          op when op in [:unregister, :prompt] -> is_binary(value)
-          _ -> false
-        end
-
-    with true <- valid,
+    with {:ok, change} <- Change.validate(change),
          {:ok, _} <- select_id(opts, id),
          :ok <- tool_list(operation, value),
-         :ok <- context_value(operation, value),
-         :ok <- Jido.Action.validate_static_data(change) do
+         :ok <- context_value(operation, value) do
       {:ok, change}
-    else
-      false -> Profile.error("configuration", "Invalid configuration change")
-      error -> error
     end
   end
 
@@ -196,6 +200,11 @@ defmodule Jido.AI.Configuration.Apply do
   alias Jido.AI.Configuration
 
   def run(params, context) do
+    with {:ok, context} <- Jido.AI.Session.Plugin.context(context),
+         do: apply_change(params, context)
+  end
+
+  defp apply_change(params, context) do
     agent = context.jido_ai_agent
 
     value =

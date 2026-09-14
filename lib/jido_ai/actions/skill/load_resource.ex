@@ -6,8 +6,8 @@ defmodule Jido.AI.Actions.Skill.LoadResource do
   skill that is not active in that session. It applies the resource policy that
   was stored during activation.
 
-  Filesystem skills load by `relative_path` and retain the legacy `path` alias.
-  Runtime specs configured with `:resource_provider` load by opaque
+  Filesystem skills load by `relative_path`. Runtime specs configured with
+  `:resource_provider` load by opaque
   `resource_id`; the provider is invoked on every authorized load and its output
   is validated before returning content to the model. Binary resources require
   an explicit resource policy and use content parts for attachment transport.
@@ -17,8 +17,7 @@ defmodule Jido.AI.Actions.Skill.LoadResource do
     name: "load_skill_resource",
     description: """
     Loads one text, image, or file resource from an activated skill. Use resource_id for
-    provider-backed runtime skills. Use relative_path for filesystem skills;
-    path remains accepted as a compatibility alias.
+    provider-backed runtime skills. Use relative_path for filesystem skills.
     """,
     schema:
       Zoi.object(%{
@@ -28,8 +27,7 @@ defmodule Jido.AI.Actions.Skill.LoadResource do
           |> Zoi.optional(),
         relative_path:
           Zoi.string(description: "A relative filesystem resource path from the skill listing")
-          |> Zoi.optional(),
-        path: Zoi.string(description: "Compatibility alias for relative_path") |> Zoi.optional()
+          |> Zoi.optional()
       })
       |> Zoi.refine({__MODULE__, :validate_resource_selector, []})
 
@@ -47,7 +45,7 @@ defmodule Jido.AI.Actions.Skill.LoadResource do
   @name_regex ~r/^[a-z0-9]+(-[a-z0-9]+)*$/
   @max_name_length 64
   @max_path_length 1_024
-  @selector_error "exactly one of resource_id, relative_path, or path is required"
+  @selector_error "exactly one of resource_id or relative_path is required"
 
   @doc false
   @spec validate_resource_selector(map(), keyword()) :: :ok | {:error, String.t()}
@@ -55,7 +53,7 @@ defmodule Jido.AI.Actions.Skill.LoadResource do
 
   def validate_resource_selector(params, _opts) when is_map(params) do
     selector_count =
-      [:resource_id, :relative_path, :path]
+      [:resource_id, :relative_path]
       |> Enum.count(fn key -> present_selector?(Map.get(params, key)) end)
 
     if selector_count == 1, do: :ok, else: {:error, @selector_error}
@@ -111,33 +109,29 @@ defmodule Jido.AI.Actions.Skill.LoadResource do
   end
 
   defp validate_selector(params, %{resource_backend: :provider}) do
-    case {param(params, :resource_id), param(params, :relative_path), param(params, :path)} do
-      {resource_id, nil, nil} ->
+    case {param(params, :resource_id), param(params, :relative_path)} do
+      {resource_id, nil} ->
         validate_resource_id(resource_id)
 
-      {_resource_id, _relative_path, _path} ->
+      {_resource_id, _relative_path} ->
         invalid_resource_id(param(params, :resource_id), :invalid_provider_selector)
     end
   end
 
   defp validate_selector(params, %{resource_backend: :filesystem}) do
-    case {param(params, :resource_id), param(params, :relative_path), param(params, :path)} do
-      {nil, relative_path, nil} ->
+    case {param(params, :resource_id), param(params, :relative_path)} do
+      {nil, relative_path} ->
         validate_path(relative_path)
 
-      {nil, nil, path} ->
-        validate_path(path)
-
-      {_resource_id, _relative_path, _path} ->
-        invalid_path(param(params, :relative_path) || param(params, :path), :invalid_filesystem_selector)
+      {_resource_id, _relative_path} ->
+        invalid_path(param(params, :relative_path), :invalid_filesystem_selector)
     end
   end
 
   defp validate_selector(params, _activation) do
-    case {param(params, :resource_id), param(params, :relative_path), param(params, :path)} do
-      {nil, relative_path, nil} -> validate_path(relative_path)
-      {nil, nil, path} -> validate_path(path)
-      {resource_id, nil, nil} -> validate_resource_id(resource_id)
+    case {param(params, :resource_id), param(params, :relative_path)} do
+      {nil, relative_path} -> validate_path(relative_path)
+      {resource_id, nil} -> validate_resource_id(resource_id)
       _ -> invalid_path(nil, :invalid_resource_selector)
     end
   end

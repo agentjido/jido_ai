@@ -30,7 +30,7 @@ defmodule Jido.AI.Actions.LLM.ChatTest do
   describe "run/2" do
     test "returns response on happy path with default model resolution" do
       assert {:ok, result} = Chat.run(%{prompt: "Hello world"}, %{})
-      assert result.model == Jido.AI.resolve_model(:fast)
+      assert result.model == Jido.AI.Models.resolve(:fast)
       assert result.text =~ "Stubbed response for: Hello world"
       assert result.usage.input_tokens > 0
       assert result.usage.output_tokens > 0
@@ -102,7 +102,7 @@ defmodule Jido.AI.Actions.LLM.ChatTest do
       }
 
       expect(ReqLLM.Generation, :generate_text, fn model, messages, opts ->
-        assert model == Jido.AI.resolve_model(:capable)
+        assert model == Jido.AI.Models.resolve(:capable)
         assert opts[:max_tokens] == 222
         assert opts[:temperature] == 0.15
         assert has_system_prompt?(messages, "You are concise")
@@ -112,7 +112,7 @@ defmodule Jido.AI.Actions.LLM.ChatTest do
 
       assert {:ok, result} = Chat.run(%{prompt: "hello"}, context)
       assert result.text == "ok"
-      assert result.model == Jido.AI.resolve_model(:capable)
+      assert result.model == Jido.AI.Models.resolve(:capable)
     end
 
     test "explicit params override plugin defaults" do

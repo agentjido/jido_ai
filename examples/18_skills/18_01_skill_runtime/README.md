@@ -10,8 +10,8 @@ The public Agent and native AI DSL use the same runtime.
 The host prepares a catalogue with `Jido.AI.Skill.AgentIntegration.prepare/1`
 and adds its `tool_context` fields to the trusted request context. The example
 uses explicit loading tools. This low-level path remains available.
-[18_02](../18_02_skill_authoring/README.md) adds `agent_skills`, automatic tools/index
-setup and the native `skills` block. Compilation and static definition
+[18_02](../18_02_skill_authoring/README.md) adds automatic tools and index setup
+through the native `skills` block. Compilation and static definition
 validation do not read the filesystem.
 
 ```elixir
@@ -64,11 +64,10 @@ callback can change the approved instructions. Renaming, failed activation,
 failed callbacks and a different Action named `load_skill` cannot create trusted
 refs. User refs cannot add skill durability to user or tool history.
 
-Session commits the approved result and its refs. The Agent-owned session thread keeps
-them. Compaction preserves its matching assistant call and actual instructions;
-the next captured HTTP request contains them. Direct host-imported history
-remains a trusted host operation, as defined in
-[02_23](../../02_requests/02_23_context_operations/README.md). This is not a cryptographic provenance
+Session commits the approved result and its refs. The Agent-owned session thread
+keeps them. Compaction preserves its matching assistant call and actual
+instructions; the next captured HTTP request contains them. Direct host-imported
+history remains a trusted host operation. This is not a cryptographic provenance
 format or a permission to load resources after restore.
 
 ## Resources and provider transport
@@ -98,7 +97,5 @@ and the skill CLI test file. They require package/CLI validation and remain open
 They were not counted as passing or added to the default example suite.
 
 History links add partial evidence for PRs 286, 316, 325, 353, 354, 358 and 360.
-All release/history statuses remain pending. Automatic skills authoring,
-standalone skill continuation, full old-Agent conversion, packaged resources,
-CLI, provider variants, complete failure/recovery, the minimum runtime and root
-package/consumer/migration/rollback gates remain required.
+This example does not cover standalone skill continuation, packaged resources,
+all provider variants, or complete failure and recovery behavior.

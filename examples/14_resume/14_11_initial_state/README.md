@@ -44,12 +44,9 @@ new thread entries use current owned request identity.
 
 ## Scope and invalid input
 
-This is the replacement for the old conversation-only
-`initial_state: %{context: context}` startup recipe. It is not a decoder or
-converter for a full v2 Agent checkpoint. Old `__strategy__`, request records
-and Plugin-owned state need their separate conversion. They are rejected here.
-No saved worker, pending input, model count or effect is inferred from Context.
-Standalone State conversion remains the separate [14_09 API](../14_09_state_migration/README.md).
+The importer accepts declared domain state and an optional `:context`. It does
+not accept runtime or plugin state from another process. No saved worker,
+pending input, model count, request, or effect is inferred from Context.
 
 An AI Context under `:thread` is rejected. A non-AI Thread value is ordinary
 application data if its field is declared in the destination schema. Unknown
@@ -63,9 +60,8 @@ exchanges are rejected. Completed historical tools need not remain in the
 current catalog; import does not execute them. Pending tool continuation belongs
 to an explicit checkpoint path with its own execution evidence.
 
-After import, use ordinary native checkpoint/restore or core instantiation with
-saved v3 state. Do not pass the resulting Plugin state back through this initial
-conversation import API.
+After import, use the normal V3 checkpoint and restore path. Do not pass runtime
+or plugin state back through this initial conversation import API.
 
 ## Evidence and refinement
 
@@ -77,8 +73,9 @@ The native definitions have required history and application fields.
 
 Two profile examples prove saved-prompt and nil-prompt behavior at the actual
 provider while an unrelated profile keeps its own data. The last example
-rejects ambiguous selection, unknown profiles, conflicting history and old
-runtime state without changing the definition or starting model work.
+rejects ambiguous selection, unknown profiles, conflicting history, and
+unsupported runtime state without changing the definition or starting model
+work.
 
 The first refinement moved history preparation before core instantiation, so a
 required history field works without an artificial default. The second moved

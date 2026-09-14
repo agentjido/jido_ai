@@ -17,20 +17,7 @@ defmodule JidoAI.Examples.SkillAuthoring.Review do
 end
 
 defmodule JidoAI.Examples.SkillAuthoring.Public do
-  use Jido.AI.Agent,
-    name: "automatic_skills",
-    model: :example,
-    system_prompt: "Base prompt",
-    tools: [],
-    streaming: false,
-    tool_timeout_ms: 1_234,
-    tool_max_retries: 3,
-    tool_retry_backoff_ms: 17,
-    agent_skills: [modules: [JidoAI.Examples.SkillAuthoring.Review]]
-end
-
-defmodule JidoAI.Examples.SkillAuthoring.Native do
-  use Jido.Agent, name: "native_automatic_skills", extensions: [Jido.AI.DSL]
+  use Jido.AI.Agent, name: "automatic_skills"
 
   agent do
     schema Zoi.object(%{

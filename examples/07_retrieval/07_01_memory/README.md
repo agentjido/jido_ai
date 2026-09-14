@@ -85,7 +85,7 @@ Enrichment retains enabled/disabled settings, per-request atom or string
 `Relevant memory` and `User prompt` sections and attaches snippet IDs, scores
 and metadata. Empty stores and requests without usable text remain unchanged.
 Chat enrichment retains its `chat.message` scope; other simple Chat routes
-remain unchanged. Legacy reasoning routes retain their enrichment scope.
+remain unchanged.
 
 Native AI routes now use the actual declared query binding, including custom
 Signal names. Both one-Turn and session calls receive recalled text. A separate
@@ -93,7 +93,7 @@ Signal names. Both one-Turn and session calls receive recalled text. A separate
 enriched query used for execution. Non-text queries pass through without
 automatic enrichment.
 
-## Failure and migration limits
+## Limits
 
 A missing store fails live enrichment before model work. Explicit opt-out still
 permits that model request. A completed external memory write remains when a
@@ -102,10 +102,7 @@ as proof that an external write was rolled back.
 
 The tests cover ordinary Store access, concurrent writes/readiness, direct and
 Exec Actions, live routes, the Agent DSL, session requests, namespace sharing,
-store replacement and the core checkpoint boundary. The retained root suite
-has 17 Store/Action cases and six updated Plugin cases.
+store replacement and the core checkpoint boundary.
 
-Full source-format parity, old-data import with timestamp preservation,
-application deployment setup, durable store backup/restore and root consumer
-checks remain required. Root dependencies still select v2. This example does
-not complete Quota, default PluginStack integration or the full migration goal.
+This in-memory example does not cover application deployment or durable store
+backup and restore.

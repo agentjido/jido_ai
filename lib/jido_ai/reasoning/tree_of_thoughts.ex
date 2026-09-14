@@ -1,12 +1,9 @@
 defmodule Jido.AI.Reasoning.TreeOfThoughts do
   @moduledoc "ToT method selection and inspection of retained request results."
   alias Jido.AI.Reasoning.Linear
-  alias Jido.AI.Reasoning.TreeOfThoughts.{Machine, Strategy}
+  alias Jido.AI.Reasoning.TreeOfThoughts.Machine
 
   def method, do: :tree_of_thoughts
-
-  @deprecated "Use method/0 for profile selection and namespace getters for retained requests"
-  def strategy_module, do: Strategy
 
   defdelegate generate_call_id(), to: Machine
   defdelegate default_generation_prompt(), to: Machine

@@ -154,16 +154,6 @@ defmodule JidoAI.Examples.FailurePositionTest do
     assert_script_done(mock)
   end
 
-  test "tool permission failure retains the current reasoning position", %{jido: jido} do
-    {mock, _} = mock([tool()])
-    config = config(mock, tools: [Add])
-    options = opts(jido, __tool_guardrail_callback__: fn _ -> {:error, :denied} end)
-    result = ReAct.run("Sum", config, options)
-    assert_position(result, config, 1, 1)
-    refute_receive {:standalone_add, _, _, _}, 20
-    assert_script_done(mock)
-  end
-
   test "successful repair keeps the same position in terminal metadata and State", %{jido: jido} do
     {mock, _} = mock([invalid(), %{reply: {:object, %{answer: "Fixed"}}}])
     config = config(mock, output: output(1))

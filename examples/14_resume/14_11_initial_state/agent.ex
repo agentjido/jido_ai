@@ -36,7 +36,10 @@ for {module, stream} <- [
         end
 
         tools do
-          action(JidoAI.Examples.InitialState.Echo, as: :import_echo, forward_context: [:observer])
+          action(JidoAI.Examples.InitialState.Echo,
+            as: :import_echo,
+            forward_context: [:observer]
+          )
         end
 
         reasoning :react do
@@ -60,22 +63,6 @@ for {module, stream} <- [
       route("ai.react.query", ai(:assistant))
     end
   end
-end
-
-defmodule JidoAI.Examples.InitialState.PublicBuffered do
-  use Jido.AI.Agent,
-    name: "initial_public_buffered",
-    tools: [JidoAI.Examples.InitialState.Echo],
-    system_prompt: "Configured",
-    streaming: false
-end
-
-defmodule JidoAI.Examples.InitialState.PublicStreamed do
-  use Jido.AI.Agent,
-    name: "initial_public_streamed",
-    tools: [JidoAI.Examples.InitialState.Echo],
-    system_prompt: "Configured",
-    streaming: true
 end
 
 defmodule JidoAI.Examples.InitialState.Profiles do

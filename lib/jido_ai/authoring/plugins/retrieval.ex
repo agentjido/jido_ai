@@ -6,7 +6,7 @@ defmodule Jido.AI.Plugins.Retrieval do
   option selects another registered store. Agents with the same store and
   namespace share memory. The store lives independently of individual Agents.
 
-  Keyword configuration replaces v2 mount configuration. Declare the three
+  Use keyword configuration. Declare the three
   `signal_routes/1` routes to store Action results in `into` (default `:result`).
   Plugin state contains configuration only. Core live admission performs memory
   reads for Chat, reasoning and native AI requests. Pure preparation only binds
@@ -71,34 +71,33 @@ defmodule Jido.AI.Plugins.Retrieval do
   end
 
   @doc false
-  def prepare_command(command, opts) do
-    state = effective_command_state(command)
-    context = Map.put(command.context, :retrieval_store, Keyword.get(opts, :store, Store))
+  def prepare_input(preparation, opts) do
+    state = effective_state(preparation.plugin_state, preparation.agent_id)
+    store = Keyword.get(opts, :store, Store)
 
     binding =
-      if action = @routes[command.signal.type] do
+      if action = @routes[preparation.signal.type] do
         %{
           action: action,
           key: :retrieval,
           defaults: state,
+          store: store,
           into: Keyword.get(opts, :into, :result)
         }
       end
 
-    Jido.AI.Capability.bind(
-      %{command | context: context},
-      :jido_ai_retrieval_capability,
-      binding
-    )
+    {:ok, %{state: state, store: store, capability: binding}}
   end
 
   @doc false
-  def admit_command(command, opts) do
-    state = effective_command_state(command)
-    signal = command.signal
-    binding = Jido.AI.Runtime.Binding.request(command.agent, signal)
-    data = if binding, do: binding.input, else: signal.data
-    native? = not is_nil(binding)
+  def admit_input(admission) do
+    %{state: state, store: store} = admission.prepared_input
+    signal = admission.signal
+    data = signal.data
+
+    native? =
+      (String.starts_with?(signal.type, "ai.") and String.ends_with?(signal.type, ".query")) or
+        Jido.AI.Runtime.Plugin.native_request?(admission)
 
     eligible? =
       native? or signal.type == "chat.message" or
@@ -107,46 +106,51 @@ defmodule Jido.AI.Plugins.Retrieval do
     if state.enabled and eligible? and is_map(data) and
          data[:disable_retrieval] != true and data["disable_retrieval"] != true do
       query = if native?, do: Map.get(data, :query, data["query"]), else: extract_query(data)
-      enrich(command, query, if(native?, do: :query, else: :prompt), state, opts)
+      enrich(query, if(native?, do: :query, else: :prompt), state, store)
     else
-      {:ok, command}
+      {:ok, nil}
     end
   end
 
-  defp effective_command_state(command) do
-    state = command.agent.state.retrieval
-    %{state | namespace: state.namespace || command.agent.id || "default"}
+  def apply_input(params, context) do
+    case get_in(context, [:plugin_inputs, __MODULE__]) do
+      %Jido.Plugin.Input{runtime: %{key: key, value: value}} -> Map.put(params, key, value)
+      _ -> params
+    end
   end
 
-  defp enrich(command, query, key, state, opts) do
+  defp effective_state(state, agent_id),
+    do: %{state | namespace: state.namespace || agent_id || "default"}
+
+  defp enrich(query, key, state, store) do
     query_text = retrieval_query_text(query)
 
     if query_text == "" do
-      {:ok, command}
+      {:ok, nil}
     else
-      enrich_with_query_text(command, query, query_text, key, state, opts)
+      enrich_with_query_text(query, query_text, key, state, store)
     end
   end
 
-  defp enrich_with_query_text(command, query, query_text, key, state, opts) do
+  defp enrich_with_query_text(query, query_text, key, state, store) do
     snippets =
       Store.recall(state.namespace, query_text,
         top_k: max(state.top_k, 1),
-        store: Keyword.get(opts, :store, Store)
+        store: store
       )
 
     if snippets == [] do
-      {:ok, command}
+      {:ok, nil}
     else
-      data =
-        command.signal.data
-        |> Map.put(key, build_enriched_query(query, snippets, state.max_snippet_chars))
-        |> Map.put(:retrieval, %{
-          namespace: state.namespace,
-          snippets: Enum.map(snippets, &Map.take(&1, [:id, :score, :metadata]))
-        })
-
-      {:ok, %{command | signal: %{command.signal | data: data}}}
+      {:ok,
+       %{
+         key: key,
+         value: build_enriched_query(query, snippets, state.max_snippet_chars),
+         retrieval: %{
+           namespace: state.namespace,
+           snippets: Enum.map(snippets, &Map.take(&1, [:id, :score, :metadata]))
+         }
+       }}
     end
   end
 
@@ -209,6 +213,9 @@ defmodule Jido.AI.Plugins.Retrieval.Agent do
 
   @impl Jido.Agent.Plugin
   def state_spec(opts), do: Jido.AI.Plugins.Retrieval.agent_state_spec(opts)
+
+  @impl Jido.Agent.Plugin
+  def prepare(preparation, opts), do: Jido.AI.Plugins.Retrieval.prepare_input(preparation, opts)
 end
 
 defmodule Jido.AI.Plugins.Retrieval.AgentServer do
@@ -216,8 +223,5 @@ defmodule Jido.AI.Plugins.Retrieval.AgentServer do
   use Jido.AgentServer.Plugin
 
   @impl Jido.AgentServer.Plugin
-  def admit(_runtime, command, opts) do
-    with {:ok, command} <- Jido.AI.Plugins.Retrieval.prepare_command(command, opts),
-         do: Jido.AI.Plugins.Retrieval.admit_command(command, opts)
-  end
+  def admit(_runtime, admission, _opts), do: Jido.AI.Plugins.Retrieval.admit_input(admission)
 end

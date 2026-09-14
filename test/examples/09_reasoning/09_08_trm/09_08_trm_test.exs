@@ -437,7 +437,7 @@ defmodule JidoAI.Examples.TRMTest do
       [:jido, :ai, :trm, :complete]
     ]
 
-    :ok = :telemetry.attach_many(id, names, &JidoAI.Examples.Linear.Telemetry.handle/4, self())
+    :ok = :telemetry.attach_many(id, names, &JidoAI.Examples.Telemetry.handle/4, self())
     on_exit(fn -> :telemetry.detach(id) end)
     {mock, context} = mock(TRM.script())
     server = start(jido)
@@ -496,7 +496,7 @@ defmodule JidoAI.Examples.TRMTest do
   test "the retained Machine still emits legacy steps completion and errors" do
     id = "trm_legacy_#{System.unique_integer([:positive])}"
     names = for phase <- [:start, :step, :complete, :error], do: [:jido, :ai, :trm, phase]
-    :ok = :telemetry.attach_many(id, names, &JidoAI.Examples.Linear.Telemetry.handle/4, self())
+    :ok = :telemetry.attach_many(id, names, &JidoAI.Examples.Telemetry.handle/4, self())
     on_exit(fn -> :telemetry.detach(id) end)
 
     {machine, _} =

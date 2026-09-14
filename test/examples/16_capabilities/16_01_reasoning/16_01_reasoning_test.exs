@@ -203,7 +203,7 @@ defmodule JidoAI.Examples.ReasoningCapabilitiesTest do
       assert {:ok, definition} = ReasoningCapabilities.definition(plugins)
       server = start_agent(jido, definition)
       assert {:error, error} = Server.call(server, signal("reasoning.cot.run"), context: context)
-      assert inspect(error) =~ "Agent Plugin observes unknown Agent fields"
+      assert inspect(error) =~ "Capability result must select a declared domain field"
     end
 
     assert_script_done(mock)

@@ -22,14 +22,14 @@ defmodule Jido.AI.Actions.LLM.EmbedTest do
   describe "run/2" do
     test "embeds single text with default model resolution" do
       expect(ReqLLM.Embedding, :embed, fn model, texts, opts ->
-        assert model == Jido.AI.resolve_model(:embedding)
+        assert model == Jido.AI.Models.resolve(:embedding)
         assert texts == ["Hello world"]
         assert opts == [return_usage: true]
         {:ok, %{embedding: [[0.1, 0.2, 0.3]], usage: %{input_tokens: 2}}}
       end)
 
       assert {:ok, result} = Embed.run(%{texts: "Hello world"}, %{})
-      assert result.model == Jido.AI.resolve_model(:embedding)
+      assert result.model == Jido.AI.Models.resolve(:embedding)
       assert result.count == 1
       assert result.dimensions == 3
       assert result.embeddings == [[0.1, 0.2, 0.3]]
@@ -65,13 +65,13 @@ defmodule Jido.AI.Actions.LLM.EmbedTest do
       }
 
       expect(ReqLLM.Embedding, :embed, fn model, texts, _opts ->
-        assert model == Jido.AI.resolve_model(:capable)
+        assert model == Jido.AI.Models.resolve(:capable)
         assert texts == ["hello"]
         {:ok, %{embedding: [[0.9]], usage: %{input_tokens: 1}}}
       end)
 
       assert {:ok, result} = Embed.run(%{texts: "hello"}, context)
-      assert result.model == Jido.AI.resolve_model(:capable)
+      assert result.model == Jido.AI.Models.resolve(:capable)
     end
 
     test "explicit model overrides context default model" do

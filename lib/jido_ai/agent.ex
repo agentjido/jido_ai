@@ -7,8 +7,7 @@ defmodule Jido.AI.Agent do
   it to one inert `%Jido.AI.Profile{}`. Model and tool calls only occur after a
   request enters the Agent runtime.
 
-  The legacy option form remains available while applications move to the
-  canonical `agent do` and `ai` DSL.
+  Agent definitions use the canonical `agent do` and `ai` DSL.
   """
 
   defmacro __using__(opts) do

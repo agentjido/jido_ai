@@ -8,9 +8,7 @@ defmodule Jido.AI.Plugins.Planning do
   map. Direct Actions keep their result maps. The route Action stores that result
   in the declared domain field and returns the complete Agent state.
   """
-  use Jido.Plugin,
-    agent: Jido.AI.Plugins.Planning.Agent,
-    agent_server: Jido.AI.Plugins.Planning.AgentServer
+  use Jido.Plugin, agent: Jido.AI.Plugins.Planning.Agent
 
   alias Jido.AI.Actions.Planning.{Plan, Decompose, Prioritize}
 
@@ -55,18 +53,18 @@ defmodule Jido.AI.Plugins.Planning do
   end
 
   @doc false
-  def prepare_command(command, opts) do
+  def prepare_input(preparation, opts) do
     binding =
-      if action = @routes[command.signal.type] do
+      if action = @routes[preparation.signal.type] do
         %{
           action: action,
           key: :planning,
           into: Keyword.get(opts, :into, :result),
-          defaults: command.agent.state.planning
+          defaults: preparation.plugin_state
         }
       end
 
-    Jido.AI.Capability.bind(command, :jido_ai_planning_capability, binding)
+    {:ok, binding}
   end
 
   defp state_schema(defaults) do
@@ -84,12 +82,7 @@ defmodule Jido.AI.Plugins.Planning.Agent do
 
   @impl Jido.Agent.Plugin
   def state_spec(opts), do: Jido.AI.Plugins.Planning.agent_state_spec(opts)
-end
 
-defmodule Jido.AI.Plugins.Planning.AgentServer do
-  @moduledoc false
-  use Jido.AgentServer.Plugin
-
-  @impl Jido.AgentServer.Plugin
-  def admit(_runtime, command, opts), do: Jido.AI.Plugins.Planning.prepare_command(command, opts)
+  @impl Jido.Agent.Plugin
+  def prepare(preparation, opts), do: Jido.AI.Plugins.Planning.prepare_input(preparation, opts)
 end

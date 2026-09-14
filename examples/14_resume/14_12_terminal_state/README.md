@@ -34,8 +34,8 @@ Failures are in `view.request.error`, with nil request result.
 keeps raw errors in its result field. Native Agent checkpoints and standalone
 signed ReAct tokens are separate APIs. The retained root tests and
 [14_03](../14_03_checkpoint_resume/README.md) cover signed tokens. This example does not
-convert v2 Agent/Plugin payloads or restore active execution. Those requirements
-remain open. [14_11](../14_11_initial_state/README.md) covers conversation-only import.
+restore active execution. [14_11](../14_11_initial_state/README.md) covers
+conversation-only import.
 
 Run from the repository root:
 

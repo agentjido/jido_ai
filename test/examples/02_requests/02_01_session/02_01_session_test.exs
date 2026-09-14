@@ -242,9 +242,9 @@ defmodule JidoAI.Examples.SessionTest do
              &(&1["role"] == "tool" and &1["tool_call_id"] == "multiply")
            )
 
-    agent = Server.agent(server)
-    assert Request.get_request(agent, request.id).extra_refs == %{case: "42"}
-    assert Request.get_result(agent, request.id) == {:ok, "Twelve"}
+    assert {:ok, %{request: saved}} = Session.snapshot(server, request_id: request.id)
+    assert saved.extra_refs == %{case: "42"}
+    assert saved.result == "Twelve"
     assert_script_done(mock)
   end
 

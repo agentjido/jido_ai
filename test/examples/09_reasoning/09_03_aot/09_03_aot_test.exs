@@ -175,39 +175,6 @@ defmodule JidoAI.Examples.AoTTest do
     assert_script_done(mock)
   end
 
-  test "public explore helpers retain typed results defaults option precedence and fresh requests",
-       %{jido: jido} do
-    {mock, context} =
-      mock([
-        %{reply: {:text, "answer: 24"}},
-        %{reply: {:text, "answer: 25"}},
-        %{reply: {:text, "found it"}}
-      ])
-
-    server = start_agent(jido, AoT.Public.new!())
-    assert {:ok, handle} = AoT.Public.explore(server, "first", context: context)
-    assert {:ok, first} = AoT.Public.await(handle)
-    assert AoT.Public.answer(first) == "24"
-
-    assert %{last_prompt: "first", last_result: ^first, completed: true} =
-             Server.agent(server).state
-
-    assert {:ok, %{answer: "25"}} = AoT.Public.explore_sync(server, "next", context: context)
-    assert length(List.last(MockLLM.report(mock).requests).body["messages"]) == 2
-    assert AoT.Public.strategy_opts()[:profile] == :standard
-    assert AoT.Public.strategy_opts()[:search_style] == :dfs
-    custom = start_agent(jido, AoT.Custom.new!())
-    assert {:ok, result} = AoT.Custom.explore_sync(custom, "custom", context: context)
-    assert result.answer == nil and result.found_solution?
-    wire = List.last(MockLLM.report(mock).requests)
-    assert wire.body["temperature"] == 0.3 and wire.body["max_tokens"] == 101
-
-    assert hd(wire.body["messages"])["content"] ==
-             Method.default_system_prompt(:long, :bfs, ["one example"])
-
-    assert_script_done(mock)
-  end
-
   test "DSL data Builder source JSON and direct Flow keep the AoT result contract", %{jido: jido} do
     {mock, context} = mock(List.duplicate(%{reply: {:text, AoT.puzzle()}}, 5))
     source = AoT.source()
@@ -287,7 +254,7 @@ defmodule JidoAI.Examples.AoTTest do
       Map.put(
         AoT.source().reasoning,
         :request_transformer,
-        JidoAI.Examples.RequestTransform.Transform
+        JidoAI.Examples.AoT.RequestTransformer
       )
 
     server =
@@ -400,25 +367,6 @@ defmodule JidoAI.Examples.AoTTest do
     assert_script_done(mock)
   end
 
-  test "real provider failures retain their cause and allow the next public exploration", %{
-    jido: jido
-  } do
-    {mock, context} =
-      mock([
-        %{reply: {:error, 503, %{error: %{message: "provider down"}}}},
-        %{reply: {:text, "answer: next"}}
-      ])
-
-    server = start_agent(jido, AoT.Public.new!())
-    assert {:ok, handle} = AoT.Public.explore(server, "fail", context: context)
-    assert {:error, {:failed, :error, result}} = AoT.Public.await(handle)
-    assert is_map(result.diagnostics.cause)
-    assert result.diagnostics.error =~ "provider"
-    assert Server.agent(server).state.last_result == result
-    assert {:ok, %{answer: "next"}} = AoT.Public.explore_sync(server, "next", context: context)
-    assert_script_done(mock)
-  end
-
   test "early AoT deltas and typed Signals keep one request and the actual method", %{jido: jido} do
     {mock, context} =
       mock([
@@ -441,25 +389,6 @@ defmodule JidoAI.Examples.AoTTest do
     typed = delivered(server, handle)
     assert Enum.any?(typed, &(&1.type == "ai.llm.delta" and &1.data.metadata.strategy == :aot))
     assert List.last(typed).data.result.answer == "24"
-    assert_script_done(mock)
-  end
-
-  test "AoT cancellation keeps its reason stops work and permits a fresh request", %{jido: jido} do
-    {mock, context} =
-      mock([
-        %{reply: {:stream, [{:wait, :held}, %{content: "answer: late"}], "stop"}},
-        %{reply: {:text, "answer: next"}}
-      ])
-
-    server = start_agent(jido, AoT.Public.new!())
-    assert {:ok, handle} = AoT.Public.explore(server, "wait", context: context, stream_to: self())
-    assert_receive {:mock_llm_waiting, ^mock, :held, provider}, 2_000
-    monitor = Process.monitor(provider)
-    assert :ok = AoT.Public.cancel(server, request_id: handle.id, reason: :changed_task)
-    assert {:error, {:cancelled, :changed_task}} = AoT.Public.await(handle)
-    assert_receive {:DOWN, ^monitor, :process, ^provider, _}, 2_000
-    assert List.last(events(handle)).kind == :request_cancelled
-    assert {:ok, %{answer: "next"}} = AoT.Public.explore_sync(server, "next", context: context)
     assert_script_done(mock)
   end
 
@@ -597,7 +526,7 @@ defmodule JidoAI.Examples.AoTTest do
        %{jido: jido} do
     id = "aot_flags_#{System.unique_integer([:positive])}"
     names = for phase <- [:start, :complete, :failed], do: [:jido, :ai, :request, phase]
-    :ok = :telemetry.attach_many(id, names, &JidoAI.Examples.Linear.Telemetry.handle/4, self())
+    :ok = :telemetry.attach_many(id, names, &JidoAI.Examples.Telemetry.handle/4, self())
     on_exit(fn -> :telemetry.detach(id) end)
     {mock, context} = mock(List.duplicate(%{reply: {:text, "answer: 24"}}, 2))
 
@@ -623,28 +552,6 @@ defmodule JidoAI.Examples.AoTTest do
     end
 
     refute_receive {:signal, _}, 50
-    assert_script_done(mock)
-  end
-
-  test "public AoT normalizes legacy examples and temperature while retained helpers remain usable",
-       %{jido: jido} do
-    {mock, context} = mock([%{reply: {:text, "answer: 24"}}])
-    server = start_agent(jido, AoT.LegacyValues.new!())
-    assert {:ok, result} = AoT.LegacyValues.explore_sync(server, "legacy", context: context)
-    wire = hd(MockLLM.report(mock).requests)
-
-    assert hd(wire.body["messages"])["content"] ==
-             Method.default_system_prompt(:standard, :dfs, ["example", "24"])
-
-    assert wire.body["temperature"] == 0.0
-    adapter = apply(Method, :strategy_module, [])
-    assert apply(adapter, :get_result, [Server.agent(server)]) == result
-    assert String.starts_with?(Method.generate_call_id(), "aot_")
-    assert Method.Machine.from_map(%{}).status == "idle"
-
-    assert Method.Machine.to_map(Method.Machine.from_map(%{status: :completed})).status ==
-             :completed
-
     assert_script_done(mock)
   end
 

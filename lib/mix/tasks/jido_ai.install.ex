@@ -36,6 +36,10 @@ end
 if Code.ensure_loaded?(Igniter) do
   defmodule Mix.Tasks.JidoAi.Install do
     @shortdoc "#{__MODULE__.Docs.short_doc()}"
+    @install_aliases %{
+      fast: "anthropic:claude-haiku-4-5",
+      capable: "anthropic:claude-sonnet-4-20250514"
+    }
 
     @moduledoc __MODULE__.Docs.long_doc()
 
@@ -46,7 +50,7 @@ if Code.ensure_loaded?(Igniter) do
       %Igniter.Mix.Task.Info{
         group: :jido_ai,
         adds_deps: [],
-        installs: [{:jido, "~> 2.0"}],
+        installs: [{:jido, "~> 3.0.0-beta.1"}],
         example: __MODULE__.Docs.example(),
         only: nil,
         positional: [],
@@ -65,7 +69,7 @@ if Code.ensure_loaded?(Igniter) do
         "config.exs",
         :jido_ai,
         [:model_aliases],
-        Map.take(Jido.AI.Models.aliases(), [:fast, :capable])
+        @install_aliases
       )
       |> Igniter.add_notice("""
       Jido AI installed successfully!

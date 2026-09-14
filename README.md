@@ -26,11 +26,38 @@ defmodule MyApp.Actions.AddNumbers do
 end
 
 defmodule MyApp.MathAgent do
-  use Jido.AI.Agent,
-    name: "math_agent",
-    model: :fast,
-    tools: [MyApp.Actions.AddNumbers],
-    system_prompt: "Solve accurately. Use tools for arithmetic."
+  use Jido.AI.Agent, name: "math_agent"
+
+  agent do
+    schema Zoi.object(%{answer: Zoi.any() |> Zoi.default(nil)})
+
+    ai :assistant do
+      instructions("Solve accurately. Use tools for arithmetic.")
+
+      models do
+        model(:answer, :fast)
+      end
+
+      reasoning :react do
+        model(:answer)
+      end
+
+      tools do
+        action(MyApp.Actions.AddNumbers, as: :add_numbers)
+      end
+
+      requests do
+        mode(:session)
+        streaming(true)
+      end
+
+      result(nil, into: :answer)
+    end
+  end
+
+  routes do
+    route("ai.ask", ai(:assistant))
+  end
 end
 
 {:ok, pid} = Jido.AgentServer.start(agent: MyApp.MathAgent)
@@ -74,8 +101,8 @@ Add `jido_ai` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:jido, "~> 2.0"},
-    {:jido_ai, "~> 2.0.0-rc.0"}
+    {:jido, "~> 3.0"},
+    {:jido_ai, "~> 3.0"}
   ]
 end
 ```
@@ -116,10 +143,35 @@ defmodule MyApp.Actions.Multiply do
 end
 
 defmodule MyApp.Agent do
-  use Jido.AI.Agent,
-    name: "my_agent",
-    model: :fast,
-    tools: [MyApp.Actions.Multiply]
+  use Jido.AI.Agent, name: "my_agent"
+
+  agent do
+    schema Zoi.object(%{answer: Zoi.any() |> Zoi.default(nil)})
+
+    ai :assistant do
+      models do
+        model(:answer, :fast)
+      end
+
+      reasoning :react do
+        model(:answer)
+      end
+
+      tools do
+        action(MyApp.Actions.Multiply, as: :multiply)
+      end
+
+      requests do
+        mode(:session)
+      end
+
+      result(nil, into: :answer)
+    end
+  end
+
+  routes do
+    route("ai.ask", ai(:assistant))
+  end
 end
 
 {:ok, pid} = Jido.AgentServer.start(agent: MyApp.Agent)
@@ -168,21 +220,21 @@ text = ReqLLM.Response.text(response)
 
 | If you need | Use | Why |
 |---|---|---|
-| Tool-using agent loops | `Jido.AI.Agent` | ReAct strategy with request tracking and tool orchestration |
-| Fixed reasoning strategy | `Jido.AI.CoDAgent`, `Jido.AI.CoTAgent`, `Jido.AI.AoTAgent`, `Jido.AI.ToTAgent`, `Jido.AI.GoTAgent`, `Jido.AI.TRMAgent`, `Jido.AI.AdaptiveAgent` | Strategy-specific control over reasoning behavior |
+| Tool-using agent loops | `Jido.AI.Agent` with `reasoning :react` | Request tracking and tool orchestration |
+| Fixed reasoning method | `Jido.AI.Agent` with a declared `reasoning` method | One authoring form for all reasoning behavior |
 | AI inside existing workflows/jobs | `Jido.AI.Actions.*` | Run via `Jido.Exec.run/3` without defining an agent module |
 | Streaming + checkpoint/resume | `Jido.AI.Reasoning.ReAct` | Standalone ReAct runtime with event streams and checkpoint tokens |
 | Direct model calls | `Jido.AI.Models.resolve/1` and ReqLLM | Optional application aliases with the native model API |
 
 ## Strategy Quick Pick
 
-- **ReAct (`Jido.AI.Agent`)**: default for tool/API calls.
-- **CoD (`Jido.AI.CoDAgent`)**: concise reasoning with lower latency/cost.
-- **Chain-of-Thought (CoT) (`Jido.AI.CoTAgent`)**: asks the model to reason through a problem in explicit intermediate steps before the final answer; useful for math, logic, and other multi-step tasks.
-- **AoT (`Jido.AI.AoTAgent`)**: one-pass algorithmic exploration with explicit final answer extraction.
-- **ToT / GoT (`Jido.AI.ToTAgent`, `Jido.AI.GoTAgent`)**: branching or graph-style exploration for complex tasks.
-- **TRM (`Jido.AI.TRMAgent`)**: iterative recursive refinement.
-- **Adaptive (`Jido.AI.AdaptiveAgent`)**: mixed workloads where strategy selection varies per task.
+- **ReAct (`:react`)**: default for tool and API calls.
+- **CoD (`:chain_of_draft`)**: concise reasoning with lower latency and cost.
+- **CoT (`:chain_of_thought`)**: linear, multi-step reasoning.
+- **AoT (`:algorithm_of_thoughts`)**: one-pass algorithmic exploration.
+- **ToT / GoT (`:tree_of_thoughts`, `:graph_of_thoughts`)**: branching or graph exploration.
+- **TRM (`:trm`)**: iterative recursive refinement.
+- **Adaptive (`:adaptive`)**: per-request method selection.
 
 Full tradeoff matrix: [Strategy Selection Playbook](guides/user/strategy_selection_playbook.md)
 
@@ -248,20 +300,6 @@ mix examples --seed 0
 Production builds compile `lib/` only. Development and test builds also compile
 the checked example modules.
 
-Older manual demos remain available:
-
-```bash
-mix run examples/scripts/demo/actions_llm_runtime_demo.exs
-mix run examples/scripts/demo/actions_tool_calling_runtime_demo.exs
-mix run examples/scripts/demo/actions_reasoning_runtime_demo.exs
-mix run examples/scripts/demo/weather_multi_turn_context_demo.exs
-```
-
-Manual example modules:
-- [`examples/lib/agents/weather_agent.ex`](https://github.com/agentjido/jido_ai/blob/main/examples/lib/agents/weather_agent.ex)
-- [`examples/lib/agents/react_demo_agent.ex`](https://github.com/agentjido/jido_ai/blob/main/examples/lib/agents/react_demo_agent.ex)
-- [`examples/lib/tools/weather_by_location.ex`](https://github.com/agentjido/jido_ai/blob/main/examples/lib/tools/weather_by_location.ex)
-
 ## Why Jido.AI
 
 - ReAct-first agent runtime with explicit request handles — `ask/await` prevents concurrent result overwrites
@@ -277,4 +315,4 @@ See [CONTRIBUTING.md](https://github.com/agentjido/jido_ai/blob/main/CONTRIBUTIN
 
 ## License
 
-Apache-2.0. See [LICENSE.md](LICENSE.md).
+Apache-2.0. See [LICENSE](LICENSE).

@@ -1,8 +1,7 @@
 defmodule JidoAI.Examples.MethodAPITest do
   use JidoAI.Examples.Case
   alias Jido.AI.{Request, Session}
-  alias Jido.AI.Reasoning.{ChainOfThought, ChainOfDraft}
-  alias Jido.AI.Reasoning.ChainOfThought.Machine
+  alias Jido.AI.Reasoning.{ChainOfDraft, ChainOfThought}
 
   defp start(jido) do
     assert {:ok, definition} = JidoAI.Examples.MethodAPI.definition()
@@ -51,30 +50,6 @@ defmodule JidoAI.Examples.MethodAPITest do
     assert_script_done(mock)
   end
 
-  test "legacy namespace modules remain loadable result adapters without old core execution", %{
-    jido: jido
-  } do
-    {mock, _} =
-      mock([%{reply: {:text, "Step 1: Add.\nConclusion: 4"}}, %{reply: {:text, "#### 5"}}])
-
-    server = start(jido)
-
-    for {namespace, method, answer} <- [{ChainOfThought, :cot, "4"}, {ChainOfDraft, :cod, "5"}] do
-      assert {:ok, handle} = request(server, mock, method)
-      assert {:ok, ^answer} = Request.await(handle)
-      adapter = apply(namespace, :strategy_module, [])
-      assert Code.ensure_loaded?(adapter)
-      agent = Server.agent(server)
-      assert apply(adapter, :get_steps, [agent]) == namespace.get_steps(agent)
-      assert apply(adapter, :get_conclusion, [agent]) == answer
-      assert apply(adapter, :get_raw_response, [agent]) == namespace.get_raw_response(agent)
-      refute function_exported?(adapter, :cmd, 3)
-      refute function_exported?(adapter, :init, 2)
-    end
-
-    assert_script_done(mock)
-  end
-
   test "a new pending or cancelled request cannot expose an earlier result as current", %{
     jido: jido
   } do
@@ -99,90 +74,5 @@ defmodule JidoAI.Examples.MethodAPITest do
     assert_receive {:DOWN, ^monitor, :process, ^provider, _}, 2_000
     assert ChainOfThought.get_raw_response(Server.agent(server)) == nil
     assert_script_done(mock)
-  end
-
-  test "the retained Machine reads an actual provider result and restores its data shape" do
-    {mock, _} = mock([%{reply: {:text, "Step 1: café ✓\nStep 2: Sum.\nConclusion: 4"}}])
-
-    {machine, [{:call_llm_stream, id, conversation}]} =
-      Machine.update(Machine.new(), {:start, "Add", "cot_api"})
-
-    assert {:ok, response} =
-             ReqLLM.generate_text(MockLLM.model(), conversation, MockLLM.options(mock))
-
-    legacy_result = %{text: ReqLLM.Response.text(response), usage: response.usage}
-    assert {completed, []} = Machine.update(machine, {:llm_result, id, {:ok, legacy_result, []}})
-    assert completed.result == "4" and completed.termination_reason == :success
-    assert completed.steps == [%{number: 1, content: "café ✓"}, %{number: 2, content: "Sum."}]
-    assert completed.usage.total_tokens == 15
-    assert Machine.from_map(Machine.to_map(completed)) == completed
-    assert Machine.to_map(completed).status == :completed
-    assert_script_done(mock)
-  end
-
-  test "the retained Machine keeps busy rejection stale-call checks raw errors and terminal closure" do
-    {running, [_]} = Machine.update(Machine.new(), {:start, "Add", "one"})
-
-    assert {^running, [{:request_error, "two", :busy, _}]} =
-             Machine.update(running, {:start, "Again", "two"})
-
-    assert {^running, []} = Machine.update(running, {:llm_result, "stale", {:error, :wrong}})
-    assert {^running, []} = Machine.update(running, {:llm_partial, "stale", "lost", :content})
-    {partial, []} = Machine.update(running, {:llm_partial, "one", "kept", :content})
-    error = %{type: :rate_limit, retryable?: true, details: %{request: "one"}}
-    assert {failed, []} = Machine.update(partial, {:llm_result, "one", {:error, error, []}})
-    assert failed.result == error and failed.streaming_text == "kept"
-    assert failed.status == "error" and failed.termination_reason == :error
-    assert {^failed, []} = Machine.update(failed, {:start, "No restart", "two"})
-  end
-
-  test "the retained Machine uses the common nested usage merge without losing provider metadata" do
-    {machine, [_]} = Machine.update(Machine.new(), {:start, "Add", "one"})
-
-    machine = %{
-      machine
-      | usage: %{"details" => %{"cached_tokens" => 3}, "provider" => "old", :input_tokens => 2}
-    }
-
-    result = %{
-      text: "Conclusion: 4",
-      usage: %{"input_tokens" => "5", "details" => %{"cached_tokens" => 4}, "provider" => "new"}
-    }
-
-    assert {completed, []} = Machine.update(machine, {:llm_result, "one", {:ok, result}})
-    assert completed.usage.input_tokens == 7
-    assert completed.usage["details"]["cached_tokens"] == 7
-    assert completed.usage["provider"] == "new"
-  end
-
-  test "the retained Machine emits its legacy start and completion telemetry with usage" do
-    id = "machine_api_#{System.unique_integer([:positive])}"
-
-    :ok =
-      :telemetry.attach_many(
-        id,
-        [[:jido, :ai, :cot, :start], [:jido, :ai, :cot, :complete]],
-        &JidoAI.Examples.Linear.Telemetry.handle/4,
-        self()
-      )
-
-    on_exit(fn -> :telemetry.detach(id) end)
-    {running, [_]} = Machine.update(Machine.new(), {:start, "Add", "one"})
-
-    assert_receive {:linear_telemetry, [:jido, :ai, :cot, :start], %{system_time: time},
-                    %{call_id: "one", prompt_length: 3}}
-
-    assert is_integer(time)
-
-    {completed, []} =
-      Machine.update(
-        running,
-        {:llm_result, "one", {:ok, %{text: "#### 4", usage: %{total_tokens: 15}}}}
-      )
-
-    assert_receive {:linear_telemetry, [:jido, :ai, :cot, :complete], %{duration: duration},
-                    %{termination_reason: :success, steps_count: 0, usage: %{total_tokens: 15}}}
-
-    assert duration >= 0 and completed.result == "4"
   end
 end

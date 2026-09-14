@@ -150,7 +150,7 @@ defmodule Jido.AI.Skill.AgentIntegrationTest do
   end
 
   test "rejects invalid path entries" do
-    assert {:error, {:invalid_agent_skills_option, :paths}} =
+    assert {:error, {:invalid_skill_source, :paths}} =
              AgentIntegration.prepare([:not_a_path])
   end
 

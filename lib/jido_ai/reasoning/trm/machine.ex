@@ -3,8 +3,8 @@ defmodule Jido.AI.Reasoning.TRM.Machine do
   Phase data model for the TRM (Tiny-Recursive-Model) reasoning pattern.
 
   This module stores method state and returns descriptions of model work.
-  Core Flow owns v3 execution. The compatibility API retains its clock and
-  telemetry events; the native adapter uses the common request event path.
+  Core Flow owns V3 execution. The standalone Machine can emit lifecycle
+  telemetry; the V3 adapter uses the common request event path.
 
   ## Overview
 
@@ -203,7 +203,7 @@ defmodule Jido.AI.Reasoning.TRM.Machine do
 
   - `:max_supervision_steps` - Maximum iterations before termination (default: 5)
   - `:act_threshold` - Confidence threshold for early stopping (default: 0.9)
-  - `:emit_telemetry?` - Emit compatibility Machine events (default: true)
+  - `:emit_telemetry?` - Emit standalone Machine events (default: true)
   """
   @spec new(keyword()) :: t()
   def new(opts) when is_list(opts) do

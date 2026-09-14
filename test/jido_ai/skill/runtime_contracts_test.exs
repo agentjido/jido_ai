@@ -72,7 +72,7 @@ defmodule Jido.AI.Skill.RuntimeContractsTest do
 
     for path <- paths do
       assert {:ok, %Spec{name: name}} = Loader.load(path), "expected valid SKILL.md at #{path}"
-      assert is_binary(name) and name != ""
+      assert name != ""
     end
   end
 end

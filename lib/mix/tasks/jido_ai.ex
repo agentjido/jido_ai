@@ -24,7 +24,7 @@ defmodule Mix.Tasks.JidoAi do
   ### Agent Configuration
       --agent MODULE       Use existing agent module (ignores --model/--tools/--system)
       --type TYPE          Agent type: react (default), aot, cod, cot, tot, got, trm, adaptive
-      --model MODEL        LLM model alias/spec (default: :fast via Jido.AI.resolve_model/1)
+      --model MODEL        LLM model alias/spec (default: :fast via Jido.AI.Models.resolve/1)
       --tools MODULES      Comma-separated tool modules
       --system PROMPT      System prompt
       --max-iterations N   Max reasoning iterations (default: 10)
@@ -421,21 +421,7 @@ defmodule Mix.Tasks.JidoAi do
 
   defp ensure_module_loaded!(module, module_string) do
     if !Code.ensure_loaded?(module) do
-      maybe_require_example_module(module_string)
-    end
-
-    if !Code.ensure_loaded?(module) do
       raise "Module #{module_string} not found or not loaded"
-    end
-  end
-
-  defp maybe_require_example_module(module_string) do
-    if String.starts_with?(module_string, "Jido.AI.Examples.") do
-      File.cwd!()
-      |> Path.join("examples/scripts/shared/bootstrap.exs")
-      |> Code.require_file()
-
-      :ok
     end
   end
 

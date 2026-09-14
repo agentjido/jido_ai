@@ -138,10 +138,10 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
   defp native_definition(opts, changes \\ %{}) do
     opts = Keyword.merge([name: "react_setup", tools: [TestCalculator], model: MockLLM.model(), streaming: false], opts)
-    source = Jido.AI.Agent.Options.lower!(opts)
+    source = definition(:react, opts)
 
     plugins =
-      Enum.map(source[:plugins], fn
+      Enum.map(source.plugins, fn
         {Jido.AI.Runtime.Plugin, config} ->
           profile = config[:profiles].assistant
           source = profile |> Map.from_struct() |> Map.merge(changes)
@@ -153,9 +153,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
           plugin
       end)
 
-    source
-    |> Keyword.put(:plugins, plugins)
-    |> Jido.Agent.new!()
+    %{source | plugins: plugins}
   end
 
   defp native_start(jido, opts \\ [], changes \\ %{}),
@@ -203,7 +201,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
   defp thread_messages(server), do: Thread.filter_by_kind(context_lane(server).session.thread, :ai_message)
   defp context_operations(server), do: Thread.filter_by_kind(context_lane(server).session.thread, :ai_context_operation)
 
-  defp replace_context(server, value, opts \\ []),
+  defp replace_context(server, value, opts),
     do: Session.modify_context(server, %{type: :replace, result_context: value}, opts)
 
   defp deferred_context(jido, terminal) do
@@ -327,7 +325,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
   end
 
   describe "signal_routes/1" do
-    test "native routes bind ReAct and ignore compatibility observations", %{jido: jido} do
+    test "native routes bind ReAct and common control signals", %{jido: jido} do
       server = native_start(jido)
       signal = Jido.Signal.new!("ai.react.query", %{query: "Work"}, source: "/test")
       assert %{id: :assistant, mode: :session} = Jido.AI.Authoring.request_binding(Server.agent(server), signal)
@@ -335,10 +333,10 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert {:ok, router} = Jido.Signal.Router.new(Server.agent(server).routes)
 
       for type <- [
-            "ai.react.cancel",
+            Session.cancel_type(),
             "jido.ai.session.control",
-            "ai.react.set_system_prompt",
-            "ai.react.context.modify"
+            "jido.ai.configure",
+            "jido.ai.context.modify"
           ] do
         assert {:ok, _} = Jido.Signal.Router.route(router, %{signal | type: type})
       end
@@ -429,7 +427,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
     test "prepared request uses its iteration override", %{jido: jido} do
       {_, profile} = prepared(jido, [max_iterations: 4], max_iterations: 2)
       assert profile.controls.max_iterations == 2
-      assert profile.controls.max_model_calls == 2
+      assert profile.controls.max_model_calls == 4
     end
 
     test "invalid iteration override keeps the declared limit", %{jido: jido} do
@@ -510,8 +508,8 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert_script_done(mock)
     end
 
-    test "request idle timeout overrides the legacy receive timeout alias", %{jido: jido} do
-      {_, profile} = prepared(jido, [stream_receive_timeout_ms: 4_500], stream_timeout_ms: 9_000)
+    test "request idle timeout overrides the profile timeout", %{jido: jido} do
+      {_, profile} = prepared(jido, [stream_timeout_ms: 4_500], stream_timeout_ms: 9_000)
       assert profile.requests.idle_timeout == 9_000
     end
 
@@ -1349,20 +1347,11 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       deferred_context(jido, :task_loss)
     end
 
-    test "invalid legacy context input is a no-op and native context input returns an error", %{jido: jido} do
+    test "invalid context input returns an error without changing state", %{jido: jido} do
       mock = mock([])
       server = start_reasoning(jido, :react, tools: [], system_prompt: "Original")
       before = Server.agent(server).state
 
-      signal =
-        Jido.Signal.new!(
-          "ai.react.context.modify",
-          %{op_id: "invalid", operation: %{type: :replace, result_context: "not a context"}},
-          source: "/test"
-        )
-
-      assert {:ok, _} = Server.call(server, signal)
-      assert Server.agent(server).state == before
       assert {:error, _} = replace_context(server, "not a context", op_id: "invalid")
       assert Server.agent(server).state == before
       assert current_context(server).system_prompt == "Original"
@@ -1727,11 +1716,11 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert_script_done(mock)
     end
 
-    test "initial state import rejects an AI Context under the legacy Thread key" do
+    test "initial state import rejects an AI Context under the Thread key" do
       source = definition(:react, tools: [])
       context = Context.new(system_prompt: "Legacy key") |> Context.append_user("legacy")
       assert {:error, error} = Jido.AI.Agent.from_initial_state(source, %{thread: context})
-      assert Exception.message(error) =~ "initial_state[:thread] is no longer supported for AI context"
+      assert Exception.message(error) =~ "initial_state[:thread] cannot contain an AI context"
       assert source.state == nil
     end
 

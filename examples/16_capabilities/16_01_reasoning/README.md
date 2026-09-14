@@ -11,8 +11,7 @@ mix test test/jido_ai/plugins/reasoning --seed 0
 ```
 
 There are 17 example cases and 21 focused Plugin contract cases. Default
-example runs exclude the example cases. Excluded cases are not passing
-cases. The full root package still requires its dependency and API migration.
+test runs exclude the example cases.
 
 ## Declaration
 
@@ -51,8 +50,7 @@ isolated request lifetime; it does not reuse the host's private AI bindings.
 Each Plugin owns `:reasoning_<method>` with four fields: `strategy`,
 `default_model`, `timeout`, and `options`. The method has one allowed value.
 Creation and an empty restored state use the declared defaults. An ordinary
-Action cannot change these fields. This does not convert a complete v2 Agent
-snapshot or resume pending v2 work.
+Action cannot change these fields.
 
 Options are a keyword list. Supported keys are `default_model`, `timeout`,
 `options`, and `into`. Defaults remain `:reasoning`, `30_000`, `%{}`, and
@@ -76,21 +74,13 @@ A failed run returns an error and
 preserves prior domain and Plugin state. It does not undo provider work.
 Timeout closes the provider work; the same host can run another request.
 
-## Public API migration
+## Public API
 
-| v2 surface | v3 surface |
-| --- | --- |
-| Plugin module names and seven `reasoning.<method>.run` Signals | Retained |
-| `schema/0`, `state_key/0` and catalog name/description/category/tags/version | Retained; the existing metadata version remains `2.0.0` |
-| `actions/0` | Retains the callable `RunStrategy` catalog entry |
-| `signal_patterns/0` | Retained |
-| `signal_routes/1` | Retained as an explicit source-map helper; targets `RunCapability` to return a complete state |
-| A map in the Agent Plugin configuration | Use a keyword list in the core declaration |
-| `plugin_spec/1` and generated v2 manifest | Use the core `{Plugin, keyword_options}` declaration |
-| `mount/2` | Core initializes the schema from `state_spec/1` |
-| `handle_signal/2` strategy override | Shared v3 preparation binds the capability; the route Action fixes its method |
-| `transform_result/3` identity callback | No callback; the route Action returns the full candidate state |
-| Implicit route installation | Declare the route, or append the `signal_routes/1` result to a source map |
+The Plugin modules expose seven `reasoning.<method>.run` Signals. Each Plugin
+provides its schema, state key, catalog data, Action catalog, Signal patterns,
+and explicit `signal_routes/1` helper. Use keyword options in the core Plugin
+declaration. Core initializes the schema from `state_spec/1`. Declare routes
+directly, or append the routes from `signal_routes/1` to a source map.
 
 `RunStrategy` remains the direct Action API. Routing it directly as a domain
 Action requires the caller to assemble the complete state, as shown in 09_14.
@@ -109,11 +99,8 @@ Tests cover raised, thrown, exited, and returned structured errors through the
 public Agent constructor, plus the valid `:error` field. This changes error handling only; Plugin callback
 order and state ownership stay with core.
 
-## Scope still open
+## Scope
 
-Chat, Planning, ModelRouting, Policy, Retrieval, Quota, PluginStack options and
-full legacy default-Plugin conversion remain required. So do CLI use, nested
-AI-tool budgets, complete method options and metadata, typed/rich method
-variants, durable recovery, root dependency cutover, package and consumer checks,
-minimum-runtime checks, and migration/rollback validation. The 126 history
-statuses remain pending; these tests add partial evidence only.
+Other example groups cover Chat, Planning, ModelRouting, Policy, Retrieval,
+Quota, skills, and runtime recovery. This example does not cover every provider
+content type or durable recovery path.

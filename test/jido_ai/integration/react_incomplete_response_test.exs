@@ -9,10 +9,23 @@ defmodule Jido.AI.Integration.ReActIncompleteResponseTest do
   alias Jido.AI.TestSupport.StreamResponseFactory
 
   defmodule BasicAgent do
-    use Jido.AI.Agent,
-      name: "incomplete_response_test_agent",
-      model: "openai:gpt-4o-mini",
-      tools: []
+    use Jido.AI.Agent, name: "incomplete_response_test_agent"
+
+    agent do
+      schema Zoi.object(%{last_result: Zoi.any() |> Zoi.default(nil), messages: Zoi.list(Zoi.map()) |> Zoi.default([])})
+
+      ai :assistant do
+        model("openai:gpt-4o-mini")
+        reasoning(:react)
+        requests(mode: :session, streaming: true)
+        memory(history: :messages)
+        result(into: :last_result)
+      end
+    end
+
+    routes do
+      route("ai.react.query", ai: :assistant)
+    end
   end
 
   setup :set_mimic_from_context

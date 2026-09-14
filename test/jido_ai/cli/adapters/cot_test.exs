@@ -9,17 +9,13 @@ defmodule Jido.AI.Reasoning.ChainOfThought.CLIAdapterTest do
   setup :set_mimic_from_context
 
   defmodule StubCoTAgent do
-    def think(pid, query) do
+    def ask(pid, query) do
       send(self(), {:cot_submit_called, pid, query})
       {:ok, :submitted}
     end
   end
 
   defmodule FixtureCoTAgent do
-    use Jido.AI.CoTAgent,
-      name: "fixture_cot_agent",
-      description: "Fixture CoT agent for adapter resolution tests"
-
     def cli_adapter, do: CoTAdapter
   end
 
@@ -33,7 +29,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.CLIAdapterTest do
   describe "create_ephemeral_agent/1" do
     test "creates ephemeral agent module with default config", %{default_module: module} do
       assert is_atom(module)
-      assert function_exported?(module, :think, 2)
+      assert function_exported?(module, :ask, 2)
       assert function_exported?(module, :name, 0)
       assert module.name() == "cli_cot_agent"
     end
@@ -47,19 +43,17 @@ defmodule Jido.AI.Reasoning.ChainOfThought.CLIAdapterTest do
     end
 
     test "uses custom model from config", %{model_module: module} do
-      opts = module.strategy_opts()
-      assert opts[:model] == "openai:gpt-4"
+      assert profile(module).models.answer.model == "openai:gpt-4"
     end
 
     test "uses default values when not specified", %{default_module: module} do
-      opts = module.strategy_opts()
-      assert opts[:model] == :fast
-      refute Keyword.has_key?(opts, :system_prompt)
+      agent_profile = profile(module)
+      assert agent_profile.models.answer.model == :fast
+      assert is_binary(agent_profile.instructions)
     end
 
     test "uses custom system_prompt from config", %{prompt_module: module} do
-      opts = module.strategy_opts()
-      assert opts[:system_prompt] == "You are a helpful reasoning assistant."
+      assert profile(module).instructions == "You are a helpful reasoning assistant."
     end
   end
 
@@ -75,7 +69,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.CLIAdapterTest do
   end
 
   describe "adapter wiring" do
-    test "submit delegates to configured CoT agent think/2 function" do
+    test "submit delegates to configured Agent ask/2 function" do
       assert {:ok, :submitted} = CoTAdapter.submit(self(), "Reason it out", %{agent_module: StubCoTAgent})
       assert_received {:cot_submit_called, pid, "Reason it out"}
       assert pid == self()
@@ -93,9 +87,8 @@ defmodule Jido.AI.Reasoning.ChainOfThought.CLIAdapterTest do
     test "await returns completed result with CoT metadata" do
       status =
         AdapterTestSupport.status(
-          result: nil,
-          details: %{steps_count: 4, phase: :complete, duration_ms: 123},
-          raw_state: %{last_result: "CoT answer"}
+          result: "CoT answer",
+          details: %{steps_count: 4, phase: :complete, duration_ms: 123}
         )
 
       expect(Jido.AI.CLI.Adapter, :status, fn _pid -> {:ok, status} end)
@@ -121,5 +114,10 @@ defmodule Jido.AI.Reasoning.ChainOfThought.CLIAdapterTest do
     test "fixture CoT agent resolves to CoT adapter" do
       assert {:ok, CoTAdapter} = Adapter.resolve(nil, FixtureCoTAgent)
     end
+  end
+
+  defp profile(module) do
+    {:ok, profile} = Jido.AI.Configuration.profile(module.definition())
+    profile
   end
 end

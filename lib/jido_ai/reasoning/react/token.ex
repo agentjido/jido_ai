@@ -148,9 +148,6 @@ defmodule Jido.AI.Reasoning.ReAct.Token do
       not (Map.has_key?(payload[:state], :context) or Map.has_key?(payload[:state], "context")) ->
         {:error, :invalid_token_state}
 
-      Map.has_key?(payload[:state], :thread) or Map.has_key?(payload[:state], "thread") ->
-        {:error, :legacy_token_state}
-
       true ->
         validate_saved_state(payload)
     end

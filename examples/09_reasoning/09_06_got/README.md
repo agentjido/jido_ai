@@ -76,7 +76,7 @@ covers the graph change in PR 314 without making incidental traversal order a
 sorting guarantee.
 
 Usage uses the shared nested-metadata merger. Missing per-call totals are
-derived before accumulation. The Machine retains legacy lifecycle telemetry
+derived before accumulation. The standalone Machine emits lifecycle telemetry
 by default. Native execution disables those duplicate events and uses common
 phase events, typed Signals and telemetry with the `:got` label. Each model call
 has separate call and phase IDs under one request.

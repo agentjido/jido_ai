@@ -16,15 +16,15 @@ values allowed by `:any`. Unknown keys fail without creating atoms. Duplicate
 atom/string aliases fail even if both values are equal. Non-string/non-atom
 keys fail before the Zoi error renderer.
 
-The small input adapter keeps the v2 distinction between a missing field and
-an explicit `nil`. Zoi defaults normally replace both. The adapter uses the
+The input adapter distinguishes a missing field from an explicit `nil`. Zoi
+defaults normally replace both. The adapter uses the
 declared inner schema for a present `nil`: metadata remains invalid, while
 `nil` remains valid for an atom or any-valued field. Zoi validates field types;
 AI does not keep a second field-type validator. Use the Signal module's
-`validate_data/1` when this input compatibility is needed. Parsing `schema/0`
+`validate_data/1` when this input behavior is needed. Parsing `schema/0`
 directly uses ordinary Zoi default rules.
 
-The following v3 changes are explicit:
+The public behavior is explicit:
 
 - `schema/0` returns static Zoi data. Metadata helpers keep their names and
   return that same schema. `to_json/0` remains a metadata map, not encoded JSON.
@@ -69,13 +69,8 @@ Direct execution uses core Exec and the shared ToolResult normalizer. Removed
 Action parameter conversion is replaced with the shared declared-key/enum
 adapter. Tests prove validation before execution, actual timeout cleanup and
 the core no-retry timeout decision. Registry and observation options stay out
-of core Exec. The old per-run `log_level` is accepted at the AI boundary; v3
-Exec does not implement the old input logging. The retained suppression tests
-do not prove full logging precedence or all legacy execution option forms.
+of core Exec. Unsupported execution options are rejected at the AI boundary.
 
 This example explicitly feeds observed request events to a publisher Agent.
-The [02_17 example](../02_17_signal_delivery/README.md) adds automatic session delivery,
-bounded queues, receipts and failure rules. Other methods, real provider
-content-part streaming, durable replay and root package checks remain required.
-The embedding case proves the provider payload and Signal boundary; the public
-embedding Action family still needs its port.
+Session delivery uses the common bounded delivery path. The embedding case
+proves the provider payload and Signal boundary.

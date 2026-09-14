@@ -1,8 +1,6 @@
 defmodule Jido.AI.SignalTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Reasoning.ReAct.Signal, as: ReactSignal
-
   alias Jido.AI.Signal.{
     EmbedResult,
     LLMDelta,
@@ -15,21 +13,6 @@ defmodule Jido.AI.SignalTest do
     ToolResult,
     Usage
   }
-
-  describe "ReactEvent" do
-    test "creates worker event signal with required fields" do
-      signal =
-        ReactSignal.new!(%{
-          request_id: "req_123",
-          event: %{id: "evt_1", kind: :llm_started}
-        })
-
-      assert signal.type == "ai.react.worker.event"
-      assert signal.source == "/ai/react/worker"
-      assert signal.data.request_id == "req_123"
-      assert signal.data.event.kind == :llm_started
-    end
-  end
 
   describe "typed signal validation" do
     test "reports missing required fields" do

@@ -101,7 +101,6 @@ defmodule Jido.AI.ObserveTest do
     assert sanitized.result.status == :error
     assert sanitized.result.error.type == :timeout
     assert sanitized.result.error.message == "timeout time...[truncated]"
-    refute match?({:error, _, _}, sanitized.result)
 
     assert Enum.take(sanitized.tags, 3) == [1, 2, 3]
     assert List.last(sanitized.tags) == %{__jido_ai_truncated__: %{omitted_items: 3}}
@@ -275,7 +274,6 @@ defmodule Jido.AI.ObserveTest do
     assert metadata.api_key == "[REDACTED]"
     assert metadata.result.status == :ok
     assert metadata.result.value.type == :map
-    refute match?({:ok, _, _}, metadata.result)
   end
 
   test "emit does not emit telemetry when disabled" do

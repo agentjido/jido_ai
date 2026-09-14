@@ -348,24 +348,6 @@ defmodule JidoAI.Examples.RequestInspectionTest do
     assert_script_done(mock)
   end
 
-  test "terminal inspection works without conversation history", %{jido: jido} do
-    {mock, context} = mock([%{reply: {:text, "No history"}}])
-    server = start_agent(jido, JidoAI.Examples.ContextViews.Stateless.new!())
-    {:ok, request} = submit(server, context)
-    assert {:ok, "No history"} = Request.await(request)
-    {:ok, view} = Session.snapshot(server)
-    assert view.request.result == "No history"
-    assert view.details.conversation == []
-
-    assert Enum.map(view.details.trace.events, & &1.kind) == [
-             :request_started,
-             :llm_started,
-             :llm_completed
-           ]
-
-    assert_script_done(mock)
-  end
-
   test "a stored terminal trace survives a lost completion reply and a new Agent Server", %{
     jido: jido
   } do

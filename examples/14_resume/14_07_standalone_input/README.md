@@ -34,7 +34,7 @@ request outcome. It retains the intermediate answer in the conversation.
 
 The empty-queue seal is atomic. Once it succeeds, later input is rejected,
 even while output repair runs. Consumption cannot increase model or iteration
-limits. The standalone API keeps its legacy maximum-iteration result and
+limits. The standalone API keeps its maximum-iteration result and
 termination reason when consumed input would require another forbidden call.
 It does not report the prior answer as the answer to that new input.
 

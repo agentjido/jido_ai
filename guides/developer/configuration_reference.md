@@ -1,121 +1,108 @@
 # Configuration Reference
 
-This is the copy-paste reference for common `jido_ai` configuration and defaults.
+## Model Aliases
 
-## Application Config
+Model aliases are global application configuration. `Jido.AI.Models` only
+resolves these aliases and direct ReqLLM or LLMDB model values.
 
 ```elixir
-# config/config.exs
 config :jido_ai,
   model_aliases: %{
     fast: "provider:fast-model",
     capable: "provider:capable-model",
-    reasoning: "provider:reasoning-model",
-    planning: "provider:planning-model"
+    reasoning: "provider:reasoning-model"
   }
 ```
 
-The package declares its default aliases in its global `config/config.exs`.
-Application `model_aliases` are merged over that configured baseline.
+Application aliases merge over the package baseline.
 
-## Strategy/Macro Defaults
+## Agent Configuration
 
-- ReAct (`Jido.AI.Agent`)
-  - `model`: `:fast` (resolved at runtime via `Jido.AI.resolve_model/1`)
-  - `max_iterations`: `10`
-  - `max_tokens`: `4096`
-  - `request_policy`: `:reject`
-  - `tool_timeout_ms`: `15_000`
-  - `tool_max_retries`: `1`
-  - `tool_retry_backoff_ms`: `200`
-  - `stream_timeout_ms`: `0` (0 = auto-derive the runner's inter-event idle
-    timeout from `tool_timeout_ms + 60_000`; `stream_receive_timeout_ms` is
-    accepted as a compatibility alias)
-  - `tool_heartbeat_ms`: `0` (0 = off). When `> 0`, the runner emits a
-    `:keepalive` runtime event every interval *while tools execute*. Tools
-    produce no stream events while running, which would otherwise starve a
-    consumer that set a short `stream_event_timeout_ms` on
-    `Jido.AI.Request.Stream.events/2` (or a short `stream_timeout_ms` on the
-    runner) and abort the run mid-tool. The heartbeat keeps both idle layers
-    alive; truly-dead streams (no tool, no heartbeat) still time out normally.
-  - `req_http_options`: `[]`
-  - `llm_opts`: `[]`
-  - `request_transformer`: `nil`
-  - `agent_skills`: `false` (explicit opt-in trust boundary). Use `true` for
-    standard `.agents/skills` roots, a list of trusted roots, keyword discovery
-    options with `paths`, an explicit `trust` policy, `max_depth`,
-    `max_directories`, and `exclude_directories`, or runtime `specs:` with an
-    optional `resource_provider:` callback. Discovery and strict validation run
-    when each agent instance initializes; runtime specs must use `source: nil`,
-    keep their supplied inline bodies, and use provider-backed resources only
-    when configured.
-  - `signal_routes`: `[]` (agent-level routes merged with ReAct strategy routes)
+Use `Jido.AI.Agent` and the Spark DSL. The `use` options are core Agent options,
+such as `name`, `description`, `metadata`, `max_state_size`, and `extensions`.
+AI configuration belongs in an `ai` block.
 
-- CoT (`Jido.AI.CoTAgent`)
-  - `model`: `:fast` (resolved at runtime via `Jido.AI.resolve_model/1`)
+```elixir
+defmodule MyApp.Assistant do
+  use Jido.AI.Agent, name: "assistant"
 
-- CoD (`Jido.AI.CoDAgent`)
-  - `model`: `:fast` (resolved at runtime via `Jido.AI.resolve_model/1`)
-  - default system prompt encourages concise drafts and final answer after `####`
+  agent do
+    schema Zoi.object(%{answer: Zoi.any() |> Zoi.default(nil)})
 
-- AoT (`Jido.AI.AoTAgent`)
-  - `model`: `:fast` (resolved at runtime via `Jido.AI.resolve_model/1`)
-  - `profile`: `:standard`
-  - `search_style`: `:dfs`
-  - `temperature`: `0.0`
-  - `max_tokens`: `2048`
-  - `require_explicit_answer`: `true`
+    ai :assistant do
+      instructions("Answer accurately.")
 
-- ToT (`Jido.AI.ToTAgent`)
-  - `model`: `:fast` (resolved at runtime via `Jido.AI.resolve_model/1`)
-  - `branching_factor`: `3`
-  - `max_depth`: `3`
-  - `traversal_strategy`: `:best_first`
+      models do
+        model :answer, :fast do
+          generation(temperature: 0.2, max_tokens: 1024)
+        end
+      end
 
-- GoT (`Jido.AI.GoTAgent`)
-  - `model`: `:fast` (resolved at runtime via `Jido.AI.resolve_model/1`)
-  - `max_nodes`: `20`
-  - `max_depth`: `5`
-  - `aggregation_strategy`: `:synthesis`
+      reasoning :react do
+        model(:answer)
+        tool_concurrency(1)
+      end
 
-- TRM (`Jido.AI.TRMAgent`)
-  - `model`: `:fast` (resolved at runtime via `Jido.AI.resolve_model/1`)
-  - `max_supervision_steps`: `5`
-  - `act_threshold`: `0.9`
+      controls do
+        max_iterations(8)
+        max_model_calls(12)
+        max_tool_calls(16)
+        timeout(60_000)
+      end
 
-- Adaptive (`Jido.AI.AdaptiveAgent`)
-  - `default_strategy`: `:react`
-  - `available_strategies`: `[:cod, :cot, :react, :tot, :got, :trm]`
-  - add AoT explicitly when desired: `available_strategies: [:cod, :cot, :react, :aot, :tot, :got, :trm]`
+      requests do
+        mode(:session)
+        on_busy(:reject)
+        max_requests(100)
+        streaming(true)
+        steering(true)
+      end
 
-## Request Defaults
+      result(nil, into: :answer)
+    end
+  end
 
-- await timeout: `30_000ms`
-- max retained requests per agent state: `100`
-- request-scoped ReAct overrides: `tools`, `allowed_tools`, `request_transformer`, `max_iterations`, `stream_timeout_ms`, `tool_heartbeat_ms`, `tool_context`, `req_http_options`, `llm_opts`
+  routes do
+    route("ai.ask", ai(:assistant))
+  end
+end
+```
 
-## Security Defaults
+Agent construction validates and lowers this data. It does not call a model or
+a tool.
 
-- hard max turns cap: `50`
-- callback timeout: `5_000ms`
+## Reasoning Methods
 
-## CLI Defaults (`mix jido_ai`)
+Supported method values are:
+
+- `:react`
+- `:chain_of_draft`
+- `:chain_of_thought`
+- `:algorithm_of_thoughts`
+- `:tree_of_thoughts`
+- `:graph_of_thoughts`
+- `:trm`
+- `:adaptive`
+
+Method-specific settings belong in `options(...)` inside the reasoning block.
+Adaptive settings include `available_strategies`, `complexity_thresholds`,
+`strategy_override`, and `method_options`. Adaptive has no `default_strategy`
+setting.
+
+Only ReAct accepts steering. ReAct and Tree of Thoughts can execute tools.
+
+## Request Overrides
+
+A request can supply its model and provider resources through caller context.
+Supported request options include `model`, `tools`, `allowed_tools`,
+`request_transformer`, `max_iterations`, `stream_timeout_ms`,
+`tool_heartbeat_ms`, `tool_context`, `req_http_options`, and `llm_opts`.
+
+`max_iterations` and `max_model_calls` are independent controls.
+
+## CLI Defaults
 
 - `--type`: `react`
-- supported types: `react | aot | cod | cot | tot | got | trm | adaptive`
+- supported values: `react | aot | cod | cot | tot | got | trm | adaptive`
 - `--timeout`: `60_000`
 - `--format`: `text`
-
-## Failure Mode: Conflicting Defaults Across Layers
-
-Symptom:
-- behavior differs between CLI, runtime calls, and tests
-
-Fix:
-- define explicit model and timeout at the call-site for critical paths
-- use one shared config module for environment-specific settings
-
-## Next
-
-- [Getting Started](../user/getting_started.md)
-- [Error Model And Recovery](error_model_and_recovery.md)

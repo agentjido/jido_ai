@@ -63,7 +63,7 @@ defmodule Jido.AI.Actions.Skill.LoadSkill do
 
   @name_regex ~r/^[a-z0-9]+(-[a-z0-9]+)*$/
   @max_name_length 64
-  @context_skills_key :__jido_ai_agent_skills__
+  @context_skills_key :__jido_ai_skills__
 
   @doc false
   def context_skills_key, do: @context_skills_key

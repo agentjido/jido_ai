@@ -1,8 +1,8 @@
 defmodule Jido.AI.Signal.Definition do
   @moduledoc false
 
-  # Keep only AI input and metadata compatibility. Core Signal owns schemas,
-  # constructors, errors and the CloudEvents envelope.
+  # AI owns input normalization and metadata. Core Signal owns schemas,
+  # constructors, errors, and the CloudEvents envelope.
   def validate_data(data, schema) do
     with {:ok, data} <- normalize_keys(data, schema) do
       # Zoi defaults also replace explicit nil. AI defaults apply only to
@@ -41,7 +41,7 @@ defmodule Jido.AI.Signal.Definition do
 
   defp normalize_keys(data, _schema), do: {:ok, data}
 
-  # The public v2 map fields accept structs and retain their nested keys.
+  # Public map fields accept structs and retain their nested keys.
   def map_value(value, _opts) when is_map(value), do: :ok
   def map_value(_, _opts), do: {:error, "must be a map"}
 

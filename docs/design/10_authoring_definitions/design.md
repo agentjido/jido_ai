@@ -4,7 +4,7 @@
 
 ## Scope and owner
 
-- Owner: `Jido.AI.Profile`, `Jido.AI.DSL`, `Jido.AI.Authoring`, Agent compatibility macros, authoring codec, portable inspection, registries, and generated convenience APIs.
+- Owner: `Jido.AI.Profile`, `Jido.AI.Agent`, `Jido.AI.DSL`, `Jido.AI.Authoring`, authoring codec, portable inspection, registries, and generated convenience APIs.
 - In scope: Canonical AI profile data, module DSL, direct data, codec documents, validation, lowering, route targets, generated Flow, Plugin stack, public inspection, and authoring parity.
 - Out of scope: Runtime model calls, tool execution, process startup, stores, a second Flow DSL, and behavior that exists only in one authoring form.
 
@@ -14,7 +14,7 @@ V2 provided `use Jido.AI.Agent`, agent options, reasoning-specific convenience a
 
 | V2 capability | V3 target |
 | --- | --- |
-| Keyword options on `use Jido.AI.Agent` | Compatibility adapter to canonical Profile and core Agent DSL |
+| Keyword options on `use Jido.AI.Agent` | Removed; use the canonical Spark DSL |
 | System prompt and model option | Profile instructions and named model table |
 | Reasoning selector | Registered method ID and validated options |
 | Tool modules | Tool catalog entries and tool sources |
@@ -55,7 +55,8 @@ The three primary authoring forms are:
 2. **Direct data:** `Jido.AI.Profile.new/2` plus `Jido.AI.Authoring.lower/2` for programmatic construction.
 3. **Codec document:** Versioned tagged data decoded through trusted registries.
 
-`use Jido.AI.Agent` remains a selected V2 compatibility surface. It adapts old options to the same Profile and core Agent lowerer. It has no independent schema or runtime.
+`use Jido.AI.Agent` is the canonical convenience form. It uses `Jido.Agent` with
+the `Jido.AI.DSL` Spark extension. It has no separate schema or runtime.
 
 The lowering pipeline is:
 
@@ -96,7 +97,8 @@ The module DSL can define inline instructions and inline Action tools through th
 
 `AUT-REQ-009`: A source-form-only convenience shall expand to canonical Profile data and shall not create source-form-only runtime behavior.
 
-`AUT-REQ-010`: The V2 compatibility macro shall call the canonical Profile and lowerer and shall reject unsupported V2 options explicitly.
+`AUT-REQ-010`: `Jido.AI.Agent` shall accept only the V3 Spark DSL and shall
+reject unsupported top-level AI options.
 
 ### DSL and inline authoring
 
@@ -138,7 +140,7 @@ The module DSL can define inline instructions and inline Action tools through th
 
 `AUT-REQ-027`: Public inspection shall distinguish declared Profile data, effective safe request data, generated Flow identity, and redacted runtime bindings.
 
-### Generated API and compatibility
+### Generated API
 
 `AUT-REQ-028`: An authored AI Agent shall expose Profile inspection and the request functions supported by its request mode.
 
@@ -224,7 +226,7 @@ Jido.AI.Portable.preflight(source, request, opts \\ []) :: {:ok, map()} | {:erro
 | --- | --- |
 | 11 Checkpoints | Stable Profile identity, Agent version, and portable definition rules |
 | 12 Observation | Safe declared and effective configuration views |
-| 90 Delivery | One migration target for V2 macros, options, docs, and examples |
+| 90 Delivery | One V3 authoring target for docs and examples |
 | Host applications | Module DSL, direct data, and codec parity |
 
 ## Open design decisions
@@ -232,7 +234,7 @@ Jido.AI.Portable.preflight(source, request, opts \\ []) :: {:ok, map()} | {:erro
 | ID | Question | Recommended option | Effect |
 | --- | --- | --- | --- |
 | `AUT-DEC-001` | Is `Jido.AI.Profile` the canonical authoring value? | Yes | Gives all forms one validation and lowering path |
-| `AUT-DEC-002` | Does `use Jido.AI.Agent` remain public in V3? | Yes as a documented compatibility wrapper for one major release | Eases V2 migration without preserving Strategy runtime |
+| `AUT-DEC-002` | Does `use Jido.AI.Agent` remain public in V3? | Yes, as the canonical convenience form for `Jido.Agent` plus `Jido.AI.DSL` | Gives users one inert Spark authoring form |
 | `AUT-DEC-003` | Can codec documents name modules? | Only by trusted registry ID | Prevents unsafe code and atom loading |
 | `AUT-DEC-004` | Can Profile fields contain anonymous functions? | No; use registered module or MFA references where allowed | Preserves portability |
 | `AUT-DEC-005` | Which form is the primary developer guide? | Core Agent DSL with `Jido.AI.DSL` | Aligns Jido AI with V3 authoring |

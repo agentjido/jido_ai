@@ -42,7 +42,6 @@ defmodule Jido.AI.CLI.AdapterStatusTest do
 
       assert {:ok, view} = Adapter.status(self())
       assert view.agent_id == "agent"
-      assert view.raw_state == %{count: 1}
       assert view.snapshot.status == status
       assert view.snapshot.done? == done?
       assert view.snapshot.details == %{phase: phase, source: :test}

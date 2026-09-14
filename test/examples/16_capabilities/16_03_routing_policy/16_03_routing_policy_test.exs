@@ -127,7 +127,7 @@ defmodule JidoAI.Examples.RoutingPolicyTest do
     assert_script_done(mock)
   end
 
-  test "Policy normalizes results and sanitizes deltas before the actual domain Action", %{
+  test "Policy leaves inbound observations unchanged for the domain Action", %{
     jido: jido
   } do
     assert {:ok, definition} = Example.definition(policy: [max_delta_chars: 5])
@@ -139,11 +139,11 @@ defmodule JidoAI.Examples.RoutingPolicyTest do
                Example.signal("ai.llm.delta", %{delta: "abc" <> <<0>> <> "defgh"})
              )
 
-    assert agent.state.observed.data.delta == "abcde"
+    assert agent.state.observed.data.delta == "abc" <> <<0>> <> "defgh"
 
     for type <- ["ai.llm.response", "ai.tool.result"] do
       assert {:ok, agent} = Server.call(server, Example.signal(type, %{result: :bad_shape}))
-      assert {:error, %{type: :malformed_result}, []} = agent.state.observed.data.result
+      assert agent.state.observed.data.result == :bad_shape
     end
   end
 
@@ -300,7 +300,7 @@ defmodule JidoAI.Examples.RoutingPolicyTest do
     assert_script_done(mock)
   end
 
-  test "disabling input blocking still normalizes observations", %{jido: jido} do
+  test "disabling input blocking leaves inbound observations unchanged", %{jido: jido} do
     {mock, context} = mock([%{reply: {:text, "Observed"}}])
 
     assert {:ok, definition} =
@@ -321,11 +321,11 @@ defmodule JidoAI.Examples.RoutingPolicyTest do
                Example.signal("ai.llm.delta", %{delta: "ab" <> <<0>> <> "cdef"})
              )
 
-    assert agent.state.observed.data.delta == "abcd"
+    assert agent.state.observed.data.delta == "ab" <> <<0>> <> "cdef"
     assert_script_done(mock)
   end
 
-  test "typed content parts and successful result envelopes survive Policy preparation", %{
+  test "typed content parts and successful result envelopes survive inbound preparation", %{
     jido: jido
   } do
     assert {:ok, definition} = Example.definition(policy: [max_delta_chars: 2])
@@ -348,8 +348,7 @@ defmodule JidoAI.Examples.RoutingPolicyTest do
       assert {:ok, agent} =
                Server.call(server, Example.signal("ai.tool.result", %{result: envelope}))
 
-      assert {:ok, %{answer: "Ready"}, effects} = agent.state.observed.data.result
-      assert effects == if(tuple_size(envelope) == 3, do: elem(envelope, 2), else: [])
+      assert agent.state.observed.data.result == envelope
     end
   end
 

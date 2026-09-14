@@ -40,23 +40,6 @@ defmodule JidoAI.Examples.AoT.Agent do
   end
 end
 
-defmodule JidoAI.Examples.AoT.Public do
-  use Jido.AI.AoTAgent, name: "public_aot", model: :example
-end
-
-defmodule JidoAI.Examples.AoT.Custom do
-  use Jido.AI.AoTAgent,
-    name: "custom_aot",
-    model: :example,
-    profile: :long,
-    search_style: :bfs,
-    examples: ["  one example  ", ""],
-    require_explicit_answer: false,
-    temperature: 0.3,
-    max_tokens: 99,
-    llm_opts: [max_tokens: 101]
-end
-
 defmodule JidoAI.Examples.AoT.Repair do
   def repair(_output, _raw, _reason), do: {:ok, %{value: 24}}
 
@@ -101,10 +84,18 @@ defmodule JidoAI.Examples.AoT do
     do: Jido.AI.Authoring.lower(base(), [Map.merge(source(), changes)])
 end
 
-defmodule JidoAI.Examples.AoT.LegacyValues do
-  use Jido.AI.AoTAgent,
-    name: "legacy_aot_values",
-    model: :example,
-    examples: [:example, 24, " ", nil],
-    temperature: "invalid"
+defmodule JidoAI.Examples.AoT.RequestTransformer do
+  @moduledoc "Adds one fresh request header to each model call."
+  @behaviour Jido.AI.Reasoning.ReAct.RequestTransformer
+
+  def transform_request(request, _state, _config, context) do
+    n = Agent.get_and_update(context.calls, &{&1 + 1, &1 + 1})
+
+    http =
+      request.llm_opts
+      |> Keyword.get(:req_http_options, [])
+      |> Keyword.put(:headers, [{"x-credential-version", Integer.to_string(n)}])
+
+    {:ok, %{llm_opts: [req_http_options: http]}}
+  end
 end

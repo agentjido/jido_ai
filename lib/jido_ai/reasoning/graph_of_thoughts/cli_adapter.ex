@@ -23,7 +23,7 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.CLIAdapter do
   @impl true
   def submit(pid, query, config) do
     agent_module = config.agent_module
-    agent_module.explore(pid, query)
+    agent_module.ask(pid, query)
   end
 
   @impl true
@@ -55,19 +55,17 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.CLIAdapter do
     max_depth = config[:max_depth] || @default_max_depth
     aggregation_strategy = config[:aggregation_strategy] || @default_aggregation_strategy
 
-    contents =
-      quote do
-        use Jido.AI.GoTAgent,
-          name: "cli_got_agent",
-          description: "CLI ephemeral GoT agent",
-          model: unquote(model),
-          max_nodes: unquote(max_nodes),
-          max_depth: unquote(max_depth),
-          aggregation_strategy: unquote(aggregation_strategy)
-      end
-
-    Module.create(module_name, contents, Macro.Env.location(__ENV__))
-    module_name
+    Jido.AI.CLI.EphemeralAgent.create(module_name,
+      method: :graph_of_thoughts,
+      name: "cli_got_agent",
+      description: "CLI ephemeral GoT agent",
+      model: model,
+      reasoning_options: %{
+        max_nodes: max_nodes,
+        max_depth: max_depth,
+        aggregation_strategy: aggregation_strategy
+      }
+    )
   end
 
   defp poll_loop(pid, deadline, interval) do
@@ -79,12 +77,7 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.CLIAdapter do
       case Jido.AI.CLI.Adapter.status(pid) do
         {:ok, status} ->
           if status.snapshot.done? do
-            answer =
-              case status.snapshot.result do
-                nil -> Map.get(status.raw_state, :last_result, "")
-                "" -> Map.get(status.raw_state, :last_result, "")
-                result -> result
-              end
+            answer = status.snapshot.result || ""
 
             {:ok, %{answer: answer, meta: extract_meta(status)}}
           else

@@ -17,10 +17,28 @@ defmodule Jido.AI.TestHelpersTest do
   end
 
   defmodule EchoAgent do
-    use Jido.AI.Agent,
-      name: "test_echo_agent",
-      description: "Agent used by public test helper tests",
-      tools: [ReadTool]
+    use Jido.AI.Agent, name: "test_echo_agent", description: "Agent used by public test helper tests"
+
+    agent do
+      schema Zoi.object(%{last_result: Zoi.any() |> Zoi.default(nil), messages: Zoi.list(Zoi.map()) |> Zoi.default([])})
+
+      ai :assistant do
+        model(:fast)
+        reasoning(:react)
+
+        tools do
+          action(ReadTool)
+        end
+
+        requests(mode: :session, streaming: true)
+        memory(history: :messages)
+        result(into: :last_result)
+      end
+    end
+
+    routes do
+      route("ai.react.query", ai: :assistant)
+    end
   end
 
   setup do

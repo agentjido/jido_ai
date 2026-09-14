@@ -62,5 +62,5 @@ Do not use this guide when:
 ## Next
 
 - [Error Model And Recovery](error_model_and_recovery.md)
-- [Directives Runtime Contract](directives_runtime_contract.md)
+- [Architecture And Runtime Flow](architecture_and_runtime_flow.md)
 - [Tool Calling With Actions](../user/tool_calling_with_actions.md)

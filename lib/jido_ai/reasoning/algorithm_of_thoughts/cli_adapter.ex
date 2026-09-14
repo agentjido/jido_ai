@@ -18,7 +18,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.CLIAdapter do
 
   @impl true
   def submit(pid, query, config) do
-    config.agent_module.explore(pid, query)
+    config.agent_module.ask(pid, query)
   end
 
   @impl true
@@ -49,21 +49,18 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.CLIAdapter do
     max_tokens = config[:max_tokens] || @default_max_tokens
     require_explicit_answer = Map.get(config, :require_explicit_answer, true)
 
-    contents =
-      quote do
-        use Jido.AI.AoTAgent,
-          name: "cli_aot_agent",
-          description: "CLI ephemeral AoT agent",
-          model: unquote(model),
-          profile: unquote(profile),
-          search_style: unquote(search_style),
-          temperature: unquote(temperature),
-          max_tokens: unquote(max_tokens),
-          require_explicit_answer: unquote(require_explicit_answer)
-      end
-
-    Module.create(module_name, contents, Macro.Env.location(__ENV__))
-    module_name
+    Jido.AI.CLI.EphemeralAgent.create(module_name,
+      method: :algorithm_of_thoughts,
+      name: "cli_aot_agent",
+      description: "CLI ephemeral AoT agent",
+      model: model,
+      generation: [temperature: temperature, max_tokens: max_tokens],
+      reasoning_options: %{
+        profile: profile,
+        search_style: search_style,
+        require_explicit_answer: require_explicit_answer
+      }
+    )
   end
 
   defp poll_loop(pid, deadline, interval) do
@@ -77,7 +74,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.CLIAdapter do
 
             {:ok,
              %{
-               answer: extract_answer(result, status.raw_state),
+               answer: extract_answer(result),
                meta: extract_meta(status)
              }}
           else
@@ -91,16 +88,9 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.CLIAdapter do
     end
   end
 
-  defp extract_answer(%{answer: answer}, _raw_state) when is_binary(answer), do: answer
-  defp extract_answer(result, _raw_state) when is_binary(result), do: result
-
-  defp extract_answer(_result, raw_state) do
-    case Map.get(raw_state, :last_result) do
-      %{answer: answer} when is_binary(answer) -> answer
-      value when is_binary(value) -> value
-      _ -> ""
-    end
-  end
+  defp extract_answer(%{answer: answer}) when is_binary(answer), do: answer
+  defp extract_answer(result) when is_binary(result), do: result
+  defp extract_answer(_result), do: ""
 
   defp extract_meta(status) do
     details = status.snapshot.details || %{}

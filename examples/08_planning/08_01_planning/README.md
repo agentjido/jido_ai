@@ -103,21 +103,15 @@ selected result field changes. The example combines Planning, reasoning and an
 ordinary route on one Agent. Provider failure preserves previously committed
 results and Plugin state. It cannot undo a completed provider request.
 
-## API migration
+## Public API
 
-| v2 surface | v3 mapping |
-| --- | --- |
-| Three Actions, public result maps and catalog accessors | Retained |
-| `Jido.AI.Plugins.Planning`, Signal names, `actions/0`, `signal_patterns/0` | Retained |
-| `schema/0`, name/description/category/tags/version, state key | Retained; default model schema now accepts the model inputs already described by the API |
-| Plugin map configuration | Use keyword options; supported keys are `default_model`, `default_max_tokens`, `default_temperature`, `into` |
-| `mount/2` | Core initializes `state_spec/1`; no Plugin process is needed |
-| `plugin_spec/1` and the v2 manifest | Use the core `{Plugin, keyword_options}` declaration |
-| Implicit Plugin routes | Declare core routes or use `signal_routes/1` in source attributes |
-| `handle_signal/2` and `transform_result/3` | Preparation binds the operation; the route Action returns a full candidate |
-| Action route target | `RunCapability` performs domain projection; direct Action use retains the result map |
+The three Actions keep their public result maps and catalog accessors. The
+Planning Plugin provides its schema, state key, Signal patterns, and route
+helper. Use keyword options in the core Plugin declaration. Supported options
+are `default_model`, `default_max_tokens`, `default_temperature`, and `into`.
+Core initializes Plugin state from `state_spec/1`. Declare routes directly, or
+use `signal_routes/1` in source attributes. `RunCapability` performs domain
+projection. Direct Action use retains the result map.
 
-Full legacy default-Plugin conversion, CLI, quota/policy, skill/resource paths,
-plan execution/repair, durable recovery, root dependency cutover, package and
-consumer checks, the minimum runtime, and migration/rollback checks remain
-required. This example does not establish a working root package.
+This example does not execute or repair generated plans and does not cover
+durable recovery.

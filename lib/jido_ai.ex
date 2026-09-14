@@ -15,8 +15,8 @@ defmodule Jido.AI do
 
   Use semantic model aliases instead of hardcoded model strings:
 
-      Jido.AI.resolve_model(:fast)      # => "provider:fast-model"
-      Jido.AI.resolve_model(:capable)   # => "provider:capable-model"
+      Jido.AI.Models.resolve(:fast)      # => "provider:fast-model"
+      Jido.AI.Models.resolve(:capable)   # => "provider:capable-model"
 
   Configure custom aliases in your config:
 
@@ -62,8 +62,6 @@ defmodule Jido.AI do
 
   import Kernel, except: [inspect: 1]
 
-  alias Jido.AI.Models
-
   @doc "Builds one canonical, validated AI profile."
   def profile(attrs, opts \\ []), do: Jido.AI.Profile.new(attrs, opts)
 
@@ -81,56 +79,6 @@ defmodule Jido.AI do
 
   @doc "Imports a versioned map, JSON, or YAML document through explicit registries."
   def import(input, opts \\ []), do: Jido.AI.Portable.import(input, opts)
-
-  @type model_alias :: atom()
-  @type model_spec :: String.t()
-  @type model_input :: model_alias() | ReqLLM.model_input()
-  @doc """
-  Returns all configured model aliases.
-
-  Application aliases are merged over the package baseline from `config/config.exs`.
-
-  ## Examples
-
-      iex> aliases = Jido.AI.model_aliases()
-      iex> is_binary(aliases[:fast])
-      true
-  """
-  @spec model_aliases() :: %{model_alias() => ReqLLM.model_input()}
-  def model_aliases, do: Models.aliases()
-
-  @doc """
-  Resolves a model alias or passes through a direct ReqLLM model input.
-
-  Model aliases are atoms like `:fast`, `:capable`, `:reasoning` that map
-  to full ReqLLM model specifications. Both alias values and direct model
-  inputs may be strings, ReqLLM tuples, inline maps, or `%LLMDB.Model{}`
-  structs.
-
-  ## Arguments
-
-    * `model` - Either a model alias atom or a direct ReqLLM model input
-
-  ## Returns
-
-    A resolved ReqLLM model input.
-
-  ## Examples
-
-      iex> String.contains?(Jido.AI.resolve_model(:fast), ":")
-      true
-
-      iex> Jido.AI.resolve_model("openai:gpt-4")
-      "openai:gpt-4"
-
-      iex> Jido.AI.resolve_model({:openai, "gpt-4.1", []})
-      {:openai, "gpt-4.1", []}
-
-      Jido.AI.resolve_model(:unknown_alias)
-      # raises ArgumentError with unknown alias message
-  """
-  @spec resolve_model(model_input()) :: ReqLLM.model_input()
-  def resolve_model(model), do: Models.resolve(model)
 
   alias Jido.AI.Configuration
 
@@ -237,7 +185,7 @@ defmodule Jido.AI do
     end
   end
 
-  @doc "Returns a compatibility view of the effective profile configuration."
+  @doc "Returns an effective configuration view for the selected AI profile."
   @spec get_strategy_config(Jido.Agent.t()) :: map()
   def get_strategy_config(agent), do: get_strategy_config(agent, nil)
 

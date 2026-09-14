@@ -10,7 +10,7 @@ defmodule Jido.AI.Authoring.Codec do
   Supply stable host Registry IDs for stored documents. Decoding calls the same
   `Jido.AI.Authoring.lower/2` boundary as direct authoring.
   """
-  alias Jido.Agent.Codec.{Data, Registry}
+  alias Jido.Codec.{Data, Registry}
   alias Jido.AI.Profile
 
   @doc "Encodes source profiles through a host-owned Registry."
@@ -27,7 +27,7 @@ defmodule Jido.AI.Authoring.Codec do
   def decode(agent, document, registry) do
     with :ok <- Data.check_document(document),
          :ok <- Data.object(document, ~w(type version profiles)),
-         :ok <- Data.version(document, "jido.ai.profiles"),
+         :ok <- profile_document(document),
          {:ok, registry} <- Registry.new(registry),
          {:ok, profiles} <- Data.decode(document["profiles"], registry),
          do: Jido.AI.Authoring.lower(agent, profiles)
@@ -46,4 +46,9 @@ defmodule Jido.AI.Authoring.Codec do
       {:ok, data}
     end
   end
+
+  defp profile_document(%{"type" => "jido.ai.profiles", "version" => 1}), do: :ok
+
+  defp profile_document(_document),
+    do: Jido.Agent.Authoring.error("Unknown AI profile document type or version")
 end

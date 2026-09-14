@@ -9,7 +9,7 @@ After this guide, you can explain how model routing and policy enforcement behav
 - `Jido.AI.Plugins.ModelRouting`: assigns model aliases by signal type unless the request already includes `model`
 - `Jido.AI.Plugins.Policy`: validates risky prompt/query content and normalizes runtime signal payloads
 
-`Jido.AI.Agent` includes both plugins by default through `Jido.AI.PluginStack.default_plugins/1`.
+Declare both plugins explicitly in the Agent's `agent` block.
 
 ## Model Routing Defaults
 

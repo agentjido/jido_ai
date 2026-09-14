@@ -133,8 +133,6 @@ defmodule JidoAI.Examples.CallableReasoningTest do
     end
 
     assert RunStrategy.name() == "reasoning_run_strategy"
-    assert RunStrategy.category() == "ai" and RunStrategy.vsn() == "1.0.0"
-    assert "reasoning" in RunStrategy.tags()
     assert {:ok, _} = Zoi.parse(RunStrategy.schema(), %{strategy: :cot, prompt: "Task"})
     assert_script_done(mock)
   end

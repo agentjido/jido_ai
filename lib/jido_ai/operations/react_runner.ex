@@ -5,7 +5,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   Enumeration owns the Agent lifetime. The shared Agent/Flow runtime executes
   all model and tool work. Terminal tokens contain AI data, never Exec values.
   Model and tool checkpoints resume through the shared Flow with fresh runtime
-  resources. Legacy v2 phase conversion remains a separate migration step.
+  resources.
   """
   alias Jido.AI.{Context, Request, Session}
   alias Jido.AI.Reasoning.ReAct.{Authoring, Checkpoint, Config, State, Token}

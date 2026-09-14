@@ -9,7 +9,6 @@ matching `test/examples/16_capabilities` folder.
 | `16_01_reasoning` | [16_01 — Reasoning capability Plugins](16_01_reasoning/README.md) | [16_01_reasoning_test.exs](../../test/examples/16_capabilities/16_01_reasoning/16_01_reasoning_test.exs) |
 | `16_02_chat` | [Chat capability and callable Actions](16_02_chat/README.md) | [16_02_chat_test.exs](../../test/examples/16_capabilities/16_02_chat/16_02_chat_test.exs) |
 | `16_03_routing_policy` | [ModelRouting and Policy](16_03_routing_policy/README.md) | [16_03_routing_policy_test.exs](../../test/examples/16_capabilities/16_03_routing_policy/16_03_routing_policy_test.exs) |
-| `16_04_plugin_stack` | [Default Plugins on public AI Agents](16_04_plugin_stack/README.md) | [16_04_plugin_stack_test.exs](../../test/examples/16_capabilities/16_04_plugin_stack/16_04_plugin_stack_test.exs) |
 
 Run this group from the repository root:
 

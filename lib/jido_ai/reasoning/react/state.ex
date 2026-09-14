@@ -3,7 +3,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
   Runtime state for a single ReAct run.
   """
 
-  alias Jido.AI.Reasoning.ReAct.{Config, PendingToolCall}
+  alias Jido.AI.Reasoning.ReAct.PendingToolCall
   alias Jido.AI.Context, as: AIContext
 
   @status_values [:running, :awaiting_tools, :completed, :failed, :cancelled]
@@ -89,17 +89,14 @@ defmodule Jido.AI.Reasoning.ReAct.State do
   Restores state from a minimal checkpoint map.
   """
   @spec from_checkpoint_map(map()) :: {:ok, t()} | {:error, term()}
-  def from_checkpoint_map(%{} = map) when is_map_key(map, :thread) or is_map_key(map, "thread") do
-    {:error, :legacy_thread_checkpoint}
-  end
-
   def from_checkpoint_map(%{} = map) do
-    with {:ok, run_id} <- fetch_binary(map, :run_id),
+    with :ok <- validate_version(map),
+         {:ok, run_id} <- fetch_binary(map, :run_id),
          {:ok, request_id} <- fetch_binary(map, :request_id),
          {:ok, status} <- fetch_status(map),
          {:ok, context} <- fetch_context(map) do
       attrs = %{
-        version: Map.get(map, :version, Map.get(map, "version", @version)),
+        version: @version,
         run_id: run_id,
         request_id: request_id,
         status: status,
@@ -131,29 +128,6 @@ defmodule Jido.AI.Reasoning.ReAct.State do
   end
 
   def from_checkpoint_map(_), do: {:error, :invalid_checkpoint_state}
-
-  @doc """
-  Converts released State-v3 data from Jido AI v2 to a native checkpoint.
-
-  Supply `:phase` (`:before_llm`, `:after_llm`, `:after_tools`, or `:terminal`),
-  `:counters` (a map with `:iterations`, `:model_calls`, and `:tool_calls`),
-  `:domain` (the reconciled application state), and `:remaining_ms`.
-  Optional `:termination_reason` identifies an old iteration-limit result.
-
-  Read these values from the saved event log and application state. Old tokens
-  do not contain enough data to infer them. Decode signed tokens with `Token`
-  first. This function checks data; it does not verify an unsigned map's source.
-
-  Conversion does not execute work. Unresolved or partly executed tools must
-  be reconciled before a failed/cancelled run can restart. Native checkpoints
-  cannot be imported again. Use `stream_from_state/3` or `Token.issue/2` with
-  the returned State. The original value remains unchanged for rollback.
-  """
-  @spec migrate(t() | map(), Config.t() | map() | keyword(), keyword()) ::
-          {:ok, t()} | {:error, term()}
-  def migrate(saved, config, evidence) do
-    Jido.AI.Reasoning.ReAct.Migration.convert(saved, config, evidence)
-  end
 
   @doc """
   Returns the minimal serializable map required to resume execution.
@@ -328,6 +302,14 @@ defmodule Jido.AI.Reasoning.ReAct.State do
   end
 
   defp restore_pending(_), do: []
+
+  defp validate_version(map) do
+    case Map.get(map, :version, Map.get(map, "version")) do
+      @version -> :ok
+      nil -> {:error, {:missing_field, :version}}
+      _ -> {:error, :checkpoint_version_mismatch}
+    end
+  end
 
   defp fetch_binary(map, key) do
     value = Map.get(map, key, Map.get(map, Atom.to_string(key)))

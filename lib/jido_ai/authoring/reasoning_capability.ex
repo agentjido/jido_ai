@@ -4,11 +4,10 @@ defmodule Jido.AI.ReasoningCapability do
     strategy = Keyword.fetch!(opts, :strategy)
     package = __CALLER__.module
     facet = Module.concat(package, Agent)
-    server_facet = Module.concat(package, AgentServer)
     state_key = :"reasoning_#{strategy}"
 
     quote do
-      use Jido.Plugin, agent: unquote(facet), agent_server: unquote(server_facet)
+      use Jido.Plugin, agent: unquote(facet)
       @strategy unquote(strategy)
       def name, do: unquote(Keyword.fetch!(opts, :name))
       def description, do: unquote(Keyword.fetch!(opts, :description))
@@ -31,17 +30,12 @@ defmodule Jido.AI.ReasoningCapability do
         @impl Jido.Agent.Plugin
         def state_spec(opts),
           do: {unquote(state_key), Jido.AI.ReasoningCapability.schema(unquote(strategy), opts)}
-      end
 
-      defmodule unquote(server_facet) do
-        @moduledoc false
-        use Jido.AgentServer.Plugin
-
-        @impl Jido.AgentServer.Plugin
-        def admit(_runtime, command, opts),
+        @impl Jido.Agent.Plugin
+        def prepare(preparation, opts),
           do:
-            Jido.AI.ReasoningCapability.prepare_command(
-              command,
+            Jido.AI.ReasoningCapability.prepare_input(
+              preparation,
               unquote(package),
               unquote(strategy),
               unquote(state_key),
@@ -83,23 +77,18 @@ defmodule Jido.AI.ReasoningCapability do
     })
   end
 
-  def prepare_command(command, package, strategy, state_key, opts) do
-    signal = command.signal
-    current = Map.get(command.context, :jido_ai_reasoning_capability)
-
+  def prepare_input(preparation, package, strategy, state_key, opts) do
     selected =
-      if signal.type == "reasoning.#{strategy}.run" do
+      if preparation.signal.type == "reasoning.#{strategy}.run" do
         %{
           owner: package,
           strategy: strategy,
           into: Keyword.get(opts, :into, :result),
           key: state_key,
-          defaults: Map.fetch!(command.agent.state, state_key)
+          defaults: preparation.plugin_state
         }
-      else
-        current
       end
 
-    Jido.AI.Capability.bind(command, :jido_ai_reasoning_capability, selected)
+    {:ok, selected}
   end
 end

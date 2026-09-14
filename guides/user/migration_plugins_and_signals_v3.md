@@ -22,7 +22,8 @@ New public plugins:
 - `Jido.AI.Plugins.Reasoning.TRM`
 - `Jido.AI.Plugins.Reasoning.Adaptive`
 
-`Jido.AI.Plugins.TaskSupervisor` remains internal runtime infrastructure, not a recommended public capability plugin.
+The old task supervisor plugin is removed. Core Jido runtime processes own
+asynchronous execution.
 
 ## Plugin Module Mapping
 

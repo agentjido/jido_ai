@@ -14,6 +14,6 @@ coverage_active? =
 coverage_exclusions = if coverage_active?, do: [:coverage_external_vm], else: []
 
 ExUnit.start(
-  exclude: [:flaky, :example, :legacy_v2] ++ coverage_exclusions,
+  exclude: [:flaky, :example] ++ coverage_exclusions,
   capture_log: true
 )

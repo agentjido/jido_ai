@@ -4,7 +4,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
 
   The caller owns the linked Agent. The same validated profile and core Flow
   serve direct Actions and declared AI Agents. Completion stops the private
-  Agent; no v2 Strategy or private Directive executor is used.
+  Agent. It does not use a separate Strategy or Directive executor.
   """
 
   use Jido.Action,
@@ -68,11 +68,6 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
           Zoi.boolean(description: "Require an explicit `answer:` line for AoT success")
           |> Zoi.optional(),
         # Adaptive options
-        default_strategy:
-          Zoi.enum([:cod, :cot, :react, :tot, :got, :trm, :aot],
-            description: "Adaptive default strategy"
-          )
-          |> Zoi.optional(),
         available_strategies:
           Zoi.list(
             Zoi.enum([:cod, :cot, :react, :tot, :got, :trm, :aot],
@@ -85,13 +80,6 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
           Zoi.map(description: "Adaptive complexity thresholds")
           |> Zoi.optional()
       })
-
-  @doc "Legacy catalog category."
-  def category, do: "ai"
-  @doc "Legacy catalog tags."
-  def tags, do: ["reasoning", "strategies", "orchestration"]
-  @doc "Legacy Action contract version."
-  def vsn, do: "1.0.0"
 
   alias Jido.AI.{Authoring, Profile, Request, Session}
   alias Jido.AgentServer, as: Server
@@ -137,7 +125,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
       :require_explicit_answer,
       :llm_timeout_ms
     ],
-    adaptive: [:model, :default_strategy, :available_strategies, :complexity_thresholds]
+    adaptive: [:model, :available_strategies, :complexity_thresholds]
   }
   @impl Jido.Action
   def run(params, context) do
@@ -242,8 +230,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
         :llm_timeout_ms,
         :request_policy,
         :temperature,
-        :max_tokens,
-        :default_strategy
+        :max_tokens
       ])
 
     profile = %{
@@ -267,7 +254,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
 
     base = %{
       name: "jido_ai_internal_reasoning_runner",
-      plugins: Jido.AI.PluginStack.default_plugins(),
+      plugins: [],
       schema: Zoi.object(%{result: Zoi.any() |> Zoi.default(nil)}),
       routes: [{"reasoning.run", Authoring.ai(:assistant)}]
     }

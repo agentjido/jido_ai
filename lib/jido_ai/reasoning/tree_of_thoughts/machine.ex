@@ -3,8 +3,8 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Machine do
   Data model for the Tree-of-Thoughts (ToT) search.
 
   This module stores search state and returns descriptions of model work.
-  Core Flow owns v3 execution. The compatibility API retains its clock and
-  telemetry events; the v3 adapter uses the common request event path.
+  Core Flow owns V3 execution. The standalone Machine can emit lifecycle
+  telemetry; the V3 adapter uses the common request event path.
 
   ## Overview
 
@@ -72,7 +72,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Machine do
 
   alias Jido.AI.Reasoning.TreeOfThoughts.Result
 
-  @typedoc "Internal machine status (string) - retained for data compatibility"
+  @typedoc "Internal machine status"
   @type internal_status :: String.t()
 
   @typedoc "External status (atom) - used in strategy state after to_map/1 conversion"
@@ -225,10 +225,6 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Machine do
       max_parse_retries: Keyword.get(opts, :max_parse_retries, 1)
     }
   end
-
-  # Retain the public callback for callers that inspect legacy transition data.
-  @spec before_transition(t(), internal_status(), internal_status()) :: {:ok, t()}
-  def before_transition(struct, _from, _to), do: {:ok, struct}
 
   @doc """
   Updates the machine state based on a message.

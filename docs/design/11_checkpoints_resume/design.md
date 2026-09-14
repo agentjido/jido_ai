@@ -4,8 +4,8 @@
 
 ## Scope and owner
 
-- Owner: Jido AI checkpoint helpers, ReAct checkpoint and token values, AI checkpoint migration, resume validation, and generated Agent checkpoint integration. Core Jido owns Agent checkpoints and persistence.
-- In scope: Portable AI progress data, versioning, sanitization, active-session normalization, skill and model bindings, completed-effect records, migration, explicit resume, and delivery guarantees.
+- Owner: Jido AI checkpoint helpers, ReAct checkpoint and token values, resume validation, and generated Agent checkpoint integration. Core Jido owns Agent checkpoints and persistence.
+- In scope: Portable AI progress data, strict versioning, sanitization, active-session normalization, skill and model bindings, completed-effect records, explicit resume, and delivery guarantees.
 - Out of scope: Persistence adapters, live Exec state, process restore, provider clients, durable queues, distributed recovery, rollback, and exactly-once execution.
 
 ## V2 capability anchor
@@ -16,7 +16,7 @@ V2 supplied Agent checkpoint helpers, ReAct continuation tokens, sanitization of
 | --- | --- |
 | Jido AI Agent checkpoint | Core `Jido.Agent.checkpoint/2` and `restore/3` |
 | Strategy continuation token | Versioned AI method checkpoint with no live executor |
-| Sanitized worker fields | No worker fields in portable state; reject or normalize legacy data |
+| Sanitized worker fields | No worker fields in portable state; reject unsupported data |
 | Resume old worker | Start a new Flow execution with a new run ID |
 | Checkpoint storage | Core `Jido.Persistence` and host adapter |
 | Active stream restore | Mark interrupted; attach a new sink only to a new run |
@@ -124,15 +124,15 @@ Completed external effects have at-least-once uncertainty. If an external effect
 
 `RES-REQ-025`: Checkpoint success shall not imply that later Signal delivery, stream delivery, or external side effects are durable.
 
-### Versions and migration
+### Versions
 
-`RES-REQ-026`: An AI checkpoint decoder shall reject an unsupported future version and shall identify the supported version range.
+`RES-REQ-026`: An AI checkpoint decoder shall accept only the current V3 version and shall reject every other version.
 
-`RES-REQ-027`: A migration shall be pure, version-to-version, deterministic, and validated after each step.
+`RES-REQ-027`: A checkpoint without an explicit current version shall fail before restore or resume work starts.
 
-`RES-REQ-028`: Legacy V2 checkpoint import, if supported, shall use a separate explicit importer and shall never be the normal V3 restore path.
+`RES-REQ-028`: Jido AI shall not import V2 Agent, Strategy, session, or ReAct checkpoint formats.
 
-`RES-REQ-029`: A failed import or migration shall not modify the stored source checkpoint.
+`RES-REQ-029`: A failed decode or validation shall not modify the stored source checkpoint.
 
 ## Public contract
 
@@ -153,9 +153,6 @@ Jido.AI.Checkpoint.new(attrs) ::
 Jido.AI.Checkpoint.sanitize(agent_or_progress) ::
   {:ok, map()} | {:error, Jido.AI.Error.t()}
 
-Jido.AI.Checkpoint.migrate(checkpoint, target_version) ::
-  {:ok, Jido.AI.Checkpoint.t()} | {:error, Jido.AI.Error.t()}
-
 Jido.AI.Resume.prepare(agent, checkpoint, bindings, opts \\ []) ::
   {:ok, Jido.AI.Execution.Input.t()} | {:error, Jido.AI.Error.t()}
 
@@ -174,14 +171,14 @@ Jido.AI.Resume.start(server, checkpoint, opts \\ []) ::
 - `RES-INV-005`: Remaining limits never increase during resume.
 - `RES-INV-006`: Runtime resources are re-resolved from trusted context.
 - `RES-INV-007`: External effects have no exactly-once guarantee from Jido AI.
-- `RES-INV-008`: Migration is pure and leaves the source unchanged on failure.
+- `RES-INV-008`: Failed decode or validation leaves the source unchanged.
 
 ## Downstream guarantees
 
 | Consumer seam | Guaranteed contract |
 | --- | --- |
 | 12 Observation | Original and resumed run correlation plus delivery-risk metadata |
-| 90 Delivery | Explicit V2 import decision and V3 compatibility window |
+| 90 Delivery | One current V3 checkpoint format and explicit removals |
 | Host persistence | Portable Agent and AI data with no live resource |
 | Host orchestration | Explicit resume input and external-effect risk data |
 
@@ -191,5 +188,5 @@ Jido.AI.Resume.start(server, checkpoint, opts \\ []) ::
 | --- | --- | --- | --- |
 | `RES-DEC-001` | Does core restore auto-resume pending AI work? | No | Prevents unexpected external effects during process start |
 | `RES-DEC-002` | What is the external-effect guarantee? | At-least-once uncertainty with explicit idempotency support | States the real boundary |
-| `RES-DEC-003` | Is V2 checkpoint import required for V3.0? | Support one explicit best-effort importer, not full runtime restoration | Gives migration help without preserving V2 workers |
-| `RES-DEC-004` | How long are AI checkpoint versions supported? | Current and one prior major encoding version | Bounds migration cost |
+| `RES-DEC-003` | Is V2 checkpoint import required for V3.0? | No | Keeps one checkpoint contract |
+| `RES-DEC-004` | How long are AI checkpoint versions supported? | Current version only until a new policy is approved | Prevents implicit format support |

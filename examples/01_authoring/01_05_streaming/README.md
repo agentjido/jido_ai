@@ -11,5 +11,5 @@ A second test cancels the live Turn. It checks the command error, prior state,
 and termination of the provider connection worker with a process monitor.
 
 Status: two passing example tests. The shared mock suite also tests receive
-timeout and disconnect cleanup. Caller wait timeout, AI request admission,
-steering, terminal events, and durable resume remain separate migration work.
+timeout and disconnect cleanup. Other examples cover request admission,
+steering, terminal events, and resume.

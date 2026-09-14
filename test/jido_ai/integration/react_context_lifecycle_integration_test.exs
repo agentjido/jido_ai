@@ -17,11 +17,29 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
   end
 
   defmodule ContextLifecycleAgent do
-    use Jido.AI.Agent,
-      name: "context_lifecycle_agent",
-      model: "openai:gpt-4o-mini",
-      system_prompt: "Initial prompt",
-      tools: [EchoTool]
+    use Jido.AI.Agent, name: "context_lifecycle_agent"
+
+    agent do
+      schema Zoi.object(%{last_result: Zoi.any() |> Zoi.default(nil), messages: Zoi.list(Zoi.map()) |> Zoi.default([])})
+
+      ai :assistant do
+        instructions("Initial prompt")
+        model("openai:gpt-4o-mini")
+        reasoning(:react)
+
+        tools do
+          action(EchoTool)
+        end
+
+        requests(mode: :session, streaming: true)
+        memory(history: :messages)
+        result(into: :last_result)
+      end
+    end
+
+    routes do
+      route("ai.react.query", ai: :assistant)
+    end
   end
 
   setup :set_mimic_from_context
@@ -99,7 +117,7 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
     # Reset context through the canonical strategy command surface.
     reset_signal =
       Jido.Signal.new!(
-        "ai.react.context.modify",
+        "jido.ai.context.modify",
         %{
           op_id: "op_reset_demo",
           context_ref: "default",

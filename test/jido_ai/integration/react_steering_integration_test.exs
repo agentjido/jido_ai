@@ -3,14 +3,25 @@ defmodule Jido.AI.Integration.ReActSteeringIntegrationTest do
   use Mimic
 
   alias Jido.AI
-  alias Jido.AI.Reasoning.ReAct
-  alias Jido.AI.TestSupport.StreamResponseFactory
 
   defmodule SteeringAgent do
-    use Jido.AI.Agent,
-      name: "react_steering_agent",
-      model: "openai:gpt-4o-mini",
-      tools: []
+    use Jido.AI.Agent, name: "react_steering_agent"
+
+    agent do
+      schema Zoi.object(%{last_result: Zoi.any() |> Zoi.default(nil), messages: Zoi.list(Zoi.map()) |> Zoi.default([])})
+
+      ai :assistant do
+        model("openai:gpt-4o-mini")
+        reasoning(:react)
+        requests(mode: :session, streaming: true, steering: true)
+        memory(history: :messages)
+        result(into: :last_result)
+      end
+    end
+
+    routes do
+      route("ai.react.query", ai: :assistant)
+    end
   end
 
   setup :set_mimic_from_context
@@ -27,104 +38,10 @@ defmodule Jido.AI.Integration.ReActSteeringIntegrationTest do
     :ok
   end
 
-  @tag :legacy_v2
-  test "public steer continues the active request instead of starting a second one" do
-    test_pid = self()
-
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, messages, _opts ->
-      count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
-      :persistent_term.put({__MODULE__, :llm_call_count}, count)
-
-      send(test_pid, {:llm_messages, count, messages})
-
-      case count do
-        1 ->
-          Process.sleep(75)
-
-          {:ok,
-           StreamResponseFactory.build(
-             [ReqLLM.StreamChunk.text("A1")],
-             %{finish_reason: :stop, usage: %{input_tokens: 3, output_tokens: 1}},
-             model
-           )}
-
-        2 ->
-          {:ok,
-           StreamResponseFactory.build(
-             [ReqLLM.StreamChunk.text("A2")],
-             %{finish_reason: :stop, usage: %{input_tokens: 4, output_tokens: 1}},
-             model
-           )}
-      end
-    end)
-
-    Mimic.stub(ReqLLM.StreamResponse, :usage, fn
-      %{usage: usage} -> usage
-      _ -> nil
-    end)
-
-    {:ok, pid} = Jido.AgentServer.start_link(agent: SteeringAgent)
-    on_exit(fn -> if Process.alive?(pid), do: Process.exit(pid, :kill) end)
-
-    {:ok, request} = SteeringAgent.ask(pid, "Q1")
-
-    assert_receive {:llm_messages, 1, first_messages}, 1_000
-    assert user_contents(first_messages) == ["Q1"]
-    assert assistant_contents(first_messages) == []
-
-    assert {:ok, _agent} =
-             ReAct.steer(
-               pid,
-               "Q2",
-               expected_request_id: request.id,
-               source: "/integration/test",
-               extra_refs: %{origin: "suite"}
-             )
-
-    assert {:ok, "A2"} = SteeringAgent.await(request, timeout: 5_000)
-
-    assert_receive {:llm_messages, 2, second_messages}, 1_000
-    assert user_contents(second_messages) == ["Q1", "Q2"]
-    assert assistant_contents(second_messages) == ["A1"]
-  end
-
   test "public inject rejects idle agents" do
     {:ok, pid} = Jido.AgentServer.start_link(agent: SteeringAgent)
     on_exit(fn -> if Process.alive?(pid), do: Process.exit(pid, :kill) end)
 
     assert {:error, {:rejected, :idle}} = AI.inject(pid, "Programmatic input")
-  end
-
-  defp user_contents(%ReqLLM.Context{} = context), do: context |> ReqLLM.Context.to_list() |> user_contents()
-
-  defp user_contents(messages) when is_list(messages) do
-    messages
-    |> Enum.filter(&(message_role(&1) == :user))
-    |> Enum.map(&message_content/1)
-  end
-
-  defp assistant_contents(%ReqLLM.Context{} = context), do: context |> ReqLLM.Context.to_list() |> assistant_contents()
-
-  defp assistant_contents(messages) when is_list(messages) do
-    messages
-    |> Enum.filter(&(message_role(&1) == :assistant))
-    |> Enum.map(&message_content/1)
-  end
-
-  defp message_role(message) when is_map(message) do
-    case Map.get(message, :role, Map.get(message, "role")) do
-      role when is_atom(role) -> role
-      "user" -> :user
-      "assistant" -> :assistant
-      "tool" -> :tool
-      "system" -> :system
-      _ -> :unknown
-    end
-  end
-
-  defp message_content(message) when is_map(message) do
-    message
-    |> Map.get(:content, Map.get(message, "content"))
-    |> Jido.AI.Turn.extract_text()
   end
 end

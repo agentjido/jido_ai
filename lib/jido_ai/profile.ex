@@ -417,11 +417,11 @@ defmodule Jido.AI.Profile do
 
   defp resolve_control_reference(value, _registries), do: {:ok, value}
 
-  defp registry(%Jido.Agent.Codec.Registry{} = registry, kind, id) do
+  defp registry(%Jido.Codec.Registry{} = registry, kind, id) do
     core_kind = if kind == :actions, do: :action, else: if(kind == :flows, do: :flow, else: nil)
 
     if core_kind,
-      do: Jido.Agent.Codec.Registry.resolve(registry, id, core_kind),
+      do: Jido.Codec.Registry.resolve(registry, id, core_kind),
       else: error("registries", "This Registry does not contain #{kind}")
   end
 

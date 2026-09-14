@@ -9,7 +9,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.Machine do
   alias Jido.AI.Reasoning.AlgorithmOfThoughts.Result
   alias Jido.AI.Turn
 
-  @typedoc "Internal machine status (string), retained for data compatibility"
+  @typedoc "Internal machine status"
   @type internal_status :: String.t()
 
   @typedoc "External status used by strategy snapshots"

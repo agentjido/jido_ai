@@ -3,8 +3,8 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Machine do
   Graph data model for the Graph-of-Thoughts (GoT) reasoning pattern.
 
   This module stores graph data and returns descriptions of model work.
-  Core Flow owns v3 execution. The compatibility API retains its clock and
-  telemetry events; the native adapter uses the common request event path.
+  Core Flow owns V3 execution. The standalone Machine can emit lifecycle
+  telemetry; the V3 adapter uses the common request event path.
 
   ## Overview
 
@@ -82,7 +82,7 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.Machine do
   # Telemetry event names
   @telemetry_prefix [:jido, :ai, :got]
 
-  @typedoc "Internal machine status (string) - retained for data compatibility"
+  @typedoc "Internal machine status"
   @type internal_status :: String.t()
 
   @typedoc "External status (atom) - used in strategy state after to_map/1 conversion"

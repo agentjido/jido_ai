@@ -3,59 +3,7 @@ defmodule Jido.AI.Signal.Helpers do
   Shared helpers for signal correlation and signal-safe payload shaping.
   """
 
-  alias Jido.AI.Error
   alias Jido.Signal
-
-  @type error_envelope :: Error.error_envelope()
-
-  @doc """
-  Builds a normalized AI runtime error envelope.
-
-  Prefer `Jido.AI.Error.error_envelope/4` for new runtime code.
-  """
-  @deprecated "Use Jido.AI.Error.error_envelope/4"
-  @spec error_envelope(atom(), String.t(), map(), boolean()) :: error_envelope()
-  defdelegate error_envelope(type, message, details \\ %{}, retryable? \\ false), to: Error
-
-  @doc """
-  Normalizes arbitrary error values into the canonical AI error envelope.
-
-  Prefer `Jido.AI.Error.normalize/4` for new runtime code.
-  """
-  @deprecated "Use Jido.AI.Error.normalize/4"
-  @spec normalize_error(term(), atom(), String.t(), map()) :: error_envelope()
-  def normalize_error(
-        reason,
-        fallback_type \\ :execution_error,
-        fallback_message \\ "Execution failed",
-        extra_details \\ %{}
-      ) do
-    Error.normalize(reason, fallback_type, fallback_message, extra_details)
-  end
-
-  @doc """
-  Ensures result payloads use `{:ok, term, effects}` or `{:error, reason, effects}` tuples.
-
-  Prefer `Jido.AI.Error.normalize_result/3` for new runtime code.
-  """
-  @deprecated "Use Jido.AI.Error.normalize_result/3"
-  @spec normalize_result(term(), atom(), String.t()) ::
-          {:ok, term(), [term()]} | {:error, error_envelope(), [term()]}
-  defdelegate normalize_result(
-                result,
-                fallback_type \\ :invalid_result,
-                fallback_message \\ "Invalid result envelope"
-              ),
-              to: Error
-
-  @doc """
-  Returns whether a result or error should be treated as retryable by runtime policy.
-
-  Prefer `Jido.AI.Error.retryable?/1` for new runtime code.
-  """
-  @deprecated "Use Jido.AI.Error.retryable?/1"
-  @spec retryable?(term()) :: boolean()
-  defdelegate retryable?(reason), to: Error
 
   @doc """
   Extracts the best available request/call correlation identifier from signal data.

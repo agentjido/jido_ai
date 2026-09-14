@@ -21,11 +21,10 @@ Each call owns one linked Agent and its Session. It uses the existing Profile,
 Authoring lowerer, reasoning Flow, model operations and Session implementation.
 No new reasoning executor or mock server is present.
 
-The old seven internal `Actions.Reasoning.Runner.*` wrappers are removed. They
-supplied static Agent macros for the old state-override path. The new factory
-places the requested method, model and options in the validated profile before
-instantiation. Cancellation of the calling Exec stops the Agent, its Session
-and the active provider connection. Normal cleanup preserves the Action result.
+The factory places the requested method, model, and options in a validated
+profile before instantiation. Cancellation of the calling Exec stops the Agent,
+its Session, and the active provider connection. Normal cleanup preserves the
+Action result.
 Repeated and concurrent calls use separate request/run IDs and leave the shared
 host runtime alive. The concurrency case uses two barriers on the same mock.
 
@@ -48,11 +47,9 @@ record and stops the private Agent. A commit observed after a wait timeout can
 still use the existing recovered-success path. Unknown external work is not
 replayed.
 
-The `diagnostics.snapshot_*` keys remain compatibility fields. Their values now
-come from canonical request records; they are not v2 Strategy snapshot structs.
+The `diagnostics.snapshot_*` values come from the canonical V3 request snapshot.
 Current request metadata and method diagnostics replace private worker fields.
-The Action retains its name, input schema, category, tags and contract version.
-Removed v2 Action metadata generators follow the separate core API migration.
+The Action retains its name, input schema, category, tags, and contract version.
 
 The factory removes parent Agent state and private AI execution bindings from
 caller context before admission. Trusted provider options use the existing
@@ -60,10 +57,8 @@ caller context before admission. Trusted provider options use the existing
 mock used by the other examples. This does not yet prove nested AI-tool budget
 aggregation or complete provider-option parity.
 
-Capability Plugin declarations, CLI dispatch, all legacy metadata/option forms,
-worker/state conversion, cold model-catalog timing, durable recovery, and root
-package/release gates remain open. This example is a production Action port,
-not proof that the full root package runs on v3.
+Capability Plugin declarations, CLI dispatch, durable recovery, and release
+gates are outside this focused Action example.
 
 The Planning port adds a current-Agent-struct defaults case. Callable reasoning
 now reads that state with map-safe access; configured timeout and prompt defaults

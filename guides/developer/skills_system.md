@@ -19,115 +19,71 @@ use session-scoped activation, validate skill files, and bound custom discovery.
 - `Jido.AI.Actions.Skill.LoadResource`
 - `mix jido_ai.skill`
 
-## Turnkey Agent Integration
+## Agent integration
 
-`Jido.AI.Agent` can wire the complete progressive-disclosure lifecycle from one
-option. Because project skills are executable instructions, enabling standard
-root discovery is an explicit trust decision:
+Declare skill sources in the canonical AI profile DSL. Each `load_path`
+declaration is an explicit trust decision because skill files contain
+executable instructions.
 
 ```elixir
 defmodule MyApp.SupportAgent do
-  use Jido.AI.Agent,
-    name: "support_agent",
-    tools: [MyApp.Search],
-    system_prompt: "You are a support agent.",
-    agent_skills: true
+  use Jido.AI.Agent, name: "support_agent"
+
+  agent do
+    schema Zoi.object(%{
+             answer: Zoi.any() |> Zoi.default(nil),
+             messages: Zoi.list(Zoi.map()) |> Zoi.default([])
+           })
+
+    ai :assistant do
+      instructions "You are a support agent."
+
+      models do
+        model :answer, :fast
+      end
+
+      reasoning :react do
+        model :answer
+      end
+
+      tools do
+        action MyApp.Search
+      end
+
+      skills max_depth: 4, max_directories: 500 do
+        skill MyApp.Skills.Review
+        load_path "priv/skills"
+        resource_policy max_text_bytes: 131_072, binary: :reject
+        resource_provider {MyApp.SkillResources, :handle}
+      end
+
+      requests do
+        mode :session
+      end
+
+      memory do
+        history :messages
+      end
+
+      result nil, into: :answer
+    end
+  end
+
+  routes do
+    route "support.ask", ai(:assistant)
+  end
 end
 ```
 
-This discovers `.agents/skills/` and `~/.agents/skills/`, appends only the compact
-name/description catalog to the system prompt, adds
-`Jido.AI.Actions.Skill.LoadSkill` and `Jido.AI.Actions.Skill.LoadResource` to the
-tool list, and makes metadata-only specs
-available through reserved tool context for that agent. Discovery and catalog
-construction happen when each agent instance initializes. The selected skill
-file is read and strictly validated when `load_skill` activates it. Thus, the
-catalog does not keep all skill bodies in memory.
+The live Agent session discovers the declared roots. It adds the compact skill
+index and the `load_skill` and `load_skill_resource` tools. It reads and checks
+the selected skill file only when the model activates that skill.
 
-Prefer an explicit list when only particular roots are trusted:
-
-```elixir
-use Jido.AI.Agent,
-  name: "support_agent",
-  tools: [MyApp.Search],
-  agent_skills: ["priv/skills", "/opt/my_app/skills"]
-```
-
-Discovery options can set tighter bounds:
-
-```elixir
-agent_skills: [
-  paths: ["priv/skills"],
-  trust: true,
-  max_depth: 4,
-  max_directories: 500,
-  exclude_directories: [".git", "node_modules", "deps", "_build"],
-  resource_policy: [
-    max_resources: 128,
-    max_depth: 6,
-    max_directories: 512,
-    max_listing_bytes: 32_768,
-    max_file_bytes: 524_288,
-    max_text_bytes: 131_072,
-    binary: :reject
-  ]
-]
-```
-
-Keyword options must include an explicit `trust` policy. Omitting it rejects
-every discovered root; passing a path list directly is the shorthand for
-trusting exactly those roots.
-
-Hosts can also supply runtime specs directly. Runtime specs must include a valid
-name, description, `source: nil`, and inline body. They are not discovered from
-the filesystem and cannot retain a filesystem root:
-
-```elixir
-runtime_specs = [
-  %Jido.AI.Skill.Spec{
-    name: "billing-playbook",
-    description: "Answer billing questions using current tenant policy.",
-    source: nil,
-    body_ref: {:inline, "# Billing Playbook\n\nCheck tenant policy before answering."},
-    metadata: %{"owner" => "support"},
-    tags: ["support"]
-  }
-]
-
-provider = fn
-  %{operation: :list}, %{tenant_id: tenant_id} ->
-    {:ok,
-     %{
-       resources: [
-         %{
-           id: "tenant-policy:#{tenant_id}",
-           name: "#{tenant_id}-policy.md",
-           type: :reference,
-           size: 512
-         }
-       ],
-       complete: true
-     }}
-
-  %{operation: :load, resource_id: id}, %{tenant_id: tenant_id} ->
-    content = MyApp.PolicyStore.fetch!(tenant_id, id)
-    {:ok, %{resource_id: id, content: content, size: byte_size(content)}}
-end
-
-use Jido.AI.Agent,
-  name: "support_agent",
-  agent_skills: [
-    specs: runtime_specs,
-    resource_provider: provider,
-    resource_policy: [max_text_bytes: 131_072]
-  ]
-```
-
-Runtime specs can be mixed with discovered paths. Runtime specs win over
-discovered skills with the same name, and shadowed discovered entries are
-reported in diagnostics. Duplicate runtime names are rejected. Filesystem-backed
-skills must enter through trusted discovery (`paths` plus `trust`) rather than
-through `specs:`.
+Direct Profile data and registered source documents use the same `skills` map.
+Filesystem sources require `paths` and `trust`. Runtime specs require a valid
+name, description, `source: nil`, and inline body. Runtime specs win over module
+specs and discovered files with the same name. Duplicate runtime names are
+rejected.
 
 The provider is called with one of these requests:
 
@@ -171,9 +127,9 @@ to permit images and files from an activated skill. `max_file_bytes` applies to
 all resources. `max_text_bytes` applies only to text, including UTF-8 scripts.
 
 `Resources.load/3` returns the raw bytes with a derived `kind` (`:text`, `:image`,
-or `:file`), MIME type, filename, byte size, and selector. `load_text/3` remains
-a text-only compatibility API. The filesystem and runtime provider paths use
-one shared validator.
+or `:file`), MIME type, filename, byte size, and selector. `load_text/3` is the
+text-only API. The filesystem and runtime provider paths use one shared
+validator.
 
 PNG, JPEG, GIF, WebP, and PDF signatures must agree with their MIME type and
 known filename extension. The signature check identifies the format; it does
@@ -521,7 +477,7 @@ Fix:
 Run the end-to-end demo script:
 
 ```bash
-mix run examples/scripts/demo/skills_runtime_foundations_demo.exs
+mix test test/examples/18_skills --include example --seed 0
 ```
 
 Prerequisites:

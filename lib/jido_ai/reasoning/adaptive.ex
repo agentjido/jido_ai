@@ -1,11 +1,8 @@
 defmodule Jido.AI.Reasoning.Adaptive do
   @moduledoc "Adaptive method selection and inspection of retained requests."
-  alias Jido.AI.Reasoning.{Linear, Adaptive.Selection, Adaptive.Strategy}
+  alias Jido.AI.Reasoning.{Linear, Adaptive.Selection}
 
   def method, do: :adaptive
-
-  @deprecated "Use method/0 for profile selection and namespace getters for retained requests"
-  def strategy_module, do: Strategy
 
   defdelegate analyze_prompt(prompt, config \\ %{}), to: Selection
 

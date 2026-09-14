@@ -310,7 +310,7 @@ defmodule Jido.AI.Skill.LoaderTest do
       assert Enum.any?(diagnostics.warnings, &(&1.type == :blank_description))
     end
 
-    test "normalizes optional fields to their public spec types" do
+    test "lenient mode omits unsupported and invalid optional fields" do
       content = """
       ---
       name: normalized-fields
@@ -330,10 +330,11 @@ defmodule Jido.AI.Skill.LoaderTest do
 
       assert spec.license == nil
       assert spec.vsn == nil
-      assert spec.tags == ["one", "2"]
+      assert spec.tags == []
       assert spec.metadata == %{}
       assert Enum.any?(spec.diagnostics.warnings, &(&1.type == :invalid_license))
       assert Enum.any?(spec.diagnostics.warnings, &(&1.type == :invalid_metadata_type))
+      assert Enum.any?(spec.diagnostics.warnings, &(&1.type == :unsupported_top_level_fields))
     end
 
     test "strict mode rejects overlong descriptions and compatibility" do
@@ -452,19 +453,6 @@ defmodule Jido.AI.Skill.LoaderTest do
       assert {:ok, %Spec{metadata: metadata}} = Loader.parse(lenient, "inline", lenient: true)
       assert metadata["number"] == "7"
       assert metadata["list"] == ~s(["one", "two"])
-    end
-
-    test "lenient legacy tags and version accept list, scalar, and non-string forms" do
-      cases = [
-        {"tags: one\nversion: 2", ["one"], nil},
-        {"tags: [one, 2]\nversion: v2", ["one", "2"], "v2"},
-        {"tags: 3\nversion: false", ["3"], nil}
-      ]
-
-      for {legacy, tags, version} <- cases do
-        content = "---\nname: legacy-fields\ndescription: Valid\n#{legacy}\n---\n"
-        assert {:ok, %Spec{tags: ^tags, vsn: ^version}} = Loader.parse(content, "inline", lenient: true)
-      end
     end
 
     @tag :tmp_dir

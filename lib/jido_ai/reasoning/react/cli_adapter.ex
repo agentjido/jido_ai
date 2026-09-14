@@ -73,39 +73,25 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapter do
     system_prompt = config[:system_prompt]
     req_http_options = config[:req_http_options] || []
     llm_opts = config[:llm_opts] || []
-    escaped_req_http_options = Macro.escape(req_http_options)
-    escaped_llm_opts = Macro.escape(llm_opts)
 
-    contents =
-      if system_prompt do
-        quote do
-          use Jido.AI.Agent,
-            name: "cli_react_agent",
-            description: "CLI ephemeral agent",
-            tools: unquote(tools),
-            model: unquote(model),
-            max_iterations: unquote(max_iterations),
-            max_tokens: unquote(max_tokens),
-            system_prompt: unquote(system_prompt),
-            req_http_options: unquote(escaped_req_http_options),
-            llm_opts: unquote(escaped_llm_opts)
-        end
-      else
-        quote do
-          use Jido.AI.Agent,
-            name: "cli_react_agent",
-            description: "CLI ephemeral agent",
-            tools: unquote(tools),
-            model: unquote(model),
-            max_iterations: unquote(max_iterations),
-            max_tokens: unquote(max_tokens),
-            req_http_options: unquote(escaped_req_http_options),
-            llm_opts: unquote(escaped_llm_opts)
-        end
-      end
+    generation =
+      llm_opts
+      |> Jido.AI.Reasoning.ReAct.Config.normalize_option_names()
+      |> Enum.into([])
+      |> Keyword.put(:max_tokens, max_tokens)
+      |> Keyword.put(:req_http_options, req_http_options)
 
-    Module.create(module_name, contents, Macro.Env.location(__ENV__))
-    module_name
+    Jido.AI.CLI.EphemeralAgent.create(module_name,
+      method: :react,
+      name: "cli_react_agent",
+      description: "CLI ephemeral agent",
+      model: model,
+      tools: tools,
+      instructions: system_prompt,
+      generation: generation,
+      max_iterations: max_iterations,
+      max_model_calls: max_iterations
+    )
   end
 
   defp maybe_put_opt(opts, _key, nil), do: opts
@@ -123,13 +109,7 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapter do
       case Jido.AI.CLI.Adapter.status(pid) do
         {:ok, status} ->
           if status.snapshot.done? do
-            # Prefer snapshot.result (general contract), fallback to raw_state.last_answer
-            answer =
-              case status.snapshot.result do
-                nil -> format_cli_answer(Map.get(status.raw_state, :last_answer, ""))
-                "" -> format_cli_answer(Map.get(status.raw_state, :last_answer, ""))
-                result -> format_cli_answer(result)
-              end
+            answer = format_cli_answer(status.snapshot.result)
 
             {:ok, %{answer: answer, meta: extract_meta(status)}}
           else
@@ -144,21 +124,18 @@ defmodule Jido.AI.Reasoning.ReAct.CLIAdapter do
   end
 
   defp extract_meta(status) do
-    strategy_state = Map.get(status.raw_state, :__strategy__, %{})
     details = Map.get(status.snapshot, :details, %{})
 
     %{
       status: status.snapshot.status,
-      iterations: Map.get(details, :iteration) || Map.get(strategy_state, :iteration, 0),
-      usage: extract_usage(strategy_state, details),
+      iterations: Map.get(details, :iteration, 0),
+      usage: extract_usage(details),
       model: Map.get(details, :model)
     }
   end
 
-  defp extract_usage(strategy_state, details) do
-    # Current Session snapshots own request metadata. The strategy-state fallback
-    # keeps compatibility with older callers during the V3 transition.
-    usage = Map.get(details, :usage) || Map.get(strategy_state, :usage) || %{}
+  defp extract_usage(details) do
+    usage = Map.get(details, :usage, %{})
 
     if map_size(usage) > 0 do
       %{

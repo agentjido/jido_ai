@@ -4,9 +4,9 @@ defmodule Jido.AI.Context.Operations.Apply do
 
   @impl Jido.Action
   def run(params, context) do
-    case Jido.AI.Error.capture(fn -> Jido.AI.Context.Operations.modify(params, context) end) do
-      {:error, _error} when is_map_key(params, :legacy?) -> {:ok, context.agent_state}
-      result -> result
-    end
+    Jido.AI.Error.capture(fn ->
+      with {:ok, context} <- Jido.AI.Session.Plugin.context(context),
+           do: Jido.AI.Context.Operations.modify(params, context)
+    end)
   end
 end

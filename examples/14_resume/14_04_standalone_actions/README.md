@@ -36,10 +36,8 @@ native admission and batch limits apply to direct ReAct and Action callers.
 The example reduces the bound below a saved two-tool batch and confirms that
 neither tool starts. Without explicit limits, the public Runner defaults apply.
 
-The helper no longer compiles against the removed AgentServer State struct.
-It can still read a transient supervisor from supported context and nested
-legacy maps. This does not restore the old Task-supervisor Skill or permit live
-supervisors in portable Agent state.
+The helper can read a transient supervisor from supported context. Live
+supervisors are not permitted in portable Agent state.
 
 Cancelling a collecting Exec stops its held real tool, private Agent and
 supervised stream owner. Process monitors prove cleanup. Resume after a complete
@@ -52,14 +50,10 @@ Agent commits, string input, metadata, multimodal input, IDs, lazy execution,
 saved tool work, runtime resources, limits and cancellation. The focused run
 also passes 15 retained root helper cases.
 
-Seven retained wrapper tests pass in a separate run with the installed Mimic
-test dependency. They check delegation only. The 13 example cases above
-provide the real runtime evidence.
-
-Query append on resume and old progressed-state conversion remain open. The
-remaining Runner trace, redaction, cycle, provider and worker requirements also
-apply to these Actions. Token replay is still caller-controlled. These examples
-do not prove durable Agent persistence or every provider/media combination.
+The 13 example cases provide the runtime evidence. Query append on resume is
+not supported. Runner trace, redaction, cycle, provider, and worker limits also
+apply to these Actions. Token replay is caller-controlled. These examples do
+not prove durable Agent persistence or every provider and media combination.
 
 Run from the repository root:
 
@@ -68,4 +62,4 @@ mix test test/examples/14_resume/14_04_standalone_actions/14_04_standalone_actio
 ```
 
 See the [implementation record](../../../docs/v3-spike/implementation.md) for
-full acceptance, retained wrapper tests, package limits and next steps.
+package limits and design history.

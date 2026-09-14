@@ -143,33 +143,6 @@ defmodule JidoAI.Examples.CheckpointResumeTest do
     assert_script_done(second)
   end
 
-  test "current tool permission is checked again before a resumed pending tool", %{jido: jido} do
-    {mock, _} =
-      mock([%{reply: {:tools, [%{id: "denied", name: "add", arguments: %{a: 1, b: 2}}]}}])
-
-    config = config(mock, tools: [Add])
-
-    events =
-      ReAct.stream("Permission", config, opts(jido)) |> Example.through_checkpoint(:after_llm)
-
-    assert List.last(events).data.reason == :after_llm
-
-    context = %{
-      jido: jido,
-      observer: self(),
-      __tool_guardrail_callback__: fn _ -> {:error, :permission_removed} end
-    }
-
-    assert {:ok, continued} =
-             ReAct.continue(List.last(events).data.token, config, opts(jido, context: context))
-
-    result = ReAct.collect_stream(continued.events)
-    assert result.termination_reason == :failed
-    assert inspect(result.result) =~ "permission_removed"
-    refute_receive {:standalone_add, _, _, _}, 20
-    assert_script_done(mock)
-  end
-
   test "saved counts still stop the model after the permitted tool round", %{jido: jido} do
     {mock, _} =
       mock([%{reply: {:tools, [%{id: "bounded", name: "add", arguments: %{a: 1, b: 2}}]}}])

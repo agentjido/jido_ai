@@ -29,7 +29,7 @@ defmodule Jido.AI.Actions.LLM.CompleteTest do
   describe "run/2" do
     test "returns response on happy path with default model resolution" do
       assert {:ok, result} = Complete.run(%{prompt: "The answer is"}, %{})
-      assert result.model == Jido.AI.resolve_model(:fast)
+      assert result.model == Jido.AI.Models.resolve(:fast)
       assert result.text =~ "Stubbed response for: The answer is"
       assert result.usage.total_tokens == result.usage.input_tokens + result.usage.output_tokens
     end
@@ -49,7 +49,7 @@ defmodule Jido.AI.Actions.LLM.CompleteTest do
       }
 
       expect(ReqLLM.Generation, :generate_text, fn model, _messages, opts ->
-        assert model == Jido.AI.resolve_model(:capable)
+        assert model == Jido.AI.Models.resolve(:capable)
         assert opts[:max_tokens] == 333
         assert opts[:temperature] == 0.2
 
@@ -57,7 +57,7 @@ defmodule Jido.AI.Actions.LLM.CompleteTest do
       end)
 
       assert {:ok, result} = Complete.run(%{prompt: "hello"}, context)
-      assert result.model == Jido.AI.resolve_model(:capable)
+      assert result.model == Jido.AI.Models.resolve(:capable)
       assert result.text == "configured"
     end
 
@@ -89,7 +89,7 @@ defmodule Jido.AI.Actions.LLM.CompleteTest do
 
     test "resolves atom model aliases" do
       assert {:ok, result} = Complete.run(%{prompt: "hello", model: :capable}, %{})
-      assert result.model == Jido.AI.resolve_model(:capable)
+      assert result.model == Jido.AI.Models.resolve(:capable)
     end
 
     test "sanitizes provider errors" do

@@ -8,7 +8,7 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.CLIAdapterTest do
   setup :set_mimic_from_context
 
   defmodule StubGoTAgent do
-    def explore(pid, query) do
+    def ask(pid, query) do
       send(self(), {:got_submit_called, pid, query})
       {:ok, :submitted}
     end
@@ -29,7 +29,7 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.CLIAdapterTest do
   describe "create_ephemeral_agent/1" do
     test "creates ephemeral agent module with default config", %{default_module: module} do
       assert is_atom(module)
-      assert function_exported?(module, :explore, 2)
+      assert function_exported?(module, :ask, 2)
       assert function_exported?(module, :name, 0)
       assert module.name() == "cli_got_agent"
     end
@@ -43,31 +43,27 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.CLIAdapterTest do
     end
 
     test "uses custom model from config", %{custom_module: module} do
-      opts = module.strategy_opts()
-      assert opts[:model] == "openai:gpt-4"
+      assert profile(module).models.answer.model == "openai:gpt-4"
     end
 
     test "uses custom max_nodes from config", %{custom_module: module} do
-      opts = module.strategy_opts()
-      assert opts[:max_nodes] == 30
+      assert profile(module).reasoning.options.max_nodes == 30
     end
 
     test "uses custom max_depth from config", %{custom_module: module} do
-      opts = module.strategy_opts()
-      assert opts[:max_depth] == 10
+      assert profile(module).reasoning.options.max_depth == 10
     end
 
     test "uses custom aggregation_strategy from config", %{custom_module: module} do
-      opts = module.strategy_opts()
-      assert opts[:aggregation_strategy] == :voting
+      assert profile(module).reasoning.options.aggregation_strategy == :voting
     end
 
     test "uses default values when not specified", %{default_module: module} do
-      opts = module.strategy_opts()
-      assert opts[:model] == :fast
-      assert opts[:max_nodes] == 20
-      assert opts[:max_depth] == 5
-      assert opts[:aggregation_strategy] == :synthesis
+      agent_profile = profile(module)
+      assert agent_profile.models.answer.model == :fast
+      assert agent_profile.reasoning.options.max_nodes == 20
+      assert agent_profile.reasoning.options.max_depth == 5
+      assert agent_profile.reasoning.options.aggregation_strategy == :synthesis
     end
   end
 
@@ -83,7 +79,7 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.CLIAdapterTest do
   end
 
   describe "adapter wiring" do
-    test "submit delegates to configured GoT agent explore/2 function" do
+    test "submit delegates to configured Agent ask/2 function" do
       assert {:ok, :submitted} = GoTAdapter.submit(self(), "Explore graph", %{agent_module: StubGoTAgent})
       assert_received {:got_submit_called, pid, "Explore graph"}
       assert pid == self()
@@ -101,9 +97,8 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.CLIAdapterTest do
     test "await returns completed result with graph metadata" do
       status =
         AdapterTestSupport.status(
-          result: nil,
-          details: %{node_count: 9, edge_count: 11, aggregation_strategy: :voting},
-          raw_state: %{last_result: "GoT answer"}
+          result: "GoT answer",
+          details: %{node_count: 9, edge_count: 11, aggregation_strategy: :voting}
         )
 
       expect(Jido.AI.CLI.Adapter, :status, fn _pid -> {:ok, status} end)
@@ -114,5 +109,10 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts.CLIAdapterTest do
       assert meta.edge_count == 11
       assert meta.aggregation_strategy == :voting
     end
+  end
+
+  defp profile(module) do
+    {:ok, profile} = Jido.AI.Configuration.profile(module.definition())
+    profile
   end
 end

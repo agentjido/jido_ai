@@ -61,8 +61,8 @@ reviewed.
 Stopping is checked after improvement. The step limit takes precedence over
 ACT in the same cycle. ACT stops at the threshold or when the last three scores
 have a range below 0.02. It also retains the existing near-maximum quality stop
-at 0.98, even if the declared threshold is higher. That last stop maps to the
-legacy `:act_threshold` termination value. Tests preserve this naming limit.
+at 0.98, even if the declared threshold is higher. That stop uses the
+`:act_threshold` termination value.
 
 Successful output remains a string. Completed metadata stores method data at
 `meta.reasoning.trm`: current and best answers, scores, feedback, ACT state,
@@ -80,8 +80,8 @@ override them. The examples verify streaming and non-streaming requests.
 ## Failure and observation
 
 Failures retain `{:failed, cause, details}` with the original canonical cause,
-method state, phase and usage. The retained Machine still returns its printable
-legacy error, such as `"Error: provider_down"`. The native path keeps that text
+method state, phase and usage. The standalone Machine also returns a printable
+error, such as `"Error: provider_down"`. The native path keeps that text
 separate from the cause. Output rejection retains the selected answer in method
 data while the domain result remains unchanged. A later request starts fresh
 and leaves previous request records intact.
@@ -108,15 +108,13 @@ Finite transitions replace Fsmx. Usage uses the shared nested merge and adds
 missing totals when both token counters are present. All 204 retained tests
 for these five modules pass on v3 dependencies. The added Machine cases check
 stale and repeated phase results, terminal replay, map round trips and usage.
-The old text filters remain compatibility behavior; they are not a security
-boundary or a general secret-removal mechanism.
+The text filters are not a security boundary or a general secret-removal
+mechanism.
 
 ## Remaining gates
 
 Full public/API parity, old command/phase-input mapping, runtime model and
 state overrides, CLI and capability APIs, complete provider/media contracts,
 active inspection, state conversion and durable recovery remain required.
-Typed results, rich queries, tools and steering are rejected in this native
-slice. A request transformer cannot enable tools. Those explicit limits do not
-close the broader feature/API requirements. The root package still uses v2
-dependencies and has not passed the v3 package or consumer gates.
+Typed results, rich queries, tools and steering are rejected in this example.
+A request transformer cannot enable tools.
