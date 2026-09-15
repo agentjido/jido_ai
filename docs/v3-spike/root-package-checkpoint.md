@@ -1,6 +1,6 @@
 # Root package checkpoint — 2026-09-07
 
-Historical record. See the [2026-09-14 status report](status.md) for current
+Historical record. See the [current status report](status.md) for current
 results, example capabilities, resolved authoring findings, and release limits.
 The failure counts below describe earlier migration checkpoints, not current tests.
 

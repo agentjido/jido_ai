@@ -649,7 +649,12 @@ now approved. Keep further changes focused on simpler supported contracts.
    and commit boundaries together for now; no Runtime extraction is included
    in this recommendation. `jido_ai` owns `Jido.Session` and `Jido.Thread`;
    keep them in this package.
-4. Reconcile remaining package guides and API inventories. Example guides and
-   the inspection-helper tests are repaired. Authoring and example suites now
-   pass; use the current record above. Release metadata, fresh coverage, and
-   live-provider verification remain separate release work.
+4. Current API inventories are reconciled. The public API and feature maps now
+   describe current source and ownership. Their old logs and the byte-identical
+   V2 JSON inventory remain separate historical evidence. The current JSON
+   indexes all 250 library files, with a generator and unit drift/link checks.
+   Reconciliation verification: 2,861 tests passed, 1 existing exclusion, no
+   failures or skips, authoring/examples included, seed 0, warnings as errors,
+   125.0 seconds. Format, forced compile, and generator drift checks passed.
+   Remaining package guides, release metadata, fresh coverage, and live-provider
+   verification are separate release work.

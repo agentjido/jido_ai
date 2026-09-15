@@ -52,6 +52,7 @@ The earlier authoring and coverage runs below used sibling path dependencies.
 
 | Check | Recorded result | Scope |
 | --- | --- | --- |
+| Current API inventory reconciliation | 2,861 passed; 1 existing flaky exclusion; no skips | Full suite with authoring/examples and four inventory checks; seed 0; warnings as errors; 125.0 seconds; format, forced compile, and generator drift check passed |
 | Profile-bound consumer migration (`087afb8c`) | 2,857 passed; 1 existing flaky exclusion; no skips | Full suite with authoring and examples; seed 0; warnings as errors; 126.8 seconds |
 | Profile-bound example suite | 658 passed; no skips | Includes catalog checks and final context-forwarding cleanup; seed 0; warnings as errors; 81.3 seconds |
 | Profile-bound format and forced compile | Passed | Format check and `mix compile --force --warnings-as-errors` |
@@ -80,7 +81,8 @@ mix compile --warnings-as-errors
 mix test --include authoring --include example --warnings-as-errors --seed 0
 ```
 
-The current test logs are `/tmp/jido-ai-refinement-full.log` and
+The current full test log is `/tmp/jido-ai-api-inventory-full.log`.
+The prior consumer logs are `/tmp/jido-ai-refinement-full.log` and
 `/tmp/jido-ai-refinement-examples.log` on the verification host.
 The result above is retained here because temporary logs are not release artifacts.
 

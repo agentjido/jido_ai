@@ -1,5 +1,12 @@
 # Release history and PR feedback audit
 
+Historical source-review ledger. Its pinned commits and pending row statuses
+are not the current package status or a current defect list. See the
+[current API map](public-api-map.md), [feature map](feature-map.md), and
+[status report](status.md). The unchanged baseline declaration inventory is
+[api-inventory-v2.json](api-inventory-v2.json); `api-inventory.json` now indexes
+the current source. Do not mark old audit gates passed from source presence alone.
+
 Status: all 126 commits and all 103 associated merged PRs have completed
 source review. All 126 v3 port checks remain pending.
 Updated: 2026-09-06.

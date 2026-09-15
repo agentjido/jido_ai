@@ -1,6 +1,6 @@
 # Jido AI v3 migration
 
-Status, 2026-09-14: working V3 implementation with tested authoring and examples;
+Status, 2026-09-15: simplified V3 implementation with tested authoring and examples;
 stable-release verification remains open. Start with the
 [current status and maturity report](status.md).
 
@@ -15,14 +15,24 @@ the port map. Use Jido v3 Actions, Flows, and Plugins for their execution.
 - [Example catalog](examples.md): proposed examples and acceptance checks.
 - [Unified Agent DSL plan](agent-dsl.md): canonical authoring, the full Jidoka-derived example, lowering and acceptance requirements.
 - [Checked example catalog](../../examples/README.md): feature examples and one mock LLM server.
-- [Feature port map](feature-map.md): current features, proposed destinations,
-  and source evidence.
+- [Feature map](feature-map.md): current supported behavior, ownership, and test evidence.
 - [Public API map](public-api-map.md): entry points, generated wrappers and
-  API acceptance cases; declared-source inventory for all production files.
+  current contracts, removals, and declared-source inventory for all production files.
+- [Current source inventory](api-inventory.json): generated from `lib`, with source hashes and declaration locations.
+- [V2 source inventory](api-inventory-v2.json): unchanged September 6 baseline;
+  not the current package API.
 - [Commit and PR audit](history-audit.md): every post-2.0 commit, user feedback,
   regression examples and required migration evidence.
 
-The migration goal now includes three preparation passes, the complete
+Regenerate the current inventory with `mix run scripts/api_inventory.exs`.
+Check it with `mix run scripts/api_inventory.exs --check`. The regular unit
+suite checks drift. Source declarations include internal exports and quoted
+templates; use the public API map to choose supported application contracts.
+No generator result establishes feature parity or release readiness.
+
+## Historical migration preparation
+
+The original migration goal included three preparation passes, the complete
 post-2.0 history audit, and four later refinement/simplification checkpoints. See the
 [preparation results](migration-plan.md#preparation-three-refinement-passes)
 and [example priorities](examples.md#implementation-priorities).

@@ -65,5 +65,5 @@ ai_locals = [
   import_deps: [:jido, :jido_action],
   locals_without_parens: ai_locals,
   export: [locals_without_parens: ai_locals],
-  inputs: ["{mix,.formatter,.credo}.exs", "{config,examples,lib,test}/**/*.{ex,exs}"]
+  inputs: ["{mix,.formatter,.credo}.exs", "{config,examples,lib,scripts,test}/**/*.{ex,exs}"]
 ]
