@@ -17,12 +17,7 @@ defmodule JidoAI.Examples.Planning.Agent do
             id: :assistant,
             model: JidoAI.Examples.MockLLM.model(),
             reasoning: :chain_of_thought,
-            controls: %{
-              timeout: 5_000,
-              max_iterations: :method_default,
-              max_model_calls: :method_default,
-              max_tool_calls: :method_default
-            },
+            controls: %{timeout: 5_000, max_model_calls: 2},
             requests: %{mode: :session, streaming: true},
             result: %{into: :review}
           })

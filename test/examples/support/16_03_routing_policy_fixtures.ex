@@ -6,7 +6,18 @@ defmodule JidoAI.Examples.RoutingPolicy do
       {ModelRouting, Keyword.get(opts, :routing, [])},
       {Policy, Keyword.get(opts, :policy, [])},
       {Chat, []},
-      {Jido.AI.Plugins.Reasoning.ChainOfThought, [timeout: 5_000]}
+      {Jido.AI.Plugins.Reasoning.ChainOfThought,
+       [
+         profile:
+           Jido.AI.Profile.new!(%{
+             id: :assistant,
+             model: JidoAI.Examples.MockLLM.model(),
+             reasoning: :chain_of_thought,
+             controls: %{timeout: 5_000},
+             requests: %{mode: :session},
+             result: %{into: :result}
+           })
+       ]}
     ]
 
     plugins = if opts[:reverse], do: Enum.reverse(plugins), else: plugins

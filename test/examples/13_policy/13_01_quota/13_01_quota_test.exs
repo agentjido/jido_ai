@@ -195,14 +195,14 @@ defmodule JidoAI.Examples.QuotaTest do
                    %{
                      name: "reason",
                      target: Example.ReasoningFlow,
-                     forward_context: [:default_model, :model_options, :ai, :jido]
+                     forward_context: [:jido_ai_callable_profile, :ai, :jido]
                    }
                  ]
                }
              )
 
     server = start_agent(jido, definition)
-    context = Map.put(context, :default_model, MockLLM.model())
+    context = Map.put(context, :jido_ai_callable_profile, reasoning_profile())
 
     assert {:ok, agent} =
              Server.call(server, Example.signal("case.review", %{query: "Review"}), context: context)
@@ -474,14 +474,14 @@ defmodule JidoAI.Examples.QuotaTest do
                    %{
                      name: "reason",
                      target: Example.ReasoningFlow,
-                     forward_context: [:default_model, :model_options, :ai, :jido]
+                     forward_context: [:jido_ai_callable_profile, :ai, :jido]
                    }
                  ]
                }
              )
 
     server = start_agent(jido, definition)
-    context = Map.put(context, :default_model, MockLLM.model())
+    context = Map.put(context, :jido_ai_callable_profile, reasoning_profile())
 
     assert {:error, _} =
              Server.call(server, Example.signal("case.review", %{query: "Review"}), context: context)
@@ -646,6 +646,17 @@ defmodule JidoAI.Examples.QuotaTest do
       Process.sleep(10)
       assert_eventually(fun, attempts - 1)
     end
+  end
+
+  defp reasoning_profile do
+    Jido.AI.Profile.new!(%{
+      id: :assistant,
+      model: MockLLM.model(),
+      reasoning: :chain_of_thought,
+      controls: %{timeout: 5_000},
+      requests: %{mode: :session},
+      result: %{into: :answer}
+    })
   end
 
   defp await(:turn, _, _), do: :ok

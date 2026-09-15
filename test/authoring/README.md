@@ -16,6 +16,7 @@ Run a group:
 mix test test/authoring/agents/authoring_test.exs --only authoring
 mix test test/authoring/agents/execution_test.exs --only authoring
 mix test test/authoring/agents/interfaces_test.exs --only authoring
+mix test test/authoring/agents/callable_profiles_test.exs --include authoring --seed 0
 mix test test/authoring/agents/boundaries_test.exs --only authoring
 mix test test/authoring/agents/known_bugs_test.exs --only authoring
 ```
@@ -27,7 +28,7 @@ mix test --include authoring --include example
 ```
 
 Plain `mix test` excludes the `:authoring` tag, as core Jido does.
-The suite has 233 expected-behavior tests. All nine findings have regression
+The suite has 238 expected-behavior tests. All nine findings have regression
 tests for their resolved behavior. The file name `open_findings_test.exs` is
 retained for review, but its four tests now assert the corrected contracts.
 See [BUGS.md](BUGS.md). The default suite also checks these fixes in
@@ -92,6 +93,7 @@ test/authoring/
     authoring_test.exs
     execution_test.exs
     interfaces_test.exs
+    callable_profiles_test.exs
     boundaries_test.exs
     known_bugs_test.exs
     recovery_test.exs
@@ -131,6 +133,10 @@ and update the catalog.
 
 ## Extended coverage
 
+- Callable reasoning Plugins preserve their bound Profile through core Builder
+  and Codec. The receiving host must supply its Profile Registry value. Tests
+  reject wrong methods and invalid configuration, then execute prompt-only
+  Signals into the selected result field without changing unrelated state.
 - Provider errors and invalid tool arguments across all eight corpus forms,
   with domain-state checks and a successful later request.
 - Mixed turn/session profiles through module, Builder, and Codec forms,

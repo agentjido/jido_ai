@@ -76,6 +76,15 @@ must bind the local HTTP/SSE model server through supported runtime options;
 it must not call that remote provider. Run native AI requests through AgentServer.
 Direct native AI `Agent.cmd` execution is not the supported runtime path.
 
+Callable reasoning accepts only a prompt. Bind a resolved session-mode Profile
+in host context under `:jido_ai_callable_profile`, or in a reasoning Plugin's
+`profile` configuration. Do not teach flat method/model/timeout inputs or
+Plugin state defaults. A raw reasoning tool must explicitly forward the Profile
+binding. Bind deterministic provider options under `context.ai[profile.id]` for
+each Profile, including nested calls; an outer Profile's transport does not
+configure a differently named inner Profile. Check that the complete local
+script was consumed. Keep detailed method and deadline matrices in unit tests.
+
 Follow these rules:
 
 1. Put the main Agent module first in the primary source file.

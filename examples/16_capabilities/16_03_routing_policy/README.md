@@ -21,7 +21,10 @@ Shared setup and fault fixtures stay in [test support](../../../test/examples/su
 
 ## Expected result and failure behavior
 
-Explicit model input wins over route defaults. Enforced rejection prevents provider work and a domain commit. Monitor mode permits the request while retaining normalization.
+For Chat and native AI, explicit model input wins over route defaults. Callable
+reasoning accepts only a prompt: routing selects the model in its host-bound
+Profile, not in the input. Enforced rejection prevents provider work and a
+domain commit. Monitor mode permits the request while retaining normalization.
 
 ## Limits
 

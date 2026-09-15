@@ -4,7 +4,7 @@ defmodule JidoAI.Examples.Quota.ReasoningFlow do
   flow do
     step "reason",
       action: Jido.AI.Actions.Reasoning.RunStrategy,
-      params: %{strategy: :cot, prompt: input(:prompt)}
+      params: %{prompt: input(:prompt)}
 
     output result("reason")
   end

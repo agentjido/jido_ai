@@ -2,6 +2,13 @@
 
 Call a reasoning method as an Action or through an Agent route.
 
+## What you will learn
+
+- Bind a resolved `Jido.AI.Profile` in host execution context under
+  `:jido_ai_callable_profile`.
+- Submit only `%{prompt: "Explain this answer"}` through `Jido.Exec` or the route.
+- Keep method, model, and timeout policy outside the requested work.
+
 ## Read the code
 
 Read [agent.ex](agent.ex).
@@ -19,6 +26,16 @@ The default test path needs no credentials or remote provider. Model cases use
 [the local HTTP/SSE server](../../support/mock_llm.ex) with real ReqLLM transport.
 Shared setup and fault fixtures stay in [test support](../../../test/examples/support).
 
+The transport binding must use the callable Profile ID, not the outer Agent ID:
+
+```elixir
+context = %{
+  jido_ai_callable_profile: profile,
+  ai: %{profile.id => %{options: JidoAI.Examples.MockLLM.options(mock)}}
+}
+Jido.Exec.run(Jido.AI.Actions.Reasoning.RunStrategy, %{prompt: "Explain"}, context)
+```
+
 ## Expected result and failure behavior
 
 `Jido.Exec.run/4` returns the method result, usage and diagnostics. The inline route commits that result while preserving case state. Cancellation stops the private request resources.
@@ -26,6 +43,9 @@ Shared setup and fault fixtures stay in [test support](../../../test/examples/su
 ## Limits
 
 The private runtime is owned by the call. It is not a durable worker. Provider failure is a failure envelope, not a successful answer.
+The test uses chain of thought to prove this boundary. Complete method and
+deadline matrices belong to the unit suite. Old flat configuration is rejected;
+Plugin state does not supply callable defaults.
 
 ## Files
 

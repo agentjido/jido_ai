@@ -7,8 +7,7 @@ defmodule JidoAI.Examples.ReasoningCapabilitiesTest do
     saved = Application.fetch_env(:jido_ai, :model_aliases)
 
     Application.put_env(:jido_ai, :model_aliases, %{
-      reasoning: MockLLM.model(),
-      fast: MockLLM.model()
+      reasoning: MockLLM.model()
     })
 
     on_exit(fn ->
@@ -38,16 +37,20 @@ defmodule JidoAI.Examples.ReasoningCapabilitiesTest do
       script = Adaptive.script(unquote(method))
       {mock, context} = mock(script)
       context = Map.put(context, :jido, jido)
-      config = [into: :result, timeout: 5_000, options: unquote(Macro.escape(options))]
+
+      config = [
+        profile: profile(strategy, %{reasoning: %{method: method(strategy), options: unquote(Macro.escape(options))}})
+      ]
+
       assert {:ok, definition} = ReasoningCapabilities.definition([{plugin, config}])
       server = start_agent(jido, definition)
       assert {:ok, original} = Server.plugin_state(server, plugin)
-      assert original.strategy == strategy and original.default_model == :reasoning
+      assert original == %{}
 
       signal =
         Jido.Signal.new!(
           "reasoning.#{strategy}.run",
-          %{prompt: "Explain this answer", strategy: :forged},
+          %{prompt: "Explain this answer"},
           source: "/examples/capabilities"
         )
 
@@ -78,14 +81,15 @@ defmodule JidoAI.Examples.ReasoningCapabilitiesTest do
   end
 
   for reverse <- [false, true] do
-    test "capability defaults and route bindings are stable with reverse order #{reverse}", %{
+    test "Profile policy and route bindings are stable with reverse order #{reverse}", %{
       jido: jido
     } do
       {mock, context} = mock(Adaptive.script(:cot))
 
       plugins = [
-        {Reasoning.ChainOfThought, [timeout: 900, options: %{system_prompt: "Use declared facts"}]},
-        {Reasoning.ChainOfDraft, [into: :review, timeout: 500]}
+        {Reasoning.ChainOfThought,
+         [profile: profile(:cot, %{controls: %{timeout: 900}, instructions: "Use declared facts"})]},
+        {Reasoning.ChainOfDraft, [profile: profile(:cod, %{controls: %{timeout: 500}, result: %{into: :review}})]}
       ]
 
       plugins = if unquote(reverse), do: Enum.reverse(plugins), else: plugins
@@ -99,7 +103,7 @@ defmodule JidoAI.Examples.ReasoningCapabilitiesTest do
           provided_params: [:timeout, :options]
         })
 
-      params = %{prompt: "Question", strategy: :cod, into: :review}
+      params = %{prompt: "Question"}
 
       assert {:ok, agent} =
                Server.call(server, signal("reasoning.cot.run", params), context: forged)
@@ -112,68 +116,29 @@ defmodule JidoAI.Examples.ReasoningCapabilitiesTest do
     end
   end
 
-  test "explicit model timeout and method parameters override capability defaults", %{jido: jido} do
-    {mock, context} = mock(Adaptive.script(:cot) ++ Adaptive.script(:cot))
+  test "input cannot override the host Profile", %{jido: jido} do
+    {mock, context} = mock([])
+    server = start_agent(jido, ReasoningCapabilities.Agent.new!())
+    before = Server.agent(server).state
 
-    config = [
-      default_model: MockLLM.model("gpt-4o-mini"),
-      timeout: 800,
-      options: %{system_prompt: "Use declared facts", llm_timeout_ms: 600}
-    ]
+    for field <- [:model, :timeout, :strategy, :options, :into, :system_prompt] do
+      params = Map.put(%{prompt: "Question"}, field, :forged)
+      assert {:error, _} = Server.call(server, signal("reasoning.cot.run", params), context: context)
+      assert Server.agent(server).state == before
+    end
 
-    assert {:ok, definition} =
-             ReasoningCapabilities.definition([{Reasoning.ChainOfThought, config}])
-
-    server = start_agent(jido, definition)
-    assert {:ok, first} = Server.call(server, signal("reasoning.cot.run"), context: context)
-    assert first.state.result.diagnostics.timeout == 800
-
-    params = %{
-      prompt: "Question",
-      model: MockLLM.model("gpt-4o"),
-      timeout: 900,
-      system_prompt: "Use explicit facts",
-      options: %{system_prompt: "Use option facts"}
-    }
-
-    assert {:ok, second} =
-             Server.call(server, signal("reasoning.cot.run", params), context: context)
-
-    assert second.state.result.diagnostics.timeout == 900
-    [first_request, second_request] = MockLLM.report(mock).requests
-    assert first_request.body["model"] == "gpt-4o-mini"
-    assert second_request.body["model"] == "gpt-4o"
-    assert hd(second_request.body["messages"])["content"] == "Use explicit facts"
-    assert second.state.result.diagnostics.options.llm_timeout_ms == 600
     assert_script_done(mock)
   end
 
-  test "capability options and restored state defaults use the same schema" do
-    plugin = Reasoning.ChainOfThought
-    config = [default_model: :fast, timeout: 800, options: %{system_prompt: "Restored"}]
-    {:reasoning_cot, schema} = Module.concat(plugin, Agent).state_spec(config)
-    assert {:ok, state} = Zoi.parse(schema, %{})
-    assert state.strategy == :cot and state.default_model == :fast
-    assert state.timeout == 800 and state.options.system_prompt == "Restored"
-    assert {:error, _} = Zoi.parse(schema, %{state | strategy: :cod})
-    assert {:error, _} = Zoi.parse(schema, %{state | timeout: 0})
-    assert plugin.actions() == [Jido.AI.Actions.Reasoning.RunStrategy]
-    assert plugin.category() == "ai" and plugin.vsn() == "2.0.0"
-
-    for config <- [
-          [timeout: 0],
-          [options: :invalid],
-          [into: nil],
-          [typo: 1],
-          [timeout: 1, timeout: 2]
-        ] do
-      assert {:error, _} = ReasoningCapabilities.definition([{plugin, config}])
+  test "Plugins require a resolved Profile with the matching method" do
+    for config <- [[], [timeout: 500], [profile: %{}], [profile: profile(:cod)]] do
+      assert {:error, _} = ReasoningCapabilities.definition([{Reasoning.ChainOfThought, config}])
     end
   end
 
   test "Plugins require explicit routes and cannot bind an unrelated Signal", %{jido: jido} do
     {mock, context} = mock([])
-    plugins = [{Reasoning.ChainOfThought, []}]
+    plugins = [{Reasoning.ChainOfThought, [profile: profile(:cot)]}]
     assert {:ok, definition} = ReasoningCapabilities.definition(plugins, routes: [])
     server = start_agent(jido, definition)
     assert {:error, _} = Server.call(server, signal("reasoning.cot.run"), context: context)
@@ -199,7 +164,7 @@ defmodule JidoAI.Examples.ReasoningCapabilitiesTest do
     {mock, context} = mock([])
 
     for into <- [:absent, :reasoning_cot] do
-      plugins = [{Reasoning.ChainOfThought, [into: into]}]
+      plugins = [{Reasoning.ChainOfThought, [profile: profile(:cot, %{result: %{into: into}})]}]
       assert {:ok, definition} = ReasoningCapabilities.definition(plugins)
       server = start_agent(jido, definition)
       assert {:error, error} = Server.call(server, signal("reasoning.cot.run"), context: context)
@@ -222,7 +187,7 @@ defmodule JidoAI.Examples.ReasoningCapabilitiesTest do
 
   test "timeout stops provider work and leaves the capability available", %{jido: jido} do
     {mock, context} = mock([%{reply: {:wait, :held, {:text, "Late"}}}] ++ Adaptive.script(:cot))
-    config = [timeout: 100]
+    config = [profile: profile(:cot, %{controls: %{timeout: 500}})]
 
     assert {:ok, definition} =
              ReasoningCapabilities.definition([{Reasoning.ChainOfThought, config}])
@@ -238,7 +203,7 @@ defmodule JidoAI.Examples.ReasoningCapabilitiesTest do
     assert_receive {:DOWN, ^ref, :process, ^provider, _}, 2_000
 
     assert {:ok, result} =
-             Server.call(server, signal("reasoning.cot.run", %{prompt: "Next", timeout: 5_000}), context: context)
+             Server.call(server, signal("reasoning.cot.run", %{prompt: "Next"}), context: context)
 
     assert result.state.result.output == "Four"
     assert_script_done(mock)
@@ -258,6 +223,39 @@ defmodule JidoAI.Examples.ReasoningCapabilitiesTest do
     assert second.state.case_id == "case-17"
     assert_script_done(mock)
   end
+
+  defp profile(strategy, attrs \\ %{}) do
+    Jido.AI.Profile.new!(
+      Map.merge(
+        %{
+          id: :assistant,
+          model: MockLLM.model(),
+          reasoning: method(strategy),
+          controls: %{
+            timeout: 5_000,
+            max_iterations: :method_default,
+            max_model_calls: :method_default,
+            max_tool_calls: :method_default
+          },
+          requests: %{mode: :session, streaming: true},
+          result: %{into: :result}
+        },
+        attrs
+      )
+    )
+  end
+
+  defp method(strategy),
+    do:
+      %{
+        cot: :chain_of_thought,
+        cod: :chain_of_draft,
+        aot: :algorithm_of_thoughts,
+        tot: :tree_of_thoughts,
+        got: :graph_of_thoughts,
+        trm: :trm,
+        adaptive: :adaptive
+      }[strategy]
 
   defp answer(:aot, result), do: result.answer
   defp answer(:tot, result), do: Jido.AI.Reasoning.TreeOfThoughts.Result.best_answer(result)

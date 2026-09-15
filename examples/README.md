@@ -19,10 +19,10 @@ for dated test results and release checks.
 | Tools | Validate numeric tool inputs. Action/Flow execution is also covered by the authoring group. |
 | Retrieval | Store and retrieve memory and enrich Agent requests. |
 | Planning | Call planning Actions and expose planning through a capability Plugin. |
-| Reasoning | Select linear methods; run Algorithm, Tree, and Graph of Thoughts, TRM, and Adaptive methods; call reasoning as an Action or model tool. |
+| Reasoning | Select linear methods; run Algorithm, Tree, and Graph of Thoughts, TRM, and Adaptive methods; call reasoning with prompt-only input and a host-bound Profile. |
 | Policy | Account for quota and accept or reject Agent requests. |
 | Resume | Run standalone ReAct; resume model/tool checkpoints; supply input queues; append queries; retain trace and failure position; restore initial and terminal state. |
-| Capabilities | Compose reasoning and chat Plugins with model routing and policy. |
+| Capabilities | Compose Profile-bound reasoning and chat Plugins with model routing and policy; keep their result fields separate. |
 | Skills | Author and activate skills and access their resources. This is not dynamic tool-source adapter support. |
 
 The separate [AI authoring suite](../test/authoring/README.md) checks multiple
@@ -30,6 +30,9 @@ construction paths. It checks complete definitions
 and state, invalid source, Plugin composition, recovery, state limits, imports,
 and same-source transport to a separate BEAM. Run it with `mix test.authoring`.
 It is not included in `mix examples`.
+
+`jido_ai` owns `Jido.Session` and `Jido.Thread`. Their module names do not imply
+that applications must get these values from core Jido.
 
 ### What these examples do not prove
 

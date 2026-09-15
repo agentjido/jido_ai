@@ -23,6 +23,10 @@ Shared setup and fault fixtures stay in [test support](../../../test/examples/su
 
 Plan, Decompose and Prioritize retain original text and parsed results. The Agent commits the selected result field. Invalid input and provider failure preserve prior domain state.
 
+The reasoning Plugin binds a Profile at construction. Its route accepts only
+the prompt and commits the reasoning envelope to `review`. Planning keeps its
+separate `result` field; neither operation replaces the other result.
+
 ## Limits
 
 These Actions do not validate or execute a generated plan. Step counts are prompt guidance. Durable plan execution and repair are outside this lesson.

@@ -23,6 +23,11 @@ Shared setup and fault fixtures stay in [test support](../../../test/examples/su
 
 Admission rejects exhausted budgets. Each guarded model invocation consumes a slot; HTTP retries do not create another invocation. Failed calls retain known cost.
 
+The nested reasoning Flow accepts only a prompt. The host binds a session-mode
+`Jido.AI.Profile` in `:jido_ai_callable_profile` and explicitly forwards that
+context key to the tool. The model cannot choose the method or its limits.
+The nested call shares the outer quota; it does not receive a new budget.
+
 ## Limits
 
 Supervise `Jido.AI.Quota.Store` before the Agent. The ledger is process-owned and is not backed up by an Agent checkpoint. Token limits cannot cap unknown in-flight provider spending. Unknown usage must not be presented as zero cost.

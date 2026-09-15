@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.InitialStateTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Agent, Configuration, Context, Request}
+  alias Jido.AI.{Agent, Configuration, Context, History, Request}
   alias JidoAI.Examples.InitialState
 
   setup do
@@ -40,9 +40,11 @@ defmodule JidoAI.Examples.InitialStateTest do
       state = %{context: old, count: 9, thread: %{id: "application-thread", rev: 2}}
 
       assert {:ok, agent} = Agent.from_initial_state(unquote(module), state, id: "imported")
-      assert Jido.AI.get_strategy_context(agent).entries == old.entries
-      assert Jido.AI.get_strategy_context(agent).system_prompt == "Saved prompt"
-      assert Jido.AI.get_strategy_context(agent).id == "imported:assistant"
+      assert {:ok, profile} = Configuration.profile(agent, :assistant)
+      assert {:ok, messages} = History.read(agent.state, profile)
+      assert messages == old.entries |> Enum.reverse() |> Enum.map(&Map.from_struct/1)
+      assert profile.instructions == "Saved prompt"
+      assert agent.id == "imported" and profile.id == :assistant
       assert agent.state.requests == %{}
       refute Map.has_key?(agent.state, :context)
       assert agent.state.count == 9 and agent.state.thread == state.thread
@@ -98,7 +100,9 @@ defmodule JidoAI.Examples.InitialStateTest do
                Agent.from_initial_state(source, %{context: old, primary_messages: primary}, profile: :review)
 
       assert agent.state.primary_messages == primary
-      assert Jido.AI.get_strategy_context(agent, :review).entries == old.entries
+      assert {:ok, review_profile} = Configuration.profile(agent, :review)
+      assert {:ok, messages} = History.read(agent.state, review_profile)
+      assert messages == old.entries |> Enum.reverse() |> Enum.map(&Map.from_struct/1)
       assert {:ok, %{instructions: "Primary prompt"}} = Configuration.profile(agent, :primary)
       assert {:ok, %{instructions: unquote(expected)}} = Configuration.profile(agent, :review)
       {mock, context} = mock([%{reply: {:text, "Reviewed"}}, %{reply: {:text, "Primary"}}])

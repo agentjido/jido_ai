@@ -31,7 +31,14 @@ defmodule JidoAI.Examples.SkillRuntimeTest do
   defp script(calls),
     do: Enum.map(calls, &%{reply: {:tools, List.wrap(&1)}}) ++ [%{reply: {:text, "Done"}}]
 
-  defp entries(server), do: Jido.AI.get_strategy_context(Server.agent(server)).entries
+  defp entries(server) do
+    agent = Server.agent(server)
+    {:ok, profile} = Jido.AI.Configuration.profile(agent, :assistant)
+    {:ok, messages} = Jido.AI.History.read(agent.state, profile)
+    # These assertions inspect the most recent tool result first.
+    Enum.reverse(messages)
+  end
+
   defp tool_entries(server), do: Enum.filter(entries(server), &(&1.role == :tool))
 
   defp compact(server),

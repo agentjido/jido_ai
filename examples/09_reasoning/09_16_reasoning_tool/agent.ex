@@ -1,5 +1,5 @@
 defmodule JidoAI.Examples.ReasoningTool.Agent do
-  use Jido.Agent, name: "reasoning_tool", extensions: [Jido.AI.DSL]
+  use Jido.AI.Agent, name: "reasoning_tool"
 
   agent do
     schema Zoi.object(%{
@@ -19,7 +19,7 @@ defmodule JidoAI.Examples.ReasoningTool.Agent do
       tools do
         action Jido.AI.Actions.Reasoning.RunStrategy,
           as: :reason,
-          forward_context: [:default_model, :model_options, :ai, :jido],
+          forward_context: [:jido_ai_callable_profile, :ai, :jido],
           timeout: 8_000
       end
 

@@ -2,6 +2,12 @@
 
 Add callable reasoning routes to a domain Agent.
 
+## What you will learn
+
+- Bind a validated Profile to each reasoning Plugin.
+- Submit prompt-only input and keep policy in the host Profile.
+- Keep separate results when native AI and callable reasoning share an Agent.
+
 ## Read the code
 
 Read [agent.ex](agent.ex), then [mixed_agent.ex](mixed_agent.ex).
@@ -21,7 +27,12 @@ Shared setup and fault fixtures stay in [test support](../../../test/examples/su
 
 ## Expected result and failure behavior
 
-CoT and CoD write their declared result fields while preserving other state. A mixed Agent can combine native AI with callable reasoning.
+CoT and CoD write the result fields declared in their Profiles while preserving
+other state. A mixed Agent can combine native AI with callable reasoning.
+The host Profile sets the model, method, timeout, and result field. Signal input
+contains only `prompt`; input cannot replace the host policy. Provider failure
+leaves prior state unchanged. A timeout stops provider work, and the same
+capability can accept another prompt.
 
 ## Limits
 

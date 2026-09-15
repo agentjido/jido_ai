@@ -8,7 +8,7 @@ Build tool-using AI agents with explicit strategy, runtime policy, and reliable 
 - OTP `27+` (release QA baseline)
 
 ## Commands
-- `mix test` (default alias excludes `:flaky`)
+- `mix test` (default alias excludes `:flaky`, `:authoring`, and `:example`)
 - `mix test.fast` (stable smoke suite)
 - `mix precommit` (`format`, `compile --warnings-as-errors`, `doctor --summary --raise`, `test.fast`)
 - `mix q` or `mix quality` (`format`, `compile`, `credo`, `doctor`, `dialyzer`)
@@ -19,12 +19,11 @@ For the V3 cleanup, run these checks from this repository in zsh:
 ```sh
 mix format --check-formatted
 mix compile --force --warnings-as-errors
-unit_tests=(${(f)"$(rg --files test/jido_ai test/jido_ai_test.exs -g '*_test.exs' -g '!test/jido_ai/authoring/**' | sort)"})
-mix test "${unit_tests[@]}" --warnings-as-errors --seed 0
+mix test --include authoring --include example --warnings-as-errors --seed 0
 ```
 
-This selection includes the deterministic runtime integration tests. Authoring
-and example suites are deferred during this cleanup. Keep the existing flaky
+Run unit, deterministic runtime integration, authoring, and example tests.
+Authoring and example repairs are now in scope. Keep the existing flaky
 exclusion; add no skips or ignored failures. See `docs/v3-spike/simplification.md`
 for verified results and the remaining repairs.
 
@@ -40,8 +39,8 @@ for verified results and the remaining repairs.
 - `Jido.AI.Actions.*`: reusable runtime actions for chat/tool/structured flows
 - ReqLLM integration for provider abstraction and model routing
 - Policy/observability modules for retries, quotas, telemetry, and traceability
-- `Jido.Session` and `Jido.Thread` are currently defined in this repository.
-  Their intended package ownership remains undecided. Keep Session.Runtime's
+- `jido_ai` owns `Jido.Session`, `Jido.Thread`, and `Jido.Thread.Entry`, despite
+  their `Jido.*` module names. Keep them in this package. Keep Session.Runtime's
   process and commit responsibilities together.
 
 ## Standards
@@ -54,8 +53,8 @@ for verified results and the remaining repairs.
 ## Testing and QA
 - Cover strategy behavior, tool-call loops, and error/fallback handling
 - Keep flaky tests isolated behind tags; maintain a stable smoke subset (`mix test.fast`)
-- Outside the bounded V3 cleanup, validate affected examples and scripts when
-  runtime behavior changes. Record deferred repairs during the cleanup.
+- Validate affected authoring tests, examples, and scripts when runtime behavior
+  changes. Use the current Profile contract and remove obsolete configuration.
 
 ## Release Hygiene
 - Work on `v3-spike` for this cleanup. `mix.exs` currently declares package
