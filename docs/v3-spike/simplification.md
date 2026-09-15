@@ -593,9 +593,11 @@ request, reasoning, standalone, Plugin, and task tests remain.
 The bounded structural work is complete. These API and ownership choices
 remain undecided; this checkpoint does not authorize more feature removal.
 
-1. Review generated Agent request helpers against route `define` helpers.
-   Choose one normal calling form. Keep request admission, stream, and cancel
-   behavior covered before removing any helper.
+1. The request-helper review is complete in `callable-v3-contract.md`.
+   Keep `ask_sync` for answers, `ask` plus Request APIs for lifecycle control,
+   and `ask_stream` for events. Core `define` returns an Agent and does not
+   replace these contracts. Removing the generated `await` and `steer` aliases
+   remains an optional API decision, not a required runtime change.
 2. The callable Profile migration is approved and implemented. Repair the
    deferred callable examples and authoring consumers listed above before release.
    Keep Plugin composition and all reasoning methods.
