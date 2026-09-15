@@ -186,7 +186,12 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
                    |> Session.caller_context()
                    |> Map.merge(Map.take(context, [:jido_ai_quota]))
                    |> Map.merge(model_context)
-                   |> Map.put(:jido_ai_checkpoint, %{state: state, config: config})
+                   |> Map.put(:jido_ai_checkpoint, %{
+                     adapter: Checkpoint,
+                     result_key: :react_checkpoint,
+                     state: state,
+                     config: config
+                   })
                ) do
           relay(owner, monitor, ref, state, config, request, server_monitor)
         else
@@ -390,7 +395,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         checkpoint: checkpoint,
         iteration:
           if(checkpoint,
-            do: Checkpoint.iteration(checkpoint),
+            do: Jido.AI.Runtime.State.iteration(checkpoint.runtime, checkpoint.phase),
             else: Map.get(record.meta, :reasoning_iteration, state.iteration)
           ),
         context: context,

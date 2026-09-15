@@ -58,6 +58,18 @@ format is version 4 and encodes that Thread. Execution checkpoint data retains
 the pending runtime position and resumes through the shared Agent/Flow runtime.
 Do not use a conversation import to resume tool execution.
 
+`Jido.AI.Runtime.State` defines the temporary execution map used by all reasoning
+methods. The model, decision, and tool-batch Actions validate its schema.
+Working provider messages and uncommitted entry deltas are temporary inputs to
+the commit path, not another retained conversation store. Live options remain
+in memory. Optional method and phase fields stay absent until needed.
+
+`Runtime.Checkpoint` owns the portable execution subset, remaining deadline,
+effect validation, and pause/ack lifecycle. Its internal format adapter owns
+the standalone value and token. The ReAct adapter implements this contract;
+other methods do not gain resume support from this separation. Session.Runtime
+still owns the process and commit lifecycle. No new worker process is added.
+
 ## Contract evidence
 
 - [Conversation codec and selection tests](../../test/jido_ai/conversation_test.exs)

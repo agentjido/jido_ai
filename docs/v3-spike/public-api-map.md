@@ -38,6 +38,17 @@ contract; they are not separate authoring models.
 
 ## Requests and state
 
+`Runtime.State` defines the internal, temporary execution map. Its schema is
+checked at preparation and the model/decision/tool-batch boundaries. It holds
+working messages, counters, deadlines, and proposed effects; it is not a
+second Session or Thread. Optional method and phase fields remain absent until
+needed. This map is not an application import/export contract.
+
+`Runtime.Checkpoint` owns shared capture, restore, deadline and effect checks,
+and pause delivery. The internal `Reasoning.ReAct.Checkpoint` adapter owns
+ReAct State projection, code/configuration fingerprints, and token encoding.
+This separation does not add resume support to other reasoning methods.
+
 | Surface | Current contract | Source and acceptance tests |
 | --- | --- | --- |
 | Generated `ask/2,3`, `ask_sync/2,3`, `ask_stream/2,3` | `ask` returns an answer for turn mode or a request handle for session mode. `ask_sync` waits for an answer; `ask_stream` starts a streaming session request. These are not aliases for core route helpers, which return the committed Agent. | [generated definitions](../../lib/jido_ai/agent/definition.ex), [interface](../../lib/jido_ai/agent/interface.ex), [interface tests](../../test/authoring/agents/interfaces_test.exs) |

@@ -1,12 +1,12 @@
 defmodule Jido.AI.Runtime.CallModel do
   @moduledoc false
-  use Jido.Action, name: "ai_call_model"
+  use Jido.Action, name: "ai_call_model", schema: Jido.AI.Runtime.State.schema()
   alias Jido.AI.{Control, Profile, ToolCatalog, Usage}
 
   @impl Jido.Action
   def run(params, context) do
     Jido.AI.Error.capture(fn ->
-      position = Jido.AI.Reasoning.ReAct.Checkpoint.model_iteration(params)
+      position = Jido.AI.Runtime.State.model_iteration(params)
 
       with :ok <- Jido.AI.Session.reasoning_iteration(context, position),
            :ok <- Jido.AI.Session.inspect_reasoning(context, Jido.AI.Reasoning.inspection(params)),
@@ -111,7 +111,7 @@ defmodule Jido.AI.Runtime.CallModel do
           usage: Usage.merge(state.usage, response.usage)
         })
 
-      Jido.AI.Reasoning.ReAct.Checkpoint.pause(next, :after_llm, context)
+      Jido.AI.Runtime.Checkpoint.pause(next, :after_llm, context)
     else
       {:model_result, {:error, reason}} when state.repairs > 0 ->
         {:ok,

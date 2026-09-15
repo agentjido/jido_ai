@@ -1,6 +1,6 @@
 defmodule Jido.AI.Runtime.NextBatch do
   @moduledoc false
-  use Jido.Action, name: "ai_next_batch"
+  use Jido.Action, name: "ai_next_batch", schema: Jido.AI.Runtime.State.schema()
 
   @impl Jido.Action
   def run(state, context), do: Jido.AI.Error.capture(fn -> execute(state, context) end)
@@ -24,9 +24,9 @@ defmodule Jido.AI.Runtime.NextBatch do
            end),
          {:ok, state} <- Jido.AI.Session.Transcript.record(state, entries, context),
          {:ok, state} <- Jido.AI.Runtime.ToolCycle.record(%{state | messages: messages}, context),
-         {:ok, state} <- Jido.AI.Reasoning.ReAct.Checkpoint.consume_queries(state, context),
+         {:ok, state} <- Jido.AI.Runtime.Checkpoint.consume_queries(state, context),
          {:ok, state} <-
-           Jido.AI.Reasoning.ReAct.Checkpoint.pause(
+           Jido.AI.Runtime.Checkpoint.pause(
              state,
              :after_tools,
              context

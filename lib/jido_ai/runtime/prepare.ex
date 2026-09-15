@@ -53,26 +53,20 @@ defmodule Jido.AI.Runtime.Prepare do
       state = %{
         profile: profile,
         effect_plan: Jido.AI.Effects.Candidate.new(context.agent_state),
-        request_id: Jido.Signal.ID.generate!(),
-        run_id: Jido.Signal.ID.generate!(),
-        started_at_ms: System.system_time(:millisecond),
         model: model,
         options: options,
         messages: ReqLLM.Context.new(messages),
         output: output,
-        iterations: 0,
-        model_calls: 0,
-        tool_calls: 0,
-        repairs: 0,
-        usage: %{},
         deadline: deadline,
         history_delta: Jido.AI.Session.Transcript.query(query, refs)
       }
 
       state = if adaptive, do: Map.put(state, :adaptive, adaptive), else: state
 
-      with {:ok, state} <- Jido.AI.Reasoning.ReAct.Checkpoint.restore(state, context),
+      with {:ok, state} <- Jido.AI.Runtime.State.new(state),
+           {:ok, state} <- Jido.AI.Runtime.Checkpoint.restore(state, context),
            {:ok, state} <- Jido.AI.Reasoning.prepare(state, query),
+           {:ok, state} <- Jido.AI.Runtime.State.validate(state),
            :ok <- Jido.AI.Session.publish_selection(context, adaptive, deadline),
            do: {:ok, state}
     else

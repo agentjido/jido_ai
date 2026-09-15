@@ -183,7 +183,7 @@ defmodule Jido.AI.Session.Runtime do
     enabled = Map.get(profile.observability, :emit_signals?, true)
     :ok = Jido.AI.Session.Delivery.register(state.delivery, record, enabled)
     saved = if checkpoint, do: checkpoint.state
-    resumed? = Jido.AI.Reasoning.ReAct.Checkpoint.resumed?(context)
+    resumed? = Jido.AI.Runtime.Checkpoint.resumed?(context)
 
     job =
       %{
@@ -378,11 +378,11 @@ defmodule Jido.AI.Session.Runtime do
 
   def handle_call({:checkpoint, id, run_id, phase, saved}, from, state) do
     case state.jobs[id] do
-      %{record: %{run_id: ^run_id}, outcome: nil, checkpoint: %{config: config}} = job ->
+      %{record: %{run_id: ^run_id}, outcome: nil, checkpoint: %{config: config, adapter: adapter}} = job ->
         saved = %{saved | seq: job.seq + 1}
 
         case Jido.AI.Error.capture(fn ->
-               {:ok, Jido.AI.Reasoning.ReAct.Token.issue(saved, config)}
+               {:ok, adapter.issue(saved, config)}
              end) do
           {:ok, token} ->
             event_id = Jido.Signal.ID.generate!()

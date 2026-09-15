@@ -60,7 +60,7 @@ defmodule Jido.AI.Session.Start do
         with {:ok, sink} <- Request.Stream.normalize_sink(resources[:stream_to]),
              :ok <- options(resources),
              :ok <- Jido.AI.Skill.Runtime.request_options(resources),
-             :ok <- Jido.AI.Reasoning.ReAct.Checkpoint.admission(context, id, run_id) do
+             :ok <- Jido.AI.Runtime.Checkpoint.admission(context, id, run_id) do
           record = %{
             id: id,
             run_id: run_id,
@@ -99,14 +99,14 @@ defmodule Jido.AI.Session.Start do
   end
 
   defp start_history(context, profile, record) do
-    if Jido.AI.Reasoning.ReAct.Checkpoint.resumed?(context),
+    if Jido.AI.Runtime.Checkpoint.resumed?(context),
       do: {:ok, context.agent_state},
       else: Jido.AI.Session.Transcript.start(context.agent_state, profile, record, context.signal.source)
   end
 
   defp checkpoint_metadata(context) do
     case context[:jido_ai_checkpoint] do
-      %{state: state} -> Jido.AI.Reasoning.ReAct.Checkpoint.metadata(state)
+      %{state: state} -> Jido.AI.Runtime.Checkpoint.metadata(state)
       _ -> %{}
     end
   end

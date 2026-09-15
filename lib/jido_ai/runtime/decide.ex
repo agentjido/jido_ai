@@ -1,6 +1,6 @@
 defmodule Jido.AI.Runtime.Decide do
   @moduledoc false
-  use Jido.Action, name: "ai_decide"
+  use Jido.Action, name: "ai_decide", schema: Jido.AI.Runtime.State.schema()
   alias Jido.AI.{Control, Output, Profile, ToolCatalog}
 
   @impl Jido.Action
@@ -138,12 +138,12 @@ defmodule Jido.AI.Runtime.Decide do
             |> Map.put_new(:termination_reason, :final_answer)
             |> Map.put(
               :reasoning_iteration,
-              Jido.AI.Reasoning.ReAct.Checkpoint.iteration(%{runtime: state, phase: :terminal})
+              Jido.AI.Runtime.State.iteration(state, :terminal)
             )
 
           meta = if state.output, do: Map.put(meta, :output, state.output_meta), else: meta
 
-          with {:ok, meta} <- Jido.AI.Reasoning.ReAct.Checkpoint.terminal(state, meta, context) do
+          with {:ok, meta} <- Jido.AI.Runtime.Checkpoint.terminal(state, meta, context) do
             content = Jido.AI.Runtime.OutputState.content(value)
 
             {:ok,

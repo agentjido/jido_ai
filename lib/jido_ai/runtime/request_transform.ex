@@ -168,7 +168,7 @@ defmodule Jido.AI.Runtime.RequestTransform do
       run_id: run_id,
       request_id: if(record, do: record.id, else: state.request_id),
       context: State.conversation(Jido.AI.Model.Messages.entries(conversation.messages), nil),
-      iteration: Jido.AI.Reasoning.ReAct.Checkpoint.model_iteration(state),
+      iteration: Jido.AI.Runtime.State.model_iteration(state),
       llm_call_id: original[:llm_call_id],
       llm_response_id: if(response, do: response.id),
       seq: Map.get(events, :seq, 0),
