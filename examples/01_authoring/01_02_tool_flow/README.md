@@ -23,6 +23,34 @@ transport and AgentServer, with [test setup](../../../test/examples/support/exam
 
 ## Important behavior
 
+### Optional live Haiku demonstration
+
+Read [MultiRoundAgent](multi_round_agent.ex), then [the launcher](demo.exs).
+Set `ANTHROPIC_API_KEY` in your environment or the package `.env`. Do not commit
+credentials. Run from the package root:
+
+```sh
+mix run examples/01_authoring/01_02_tool_flow/demo.exs
+```
+
+This makes paid requests to Claude Haiku 4.5. It asks for three dependent tool
+rounds: `quote(7, 13)` → `multiply(91, 6)` → `multiply(546, 4)`, followed by a
+final answer. Expected totals are 91, 546, and 2184 cents. The launcher prints
+committed tool results, the answer, and elapsed time. It does not print private
+model reasoning or credentials.
+
+Limits: four model calls, three tool calls, 512 output tokens per call, and a
+60-second runtime deadline. The core AgentServer Turn and caller wait have
+65-second limits; the core default of five seconds is too short for this live
+multi-round task. HTTP retries are disabled. Both runtime processes
+are stopped on success or failure. Live model choices can vary; the prompt is
+not an enforcement rule. The launcher checks the tool-result count, not answer
+quality. [Deterministic tests](../../../test/examples/01_authoring/01_02_tool_flow/multi_round_test.exs)
+check result propagation, state commit, and failure after a tool round without
+credentials. They bind the `:fast` application alias to the local test transport.
+
+### Basic two-call example
+
 The next model call receives results `6` and `20`, with their original call IDs.
 The final answer enters Agent state. An unknown tool or invalid arguments in a
 batch prevent every tool in that batch from starting. The model-call limit
