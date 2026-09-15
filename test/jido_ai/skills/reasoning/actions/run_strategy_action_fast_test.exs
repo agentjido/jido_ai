@@ -1,45 +1,17 @@
 defmodule Jido.AI.Actions.Reasoning.RunStrategyFastTest do
-  @moduledoc """
-  Fast-smoke subset for `RunStrategy` used by `mix test.fast`.
-
-  Full strategy-matrix coverage lives in `run_strategy_action_test.exs`.
-  """
-
-  use ExUnit.Case, async: false
-  use Mimic
+  @moduledoc "Successful callable CoT completion for the fast gate."
+  use Jido.AI.Test.CallableReasoningCase, async: false
 
   alias Jido.AI.Actions.Reasoning.RunStrategy
-  alias Jido.AI.TestSupport.FakeReqLLM
 
   @moduletag :stable_smoke
   @moduletag :unit
-  @moduletag :capture_log
 
-  setup :set_mimic_from_context
-  setup :stub_req_llm
-
-  setup_all do
-    # Complete the one-time catalog load before a strategy request starts its
-    # 750 ms timeout budget.
-    _ = LLMDB.providers()
-    :ok
-  end
-
-  defp stub_req_llm(context), do: FakeReqLLM.setup_stubs(context)
-
-  test "executes representative strategy path for fast gate" do
-    params = %{strategy: :cot, prompt: "Explain 2+2", timeout: 750}
-
-    payload =
-      case RunStrategy.run(params, %{}) do
-        {:ok, payload} -> payload
-        {:error, payload} -> payload
-      end
-
-    assert payload.strategy == :cot
-    assert payload.status in [:success, :running, :idle, :failure]
-    assert is_map(payload.usage)
-    assert is_map(payload.diagnostics)
+  test "CoT completes through the isolated runtime and HTTP transport", %{jido: jido} do
+    params = %{strategy: :cot, prompt: "Explain 2 + 2"}
+    assert {{:ok, payload}, [_request], nil} = call(jido, params, script(:cot), 1)
+    assert_success(payload, :cot, :chain_of_thought, 1, :success)
+    assert payload.output == "Four"
   end
 
   test "rejects invalid strategy request in fast gate" do

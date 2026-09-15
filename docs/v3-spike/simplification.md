@@ -226,9 +226,9 @@ recovery, deferred context replacement, checkpoints, and trace truncation.
   script discovery does not reach that worker through `Turn.execute/4`.
   Explicit caller context under `ai.assistant.options` works across the
   boundary. The final success checks use the local HTTP fixture.
-- The existing seven-method execution matrix accepts success or failure; it
-  does not prove successful completion of every method. The retained native
-  method and standalone ReAct tests provide their stronger runtime checks.
+- At the callable validation checkpoint, the seven-method execution matrix
+  accepted success or failure. The completion checkpoint below replaces that
+  matrix with required successful results for every callable method.
 
 The review found real contract differences that prevent a larger compatible
 merge:
@@ -248,6 +248,56 @@ containers with Profile configuration. It must define model defaults, ignored
 keys, generation validation, explicit limit precedence, and when Plugin
 configuration errors occur. Generated Agent helpers and Session/Thread values
 are unchanged.
+
+## Callable completion coverage
+
+The unit matrix and the fast callable test now require successful completion
+through `Jido.Exec.run(RunStrategy, ...)`. They use the real private Agent,
+Session, Request, and ReqLLM HTTP/SSE path. The local `Jido.AI.Test.MockLLM`
+supplies finite response scripts through its public model and option helpers.
+No provider or runtime function is stubbed. No live provider is used.
+
+- All seven callable IDs complete: `cod`, `cot`, `tot`, `got`, `trm`, `aot`,
+  and `adaptive`. Tests check exact answers, usage, method and termination
+  metadata, completed snapshots, and exact HTTP call counts. ToT retains ranked
+  candidates and tree bounds; AoT retains its explicit answer and backtracking
+  data. Plugin timeout and instruction defaults reach a successful call and
+  the actual HTTP request.
+- The tests read the private Agent's Profile through `Configuration.profile/2`
+  and resolve its method through `Reasoning.select/2`. They require numeric
+  model-call and iteration limits: 1 for linear methods and AoT, 802 for the
+  tested ToT policy, 40 for default GoT, 3 for one TRM cycle, 15 for default
+  TRM, and 10 for Adaptive's ReAct choice. Exact observed call counts must stay
+  within these limits. This does not add new callable limit options.
+- Default TRM completes all five cycles and 15 model calls. It returns the
+  fifth improvement with `:max_steps`. A separate case stops after one cycle
+  at `:act_threshold`. Adaptive selects CoD for a simple query, ReAct for a
+  tool query, and TRM for an improvement query. It falls back to available CoT
+  when ReAct is absent. A fallback to TRM also completes all five cycles;
+  its budget is resolved after selection.
+- Separate negative cases require AoT failure without an explicit answer,
+  ToT evaluation failure, and TRM supervision failure. They check retained
+  method data and completed usage. `Jido.Exec` retains the Action error
+  envelope under `ExecutionFailureError.details.reason`. These cases cannot
+  pass as recovered success.
+- `test/support/callable_reasoning_case.ex` contains focused unit support.
+  The response formats follow the reviewed example fixtures, but the tests
+  do not call example helpers. An HTTP barrier holds the first request while
+  public Agent APIs identify the private Agent and Session. Process monitors
+  verify that both owners and provider work stop. The host has no remaining
+  private Agents. Every script must have no unused responses, unexpected
+  requests, or held requests. The tests use no sleeps or runtime observer hooks.
+
+This checkpoint changes tests and documentation only. No current method
+defect was found. The Profile-bound callable contract in
+`callable-v3-contract.md` remains a proposal awaiting approval. Its original
+statement that the unit matrix permits failure describes the earlier
+checkpoint. The tests here close that success-coverage gap; they do not
+authorize the configuration migration. Flat callable inputs, Plugin defaults,
+and current validation behavior remain. Callable timeout, caller-death, outer
+cancellation, concurrent-call, and wider Plugin-composition coverage from the
+deferred example suites still need a selected unit or example verification
+step. Authoring and example suites remain deferred.
 
 ## Profile model input validation
 
@@ -361,6 +411,18 @@ suites remain deferred; their compiled source and support needed no repair.
 After the checks, `rmdir` removed the two empty test fixture directories listed
 above and 77 empty directories under `tmp/`. Build, dependency, and Git
 directories were not touched.
+
+Callable completion result: 145 files; 1,853 passed, 1 excluded; no failures
+or skips. The selected run took 21.0 seconds with seed 0 and warnings as
+errors. Format and forced compile with warnings as errors passed; the dev
+compile compiled 337 files. The focused callable run passed all 20 tests in
+3.3 seconds with seed 0 and warnings as errors. Nine tests were added, and the
+existing matrix, defaults test, and fast completion test now require success.
+The existing flaky exclusion is unchanged. Authoring and example suites were
+not run or changed; their compiled source and support needed no repair.
+After verification, `rmdir` removed the two empty test fixture directories
+listed above and 75 empty directories under `tmp/`. No empty source directory
+remained. Build, dependency, and Git directories were not touched.
 
 The 15 tests added at the model-call checkpoint cover default ReqLLM calls,
 callback data and delegation,
