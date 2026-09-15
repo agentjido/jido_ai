@@ -7,6 +7,47 @@ source, notes, and test under the same group and example ID.
 The examples use real Jido AI public features and a deterministic local model
 server. They do not need provider credentials.
 
+## What the examples can do
+
+The catalog has 46 feature folders in 10 groups. These are executable contract
+examples, not only prompt demonstrations. See the [package maturity report](../docs/v3-spike/status.md)
+for dated test results and release checks.
+
+| Group | Demonstrated capability |
+| --- | --- |
+| Authoring | Define an AI Agent in multiple forms; use Action and Flow tools, typed output, controls, streams, and the core AI extension. |
+| Requests | Run successive session requests; steer and cancel work; inspect requests; preserve context and thread values; handle completion failures, limits, and usage. |
+| Tools | Validate numeric tool inputs. Action/Flow execution is also covered by the authoring group. |
+| Retrieval | Store and retrieve memory and enrich Agent requests. |
+| Planning | Call planning Actions and expose planning through a capability Plugin. |
+| Reasoning | Select linear methods; run Algorithm, Tree, and Graph of Thoughts, TRM, and Adaptive methods; call reasoning as an Action or model tool. |
+| Policy | Account for quota and accept or reject Agent requests. |
+| Resume | Run standalone ReAct; resume model/tool checkpoints; supply input queues; append queries; retain trace and failure position; restore initial and terminal state. |
+| Capabilities | Compose reasoning and chat Plugins with model routing and policy. |
+| Skills | Author and activate skills and access their resources. This is not dynamic tool-source adapter support. |
+
+The separate [AI authoring suite](../test/authoring/README.md) adds 233 tests
+across seven cases and eight construction paths. It checks complete definitions
+and state, invalid source, Plugin composition, recovery, state limits, imports,
+and same-source transport to a separate BEAM. Run it with `mix test.authoring`.
+It is not included in `mix examples`.
+
+### What these examples do not prove
+
+Provider responses are scripted. The examples exercise the HTTP/SSE client,
+real Actions, Flows, AgentServer, and session code, but do not measure model
+answer quality or verify every remote provider. They do not establish load
+capacity, long-running reliability, or migration between source versions.
+Checkpoint examples do not establish durable distributed orchestration.
+The retrieval store is process-owned ETS; an Agent checkpoint does not back up
+that external memory. Automatic skill authoring requires a ReAct session profile
+and a live owner. See each feature guide for its configuration limits.
+
+Dynamic native `tool_sources` remain on hold and are explicitly rejected.
+Public rich-model export is out of scope; use model IDs or aliases. Core Registry
+references require values supplied by the receiving host. Native AI requests
+use AgentServer; direct native `Agent.cmd` execution is not supported.
+
 ## Run
 
 Run these commands from the repository root:

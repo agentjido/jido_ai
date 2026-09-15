@@ -1,0 +1,131 @@
+{
+  "description": null,
+  "metadata": {
+    "$type": "map",
+    "entries": [
+      [
+        "case",
+        "policy"
+      ]
+    ]
+  },
+  "module": "agent/0",
+  "name": "authoring_ai_policy",
+  "plugins": [
+    {
+      "module": "plugin/2",
+      "options": [
+        {
+          "$type": "tuple",
+          "items": [
+            {
+              "$type": "atom",
+              "id": "atom/3"
+            },
+            {
+              "$type": "atom",
+              "id": "atom/4"
+            }
+          ]
+        }
+      ],
+      "type": "jido.plugin",
+      "version": 1
+    },
+    {
+      "module": "plugin/5",
+      "options": [
+        {
+          "$type": "tuple",
+          "items": [
+            {
+              "$type": "atom",
+              "id": "atom/6"
+            },
+            {
+              "$type": "map",
+              "entries": [
+                [
+                  "case.assistant",
+                  {
+                    "$type": "value",
+                    "id": "value/7"
+                  }
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "type": "jido.plugin",
+      "version": 1
+    },
+    {
+      "module": "plugin/8",
+      "options": [
+        {
+          "$type": "tuple",
+          "items": [
+            {
+              "$type": "atom",
+              "id": "atom/9"
+            },
+            {
+              "$type": "map",
+              "entries": [
+                [
+                  {
+                    "$type": "atom",
+                    "id": "atom/10"
+                  },
+                  {
+                    "$type": "value",
+                    "id": "value/11"
+                  }
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "type": "jido.plugin",
+      "version": 1
+    }
+  ],
+  "routes": [
+    {
+      "defaults": {
+        "$type": "map",
+        "entries": [
+          [
+            {
+              "$type": "atom",
+              "id": "atom/13"
+            },
+            {
+              "$type": "atom",
+              "id": "atom/10"
+            }
+          ]
+        ]
+      },
+      "kind": "action",
+      "match": null,
+      "path": "case.assistant",
+      "priority": 0,
+      "target": "action/12"
+    },
+    {
+      "defaults": null,
+      "kind": "action",
+      "match": null,
+      "path": "jido.ai.configure",
+      "priority": 0,
+      "target": "action/14"
+    }
+  ],
+  "schema": "schema/1",
+  "type": "jido.agent",
+  "version": 2,
+  "vsn": 1
+}

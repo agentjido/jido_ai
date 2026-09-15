@@ -1,7 +1,12 @@
 # Jido AI v3 migration
 
-Status: migration started on 2026-09-06. Authoring, shared operations and session requests have production ports and acceptance examples; the full package port is in progress.
-Initial inspection: 2026-09-05. Migration planning update: 2026-09-06.
+Status, 2026-09-14: working V3 implementation with tested authoring and examples;
+stable-release verification remains open. Start with the
+[current status and maturity report](status.md).
+
+The material below records the initial September 5–7 migration plan and source
+inspection. Its dependency and failure descriptions are historical. Current
+tests run in the root package, not a separate acceptance project.
 
 Use examples to select the API and execution model. Keep current AI features in
 the port map. Use Jido v3 Actions, Flows, and Plugins for their execution.
@@ -21,7 +26,7 @@ The migration goal now includes three preparation passes, the complete
 post-2.0 history audit, and four later refinement/simplification checkpoints. See the
 [preparation results](migration-plan.md#preparation-three-refinement-passes)
 and [example priorities](examples.md#implementation-priorities).
-The user authorized production implementation with “start the migration”. See the [implementation record](implementation.md) for current checks and remaining work.
+The user authorized production implementation with “start the migration”. See the [implementation record](implementation.md) for the dated migration history.
 
 The history pass is complete: 126 commits after `v2.0.0` through `fc5bc143`,
 plus all 103 linked merged PRs, have source reviews and required acceptance

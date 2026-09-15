@@ -15,7 +15,10 @@ defmodule Jido.AI.Agent.Interface do
           signal = Jido.Signal.new!(route.path, %{query: query}, source: "/jido/ai/agent")
 
           with {:ok, agent} <-
-                 Jido.AgentServer.call(server, signal, timeout: opts[:timeout] || 30_000) do
+                 Jido.AgentServer.call(server, signal,
+                   timeout: opts[:timeout] || 30_000,
+                   context: Keyword.get(opts, :context, %{})
+                 ) do
             {:ok, Map.fetch!(agent.state, profile.result.into)}
           end
       end

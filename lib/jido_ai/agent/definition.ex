@@ -3,21 +3,6 @@ defmodule Jido.AI.Agent.Definition do
 
   defmacro __using__(opts) do
     {max_state_size, opts} = Keyword.pop(opts, :max_state_size)
-    metadata = Keyword.get(opts, :metadata, {:%{}, [], []})
-
-    metadata =
-      if is_nil(max_state_size) do
-        metadata
-      else
-        quote do
-          Map.put(
-            unquote(metadata),
-            Jido.AI.Authoring.state_size_key(),
-            unquote(max_state_size)
-          )
-        end
-      end
-
     extensions_ast = Keyword.get(opts, :extensions, [])
 
     extensions =
@@ -39,12 +24,10 @@ defmodule Jido.AI.Agent.Definition do
         description: "extensions must be a compile-time list of modules"
     end
 
-    opts =
-      opts
-      |> Keyword.put(:metadata, metadata)
-      |> Keyword.put(:extensions, Enum.uniq([Jido.AI.DSL | extensions]))
+    opts = Keyword.put(opts, :extensions, Enum.uniq([Jido.AI.DSL | extensions]))
 
     quote location: :keep do
+      @jido_ai_max_state_size unquote(max_state_size)
       use Jido.Agent, unquote(opts)
 
       import Jido.AI.Agent, only: [tools_from_skills: 1]

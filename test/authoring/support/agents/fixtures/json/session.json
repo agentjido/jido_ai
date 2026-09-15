@@ -1,0 +1,155 @@
+{
+  "type": "jido.ai.profiles",
+  "version": 1,
+  "profiles": [
+    {
+      "$type": "map",
+      "entries": [
+        [
+          {
+            "$type": "atom",
+            "id": "atoms/id"
+          },
+          {
+            "$type": "atom",
+            "id": "atoms/assistant"
+          }
+        ],
+        [
+          {
+            "$type": "atom",
+            "id": "atoms/models"
+          },
+          {
+            "$type": "map",
+            "entries": [
+              [
+                {
+                  "$type": "atom",
+                  "id": "atoms/default"
+                },
+                {
+                  "$type": "map",
+                  "entries": [
+                    [
+                      {
+                        "$type": "atom",
+                        "id": "atoms/model"
+                      },
+                      {
+                        "$type": "value",
+                        "id": "values/model"
+                      }
+                    ]
+                  ]
+                }
+              ]
+            ]
+          }
+        ],
+        [
+          {
+            "$type": "atom",
+            "id": "atoms/instructions"
+          },
+          "Use the case facts."
+        ],
+        [
+          {
+            "$type": "atom",
+            "id": "atoms/controls"
+          },
+          {
+            "$type": "map",
+            "entries": [
+              [
+                {
+                  "$type": "atom",
+                  "id": "atoms/timeout"
+                },
+                5000
+              ]
+            ]
+          }
+        ],
+        [
+          {
+            "$type": "atom",
+            "id": "atoms/result"
+          },
+          {
+            "$type": "map",
+            "entries": [
+              [
+                {
+                  "$type": "atom",
+                  "id": "atoms/into"
+                },
+                {
+                  "$type": "atom",
+                  "id": "atoms/reply"
+                }
+              ]
+            ]
+          }
+        ],
+        [
+          {
+            "$type": "atom",
+            "id": "atoms/requests"
+          },
+          {
+            "$type": "map",
+            "entries": [
+              [
+                {
+                  "$type": "atom",
+                  "id": "atoms/mode"
+                },
+                {
+                  "$type": "atom",
+                  "id": "atoms/session"
+                }
+              ],
+              [
+                {
+                  "$type": "atom",
+                  "id": "atoms/streaming"
+                },
+                true
+              ],
+              [
+                {
+                  "$type": "atom",
+                  "id": "atoms/max_requests"
+                },
+                3
+              ]
+            ]
+          }
+        ],
+        [
+          {
+            "$type": "atom",
+            "id": "atoms/memory"
+          },
+          {
+            "$type": "map",
+            "entries": [
+              [
+                {
+                  "$type": "atom",
+                  "id": "atoms/history"
+                },
+                {
+                  "$type": "atom",
+                  "id": "atoms/messages"
+                }
+              ]
+            ]
+          }
+        ]
+      ]
+    }
+  ]
+}

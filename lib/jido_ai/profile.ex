@@ -471,7 +471,8 @@ defmodule Jido.AI.Profile do
   end
 
   def source(value) do
-    with {:ok, value} <- fields(value, @fields ++ [:routes], "profile"),
+    with {:ok, value} <- input_map(value),
+         {:ok, value} <- fields(value, @fields ++ [:model, :routes], "profile"),
          {routes, value} = Map.pop(value, :routes, []),
          {:ok, profile} <- new(value),
          do: {:ok, {profile, routes}}

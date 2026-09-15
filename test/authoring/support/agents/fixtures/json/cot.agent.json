@@ -1,0 +1,83 @@
+{
+  "description": null,
+  "metadata": {
+    "$type": "map",
+    "entries": [
+      [
+        "case",
+        "cot"
+      ]
+    ]
+  },
+  "module": "agent/0",
+  "name": "authoring_ai_cot",
+  "plugins": [
+    {
+      "module": "plugin/2",
+      "options": [
+        {
+          "$type": "tuple",
+          "items": [
+            {
+              "$type": "atom",
+              "id": "atom/3"
+            },
+            {
+              "$type": "map",
+              "entries": [
+                [
+                  {
+                    "$type": "atom",
+                    "id": "atom/4"
+                  },
+                  {
+                    "$type": "value",
+                    "id": "value/5"
+                  }
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "type": "jido.plugin",
+      "version": 1
+    }
+  ],
+  "routes": [
+    {
+      "defaults": {
+        "$type": "map",
+        "entries": [
+          [
+            {
+              "$type": "atom",
+              "id": "atom/7"
+            },
+            {
+              "$type": "atom",
+              "id": "atom/4"
+            }
+          ]
+        ]
+      },
+      "kind": "action",
+      "match": null,
+      "path": "case.assistant",
+      "priority": 0,
+      "target": "action/6"
+    },
+    {
+      "defaults": null,
+      "kind": "action",
+      "match": null,
+      "path": "jido.ai.configure",
+      "priority": 0,
+      "target": "action/8"
+    }
+  ],
+  "schema": "schema/1",
+  "type": "jido.agent",
+  "version": 2,
+  "vsn": 1
+}

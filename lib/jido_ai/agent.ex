@@ -8,6 +8,10 @@ defmodule Jido.AI.Agent do
   request enters the Agent runtime.
 
   Agent definitions use the canonical `agent do` and `ai` DSL.
+
+  Native AI routes require AgentServer admission. Use the generated `ask/3`
+  helper or `Jido.AgentServer.call/3`. Direct `Jido.Agent.cmd/3` calls on these
+  routes return a runtime validation error; they do not start model work.
   """
 
   defmacro __using__(opts) do

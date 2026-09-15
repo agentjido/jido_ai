@@ -18,8 +18,11 @@ Application aliases merge over the package baseline.
 
 ## Agent Configuration
 
-Use `Jido.AI.Agent` and the Spark DSL. The `use` options are core Agent options,
-such as `name`, `description`, `metadata`, `max_state_size`, and `extensions`.
+Use `Jido.AI.Agent` and the Spark DSL. The `use` options include core Agent options,
+such as `name`, `description`, `metadata`, and `extensions`. The AI wrapper also
+accepts `max_state_size` as a positive byte limit on the complete Agent state,
+including Plugin-owned fields. It works with keyword or block metadata.
+Construction and state updates enforce the limit; failed updates do not commit.
 AI configuration belongs in an `ai` block.
 
 ```elixir
@@ -70,6 +73,20 @@ end
 
 Agent construction validates and lowers this data. It does not call a model or
 a tool.
+
+## Portable Models and Dynamic Tool Sources
+
+Public `Jido.AI.export/3` supports model IDs and aliases. For a rich model record,
+it returns a structured validation error. Rich-model export is out of scope.
+Core `Jido.Agent.Codec` has no model-specific export format: it encodes a
+registered struct as a value reference. The receiving host must supply the
+actual record in its Registry. The document does not contain the model record.
+
+Dynamic tool-source declarations can be authored and transported, but native
+AI routes do not resolve them yet. Selecting a profile with these sources
+returns a `tool_sources` validation error before model work starts, in both
+turn and session modes. Supply resolved static tools for native execution.
+The runtime does not silently omit optional or required sources.
 
 ## Reasoning Methods
 

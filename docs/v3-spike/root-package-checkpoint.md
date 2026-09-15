@@ -1,5 +1,9 @@
 # Root package checkpoint — 2026-09-07
 
+Historical record. See the [2026-09-14 status report](status.md) for current
+results, example capabilities, resolved authoring findings, and release limits.
+The failure counts below describe earlier migration checkpoints, not current tests.
+
 The root Mix project now uses local Jido v3, Action beta and Signal beta.
 Every production source file remains under `lib`. The acceptance project now
 uses the root package as a path dependency. It compiles only its examples and

@@ -1,5 +1,10 @@
 # Example catalog
 
+This is the migration planning catalog. For implemented capabilities and their
+limits, use the [checked example summary](../../examples/README.md#what-the-examples-can-do)
+and [current maturity report](status.md). The proposed families below are not
+a claim that every planned feature is supported.
+
 Status: the checked source and test catalog lives in
 [examples](../../examples/README.md). The IDs below map to matching source,
 guide, and test folders in the root project.

@@ -1,5 +1,9 @@
 # Jido AI v3 implementation record
 
+Historical implementation log. The [2026-09-14 status report](status.md) replaces
+the current-status claims and remaining-work summary below. Keep these dated
+entries as migration evidence, not as current test results.
+
 ## Root package cutover: 2026-09-07
 
 The user changed the immediate order: build the complete package, obtain a

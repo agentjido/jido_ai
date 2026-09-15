@@ -8,7 +8,12 @@
 [![Ecosystem](https://img.shields.io/badge/ecosystem-jido.run-0ea5e9.svg)](https://jido.run/ecosystem)
 [![Discord](https://img.shields.io/badge/discord-join-5865F2.svg?logo=discord&logoColor=white)](https://jido.run/discord)
 
-Build tool-using Elixir agents with explicit reasoning strategies and production-ready request orchestration.
+Build tool-using Elixir agents with explicit reasoning strategies and request orchestration.
+
+This `v3-spike` branch has a working V3 implementation with automated authoring
+and example tests. It is not yet a verified stable V3 release. See the
+[current status and maturity report](docs/v3-spike/status.md) and
+[example capabilities](examples/README.md#what-the-examples-can-do).
 
 [Hex](https://hex.pm/packages/jido_ai) | [HexDocs](https://hexdocs.pm/jido_ai) | [Jido Ecosystem](https://jido.run/ecosystem) | [Discord](https://jido.run/discord)
 

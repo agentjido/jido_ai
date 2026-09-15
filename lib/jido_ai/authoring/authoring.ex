@@ -25,7 +25,7 @@ defmodule Jido.AI.Authoring do
      %{
        config
        | metadata: Map.put(metadata, state_size_key(), limit),
-         schema: Zoi.refine(schema, {Jido.AI.Runtime.StateSize, :validate, [limit]})
+         schema: Zoi.refine(schema, {Jido.AI.Runtime.StateSize, :check, [limit]})
      }}
   end
 
@@ -45,7 +45,13 @@ defmodule Jido.AI.Authoring do
   @doc false
   def request_method(agent, signal), do: Jido.AI.Runtime.Binding.method(agent, signal)
 
-  @doc "Lowers profiles on a neutral Agent or static attribute map, then applies core validation."
+  @doc """
+  Lowers profiles on a neutral Agent or static attributes, then applies core validation.
+
+  Profiles can be `Jido.AI.Profile` structs, maps, or keyword lists. Source maps
+  and keyword lists accept the `model` shorthand and optional `routes` field.
+  Duplicate keyword fields and unknown fields are rejected.
+  """
   def lower(%Jido.Agent{id: nil, state: nil} = agent, profiles) do
     attrs = agent |> Map.from_struct() |> Map.drop([:id, :state])
     with {:ok, attrs} <- lower_config(attrs, profiles), do: Jido.Agent.new(attrs)

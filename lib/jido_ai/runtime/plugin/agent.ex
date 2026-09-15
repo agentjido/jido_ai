@@ -6,6 +6,9 @@ defmodule Jido.AI.Runtime.Plugin.Agent do
   def state_spec(opts), do: Jido.AI.Runtime.Plugin.agent_state_spec(opts)
 
   @impl Jido.Agent.Plugin
+  def prepare(_preparation, _opts), do: {:ok, :requires_agent_server}
+
+  @impl Jido.Agent.Plugin
   def directives(_opts), do: [Jido.AI.Configuration.Change]
 
   @impl Jido.Agent.Plugin

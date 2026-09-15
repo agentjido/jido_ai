@@ -1,0 +1,153 @@
+{
+  "type": "jido.ai.profiles",
+  "version": 1,
+  "profiles": [
+    {
+      "$type": "map",
+      "entries": [
+        [
+          {
+            "$type": "atom",
+            "id": "atoms/id"
+          },
+          {
+            "$type": "atom",
+            "id": "atoms/assistant"
+          }
+        ],
+        [
+          {
+            "$type": "atom",
+            "id": "atoms/models"
+          },
+          {
+            "$type": "map",
+            "entries": [
+              [
+                {
+                  "$type": "atom",
+                  "id": "atoms/default"
+                },
+                {
+                  "$type": "map",
+                  "entries": [
+                    [
+                      {
+                        "$type": "atom",
+                        "id": "atoms/model"
+                      },
+                      {
+                        "$type": "value",
+                        "id": "values/model"
+                      }
+                    ]
+                  ]
+                }
+              ]
+            ]
+          }
+        ],
+        [
+          {
+            "$type": "atom",
+            "id": "atoms/instructions"
+          },
+          "Use the case facts."
+        ],
+        [
+          {
+            "$type": "atom",
+            "id": "atoms/controls"
+          },
+          {
+            "$type": "map",
+            "entries": [
+              [
+                {
+                  "$type": "atom",
+                  "id": "atoms/timeout"
+                },
+                5000
+              ]
+            ]
+          }
+        ],
+        [
+          {
+            "$type": "atom",
+            "id": "atoms/result"
+          },
+          {
+            "$type": "map",
+            "entries": [
+              [
+                {
+                  "$type": "atom",
+                  "id": "atoms/into"
+                },
+                {
+                  "$type": "atom",
+                  "id": "atoms/reply"
+                }
+              ]
+            ]
+          }
+        ],
+        [
+          {
+            "$type": "atom",
+            "id": "atoms/tools"
+          },
+          [
+            {
+              "$type": "map",
+              "entries": [
+                [
+                  {
+                    "$type": "atom",
+                    "id": "atoms/name"
+                  },
+                  "double"
+                ],
+                [
+                  {
+                    "$type": "atom",
+                    "id": "atoms/description"
+                  },
+                  "Double an integer"
+                ],
+                [
+                  {
+                    "$type": "atom",
+                    "id": "atoms/target"
+                  },
+                  {
+                    "$type": "atom",
+                    "id": "atoms/Elixir.JidoAITest.Authoring.Agents.Fixtures.Double"
+                  }
+                ],
+                [
+                  {
+                    "$type": "atom",
+                    "id": "atoms/timeout"
+                  },
+                  5000
+                ],
+                [
+                  {
+                    "$type": "atom",
+                    "id": "atoms/forward_context"
+                  },
+                  {
+                    "$type": "atom",
+                    "id": "atoms/public"
+                  }
+                ]
+              ]
+            }
+          ]
+        ]
+      ]
+    }
+  ]
+}

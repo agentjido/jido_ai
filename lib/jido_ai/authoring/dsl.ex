@@ -680,6 +680,7 @@ defmodule Jido.AI.DSL do
   }
 
   use Spark.Dsl.Extension,
+    transformers: [Jido.AI.DSL.StateSizeTransformer],
     dsl_patches: [%Spark.Dsl.Patch.AddEntity{section_path: [:agent], entity: @profile}],
     imports: [Jido.AI.DSL.Macros]
 

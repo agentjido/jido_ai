@@ -2,12 +2,13 @@ defmodule Jido.AI.Runtime.Run do
   @moduledoc "Assembles one complete Agent result from the shared reasoning Flow."
   use Jido.Action, name: "ai_agent_run", schema: Zoi.object(%{query: Jido.AI.Query.schema()})
 
-  def run(params, context),
-    do:
+  def run(params, context) do
+    with {:ok, context} <- Jido.AI.Session.Plugin.context(context) do
       Jido.AI.Error.capture(fn ->
-        with {:ok, context} <- Jido.AI.Session.Plugin.context(context),
-             do: execute(Jido.AI.Plugins.Retrieval.apply_input(params, context), context)
+        execute(Jido.AI.Plugins.Retrieval.apply_input(params, context), context)
       end)
+    end
+  end
 
   defp execute(%{query: query}, context) do
     profile = context.jido_ai_profiles[context.jido_ai_turn_profile]

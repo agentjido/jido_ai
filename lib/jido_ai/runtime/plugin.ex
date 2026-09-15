@@ -33,6 +33,9 @@ defmodule Jido.AI.Runtime.Plugin do
           {:error, _} = error -> error
         end
 
+      %Jido.Plugin.Input{} ->
+        Jido.AI.Profile.error("runtime", "Native AI routes require AgentServer admission; use Jido.AgentServer.call/3")
+
       _ ->
         {:ok, context}
     end
@@ -139,7 +142,8 @@ defmodule Jido.AI.Runtime.Plugin do
       Jido.AI.Capability.prepared(command.context, Jido.AI.Plugins.ModelRouting) ||
         Jido.AI.Plugins.ModelRouting.selected_for_agent(command.agent, command.signal)
 
-    with {:ok, effective} <-
+    with :ok <- supported_tool_sources(binding, Keyword.fetch!(opts, :profiles)),
+         {:ok, effective} <-
            Jido.AI.Configuration.profiles(
              Keyword.fetch!(opts, :profiles),
              Map.get(command.agent.state, Jido.AI.Configuration.key(), %{})
@@ -164,6 +168,21 @@ defmodule Jido.AI.Runtime.Plugin do
 
       profile_id = if match?(%{mode: :turn}, binding), do: binding.id
       {:ok, %{command | context: Map.put(context, :jido_ai_turn_profile, profile_id)}}
+    end
+  end
+
+  defp supported_tool_sources(nil, _profiles), do: :ok
+
+  defp supported_tool_sources(%{id: id}, profiles) do
+    case profiles[id] do
+      %{tool_sources: [_ | _]} ->
+        Jido.AI.Profile.error(
+          "tool_sources",
+          "Native AI routes do not resolve dynamic tool sources; supply resolved static tools"
+        )
+
+      _ ->
+        :ok
     end
   end
 

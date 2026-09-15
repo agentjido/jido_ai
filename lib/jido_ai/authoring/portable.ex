@@ -41,6 +41,8 @@ defmodule Jido.AI.Portable do
     end
   end
 
+  # Rich model records require the core Codec Registry; public model IDs must
+  # not silently discard record-specific options during export.
   def export(source, format, opts \\ [])
 
   def export(source, format, opts) when format in [:map, :json, :yaml] do
@@ -166,7 +168,8 @@ defmodule Jido.AI.Portable do
   defp definition(_), do: Profile.error("agent", "Expected an Agent module or definition")
 
   defp export_profile(profile, registries) do
-    with {:ok, instructions} <- export_instructions(profile.instructions, registries),
+    with :ok <- exportable_models(profile),
+         {:ok, instructions} <- export_instructions(profile.instructions, registries),
          {:ok, models} <- export_models(profile, registries),
          {:ok, tools} <- traverse(profile.tools, &export_tool(&1, registries)),
          {:ok, tool_sources} <- traverse(profile.tool_sources, &export_tool_source(&1, registries)),
@@ -195,6 +198,19 @@ defmodule Jido.AI.Portable do
   defp export_instructions(module, registries) do
     with {:ok, ref} <- reference(registries, :actions, module, "instructions"),
          do: {:ok, %{"action" => ref}}
+  end
+
+  defp exportable_models(profile) do
+    case Enum.find(profile.models, fn {_role, entry} -> is_struct(entry.model) end) do
+      nil ->
+        :ok
+
+      {role, _} ->
+        Profile.error(
+          "models.#{role}.model",
+          "Rich model records require core Agent Codec with a Registry; public export accepts model IDs"
+        )
+    end
   end
 
   defp export_models(profile, registries) do

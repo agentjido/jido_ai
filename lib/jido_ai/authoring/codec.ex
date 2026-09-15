@@ -4,8 +4,10 @@ defmodule Jido.AI.Authoring.Codec do
 
   This format stores profile data before lowering. It is separate from the
   lowered Agent document. The profile body uses the core tagged-data format to
-  retain keyword lists, known atoms and registered static values such as schemas
-  and rich model records. It cannot import code or create atoms.
+  retain keyword lists, known atoms and references to registered static values.
+  For schemas and rich model records, the receiving Registry supplies the value;
+  the document does not serialize the record itself. This is not a model-specific
+  export format. It cannot import code or create atoms.
 
   Supply stable host Registry IDs for stored documents. Decoding calls the same
   `Jido.AI.Authoring.lower/2` boundary as direct authoring.

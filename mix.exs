@@ -10,6 +10,7 @@ defmodule JidoAi.MixProject do
       version: @version,
       elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
+      test_ignore_filters: [~r/test\/authoring\/support\//],
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases(),
@@ -39,6 +40,7 @@ defmodule JidoAi.MixProject do
   def cli do
     [
       preferred_envs: [
+        "test.authoring": :test,
         examples: :test,
         coveralls: :test,
         "coveralls.detail": :test,
@@ -66,9 +68,9 @@ defmodule JidoAi.MixProject do
   defp deps do
     [
       # Jido ecosystem
-      {:jido, path: "../jido", override: true},
-      {:jido_action, path: "../jido_action", override: true},
-      {:jido_signal, path: "../jido_signal", override: true},
+      {:jido, "~> 3.0.0-beta.1", override: true},
+      {:jido_action, "~> 3.0.0-beta.11", override: true},
+      {:jido_signal, "~> 3.0.0-beta.4", override: true},
       {:req_llm, "~> 1.22.0"},
 
       # Runtime
@@ -96,6 +98,7 @@ defmodule JidoAi.MixProject do
       setup: ["deps.get", "git_hooks.install"],
       test: "test --exclude flaky",
       examples: "test test/examples --only example",
+      "test.authoring": "test test/authoring --only authoring --seed 0",
       "test.fast": "cmd env MIX_ENV=test mix test --exclude flaky --only stable_smoke",
       precommit: [
         "format --check-formatted",
