@@ -248,8 +248,7 @@ defmodule Jido.ThreadValueTest do
     lane = %{
       active_context_ref: "default",
       pending_context_op: nil,
-      applied_context_ops: [],
-      session: Session.new(id: "session", now: 10) |> Session.append(%{kind: :note, at: 10})
+      applied_context_ops: []
     }
 
     assert :ok = Operations.validate_state(%{assistant: lane}, %{assistant: %{}}, nil)
@@ -262,7 +261,8 @@ defmodule Jido.ThreadValueTest do
              Operations.validate_state(%{assistant: lane}, :invalid, nil)
   end
 
-  test "context capture ignores profiles without history" do
-    assert Operations.capture(%{}, %{memory: %{history: nil}}, [], "agent", %{}) == []
+  test "context lanes reject a duplicate conversation store" do
+    lane = %{active_context_ref: "default", pending_context_op: nil, applied_context_ops: [], session: Session.new()}
+    assert {:error, _} = Operations.validate_state(%{assistant: lane}, %{assistant: %{}}, nil)
   end
 end

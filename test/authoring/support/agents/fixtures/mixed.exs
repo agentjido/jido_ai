@@ -5,7 +5,7 @@ defmodule JidoAITest.Authoring.Agents.Fixtures.Mixed do
     schema Zoi.object(%{
              reply: Zoi.string() |> Zoi.default(""),
              review: Zoi.string() |> Zoi.default(""),
-             messages: Zoi.list(Zoi.map()) |> Zoi.default([])
+             messages: Jido.AI.Conversation.schema()
            })
 
     ai :assistant do

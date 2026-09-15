@@ -4,7 +4,6 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
 
   alias Jido.AI.{Configuration, Context, History, Profile, Session}
   alias Jido.Thread
-  alias Jido.AI.Context.Operations
   alias Jido.AI.TestSupport.StreamResponseFactory
 
   defmodule EchoTool do
@@ -20,7 +19,7 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
     use Jido.AI.Agent, name: "context_lifecycle_agent"
 
     agent do
-      schema Zoi.object(%{last_result: Zoi.any() |> Zoi.default(nil), messages: Zoi.list(Zoi.map()) |> Zoi.default([])})
+      schema Zoi.object(%{last_result: Zoi.any() |> Zoi.default(nil), messages: Jido.AI.Conversation.schema()})
 
       ai :assistant do
         instructions("Initial prompt")
@@ -136,7 +135,8 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
     state_after_reset = conversation(pid)
     assert hd(state_after_reset) == %{role: :system, content: "Reset prompt"}
     assert {:ok, %Profile{instructions: "Reset prompt"} = profile} = Configuration.profile(fetch_agent(pid))
-    assert {:ok, [%{role: :user, content: "Reset seed"}]} = History.read(fetch_agent(pid).state, profile)
+    assert {:ok, [%{role: :user, content: seed}]} = History.read(fetch_agent(pid).state, profile)
+    assert Jido.AI.Query.summarize(seed) == "Reset seed"
     assert non_system_messages(state_after_reset) == [%{role: :user, content: "Reset seed"}]
 
     # Turn 3 should project only from reset context, not from pre-reset turns.
@@ -160,10 +160,11 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
 
     # The Agent-owned log is append-only: reset is a context operation entry.
     [context_op] = Thread.filter_by_kind(session_thread, :ai_context_operation)
-    assert context_op.payload.op_id == "op_reset_demo"
-    assert context_op.payload.context_ref == "default"
-    assert context_op.payload.operation.type == :replace
-    assert context_op.payload.operation.reason == :manual
+    assert {:ok, operation} = Jido.AI.Context.Operations.operation(context_op)
+    assert operation.op_id == "op_reset_demo"
+    assert operation.context_ref == "default"
+    assert operation.operation.type == :replace
+    assert operation.operation.reason == :manual
 
     # The session thread still preserves the full audit history of all turns.
     ai_messages = Thread.filter_by_kind(session_thread, :ai_message)
@@ -182,9 +183,7 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
   end
 
   defp session_thread(pid) do
-    lanes = fetch_agent(pid).state[Operations.key()]
-    [lane] = Map.values(lanes)
-    lane.session.thread
+    fetch_agent(pid).state.messages.thread
   end
 
   defp fetch_agent(pid) do
@@ -242,18 +241,16 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
   end
 
   defp message_content(message) when is_map(message) do
-    Map.get(message, :content, Map.get(message, "content"))
+    Jido.AI.Query.summarize(Map.get(message, :content, Map.get(message, "content")))
   end
 
   defp entry_role(entry) when is_map(entry) do
-    entry
-    |> Map.get(:payload, %{})
-    |> Map.get(:role)
+    {:ok, message} = Jido.AI.Conversation.message(entry)
+    message.role
   end
 
   defp entry_content(entry) when is_map(entry) do
-    entry
-    |> Map.get(:payload, %{})
-    |> Map.get(:content)
+    {:ok, message} = Jido.AI.Conversation.message(entry)
+    Jido.AI.Query.summarize(message.content)
   end
 end

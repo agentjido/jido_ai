@@ -30,8 +30,8 @@ defmodule Jido.AI.Session.InspectionTest do
                      assistant: Zoi.any() |> Zoi.default(nil),
                      primary: Zoi.any() |> Zoi.default(nil),
                      review: Zoi.any() |> Zoi.default(nil),
-                     messages: Zoi.list(Zoi.map()) |> Zoi.default([]),
-                     review_messages: Zoi.list(Zoi.map()) |> Zoi.default([])
+                     messages: Jido.AI.Conversation.schema(),
+                     review_messages: Jido.AI.Conversation.schema()
                    }),
                  routes: Enum.map(profiles, &{"#{&1.id}.ask", Authoring.ai(&1.id)})
                },
@@ -151,12 +151,23 @@ defmodule Jido.AI.Session.InspectionTest do
     assert {:ok, active} = Session.snapshot(server)
     assert active.request.id == next.id and active.request.profile_id == :primary
     assert active.details.config.system_prompt == "primary prompt"
-    assert Enum.map(active.details.conversation, & &1.content) == ["primary prompt", "Primary query"]
+
+    assert Enum.map(active.details.conversation, &Jido.AI.Query.summarize(&1.content)) == [
+             "primary prompt",
+             "Primary query"
+           ]
+
     assert {:ok, retained} = Session.snapshot(server, request_id: first.id)
     assert retained.request.profile_id == :review and retained.live == nil
     assert retained.details.phase == :request_completed
     assert retained.details.config.system_prompt == "review prompt"
-    assert Enum.map(retained.details.conversation, & &1.content) == ["review prompt", "Review query", "Reviewed"]
+
+    assert Enum.map(retained.details.conversation, &Jido.AI.Query.summarize(&1.content)) == [
+             "review prompt",
+             "Review query",
+             "Reviewed"
+           ]
+
     assert {:ok, [query, answer]} = History.read(retained.agent.state, review)
     assert query.refs.request_id == first.id and answer.refs.request_id == first.id
     assert List.last(retained.details.conversation).refs == answer.refs
@@ -164,7 +175,13 @@ defmodule Jido.AI.Session.InspectionTest do
     assert {:ok, "Primary answer"} = Request.await(next)
     assert {:ok, done} = Session.snapshot(server)
     assert done.live == nil and done.details.active_request_id == nil
-    assert Enum.map(done.details.conversation, & &1.content) == ["primary prompt", "Primary query", "Primary answer"]
+
+    assert Enum.map(done.details.conversation, &Jido.AI.Query.summarize(&1.content)) == [
+             "primary prompt",
+             "Primary query",
+             "Primary answer"
+           ]
+
     assert_script_done(mock)
   end
 
@@ -180,7 +197,12 @@ defmodule Jido.AI.Session.InspectionTest do
     assert {:ok, active} = Session.snapshot(server)
     assert active.details.config.system_prompt == "Changed prompt"
     assert active.details.config.base_tool_context == %{tenant: "two"}
-    assert Enum.map(active.details.conversation, & &1.content) == ["Changed prompt", "First query"]
+
+    assert Enum.map(active.details.conversation, &Jido.AI.Query.summarize(&1.content)) == [
+             "Changed prompt",
+             "First query"
+           ]
+
     assert {:ok, current} = Configuration.profile(active.agent)
     assert current.instructions == "Changed prompt" and current.tool_context == %{tenant: "two"}
     assert Agent.profile(active.agent, :assistant) == profile
@@ -212,7 +234,13 @@ defmodule Jido.AI.Session.InspectionTest do
     assert {:ok, agent} = Agent.from_initial_state(source, %{context: context})
     server = start_agent(jido, agent)
     assert {:ok, view} = Session.snapshot(server)
-    assert view.details.conversation == Context.to_messages(context)
+    assert [system, user, call, tool, answer] = view.details.conversation
+    assert system == %{role: :system, content: "Saved prompt"}
+    assert user.role == :user and user.content == parts
+    assert Map.take(user.refs, [:case_id]) == refs
+    assert hd(call.tool_calls).id == tool.tool_call_id
+    assert tool.name == "echo" and Jido.AI.Query.summarize(tool.content) == "5"
+    assert answer.role == :assistant and Jido.AI.Query.summarize(answer.content) == "Answer"
     assert view.details.active_context_ref == "default"
     assert view.request == nil
     assert {:ok, _} = Session.modify_context(server, %{type: :switch}, context_ref: "fresh", op_id: "fresh")

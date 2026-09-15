@@ -42,7 +42,16 @@ defmodule JidoAI.Examples.InitialStateTest do
       assert {:ok, agent} = Agent.from_initial_state(unquote(module), state, id: "imported")
       assert {:ok, profile} = Configuration.profile(agent, :assistant)
       assert {:ok, messages} = History.read(agent.state, profile)
-      assert messages == old.entries |> Enum.reverse() |> Enum.map(&Map.from_struct/1)
+      assert Enum.map(messages, & &1.role) == [:user, :assistant, :tool, :assistant]
+      imported = agent.state.messages.thread.entries
+      assert agent.state.messages.id == old.id
+
+      for entry <- imported do
+        assert entry.refs.request_id == "old-request"
+        assert entry.refs.run_id == "old-run"
+        assert entry.refs.case_id == "one"
+      end
+
       assert profile.instructions == "Saved prompt"
       assert agent.id == "imported" and profile.id == :assistant
       assert agent.state.requests == %{}
@@ -74,7 +83,7 @@ defmodule JidoAI.Examples.InitialStateTest do
       assert Enum.at(wire.body["messages"], 2)["tool_calls"] |> hd() |> Map.fetch!("id") == "saved-tool"
       assert Enum.at(wire.body["messages"], 3)["tool_call_id"] == "saved-tool"
       saved = Server.agent(server)
-      assert Enum.take(saved.state.messages, 4) == Enum.reverse(old.entries) |> Enum.map(&Map.from_struct/1)
+      assert Enum.take(saved.state.messages.thread.entries, 4) == imported
       assert :ok = Jido.Action.validate_static_data(saved.state)
       copy = saved.state |> :erlang.term_to_binary() |> :erlang.binary_to_term([:safe])
       assert :ok = Server.stop(server, :normal)
@@ -84,7 +93,7 @@ defmodule JidoAI.Examples.InitialStateTest do
       [_, wire] = MockLLM.report(mock).requests
       assert Enum.count(wire.body["messages"], &(&1["role"] == "tool")) == 1
       assert Enum.all?(MockLLM.report(mock).requests, &(&1.body["stream"] == unquote(streaming?)))
-      assert length(Server.agent(restored).state.messages) == 8
+      assert Jido.Thread.entry_count(Server.agent(restored).state.messages.thread) == 8
       refute_received {:example_action_started, "import_echo"}
       assert_script_done(mock)
     end
@@ -93,7 +102,7 @@ defmodule JidoAI.Examples.InitialStateTest do
   for {prompt, expected} <- [{nil, "Review prompt"}, {"Saved review", "Saved review"}] do
     test "profile selection keeps unrelated history and uses #{inspect(prompt)} prompt", %{jido: jido} do
       old = Context.new(system_prompt: unquote(prompt)) |> Context.append_user("Old review")
-      primary = Jido.AI.History.query("Old primary", %{})
+      {:ok, primary} = Jido.AI.Conversation.append(Jido.Session.new(), [ReqLLM.Context.user("Old primary")])
       source = InitialState.Profiles.definition()
 
       assert {:ok, agent} =
@@ -102,7 +111,8 @@ defmodule JidoAI.Examples.InitialStateTest do
       assert agent.state.primary_messages == primary
       assert {:ok, review_profile} = Configuration.profile(agent, :review)
       assert {:ok, messages} = History.read(agent.state, review_profile)
-      assert messages == old.entries |> Enum.reverse() |> Enum.map(&Map.from_struct/1)
+      assert [%{role: :user, content: content}] = messages
+      assert Jido.AI.Query.summarize(content) == "Old review"
       assert {:ok, %{instructions: "Primary prompt"}} = Configuration.profile(agent, :primary)
       assert {:ok, %{instructions: unquote(expected)}} = Configuration.profile(agent, :review)
       {mock, context} = mock([%{reply: {:text, "Reviewed"}}, %{reply: {:text, "Primary"}}])

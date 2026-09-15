@@ -38,7 +38,7 @@ defmodule JidoAITest.Authoring.Agents.Cases do
       Zoi.object(%{
         reply: Zoi.string() |> Zoi.default(""),
         case_id: Zoi.string() |> Zoi.default("case-17"),
-        messages: Zoi.list(Zoi.map()) |> Zoi.default([])
+        messages: Jido.AI.Conversation.schema()
       })
 
   def schema(:multi),
@@ -113,7 +113,7 @@ defmodule JidoAITest.Authoring.Agents.Cases do
         %{state | reply: %{}}
 
       :session ->
-        Map.merge(state, %{messages: [], requests: %{}, jido_ai_contexts: %{}})
+        Map.merge(state, %{messages: nil, requests: %{}, jido_ai_contexts: %{}})
 
       :multi ->
         Map.put(state, :review, "")

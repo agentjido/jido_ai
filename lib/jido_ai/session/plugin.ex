@@ -251,12 +251,7 @@ defmodule Jido.AI.Session.Plugin do
         state
 
       field ->
-        update_in(state, [field], fn entries ->
-          entries
-          |> Enum.reverse()
-          |> Enum.drop_while(&(get_in(&1, [:refs, :request_id]) == record.id))
-          |> Enum.reverse()
-        end)
+        update_in(state, [field], &Jido.AI.Conversation.before_request(&1, record.id))
     end
   end
 end

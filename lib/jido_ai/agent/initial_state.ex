@@ -74,7 +74,13 @@ defmodule Jido.AI.Agent.InitialState do
          {:ok, messages} <- History.messages(values),
          {:ok, open} <- History.open_tool_calls(messages),
          true <- map_size(open) == 0 do
-      {:ok, state |> Map.delete(:context) |> Map.put(profile.memory.history, values), context.system_prompt}
+      state =
+        state
+        |> Map.delete(:context)
+        |> Map.put(profile.memory.history, Jido.Session.new(id: context.id))
+        |> History.append(profile, values)
+
+      {:ok, state, context.system_prompt}
     else
       {:error, _} = failure -> failure
       _ -> error("Expected a portable complete Context, a profile with history, and no competing history field")

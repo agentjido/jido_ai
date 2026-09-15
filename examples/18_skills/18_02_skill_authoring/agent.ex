@@ -4,7 +4,7 @@ defmodule JidoAI.Examples.SkillAuthoring.Public do
   agent do
     schema Zoi.object(%{
              reply: Zoi.any() |> Zoi.default(nil),
-             messages: Zoi.list(Zoi.map()) |> Zoi.default([])
+             messages: Jido.AI.Conversation.schema()
            })
 
     ai :assistant do

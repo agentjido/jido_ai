@@ -1,5 +1,11 @@
 # Current public API map
 
+Conversation consolidation is in progress. `Jido.AI.Conversation` introduces
+canonical Session/Thread message projection. Runtime history now stores Session
+values, with no second Session in Plugin lane state. Projection and standalone
+ReAct consolidation remain. See [the migration plan](conversation-consolidation.md). Do not treat
+the temporary coexistence of History and Conversation as the final API.
+
 Checked against the source on 2026-09-15, after `a59eb23c`.
 This map describes the current V3 branch, not a released V3 package.
 The [source inventory](api-inventory.json) records declarations; an exported

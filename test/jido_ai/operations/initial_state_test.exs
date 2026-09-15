@@ -10,11 +10,12 @@ defmodule Jido.AI.InitialStateTest do
 
   test "import supplies a required history field and retains required domain data" do
     source = source()
-    fields = source.schema.fields |> Keyword.put(:messages, Zoi.list(Zoi.map())) |> Keyword.put(:count, Zoi.integer())
+    fields = source.schema.fields |> Keyword.put(:messages, Jido.Session.schema()) |> Keyword.put(:count, Zoi.integer())
     source = %{source | schema: %{source.schema | fields: fields}}
     assert {:ok, agent} = Agent.from_initial_state(source, %{context: context(), count: 7}, id: "restored")
     assert agent.id == "restored" and agent.state.count == 7
-    assert [%{role: :user, content: "Previous"}] = agent.state.messages
+    assert {:ok, [%{role: :user, content: content}]} = Jido.AI.Conversation.messages(agent.state.messages)
+    assert Jido.AI.Query.summarize(content) == "Previous"
     assert source.state == nil
     assert {:error, _} = Agent.from_initial_state(source, %{context: context(), count: "invalid"})
   end
@@ -22,13 +23,14 @@ defmodule Jido.AI.InitialStateTest do
   test "missing Context uses core domain defaults and an empty prompt remains explicit" do
     source = source()
     assert {:ok, agent} = Agent.from_initial_state(source, %{})
-    assert agent.state.messages == []
+    assert is_nil(agent.state.messages)
     assert {:ok, %Profile{instructions: "Configured"} = profile} = Configuration.profile(agent)
     assert {:ok, []} = History.read(agent.state, profile)
     assert Agent.profile(source, :assistant).instructions == "Configured"
     assert {:ok, empty} = Agent.from_initial_state(source, %{context: %{context() | system_prompt: ""}})
     assert {:ok, %Profile{instructions: ""} = profile} = Configuration.profile(empty)
-    assert {:ok, [%{role: :user, content: "Previous"}]} = History.read(empty.state, profile)
+    assert {:ok, [%{role: :user, content: content}]} = History.read(empty.state, profile)
+    assert Jido.AI.Query.summarize(content) == "Previous"
   end
 
   test "import rejects old runtime state, Plugin state, unknown fields and duplicate field aliases" do
@@ -85,7 +87,7 @@ defmodule Jido.AI.InitialStateTest do
     end
 
     assert {:ok, agent} = Agent.from_initial_state(source(), %{context: complete})
-    assert length(agent.state.messages) == 2
+    assert Jido.Thread.entry_count(agent.state.messages.thread) == 2
   end
 
   test "decoded Context maps retain chronological data and reject unknown format fields" do
@@ -99,11 +101,12 @@ defmodule Jido.AI.InitialStateTest do
     }
 
     assert {:ok, agent} = Agent.from_initial_state(source(), %{"context" => input})
-    assert Enum.map(agent.state.messages, & &1.content) == ["Old question", "Old answer"]
-    assert List.last(agent.state.messages).refs == %{"case" => "one"}
+    assert {:ok, projected} = Jido.AI.Conversation.messages(agent.state.messages)
+    assert Enum.map(projected, &Jido.AI.Query.summarize(&1.content)) == ["Old question", "Old answer"]
+    assert List.last(agent.state.messages.thread.entries).refs["case"] == "one"
     assert {:ok, %Profile{instructions: "Imported"} = profile} = Configuration.profile(agent)
     assert {:ok, history} = History.read(agent.state, profile)
-    assert history == agent.state.messages
+    assert Enum.map(history, &Jido.AI.Query.summarize(&1.content)) == ["Old question", "Old answer"]
     assert {:error, _} = Agent.from_initial_state(source(), %{context: Map.put(input, "version", 999)})
     assert {:error, _} = Agent.from_initial_state(source(), %{context: Map.put(input, :id, "conflicting")})
   end

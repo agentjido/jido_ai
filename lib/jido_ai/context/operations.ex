@@ -1,6 +1,6 @@
 defmodule Jido.AI.Context.Operations do
   @moduledoc "Portable context lanes, deferred operations, and their Agent-owned sessions."
-  alias Jido.AI.{Configuration, Context, History, Profile}
+  alias Jido.AI.{Configuration, Context, Conversation, History, Profile}
   alias Jido.{Session, Thread}
   alias __MODULE__.Change
   @key :jido_ai_contexts
@@ -16,7 +16,7 @@ defmodule Jido.AI.Context.Operations do
   def active_ref(state, id), do: get_in(state, [@key, id, :active_context_ref]) || "default"
 
   @doc false
-  def session_id(state, profile, agent_id), do: value(state, profile, agent_id).session.id
+  def session_id(state, profile, _agent_id), do: state[profile.memory.history].id
 
   def live(server, operation, opts \\ []) do
     signal =
@@ -75,15 +75,6 @@ defmodule Jido.AI.Context.Operations do
     end
   end
 
-  def capture(_state, %{memory: %{history: nil}}, _entries, _agent_id, _record), do: []
-
-  def capture(state, profile, entries, agent_id, record) do
-    value = value(state, profile, agent_id)
-    value = sync(value, state, profile)
-    session = append_messages(value.session, entries, value.active_context_ref, record)
-    [%Change{profile_id: profile.id, value: %{value | session: session}}]
-  end
-
   defp active?(state, id),
     do:
       Enum.any?(Map.get(state, :requests, %{}), fn {_, r} ->
@@ -97,18 +88,13 @@ defmodule Jido.AI.Context.Operations do
     end
   end
 
-  defp new_value(agent_id, profile_id) do
-    id = session_id(agent_id, profile_id)
-
+  defp new_value(_agent_id, _profile_id) do
     %{
       active_context_ref: "default",
       pending_context_op: nil,
-      applied_context_ops: [],
-      session: Session.new(id: id, thread: Thread.new(id: "#{id}:thread"))
+      applied_context_ops: []
     }
   end
-
-  defp session_id(agent_id, profile_id), do: "ai:#{agent_id}:#{profile_id}"
 
   defp normalize(params, value, profile, agent, signal_id) do
     operation = field(params, :operation)
@@ -149,16 +135,16 @@ defmodule Jido.AI.Context.Operations do
 
   defp normalize_result(:switch, _, _, _), do: {:ok, nil}
 
-  defp normalize_result(:replace, operation, profile, agent) do
+  defp normalize_result(:replace, operation, _profile, _agent) do
     with {:ok, context} <-
-           Context.coerce(field(operation, :result_context) || field(operation, :context)),
+           replacement_context(field(operation, :result_context) || field(operation, :context)),
          true <- is_nil(context.system_prompt) or is_binary(context.system_prompt),
-         {:ok, checked} <- History.replace(agent, profile, context.entries) do
+         {:ok, entries} <- History.prepare_entries(context.entries) do
       result =
         Context.new(id: context.id, system_prompt: context.system_prompt)
-        |> Context.append_messages(checked.state[profile.memory.history])
+        |> Context.append_messages(entries)
 
-      {:ok, result}
+      {:ok, result_thread(result)}
     end
   end
 
@@ -171,17 +157,17 @@ defmodule Jido.AI.Context.Operations do
   defp field(_, _), do: nil
 
   defp apply_operation(state, profile, value, operation) do
-    value = sync(value, state, profile)
     current = context(state, profile)
+    session = state[profile.memory.history] || Session.new()
 
     result =
       case operation.operation.type do
         :replace ->
-          compact(current, operation.operation.result_context, operation.operation.reason)
+          compact(current, result_view(operation.operation.result_context), operation.operation.reason)
 
         :switch ->
           project(
-            value.session.thread,
+            session.thread,
             operation.context_ref,
             Context.new(system_prompt: profile.instructions)
           )
@@ -189,13 +175,13 @@ defmodule Jido.AI.Context.Operations do
 
     operation =
       if operation.operation.type == :replace,
-        do: put_in(operation.operation.result_context, result),
+        do: put_in(operation.operation.result_context, result_thread(result)),
         else: operation
 
     session =
-      Session.append(value.session, %{
+      Session.append(session, %{
         kind: :ai_context_operation,
-        payload: operation,
+        payload: encode_operation(operation),
         refs: %{op_id: operation.op_id, context_ref: operation.context_ref}
       })
 
@@ -203,7 +189,6 @@ defmodule Jido.AI.Context.Operations do
       value
       | active_context_ref: operation.context_ref,
         pending_context_op: nil,
-        session: session,
         applied_context_ops:
           Enum.take(
             [operation.op_id | Enum.reject(value.applied_context_ops, &(&1 == operation.op_id))],
@@ -211,7 +196,7 @@ defmodule Jido.AI.Context.Operations do
           )
     }
 
-    candidate = Map.put(state, profile.memory.history, entry_maps(result.entries))
+    candidate = Map.put(state, profile.memory.history, session)
 
     prompt =
       if is_binary(result.system_prompt),
@@ -227,31 +212,21 @@ defmodule Jido.AI.Context.Operations do
     {:ok, candidate, [%Change{profile_id: profile.id, value: value} | prompt]}
   end
 
-  # Ordinary history Actions and one-Turn Flows can change domain history.
-  # Save that exact view before recording an operation or a new message batch.
-  # This checkpoint is not another user operation and consumes no operation ID.
-  defp sync(value, state, profile) do
-    current = context(state, profile)
+  @doc false
+  def project_entries(session, profile) do
+    ref =
+      session.thread.entries
+      |> Enum.filter(&(&1.kind == :ai_context_operation))
+      |> List.last()
+      |> case do
+        nil -> "default"
+        entry -> field(entry.payload, :context_ref)
+      end
 
-    previous =
-      project(
-        value.session.thread,
-        value.active_context_ref,
-        Context.new(system_prompt: profile.instructions)
-      )
-
-    if current.entries == previous.entries and current.system_prompt == previous.system_prompt do
-      value
-    else
-      session =
-        Session.append(value.session, %{
-          kind: :ai_context_snapshot,
-          payload: %{context_ref: value.active_context_ref, result_context: current},
-          refs: %{context_ref: value.active_context_ref}
-        })
-
-      %{value | session: session}
-    end
+    session.thread
+    |> project(ref, Context.new(system_prompt: profile.instructions))
+    |> Map.fetch!(:entries)
+    |> entry_maps()
   end
 
   defp context(state, profile) do
@@ -261,36 +236,20 @@ defmodule Jido.AI.Context.Operations do
     |> Context.append_messages(entries)
   end
 
-  defp append_messages(session, entries, ref, record) do
-    Session.append(
-      session,
-      Enum.map(entries, fn entry ->
-        %{
-          kind: :ai_message,
-          payload: Map.put(entry, :context_ref, ref),
-          refs:
-            (Map.get(entry, :refs) || %{})
-            |> Map.drop([:request_id, :run_id, :signal_id, "request_id", "run_id", "signal_id"])
-            |> Map.merge(%{request_id: record.id, run_id: record.run_id})
-        }
-      end)
-    )
-  end
-
   defp project(thread, ref, fallback) do
     Enum.reduce(Thread.to_list(thread), fallback, fn entry, context ->
-      if field(entry.payload, :context_ref) == ref do
+      if (field(entry.refs, :context_ref) || field(entry.payload, :context_ref) || "default") == ref do
         case entry.kind do
-          :ai_context_snapshot ->
-            entry.payload.result_context
-
           :ai_context_operation ->
-            if entry.payload.operation.type == :replace,
-              do: entry.payload.operation.result_context,
+            {:ok, operation} = operation(entry)
+
+            if operation.operation.type == :replace,
+              do: result_view(operation.operation.result_context),
               else: context
 
           :ai_message ->
-            Context.append_messages(context, [entry.payload])
+            {:ok, message} = Conversation.message(entry)
+            Context.append_messages(context, [message_fields(message, entry)])
 
           _ ->
             context
@@ -405,43 +364,16 @@ defmodule Jido.AI.Context.Operations do
          %{
            active_context_ref: ref,
            pending_context_op: pending,
-           applied_context_ops: ids,
-           session: %Session{} = session
+           applied_context_ops: ids
          } = value
        ) do
-    Map.keys(value) -- [:active_context_ref, :pending_context_op, :applied_context_ops, :session] ==
+    Map.keys(value) -- [:active_context_ref, :pending_context_op, :applied_context_ops] ==
       [] and
       nonempty?(ref) and is_list(ids) and length(ids) <= 128 and Enum.all?(ids, &nonempty?/1) and
-      length(ids) == length(Enum.uniq(ids)) and (is_nil(pending) or valid_operation?(pending)) and
-      Session.open?(session) and valid_session?(session)
+      length(ids) == length(Enum.uniq(ids)) and (is_nil(pending) or valid_operation?(pending))
   end
 
   defp valid_value?(_), do: false
-
-  defp valid_session?(session) do
-    match?({:ok, _}, Session.validate(session)) and
-      Enum.all?(Enum.with_index(session.thread.entries), fn {entry, index} ->
-        valid_entry?(entry, index)
-      end)
-  end
-
-  defp valid_entry?(%Thread.Entry{} = entry, index) do
-    nonempty?(entry.id) and entry.seq == index and is_integer(entry.at) and
-      is_atom(entry.kind) and is_map(entry.payload) and is_map(entry.refs) and
-      valid_payload?(entry.kind, entry.payload)
-  end
-
-  defp valid_entry?(_, _), do: false
-
-  defp valid_payload?(:ai_context_operation, payload), do: valid_operation?(payload)
-
-  defp valid_payload?(:ai_context_snapshot, payload),
-    do: nonempty?(payload[:context_ref]) and valid_context?(payload[:result_context])
-
-  defp valid_payload?(:ai_message, payload),
-    do: nonempty?(payload[:context_ref]) and valid_messages?([payload])
-
-  defp valid_payload?(_, _), do: true
 
   defp valid_operation?(%{op_id: id, context_ref: ref, operation: operation})
        when is_map(operation) do
@@ -450,28 +382,101 @@ defmodule Jido.AI.Context.Operations do
       (is_nil(operation[:base_seq]) or is_integer(operation[:base_seq])) and
       is_map(operation[:meta]) and
       case operation.type do
-        :replace -> valid_context?(operation[:result_context])
+        :replace -> match?({:ok, _}, Thread.validate(operation[:result_context]))
         :switch -> is_nil(operation[:result_context])
       end
   end
 
   defp valid_operation?(_), do: false
 
-  defp valid_context?(%Context{} = context),
-    do:
-      (is_nil(context.system_prompt) or is_binary(context.system_prompt)) and
-        is_list(context.entries) and valid_messages?(entry_maps(context.entries))
+  @doc "Decodes the portable payload of a committed context operation."
+  def operation(%Thread.Entry{kind: :ai_context_operation, payload: %{"version" => 1} = payload}) do
+    raw = payload["operation"]
+    type = normalize_enum(raw["type"], [:replace, :switch])
 
-  defp valid_context?(_), do: false
+    result =
+      if type == :replace do
+        {:ok, thread} = Thread.decode(raw["result_context"])
+        thread
+      end
 
-  defp valid_messages?(entries) do
-    case History.messages(entries) do
-      {:ok, messages} ->
-        Enum.all?(messages, &match?({:ok, _}, Zoi.parse(ReqLLM.Message.schema(), &1)))
+    value = %{
+      op_id: payload["op_id"],
+      context_ref: payload["context_ref"],
+      operation: %{
+        type: type,
+        reason: normalize_enum(raw["reason"], [:manual, :restore, :compaction, :system]),
+        result_context: result,
+        base_seq: raw["base_seq"],
+        meta: raw["meta"]
+      }
+    }
 
-      _ ->
-        false
-    end
+    if valid_operation?(value), do: {:ok, value}, else: {:error, :invalid_context_operation}
+  rescue
+    _ -> {:error, :invalid_context_operation}
+  end
+
+  def operation(_), do: {:error, :invalid_context_operation}
+
+  defp encode_operation(value) do
+    operation = value.operation
+
+    %{
+      "version" => 1,
+      "op_id" => value.op_id,
+      "context_ref" => value.context_ref,
+      "operation" => %{
+        "type" => Atom.to_string(operation.type),
+        "reason" => Atom.to_string(operation.reason),
+        "result_context" => if(operation.result_context, do: Thread.encode(operation.result_context)),
+        "base_seq" => operation.base_seq,
+        "meta" => operation.meta
+      }
+    }
+  end
+
+  defp replacement_context(%Session{thread: thread}), do: replacement_context(thread)
+  defp replacement_context(%Thread{} = thread), do: {:ok, result_view(thread)}
+  defp replacement_context(value), do: Context.coerce(value)
+
+  defp result_thread(context) do
+    thread = Thread.new(id: context.id, metadata: %{system_prompt: context.system_prompt})
+
+    Enum.reduce(entry_maps(context.entries), thread, fn entry, thread ->
+      {:ok, messages} = History.messages([entry])
+      {:ok, [canonical]} = Conversation.entries(messages, entry.refs || %{})
+
+      canonical =
+        case entry[:timestamp] do
+          %DateTime{} = timestamp -> %{canonical | at: DateTime.to_unix(timestamp, :millisecond)}
+          _ -> canonical
+        end
+
+      Thread.append(thread, canonical)
+    end)
+  end
+
+  defp result_view(%Thread{} = thread) do
+    messages =
+      Enum.flat_map(thread.entries, fn entry ->
+        if entry.kind in [:ai_message, "ai_message"] do
+          {:ok, message} = Conversation.message(entry)
+          [message_fields(message, entry)]
+        else
+          []
+        end
+      end)
+
+    Context.new(id: thread.id, system_prompt: field(thread.metadata, :system_prompt))
+    |> Context.append_messages(messages)
+  end
+
+  defp message_fields(message, entry) do
+    message
+    |> Map.from_struct()
+    |> Map.put(:refs, entry.refs)
+    |> Map.put(:timestamp, DateTime.from_unix!(entry.at, :millisecond))
   end
 
   defp nonempty?(value), do: is_binary(value) and value != ""

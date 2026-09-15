@@ -78,10 +78,13 @@ defmodule JidoAI.Examples.SkillRuntimeTest do
     assert wire_text(List.last(MockLLM.report(mock).requests)) =~ "After compaction"
 
     assert Thread.filter_by_kind(
-             Server.agent(server).state.jido_ai_contexts.assistant.session.thread,
+             Server.agent(server).state.messages.thread,
              :ai_message
            )
-           |> Enum.any?(&(&1.payload.role == :tool and &1.payload.refs[:durable]))
+           |> Enum.any?(fn entry ->
+             {:ok, message} = Jido.AI.Conversation.message(entry)
+             message.role == :tool and entry.refs[:durable]
+           end)
 
     assert :ok = Jido.Action.validate_static_data(Server.agent(server).state)
     assert_script_done(mock)

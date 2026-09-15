@@ -34,6 +34,12 @@ defmodule JidoAI.Examples.Case do
     server
   end
 
+  def conversation(agent) do
+    {:ok, profile} = Jido.AI.Configuration.profile(agent)
+    {:ok, entries} = Jido.AI.History.read(agent.state, profile)
+    entries
+  end
+
   # Keep provider substitution in test support, not in the teaching Agent.
   def native_mock(script) do
     {server, _context} = mock(script)

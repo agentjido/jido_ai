@@ -298,7 +298,7 @@ defmodule JidoAI.Examples.TraceAndCyclesTest do
 
   defp warning?(entry) do
     role = Map.get(entry, :role, Map.get(entry, "role"))
-    content = Map.get(entry, :content, Map.get(entry, "content"))
+    content = Jido.AI.Query.summarize(Map.get(entry, :content, Map.get(entry, "content")))
 
     role in [:user, "user"] and is_binary(content) and
       String.contains?(content, "identical parameters")

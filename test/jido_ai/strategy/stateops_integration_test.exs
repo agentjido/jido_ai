@@ -46,7 +46,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     assert view.details.model_calls == 1 and view.details.active_request_id == handle.id
     assert is_binary(view.details.current_llm_call_id)
     assert Process.alive?(view.live.worker_pid)
-    assert List.last(view.details.conversation).content == "test query"
+    assert Jido.AI.Query.summarize(List.last(view.details.conversation).content) == "test query"
     refute Map.has_key?(view.agent.state, :__strategy__)
     assert :ok = MockLLM.release(mock, :model)
     assert {:ok, "Done"} = Request.await(handle)
@@ -279,7 +279,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     initial = Agent.new!(state: %{label: "keep"})
     context = Context.new() |> Context.append_user("first") |> Context.append_assistant("second")
     changed = Jido.AI.update_context_entries(initial, context.entries)
-    assert initial.state.messages == [] and changed.state.label == "keep"
+    assert is_nil(initial.state.messages) and changed.state.label == "keep"
     server = start_agent(jido, changed)
     assert {:ok, handle} = ask(server, mock, "third")
     assert {:ok, "Done"} = Request.await(handle)

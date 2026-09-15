@@ -12,7 +12,7 @@ for {module, stream} <- [
           reply: Zoi.string() |> Zoi.default(""),
           count: Zoi.integer(),
           thread: Zoi.map() |> Zoi.default(%{}),
-          messages: Zoi.list(Zoi.map())
+          messages: Jido.Session.schema()
         })
       )
 
@@ -59,8 +59,8 @@ defmodule JidoAI.Examples.InitialState.Profiles do
     schema(
       Zoi.object(%{
         reply: Zoi.string() |> Zoi.default(""),
-        primary_messages: Zoi.list(Zoi.map()) |> Zoi.default([]),
-        review_messages: Zoi.list(Zoi.map()) |> Zoi.default([])
+        primary_messages: Jido.AI.Conversation.schema(),
+        review_messages: Jido.AI.Conversation.schema()
       })
     )
 

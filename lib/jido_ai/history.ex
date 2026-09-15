@@ -1,6 +1,6 @@
 defmodule Jido.AI.History do
   @moduledoc "Projects portable domain message maps through the existing AI context."
-  alias Jido.AI.{Context, Profile}
+  alias Jido.AI.{Context, Conversation, Profile}
   @refs_key :jido_ai_refs
 
   def entries(messages) do
@@ -15,8 +15,9 @@ defmodule Jido.AI.History do
     do: entries([%{role: :user, content: query, refs: Jido.AI.Skill.Runtime.untrusted_refs(refs)}])
 
   def refs(record, source) do
-    %{request_id: record.id, run_id: record.run_id}
-    |> Map.merge(record.extra_refs)
+    record.extra_refs
+    |> Map.drop([:request_id, :run_id, :signal_id, "request_id", "run_id", "signal_id"])
+    |> Map.merge(%{request_id: record.id, run_id: record.run_id})
     |> Map.put(:source, source)
     |> Jido.AI.Skill.Runtime.untrusted_refs()
   end
@@ -25,13 +26,14 @@ defmodule Jido.AI.History do
 
   def read(state, profile) when is_map(state) do
     case Map.get(state, profile.memory.history) do
-      values when is_list(values) ->
-        if Enum.all?(values, &is_map/1),
-          do: {:ok, values},
-          else: Profile.error("memory.history", "Expected message maps")
+      nil ->
+        {:ok, []}
+
+      %Jido.Session{} = session ->
+        {:ok, Jido.AI.Context.Operations.project_entries(session, profile)}
 
       _ ->
-        Profile.error("memory.history", "Expected a list of message maps")
+        Profile.error("memory.history", "Expected a Jido.Session value")
     end
   end
 
@@ -39,8 +41,10 @@ defmodule Jido.AI.History do
 
   @doc false
   def replace(agent, profile, entries) do
-    with {:ok, values} <- prepare_entries(entries),
-         do: Jido.Agent.set(agent, %{profile.memory.history => values})
+    with {:ok, values} <- prepare_entries(entries) do
+      state = append(Map.put(agent.state, profile.memory.history, nil), profile, values)
+      Jido.Agent.set(agent, %{profile.memory.history => state[profile.memory.history]})
+    end
   end
 
   @doc false
@@ -74,33 +78,7 @@ defmodule Jido.AI.History do
   # A complete exchange has one result for every announced call. A pending
   # after-model pause is the only supported position with an open exchange.
   @doc false
-  def open_tool_calls(messages) do
-    Enum.reduce_while(messages, {:ok, %{}}, fn message, {:ok, open} ->
-      case advance_history(message, open) do
-        {:ok, next} -> {:cont, {:ok, next}}
-        error -> {:halt, error}
-      end
-    end)
-  end
-
-  defp advance_history(%{role: :tool, tool_call_id: id, name: name}, open) do
-    case open[id] do
-      %{name: expected} when name in [nil, expected] -> {:ok, Map.delete(open, id)}
-      _ -> {:error, :invalid_tool_history}
-    end
-  end
-
-  defp advance_history(%{role: :assistant} = message, open) when map_size(open) == 0 do
-    calls = Enum.map(message.tool_calls || [], &ReqLLM.ToolCall.to_map/1)
-    ids = Enum.map(calls, & &1.id)
-
-    if Enum.all?(ids, &(is_binary(&1) and &1 != "")) and ids == Enum.uniq(ids),
-      do: {:ok, Map.new(calls, &{&1.id, &1})},
-      else: {:error, :invalid_tool_history}
-  end
-
-  defp advance_history(_, open) when map_size(open) == 0, do: {:ok, open}
-  defp advance_history(_, _), do: {:error, :invalid_tool_history}
+  defdelegate open_tool_calls(messages), to: Jido.AI.Conversation
 
   def messages(entries) do
     values = Context.new() |> Context.append_messages(entries) |> Context.to_messages()
@@ -190,8 +168,27 @@ defmodule Jido.AI.History do
 
   def append(state, %{memory: %{history: nil}}, _), do: state
 
-  def append(state, profile, entries),
-    do: Map.update!(state, profile.memory.history, &(&1 ++ entries))
+  def append(state, profile, entries) do
+    session = Map.get(state, profile.memory.history) || Jido.Session.new()
+    ref = Jido.AI.Context.Operations.active_ref(state, profile.id)
+
+    session =
+      Enum.reduce(entries, session, fn entry, session ->
+        {:ok, messages} = messages([entry])
+        refs = Map.put(Map.get(entry, :refs) || %{}, :context_ref, ref)
+        {:ok, [canonical]} = Conversation.entries(messages, refs)
+
+        canonical =
+          case entry[:timestamp] do
+            %DateTime{} = timestamp -> %{canonical | at: DateTime.to_unix(timestamp, :millisecond)}
+            _ -> canonical
+          end
+
+        Jido.Session.append(session, canonical)
+      end)
+
+    Map.put(state, profile.memory.history, session)
+  end
 
   def record(state, entries, context) do
     entries =
@@ -204,7 +201,12 @@ defmodule Jido.AI.History do
 
           Enum.map(
             entries,
-            &Map.update(&1, :refs, refs, fn existing -> Map.merge(refs, existing || %{}) end)
+            &Map.update(&1, :refs, refs, fn existing ->
+              refs
+              |> Map.merge(existing || %{})
+              |> Map.drop([:signal_id, "request_id", "run_id", "signal_id"])
+              |> Map.merge(%{request_id: record.id, run_id: record.run_id})
+            end)
           )
       end
 

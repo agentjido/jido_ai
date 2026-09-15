@@ -5,9 +5,9 @@ defmodule JidoAI.Examples.SteeringTest do
   alias JidoAI.Examples.Session.Agent, as: API
 
   defp texts(server) do
-    Server.agent(server).state.messages
+    conversation(Server.agent(server))
     |> Enum.filter(&(&1.role == :user))
-    |> Enum.map(& &1.content)
+    |> Enum.map(&Jido.AI.Query.summarize(&1.content))
   end
 
   defp start(jido, changes \\ %{}) do
@@ -71,13 +71,14 @@ defmodule JidoAI.Examples.SteeringTest do
     assert Enum.all?(consumed, &(&1.request_id == id))
     assert Enum.count(events, &(&1.kind == :request_completed)) == 1
     assert texts(server) == ["Review the code", "Focus on auth.", "Include expired tokens."]
-    entries = Server.agent(server).state.messages
+    entries = conversation(Server.agent(server))
 
-    assert Enum.find(entries, &(&1.content == "Focus on auth.")).refs == %{
-             request_id: "caller-ref",
+    assert Enum.find(entries, &(Jido.AI.Query.summarize(&1.content) == "Focus on auth.")).refs == %{
+             request_id: id,
              run_id: hd(events).run_id,
              custom: 1,
-             source: "/human"
+             source: "/human",
+             context_ref: "default"
            }
 
     [_, wire] = MockLLM.report(mock).requests
@@ -254,7 +255,7 @@ defmodule JidoAI.Examples.SteeringTest do
     changes = %{requests: %{mode: :turn}, controls: %{input: [], timeout: 10_000}}
     server = start(jido, changes)
     assert {:ok, agent} = ask(server, context)
-    assert Enum.map(agent.state.messages, & &1.role) == [:user, :assistant]
+    assert Enum.map(conversation(agent), & &1.role) == [:user, :assistant]
     assert agent.state.reply == "One Turn"
 
     denied =
@@ -325,7 +326,7 @@ defmodule JidoAI.Examples.SteeringTest do
       schema:
         Zoi.object(%{
           reply: Zoi.map() |> Zoi.default(%{}),
-          messages: Zoi.list(Zoi.map()) |> Zoi.default([])
+          messages: Jido.AI.Conversation.schema()
         }),
       routes: [{"ai.ask", Jido.AI.Authoring.ai(:assistant)}]
     }

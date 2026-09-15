@@ -71,3 +71,78 @@ do not put ReqLLM structs or runtime resources into the portable format.
   deduplication, and durable skill compaction must survive the migration.
 - Current Session-mode history can be published during execution; turn-mode
   history is appended by Runtime.Run. Preserve this distinction in tests.
+- Added the first Conversation projection implementation and contract tests.
+  It encodes versioned AI message payloads without provider structs, handles
+  binary content, and projects only AI entries. Tool-exchange validation moved
+  from History into this boundary. History delegates during migration; this is
+  temporary, not a second final API. Runtime storage migration remains open.
+- Context.Operations now captures versioned canonical AI message entries and
+  projects them through Conversation when switching lanes. Context reference
+  moved to entry refs. The 83-test ReAct/projection run passed after migrating
+  payload-specific assertions. Duplicate domain history storage is still open;
+  this checkpoint changes its entry boundary, not the final ownership yet.
+- Active storage migration: History now reads/writes a Session in the selected
+  Profile field. Context.Operations no longer stores another Session or has a
+  sync/capture path. Session admission allocates the value; commits append to
+  its Thread. The canonical runtime test proves two requests retain one Session
+  identity and grow its Thread from two to four entries, with no duplicate
+  conversation in Plugin state. Eight projection/runtime tests passed.
+- Migration is not yet a green checkpoint. Older list schemas, direct list
+  assertions, initial-state fixtures, and examples still require conversion.
+  Context remains a temporary projection type and must be removed as planned.
+  Before storage migration, the full entry suite had two outdated payload
+  assertions (skill example and context lifecycle integration); migrate them.
+- ReasoningDetails require an explicit normalized representation in JSON and
+  reconstruction at the ReqLLM boundary; plain JSON maps lose provider replay
+  behavior. The codec now preserves that distinction from raw provider maps.
+- Migrated list-based history/messages schema declarations in examples and
+  fixtures to Conversation.schema (nullable Session; nil means not started).
+- Replacement operations now store canonical Thread snapshots, not Context
+  structs. Focused tests cover preserved Session identity and the next provider
+  request after replacement. Context is still used as a transient projection;
+  its removal and remaining list-based assertions are open.
+- Request/run reference ownership now applies directly to the canonical store.
+  Removed the old split behavior where domain history could retain spoofed IDs
+  while a second Thread copy held the trusted IDs. Projection timestamps now
+  come from the canonical entry rather than being regenerated on each read.
+- Migrated steering and incomplete-response example assertions to public
+  conversation inspection; all 29 focused tests passed. Shared example support
+  reads the selected Profile's conversation instead of enumerating Session.
+- Fixed reference loss in standalone history reconstruction and replacement,
+  and preserved entry timestamps through compaction. ReAct/context lifecycle
+  and durable skill tests are the current regression gate.
+- The first full storage-migration run completed with 82 failures out of 2,871
+  tests (one existing exclusion). This is a repair inventory, not a release
+  result. Several listed failures have since been fixed; rerun after migration.
+- Import now preserves the saved conversation identity and per-entry refs when
+  constructing the canonical Session. Import/resume tests check unchanged
+  canonical entry prefixes, multimodal provider input, and no tool replay.
+  All 39 focused import/resume tests passed.
+- Migrated Session inspection and skill-authoring consumers; all 30 focused
+  tests passed. A new full-suite run is in
+  `/tmp/jido-ai-session-migration-refresh.log`.
+- Still required before completion: remove transient Context adapters and old
+  configuration/import forms; verify JSON round trips of context-operation
+  snapshots, not just message entries; finish remaining suite repairs; refresh
+  current documentation and inventories; run final MockLLM and live gates.
+- Committed context-operation snapshots now use a versioned JSON-safe payload
+  containing an encoded canonical Thread. A runtime test exports/imports the
+  owning Session and proves the selected replacement conversation survives.
+  All 80 focused snapshot/ReAct tests passed.
+- Removed unused duplicate-store validators and the obsolete synchronization
+  snapshot branch. All 16 focused state-operation/runtime tests passed.
+- Authoring construction/execution checks passed all 119 tests after migrating
+  expected initial Session fields and entry-count assertions.
+- Fixed the private callable Agent's generated conversation schema. A separate
+  confirmatory lifecycle run passed all 12 tests. One earlier run hit its
+  400 ms deadline before the provider barrier under concurrent compilation;
+  no timeout assertion was weakened.
+- Current checkpoint gate: `/tmp/jido-ai-canonical-checkpoint.log` (format,
+  regenerated inventory, forced compile, full unit/authoring/example suite).
+  The first run found one stale operation-payload assertion. The test now uses
+  the operation decoder. The final gate in
+  `/tmp/jido-ai-canonical-checkpoint-final.log` passed format, inventory,
+  forced compilation, and all 2,872 tests (one existing exclusion).
+  This is the canonical-storage checkpoint, not goal completion. Shared
+  selection, removal of transient Context values, final documentation, and
+  the final live Haiku run remain open.

@@ -79,7 +79,7 @@ defmodule JidoAI.Examples.RequestInspectionTest do
     assert view.live.worker_status == :running
     assert Enum.map(view.details.trace.events, & &1.kind) == [:request_started, :llm_started]
     assert :ok = Jido.Action.validate_static_data(view.agent.state)
-    assert List.last(view.details.conversation).content == "Inspect this request"
+    assert Jido.AI.Query.summarize(List.last(view.details.conversation).content) == "Inspect this request"
     :ok = MockLLM.release(mock, :model)
     assert {:ok, "Done"} = Request.await(request)
     assert_script_done(mock)

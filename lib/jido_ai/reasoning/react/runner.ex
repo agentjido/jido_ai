@@ -243,7 +243,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
            Zoi.object(
              Map.merge(fields, %{
                result: Zoi.any() |> Zoi.default(result),
-               messages: Zoi.list(Zoi.map()) |> Zoi.default(history)
+               messages: Jido.AI.Conversation.schema() |> Zoi.default(history_session(history))
              })
            )
        }}
@@ -343,13 +343,26 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     end
   end
 
+  defp history_session([]), do: nil
+
+  defp history_session(history) do
+    Enum.reduce(history, Jido.Session.new(), fn entry, session ->
+      {:ok, messages} = Jido.AI.History.messages([entry])
+      {:ok, next} = Jido.AI.Conversation.append(session, messages, Map.get(entry, :refs) || %{})
+      next
+    end)
+  end
+
   defp snapshot(state, config, server, event) do
     agent = Server.agent(server)
     record = agent.state.requests[state.request_id]
 
+    {:ok, profile} = Jido.AI.Configuration.profile(agent)
+    {:ok, entries} = Jido.AI.History.read(agent.state, profile)
+
     context =
       Context.new(system_prompt: config.system_prompt)
-      |> Context.append_messages(agent.state.messages)
+      |> Context.append_messages(entries)
 
     status =
       case event.kind do

@@ -26,7 +26,7 @@ defmodule JidoAI.Examples.IncompleteResponseTest do
       assert result.outcome == {:error, {:incomplete_response, reason}}
       assert result.status == :failed
       assert Enum.map(result.messages, & &1.role) == [:user]
-      assert hd(result.messages).content == "Hello"
+      assert Jido.AI.Query.summarize(hd(result.messages).content) == "Hello"
       assert Usage.token_counts(result.usage) == %{input_tokens: 5, output_tokens: 0, total_tokens: 5}
       refute Enum.any?(result.events, &(&1.kind in [:llm_completed, :request_completed]))
       refute Enum.any?(result.events, &(&1.kind == :checkpoint and &1.data.reason == :after_llm))
@@ -96,7 +96,7 @@ defmodule JidoAI.Examples.IncompleteResponseTest do
     if record.status == :failed, do: assert(agent.state.reply == "untouched")
     assert {:ok, %{live: nil}} = Session.snapshot(server)
     assert :ok = Jido.Action.validate_static_data(agent.state)
-    %{outcome: outcome, status: record.status, events: events, usage: record.meta.usage, messages: agent.state.messages}
+    %{outcome: outcome, status: record.status, events: events, usage: record.meta.usage, messages: conversation(agent)}
   end
 
   defp execute(:standalone, jido, mock, _context) do

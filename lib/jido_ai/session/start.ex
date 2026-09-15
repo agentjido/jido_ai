@@ -16,6 +16,12 @@ defmodule Jido.AI.Session.Start do
     profile_id = context.jido_ai_admission_profile
     records = context.agent_state.requests
     profile = context.jido_ai_profiles[profile_id]
+
+    context =
+      if profile.memory.history && is_nil(context.agent_state[profile.memory.history]),
+        do: put_in(context.agent_state[profile.memory.history], Jido.Session.new()),
+        else: context
+
     resources = Map.get(context, :jido_ai_request, %{})
     run_id = Map.get_lazy(resources, :run_id, &Jido.Signal.ID.generate!/0)
 
@@ -86,29 +92,9 @@ defmodule Jido.AI.Session.Start do
           }
 
           with {:ok, candidate} <- start_history(context, profile, record) do
-            changes = context_changes(context, candidate, profile, record)
-            {:ok, candidate, [%Change{operation: :start, record: record} | changes]}
+            {:ok, candidate, [%Change{operation: :start, record: record}]}
           end
         end
-    end
-  end
-
-  defp context_changes(_, _, %{memory: %{history: nil}}, _), do: []
-
-  defp context_changes(context, candidate, profile, record) do
-    if Jido.AI.Reasoning.ReAct.Checkpoint.resumed?(context) do
-      []
-    else
-      field = profile.memory.history
-      entries = Enum.drop(candidate[field], length(context.agent_state[field]))
-
-      Jido.AI.Context.Operations.capture(
-        context.agent_state,
-        profile,
-        entries,
-        context.jido_ai_agent.id,
-        record
-      )
     end
   end
 

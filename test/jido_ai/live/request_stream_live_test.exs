@@ -52,7 +52,7 @@ defmodule Jido.AI.Live.RequestStreamLiveTest do
     use Jido.AI.Agent, name: "live_request_stream_agent"
 
     agent do
-      schema Zoi.object(%{last_result: Zoi.any() |> Zoi.default(nil), messages: Zoi.list(Zoi.map()) |> Zoi.default([])})
+      schema Zoi.object(%{last_result: Zoi.any() |> Zoi.default(nil), messages: Jido.AI.Conversation.schema()})
 
       ai :assistant do
         model :answer, :fast, max_tokens: 64

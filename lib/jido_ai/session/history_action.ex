@@ -19,16 +19,7 @@ defmodule Jido.AI.Session.HistoryAction do
       record = record |> Map.put(:inspection, batch.inspection) |> Map.put(:meta, batch.meta)
       record = Jido.AI.Session.Inspection.fit(record, candidate, context)
 
-      changes =
-        Jido.AI.Context.Operations.capture(
-          context.agent_state,
-          profile,
-          entries,
-          context.jido_ai_agent.id,
-          record
-        )
-
-      {:ok, candidate, [%Change{operation: :history, record: record, batch_id: batch_id} | changes]}
+      {:ok, candidate, [%Change{operation: :history, record: record, batch_id: batch_id}]}
     else
       _ -> {:error, :stale_history}
     end

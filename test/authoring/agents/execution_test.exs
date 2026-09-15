@@ -74,7 +74,8 @@ defmodule JidoAITest.Authoring.Agents.ExecutionTest do
 
           assert state.requests[id].status == :completed
           assert state.requests[id].query == step.query
-          assert length(state.messages) == 2 * (index + 1)
+          assert %Jido.Session{} = state.messages
+          assert Jido.Thread.entry_count(state.messages.thread) == 2 * (index + 1)
           assert :ok = Jido.Action.validate_static_data(state)
         else
           assert state === expected

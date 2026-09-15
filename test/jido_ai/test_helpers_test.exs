@@ -20,7 +20,7 @@ defmodule Jido.AI.TestHelpersTest do
     use Jido.AI.Agent, name: "test_echo_agent", description: "Agent used by public test helper tests"
 
     agent do
-      schema Zoi.object(%{last_result: Zoi.any() |> Zoi.default(nil), messages: Zoi.list(Zoi.map()) |> Zoi.default([])})
+      schema Zoi.object(%{last_result: Zoi.any() |> Zoi.default(nil), messages: Jido.AI.Conversation.schema()})
 
       ai :assistant do
         model(:fast)

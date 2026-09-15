@@ -43,7 +43,7 @@ defmodule JidoAITest.Authoring.Agents.CombinationsTest do
       assert {:ok, "Cleared"} = Mixed.ask(first, "Clear query", profile: :assistant, context: context(first_mock))
       assert {:ok, "Other"} = Mixed.ask(second, "Other query", profile: :assistant, context: context(second_mock))
       assert Server.agent(second).state.review == ""
-      assert Server.agent(second).state.messages == []
+      assert is_nil(Server.agent(second).state.messages)
       assert Server.agent(second).state.jido_ai_config == %{}
       assert %{remaining: [], unexpected: [], requests: [turn, review, cleared]} = MockLLM.report(first_mock)
       assert turn.body["model"] == "gpt-4o-mini"

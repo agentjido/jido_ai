@@ -6,7 +6,7 @@ defmodule JidoAI.Examples.ToolFlow.MultiRoundAgent do
     schema Zoi.object(%{
              answer: Zoi.string() |> Zoi.default(""),
              case_id: Zoi.string() |> Zoi.default("quote-42"),
-             history: Zoi.list(Zoi.map()) |> Zoi.default([])
+             history: Jido.AI.Conversation.schema()
            })
 
     ai :assistant do
