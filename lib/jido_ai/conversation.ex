@@ -56,7 +56,7 @@ defmodule Jido.AI.Conversation do
   def messages(%Session{thread: thread}), do: messages(thread)
 
   def messages(%Thread{} = thread) do
-    with {:ok, _} <- Thread.validate(thread) do
+    with {:ok, thread} <- select(thread) do
       safely(fn ->
         thread
         |> Thread.to_list()
@@ -65,6 +65,59 @@ defmodule Jido.AI.Conversation do
       end)
     end
   end
+
+  @doc "Selects the active conversation from the append-only log, or a named lane."
+  def select(value, ref \\ nil)
+  def select(%Session{thread: thread}, ref), do: select(thread, ref)
+
+  def select(%Thread{} = thread, ref) do
+    with {:ok, _} <- Thread.validate(thread) do
+      safely(fn ->
+        operations = Enum.filter(thread.entries, &(&1.kind in [:ai_context_operation, "ai_context_operation"]))
+
+        ref =
+          ref ||
+            case List.last(operations) do
+              nil -> nil
+              entry -> operation!(entry).context_ref
+            end
+
+        {entries, metadata} =
+          Enum.reduce(thread.entries, {[], thread.metadata}, fn entry, acc ->
+            lane = field(entry.refs, :context_ref) || field(entry.payload, :context_ref) || "default"
+
+            case {is_nil(ref) or lane == ref, entry.kind} do
+              {true, kind} when kind in [:ai_context_operation, "ai_context_operation"] ->
+                case operation!(entry).operation do
+                  %{type: :replace, result_context: snapshot} ->
+                    {Enum.reverse(snapshot.entries), snapshot.metadata}
+
+                  %{type: :switch} ->
+                    acc
+                end
+
+              {true, kind} when kind in [:ai_message, "ai_message"] ->
+                {entries, metadata} = acc
+                {[entry | entries], metadata}
+
+              _ ->
+                acc
+            end
+          end)
+
+        Thread.new(id: thread.id, metadata: metadata) |> Thread.append(Enum.reverse(entries))
+      end)
+    end
+  end
+
+  def select(_, _), do: {:error, :invalid_conversation}
+
+  defp operation!(entry) do
+    {:ok, operation} = Jido.AI.Conversation.Operation.decode(entry)
+    operation
+  end
+
+  defp field(map, key), do: Map.get(map, key, Map.get(map, Atom.to_string(key)))
 
   @doc "Projects one canonical AI entry. References remain outside the message."
   def message(%Thread.Entry{kind: kind, payload: payload}) when kind in [:ai_message, "ai_message"],

@@ -58,7 +58,27 @@ do not put ReqLLM structs or runtime resources into the portable format.
 - Keep checkpoint commits scoped to this repository. No dependency or
   cross-package changes without a demonstrated need.
 
-## Progress
+## Current status
+
+Checkpoint `d6e57354` stores each Profile conversation in one canonical Session.
+The Plugin has no duplicate Session. The checkpoint passed format, inventory,
+forced compilation, and 2,872 tests with one existing exclusion.
+
+The next checkpoint adds shared lane/replacement selection and a pure operation
+payload codec. Format, forced compilation, inventory, and all 2,875 tests pass
+with one existing exclusion. Log: `/tmp/jido-ai-selection-codec-full.log`.
+
+Remaining work:
+
+1. Replace the transient Context value in standalone ReAct state, checkpoints,
+   request-transform views, initial-state import, and context controls.
+2. Remove the old Context/History conversion paths and competing import forms.
+3. Reconcile public configuration, inspection, guides, and API inventories.
+4. Run the complete unit, authoring, and MockLLM example suite, then the bounded
+   live Haiku example with three dependent tool rounds and a committed answer.
+5. Commit the tested result. Do not claim release readiness from a partial gate.
+
+## Work log (historical steps, not current status)
 
 - Goal started; baseline format, forced compile, and full test command passed.
   Log: `/tmp/jido-ai-conversation-baseline.log`.
@@ -146,3 +166,17 @@ do not put ReqLLM structs or runtime resources into the portable format.
   This is the canonical-storage checkpoint, not goal completion. Shared
   selection, removal of transient Context values, final documentation, and
   the final live Haiku run remain open.
+- Shared selection now lives in Conversation.select/2. The general message
+  reader and context-operation projection both use it. Replacements select
+  canonical snapshot entries; lane switches select the named lane without
+  changing the audit log. Tests cover JSON restore and repeated projection.
+  All 88 focused conversation/runtime/ReAct tests passed in
+  `/tmp/jido-ai-selection-final.log`.
+- The pure operation codec now lives in Conversation.Operation. Selection no
+  longer depends on the context-control runtime. The temporary runtime decoder
+  wrapper is removed. Malformed saved operations return tagged errors; switch
+  operations cannot silently discard a supplied replacement snapshot.
+  All 90 focused tests passed before removal of the wrapper. The complete gate
+  after that removal is `/tmp/jido-ai-selection-codec-full.log`.
+  That gate passed all 2,875 tests with one existing exclusion. Format, forced
+  compilation, and the source inventory check also passed.

@@ -287,7 +287,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
     assert context_lane(server).pending_context_op == nil
     assert context_lane(server).applied_context_ops == ["deferred"]
     assert [entry] = context_operations(server)
-    assert {:ok, %{operation: %{type: :replace, reason: :manual}}} = ContextOps.operation(entry)
+    assert {:ok, %{operation: %{type: :replace, reason: :manual}}} = Jido.AI.Conversation.Operation.decode(entry)
     assert List.last(Thread.to_list(Server.agent(server).state.messages.thread)).id == entry.id
     assert {:ok, next} = request(server, mock, :react, "Continue")
     assert {:ok, "Next answer"} = Request.await(next)
@@ -1348,7 +1348,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert current_history(server) == history_entries(replacement)
       assert {:ok, %Profile{instructions: "Keep me"}} = Configuration.profile(Server.agent(server))
       assert [entry] = context_operations(server)
-      assert {:ok, %{operation: %{result_context: snapshot}}} = ContextOps.operation(entry)
+      assert {:ok, %{operation: %{result_context: snapshot}}} = Jido.AI.Conversation.Operation.decode(entry)
       assert snapshot.metadata.system_prompt == nil
       assert {:ok, handle} = request(server, mock, :react, "next turn")
       assert {:ok, "Done"} = Request.await(handle)
@@ -1413,7 +1413,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert context_lane(server).applied_context_ops == ["op_compact"]
       assert [entry] = context_operations(server)
       assert entry.refs == %{op_id: "op_compact", context_ref: "default"}
-      assert {:ok, operation} = ContextOps.operation(entry)
+      assert {:ok, operation} = Jido.AI.Conversation.Operation.decode(entry)
       assert operation.op_id == "op_compact"
 
       assert Map.delete(operation.operation, :result_context) == %{

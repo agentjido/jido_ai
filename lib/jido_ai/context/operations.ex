@@ -181,7 +181,7 @@ defmodule Jido.AI.Context.Operations do
     session =
       Session.append(session, %{
         kind: :ai_context_operation,
-        payload: encode_operation(operation),
+        payload: Jido.AI.Conversation.Operation.encode(operation),
         refs: %{op_id: operation.op_id, context_ref: operation.context_ref}
       })
 
@@ -214,17 +214,8 @@ defmodule Jido.AI.Context.Operations do
 
   @doc false
   def project_entries(session, profile) do
-    ref =
-      session.thread.entries
-      |> Enum.filter(&(&1.kind == :ai_context_operation))
-      |> List.last()
-      |> case do
-        nil -> "default"
-        entry -> field(entry.payload, :context_ref)
-      end
-
     session.thread
-    |> project(ref, Context.new(system_prompt: profile.instructions))
+    |> project(nil, Context.new(system_prompt: profile.instructions))
     |> Map.fetch!(:entries)
     |> entry_maps()
   end
@@ -237,27 +228,14 @@ defmodule Jido.AI.Context.Operations do
   end
 
   defp project(thread, ref, fallback) do
-    Enum.reduce(Thread.to_list(thread), fallback, fn entry, context ->
-      if (field(entry.refs, :context_ref) || field(entry.payload, :context_ref) || "default") == ref do
-        case entry.kind do
-          :ai_context_operation ->
-            {:ok, operation} = operation(entry)
+    {:ok, selected} = Conversation.select(thread, ref)
 
-            if operation.operation.type == :replace,
-              do: result_view(operation.operation.result_context),
-              else: context
+    metadata =
+      if Map.has_key?(selected.metadata, :system_prompt) or Map.has_key?(selected.metadata, "system_prompt"),
+        do: selected.metadata,
+        else: Map.put(selected.metadata, :system_prompt, fallback.system_prompt)
 
-          :ai_message ->
-            {:ok, message} = Conversation.message(entry)
-            Context.append_messages(context, [message_fields(message, entry)])
-
-          _ ->
-            context
-        end
-      else
-        context
-      end
-    end)
+    result_view(%{selected | metadata: metadata})
   end
 
   defp entry_maps(entries),
@@ -370,71 +348,10 @@ defmodule Jido.AI.Context.Operations do
     Map.keys(value) -- [:active_context_ref, :pending_context_op, :applied_context_ops] ==
       [] and
       nonempty?(ref) and is_list(ids) and length(ids) <= 128 and Enum.all?(ids, &nonempty?/1) and
-      length(ids) == length(Enum.uniq(ids)) and (is_nil(pending) or valid_operation?(pending))
+      length(ids) == length(Enum.uniq(ids)) and (is_nil(pending) or Jido.AI.Conversation.Operation.valid?(pending))
   end
 
   defp valid_value?(_), do: false
-
-  defp valid_operation?(%{op_id: id, context_ref: ref, operation: operation})
-       when is_map(operation) do
-    nonempty?(id) and nonempty?(ref) and operation[:type] in [:replace, :switch] and
-      operation[:reason] in [:manual, :restore, :compaction, :system] and
-      (is_nil(operation[:base_seq]) or is_integer(operation[:base_seq])) and
-      is_map(operation[:meta]) and
-      case operation.type do
-        :replace -> match?({:ok, _}, Thread.validate(operation[:result_context]))
-        :switch -> is_nil(operation[:result_context])
-      end
-  end
-
-  defp valid_operation?(_), do: false
-
-  @doc "Decodes the portable payload of a committed context operation."
-  def operation(%Thread.Entry{kind: :ai_context_operation, payload: %{"version" => 1} = payload}) do
-    raw = payload["operation"]
-    type = normalize_enum(raw["type"], [:replace, :switch])
-
-    result =
-      if type == :replace do
-        {:ok, thread} = Thread.decode(raw["result_context"])
-        thread
-      end
-
-    value = %{
-      op_id: payload["op_id"],
-      context_ref: payload["context_ref"],
-      operation: %{
-        type: type,
-        reason: normalize_enum(raw["reason"], [:manual, :restore, :compaction, :system]),
-        result_context: result,
-        base_seq: raw["base_seq"],
-        meta: raw["meta"]
-      }
-    }
-
-    if valid_operation?(value), do: {:ok, value}, else: {:error, :invalid_context_operation}
-  rescue
-    _ -> {:error, :invalid_context_operation}
-  end
-
-  def operation(_), do: {:error, :invalid_context_operation}
-
-  defp encode_operation(value) do
-    operation = value.operation
-
-    %{
-      "version" => 1,
-      "op_id" => value.op_id,
-      "context_ref" => value.context_ref,
-      "operation" => %{
-        "type" => Atom.to_string(operation.type),
-        "reason" => Atom.to_string(operation.reason),
-        "result_context" => if(operation.result_context, do: Thread.encode(operation.result_context)),
-        "base_seq" => operation.base_seq,
-        "meta" => operation.meta
-      }
-    }
-  end
 
   defp replacement_context(%Session{thread: thread}), do: replacement_context(thread)
   defp replacement_context(%Thread{} = thread), do: {:ok, result_view(thread)}

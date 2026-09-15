@@ -160,7 +160,7 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
 
     # The Agent-owned log is append-only: reset is a context operation entry.
     [context_op] = Thread.filter_by_kind(session_thread, :ai_context_operation)
-    assert {:ok, operation} = Jido.AI.Context.Operations.operation(context_op)
+    assert {:ok, operation} = Jido.AI.Conversation.Operation.decode(context_op)
     assert operation.op_id == "op_reset_demo"
     assert operation.context_ref == "default"
     assert operation.operation.type == :replace

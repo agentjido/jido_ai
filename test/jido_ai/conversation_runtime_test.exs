@@ -30,7 +30,7 @@ defmodule Jido.AI.ConversationRuntimeTest do
     state = Server.agent(server).state
     assert state.messages.id == original.id
     operation = List.last(state.messages.thread.entries)
-    assert {:ok, %{operation: %{result_context: %Jido.Thread{}}}} = Jido.AI.Context.Operations.operation(operation)
+    assert {:ok, %{operation: %{result_context: %Jido.Thread{}}}} = Jido.AI.Conversation.Operation.decode(operation)
 
     assert {:ok, decoded} =
              state.messages |> Jido.Session.encode() |> Jason.encode!() |> Jason.decode!() |> Jido.Session.decode()

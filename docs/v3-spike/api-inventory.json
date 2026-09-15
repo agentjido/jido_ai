@@ -5841,7 +5841,7 @@
       "modules": [
         "Jido.AI.Context.Operations"
       ],
-      "sha256": "29308a24993a202a4d50140773cf500fab98c9527d8e0541d2ec4977340cfde2",
+      "sha256": "b4342acfb3da63343fd1c777b1513463a6eda53b2fb9b699ee01632dfd84a483",
       "declarations": [
         {
           "line": 1,
@@ -5993,7 +5993,7 @@
           ]
         },
         {
-          "line": 348,
+          "line": 326,
           "module": "Jido.AI.Context.Operations",
           "name": "validate_state",
           "kind": "def",
@@ -6002,30 +6002,8 @@
             3
           ],
           "clause_lines": [
-            348,
-            361
-          ]
-        },
-        {
-          "line": 392,
-          "module": "Jido.AI.Context.Operations",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 393,
-          "module": "Jido.AI.Context.Operations",
-          "name": "operation",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            393,
-            420
+            326,
+            339
           ]
         }
       ]
@@ -6285,7 +6263,7 @@
       "modules": [
         "Jido.AI.Conversation"
       ],
-      "sha256": "c316fd7a9ca12ad93c3a2304a7e08da834ebc72f5b956e42b5a2e1e378f901f5",
+      "sha256": "44261f79c6127ec52066632d5bada9f96b204cd779ea998a056149125eac7b0a",
       "declarations": [
         {
           "line": 1,
@@ -6422,19 +6400,22 @@
         {
           "line": 70,
           "module": "Jido.AI.Conversation",
-          "name": "message",
+          "name": "select",
           "kind": "def",
           "quoted": false,
           "arities": [
-            1
+            1,
+            2
           ],
           "clause_lines": [
             70,
-            73
+            71,
+            73,
+            113
           ]
         },
         {
-          "line": 75,
+          "line": 122,
           "module": "Jido.AI.Conversation",
           "name": "doc",
           "status": "documented",
@@ -6442,7 +6423,29 @@
           "quoted": false
         },
         {
-          "line": 76,
+          "line": 123,
+          "module": "Jido.AI.Conversation",
+          "name": "message",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            123,
+            126
+          ]
+        },
+        {
+          "line": 128,
+          "module": "Jido.AI.Conversation",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 129,
           "module": "Jido.AI.Conversation",
           "name": "open_tool_calls",
           "kind": "def",
@@ -6451,7 +6454,72 @@
             1
           ],
           "clause_lines": [
-            76
+            129
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_ai/conversation/operation.ex",
+      "modules": [
+        "Jido.AI.Conversation.Operation"
+      ],
+      "sha256": "f98ff15c631991deb2f8ddcdf7510280f35d7013c9d105146d7dc56f20effa8f",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Conversation.Operation",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Conversation.Operation",
+          "name": "moduledoc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 5,
+          "module": "Jido.AI.Conversation.Operation",
+          "name": "valid?",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            5,
+            16
+          ]
+        },
+        {
+          "line": 18,
+          "module": "Jido.AI.Conversation.Operation",
+          "name": "decode",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            18,
+            47
+          ]
+        },
+        {
+          "line": 49,
+          "module": "Jido.AI.Conversation.Operation",
+          "name": "encode",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            49
           ]
         }
       ]
@@ -31770,8 +31838,8 @@
   "schema_version": 2,
   "historical_inventory": "api-inventory-v2.json",
   "contract_map": "public-api-map.md",
-  "source_digest": "8140e4ed1bcca26e3cfa61df1ba0e8054f15db375f654925ec2697abeae78455",
-  "file_count": 251,
+  "source_digest": "6e732a59bdc3dc3bf774f76dc277e690c641c5dd0a33114946c0fbf1b87614a6",
+  "file_count": 252,
   "ownership": {
     "Jido.Session": "jido_ai",
     "Jido.Thread": "jido_ai",

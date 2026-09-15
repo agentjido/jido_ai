@@ -4,6 +4,48 @@ defmodule Jido.AI.ConversationTest do
   alias ReqLLM.{Context, Message, ToolCall}
   alias ReqLLM.Message.ContentPart
 
+  test "selection applies replacements and lane switches without changing the log" do
+    {:ok, thread} = Conversation.append(Jido.Thread.new(), [Context.user("old")])
+    {:ok, thread} = Conversation.append(thread, [Context.user("other")], %{context_ref: "other"})
+    {:ok, snapshot} = Conversation.append(Jido.Thread.new(), [Context.user("saved")])
+
+    replacement = %{
+      "version" => 1,
+      "op_id" => "replace",
+      "context_ref" => "default",
+      "operation" => %{
+        "type" => "replace",
+        "reason" => "manual",
+        "result_context" => Jido.Thread.encode(snapshot),
+        "base_seq" => nil,
+        "meta" => %{}
+      }
+    }
+
+    thread = Jido.Thread.append(thread, %{kind: :ai_context_operation, payload: replacement})
+    {:ok, thread} = Conversation.append(thread, [Context.user("next")])
+    assert {:ok, messages} = Conversation.messages(thread)
+    assert Enum.map(messages, &hd(&1.content).text) == ["saved", "next"]
+    assert length(thread.entries) == 4
+
+    switch = %{
+      replacement
+      | "op_id" => "switch",
+        "context_ref" => "other",
+        "operation" => %{replacement["operation"] | "type" => "switch", "result_context" => nil}
+    }
+
+    thread = Jido.Thread.append(thread, %{kind: :ai_context_operation, payload: switch})
+    {:ok, restored} = thread |> Jido.Thread.encode() |> Jason.encode!() |> Jason.decode!() |> Jido.Thread.decode()
+    assert {:ok, [message]} = Conversation.messages(restored)
+    assert hd(message.content).text == "other"
+    assert {:ok, other} = Conversation.select(restored, "other")
+    assert {:ok, [^message]} = Conversation.messages(other)
+    assert {:ok, selected} = Conversation.select(restored, "default")
+    assert {:ok, messages} = Conversation.messages(selected)
+    assert Enum.map(messages, &hd(&1.content).text) == ["saved", "next"]
+  end
+
   test "canonical session survives JSON with tool correlation and references" do
     call = ToolCall.new("call-1", "multiply", ~s({"a":7,"b":13}))
 
