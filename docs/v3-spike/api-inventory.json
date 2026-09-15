@@ -16182,7 +16182,7 @@
       "modules": [
         "Jido.AI.Reasoning.ReAct.Checkpoint"
       ],
-      "sha256": "c8c2be1e80e3f94d76e02de343d55d930ecfc5e89358d023557eff116fbf8fc5",
+      "sha256": "0f1eadba473019016391a231019f0da839b4eac4e7421faf092b13992a988bbc",
       "declarations": [
         {
           "line": 1,
@@ -16281,7 +16281,7 @@
           ]
         },
         {
-          "line": 192,
+          "line": 190,
           "module": "Jido.AI.Reasoning.ReAct.Checkpoint",
           "name": "restore",
           "kind": "def",
@@ -16290,11 +16290,11 @@
             2
           ],
           "clause_lines": [
-            192
+            190
           ]
         },
         {
-          "line": 216,
+          "line": 214,
           "module": "Jido.AI.Reasoning.ReAct.Checkpoint",
           "name": "metadata",
           "kind": "def",
@@ -16303,12 +16303,12 @@
             1
           ],
           "clause_lines": [
-            216,
-            218
+            214,
+            216
           ]
         },
         {
-          "line": 227,
+          "line": 225,
           "module": "Jido.AI.Reasoning.ReAct.Checkpoint",
           "name": "terminal",
           "kind": "def",
@@ -16317,11 +16317,11 @@
             3
           ],
           "clause_lines": [
-            227
+            225
           ]
         },
         {
-          "line": 236,
+          "line": 234,
           "module": "Jido.AI.Reasoning.ReAct.Checkpoint",
           "name": "iteration",
           "kind": "def",
@@ -16330,11 +16330,11 @@
             1
           ],
           "clause_lines": [
-            236
+            234
           ]
         },
         {
-          "line": 242,
+          "line": 240,
           "module": "Jido.AI.Reasoning.ReAct.Checkpoint",
           "name": "doc",
           "status": "hidden",
@@ -16342,7 +16342,7 @@
           "quoted": false
         },
         {
-          "line": 243,
+          "line": 241,
           "module": "Jido.AI.Reasoning.ReAct.Checkpoint",
           "name": "model_iteration",
           "kind": "def",
@@ -16351,11 +16351,11 @@
             1
           ],
           "clause_lines": [
-            243
+            241
           ]
         },
         {
-          "line": 249,
+          "line": 247,
           "module": "Jido.AI.Reasoning.ReAct.Checkpoint",
           "name": "append_query",
           "kind": "def",
@@ -16364,11 +16364,11 @@
             5
           ],
           "clause_lines": [
-            249
+            247
           ]
         },
         {
-          "line": 333,
+          "line": 329,
           "module": "Jido.AI.Reasoning.ReAct.Checkpoint",
           "name": "consume_queries",
           "kind": "def",
@@ -16377,7 +16377,7 @@
             2
           ],
           "clause_lines": [
-            333
+            329
           ]
         }
       ]
@@ -16829,7 +16829,7 @@
       "modules": [
         "Jido.AI.Reasoning.ReAct.Runner"
       ],
-      "sha256": "a05b0d45654c8cfc45800faec967a1101fad33cb679cfbbf755b24db42012160",
+      "sha256": "c6e1a92e0a6e6d081750d4f4a65dd42bd56f28e1cfd3960fb2beb99880ced79e",
       "declarations": [
         {
           "line": 1,
@@ -16881,7 +16881,7 @@
       "modules": [
         "Jido.AI.Reasoning.ReAct.State"
       ],
-      "sha256": "c7868a0ed7033059608f4ca3592029f1142356872d6098530fafaf944f20bc30",
+      "sha256": "a6da3fda22d55f86d9da3a18c5e040442e36927c44d749314cde8585064ff2d9",
       "declarations": [
         {
           "line": 1,
@@ -16899,14 +16899,14 @@
           "quoted": false
         },
         {
-          "line": 44,
+          "line": 45,
           "module": "Jido.AI.Reasoning.ReAct.State",
           "source": "[Zoi.Struct.struct_fields(@schema)]",
           "kind": "defstruct",
           "quoted": false
         },
         {
-          "line": 46,
+          "line": 47,
           "module": "Jido.AI.Reasoning.ReAct.State",
           "name": "doc",
           "status": "documented",
@@ -16914,7 +16914,7 @@
           "quoted": false
         },
         {
-          "line": 50,
+          "line": 51,
           "module": "Jido.AI.Reasoning.ReAct.State",
           "name": "schema",
           "kind": "def",
@@ -16923,11 +16923,11 @@
             0
           ],
           "clause_lines": [
-            50
+            51
           ]
         },
         {
-          "line": 52,
+          "line": 53,
           "module": "Jido.AI.Reasoning.ReAct.State",
           "name": "doc",
           "status": "documented",
@@ -16935,7 +16935,7 @@
           "quoted": false
         },
         {
-          "line": 56,
+          "line": 57,
           "module": "Jido.AI.Reasoning.ReAct.State",
           "name": "new",
           "kind": "def",
@@ -16945,7 +16945,7 @@
             3
           ],
           "clause_lines": [
-            56
+            57
           ]
         },
         {
@@ -17286,6 +17286,69 @@
           ],
           "clause_lines": [
             285
+          ]
+        },
+        {
+          "line": 343,
+          "module": "Jido.AI.Reasoning.ReAct.State",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 344,
+          "module": "Jido.AI.Reasoning.ReAct.State",
+          "name": "conversation",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            344
+          ]
+        },
+        {
+          "line": 359,
+          "module": "Jido.AI.Reasoning.ReAct.State",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 360,
+          "module": "Jido.AI.Reasoning.ReAct.State",
+          "name": "history",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            360
+          ]
+        },
+        {
+          "line": 370,
+          "module": "Jido.AI.Reasoning.ReAct.State",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 371,
+          "module": "Jido.AI.Reasoning.ReAct.State",
+          "name": "messages",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            371
           ]
         }
       ]
@@ -21713,7 +21776,7 @@
       "modules": [
         "Jido.AI.Runtime.RequestTransform"
       ],
-      "sha256": "6e86efbf3653a555b6aa2fc1099dcacb0c69bbff72eee2430470f983acd20490",
+      "sha256": "b87583ea3e92bc860778d66c4c06c6f9539645e13d8a97da7087b6fe7b568a69",
       "declarations": [
         {
           "line": 1,
@@ -31838,7 +31901,7 @@
   "schema_version": 2,
   "historical_inventory": "api-inventory-v2.json",
   "contract_map": "public-api-map.md",
-  "source_digest": "6e732a59bdc3dc3bf774f76dc277e690c641c5dd0a33114946c0fbf1b87614a6",
+  "source_digest": "a51d62f974a5c1f915056b81ad81c0b062041d2656f6b564ddc2d750fdcf92e6",
   "file_count": 252,
   "ownership": {
     "Jido.Session": "jido_ai",

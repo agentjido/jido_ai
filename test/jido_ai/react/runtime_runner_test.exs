@@ -2,7 +2,6 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   use Jido.AI.Test.ReasoningCase, async: false
   use Mimic
 
-  alias Jido.AI.Context, as: AIContext
   alias Jido.AI.Actions.Skill.LoadSkill
   alias Jido.AI.PendingInputServer
   alias Jido.AI.Reasoning.ReAct
@@ -939,8 +938,8 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
              output_tokens: 0
            }
 
-    assert user_contents(AIContext.to_messages(failed_state.context)) == ["Say hello"]
-    assert assistant_contents(AIContext.to_messages(failed_state.context)) == []
+    assert user_contents(ReAct.State.messages(failed_state.context)) == ["Say hello"]
+    assert assistant_contents(ReAct.State.messages(failed_state.context)) == []
   end
 
   test "uses non-streaming generation when streaming is disabled", %{jido: jido} do

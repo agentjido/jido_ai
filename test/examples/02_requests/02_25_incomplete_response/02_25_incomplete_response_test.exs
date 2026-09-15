@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.IncompleteResponseTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Context, Request, Session, Usage}
+  alias Jido.AI.{Request, Session, Usage}
   alias Jido.AI.Reasoning.ReAct
   alias Jido.AI.Reasoning.ReAct.{Config, Token}
   alias JidoAI.Examples.IncompleteResponse.Agent
@@ -121,7 +121,7 @@ defmodule JidoAI.Examples.IncompleteResponseTest do
       status: saved.status,
       events: result.trace,
       usage: saved.usage,
-      messages: Context.to_messages(saved.context)
+      messages: Jido.AI.Reasoning.ReAct.State.messages(saved.context)
     }
   end
 end

@@ -167,7 +167,7 @@ defmodule Jido.AI.Runtime.RequestTransform do
     %State{
       run_id: run_id,
       request_id: if(record, do: record.id, else: state.request_id),
-      context: Context.append_messages(Context.new(id: run_id), Jido.AI.History.entries(conversation.messages)),
+      context: State.conversation(Jido.AI.History.entries(conversation.messages), nil),
       iteration: Jido.AI.Reasoning.ReAct.Checkpoint.model_iteration(state),
       llm_call_id: original[:llm_call_id],
       llm_response_id: if(response, do: response.id),
@@ -193,7 +193,9 @@ defmodule Jido.AI.Runtime.RequestTransform do
   end
 
   def latest_query(context) do
-    case Enum.find(context.entries, &(&1.role == :user)) do
+    {:ok, messages} = Jido.AI.Conversation.messages(context)
+
+    case Enum.find(Enum.reverse(messages), &(&1.role == :user)) do
       %{content: content} when is_binary(content) -> content
       %{content: content} when is_list(content) -> Jido.AI.Query.summarize(content)
       _ -> ""

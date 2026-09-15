@@ -32,7 +32,12 @@ defmodule JidoAI.Examples.StandaloneRuntimeTest do
     assert {:ok, saved, _} = Token.decode_state(result.final_token, config)
     assert saved.status == :completed and saved.result == "Ready"
     assert saved.seq == List.last(result.trace).seq
-    assert Enum.any?(saved.context.entries, &(&1.role == :assistant and &1.content == "Ready"))
+
+    assert Enum.any?(
+             conversation_entries(saved.context),
+             &(&1.role == :assistant and Jido.AI.Query.summarize(&1.content) == "Ready")
+           )
+
     assert_script_done(mock)
   end
 
@@ -52,7 +57,7 @@ defmodule JidoAI.Examples.StandaloneRuntimeTest do
     assert Enum.count(result.trace, &(&1.kind == :tool_completed)) == 1
     assert List.last(result.trace).kind == :checkpoint
     assert {:ok, saved, _} = Token.decode_state(result.final_token, config)
-    assert Enum.any?(saved.context.entries, &(&1.role == :tool and &1.tool_call_id == "sum-id"))
+    assert Enum.any?(conversation_entries(saved.context), &(&1.role == :tool and &1.tool_call_id == "sum-id"))
     assert_script_done(mock)
   end
 

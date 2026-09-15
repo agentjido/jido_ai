@@ -71,7 +71,9 @@ with one existing exclusion. Log: `/tmp/jido-ai-selection-codec-full.log`.
 Remaining work:
 
 1. Replace the transient Context value in standalone ReAct state, checkpoints,
-   request-transform views, initial-state import, and context controls.
+   request-transform views, initial-state import, and context controls. The
+   standalone state, checkpoints, and request-transform state views now use
+   Thread; initial-state import and context controls remain.
 2. Remove the old Context/History conversion paths and competing import forms.
 3. Reconcile public configuration, inspection, guides, and API inventories.
 4. Run the complete unit, authoring, and MockLLM example suite, then the bounded
@@ -79,6 +81,25 @@ Remaining work:
 5. Commit the tested result. Do not claim release readiness from a partial gate.
 
 ## Work log (historical steps, not current status)
+
+- Active standalone migration: ReAct.State.context now holds a canonical
+  Thread. Its checkpoint format is version 4 and encodes the Thread for JSON.
+  Runner, checkpoint capture/continuation, and request-transform state views
+  now use that value. The focused ReAct/checkpoint suite passed 111 tests in
+  `/tmp/jido-ai-react-thread-confirm.log`. Resume/example consumers are being
+  checked in `/tmp/jido-ai-react-thread-examples.log`. Temporary message-map
+  conversion helpers still need consolidation; this is not a finished gate.
+- Migrated standalone example inspection to canonical entry projection. The
+  focused run passed 148 of 150 tests; the two remaining assertions treated
+  thinking as visible text. They now check visible text and thinking content
+  separately. The confirmatory trace run is
+  `/tmp/jido-ai-react-trace-confirm.log`; the subsequent full gate is
+  `/tmp/jido-ai-react-thread-full.log`.
+- Standalone Thread checkpoint gate passed format, forced compilation, the
+  current source inventory check, and all 2,876 tests with one existing
+  exclusion. Log: `/tmp/jido-ai-react-thread-full.log`. The initial format
+  failure was corrected before the full test run. This verifies the migration
+  of standalone state, not completion of the remaining Context removal.
 
 - Goal started; baseline format, forced compile, and full test command passed.
   Log: `/tmp/jido-ai-conversation-baseline.log`.

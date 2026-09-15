@@ -7,7 +7,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   Model and tool checkpoints resume through the shared Flow with fresh runtime
   resources.
   """
-  alias Jido.AI.{Context, Request, Session}
+  alias Jido.AI.{Request, Session}
   alias Jido.AI.Reasoning.ReAct.{Authoring, Checkpoint, Config, State, Token}
   alias Jido.AI.Runtime.Event
   alias Jido.AgentServer, as: Server
@@ -24,7 +24,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp build_stream(state, config, opts) do
-    messages = if opts[:query], do: [%{role: :user, content: opts[:query]}], else: Context.to_messages(state.context)
+    messages = if opts[:query], do: [%{role: :user, content: opts[:query]}], else: State.messages(state.context)
 
     model_options = Jido.AI.Runtime.ModelCall.bind_options(messages, config.llm.llm_opts)
     opts = Keyword.put(opts, :model_call_options, model_options)
@@ -252,9 +252,10 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     end
   end
 
-  defp query(%{checkpoint: nil, context: %{entries: [entry], system_prompt: _}})
-       when entry.role == :user,
-       do: {:ok, entry.content}
+  defp query(%{checkpoint: nil, context: %Jido.Thread{entries: [entry]}}) do
+    with {:ok, %{role: :user, content: content}} <- Jido.AI.Conversation.message(entry),
+         do: {:ok, content}
+  end
 
   defp query(%{checkpoint: %{runtime: %{history_delta: entries}}}) do
     case Enum.find(entries, &(&1.role == :user)) do
@@ -360,9 +361,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     {:ok, profile} = Jido.AI.Configuration.profile(agent)
     {:ok, entries} = Jido.AI.History.read(agent.state, profile)
 
-    context =
-      Context.new(system_prompt: config.system_prompt)
-      |> Context.append_messages(entries)
+    context = State.conversation(entries, config.system_prompt)
 
     status =
       case event.kind do

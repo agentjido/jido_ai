@@ -99,10 +99,9 @@ defmodule JidoAI.Examples.TraceAndCyclesTest do
       assert paused.streaming_text == saved.streaming_text
       assert paused.streaming_thinking == saved.streaming_thinking
 
-      assert Enum.any?(
-               saved.context.entries,
-               &(&1.role == :assistant && &1.content == "First second")
-             )
+      assistant = Enum.find(conversation_entries(saved.context), &(&1.role == :assistant))
+      assert Enum.filter(assistant.content, &(&1.type == :text)) |> Enum.map_join(& &1.text) == "First second"
+      assert Enum.filter(assistant.content, &(&1.type == :thinking)) |> Enum.map_join(& &1.text) == "Synthetic thought"
 
       assert_script_done(mock)
     end
@@ -186,7 +185,7 @@ defmodule JidoAI.Examples.TraceAndCyclesTest do
     assert Enum.count(result.trace, &(&1.kind == :tool_completed)) == 4
     assert {:ok, saved, _} = Token.decode_state(result.final_token, config)
     assert is_binary(saved.prev_tool_signature)
-    assert Enum.count(saved.context.entries, &warning?/1) == 1
+    assert Enum.count(conversation_entries(saved.context), &warning?/1) == 1
     assert_script_done(mock)
   end
 
@@ -229,7 +228,7 @@ defmodule JidoAI.Examples.TraceAndCyclesTest do
     second = next.events |> CheckpointResume.through_checkpoint(:after_tools) |> List.last()
     assert {:ok, second_state, _} = Token.decode_state(second.data.token, config)
     assert second_state.prev_tool_signature == first_state.prev_tool_signature
-    assert Enum.count(second_state.context.entries, &warning?/1) == 1
+    assert Enum.count(conversation_entries(second_state.context), &warning?/1) == 1
     assert {:ok, next} = ReAct.continue(second.data.token, config, opts(jido))
     result = ReAct.collect_stream(next.events)
     assert result.result == "Resumed"

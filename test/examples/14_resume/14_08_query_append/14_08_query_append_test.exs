@@ -110,7 +110,7 @@ defmodule JidoAI.Examples.QueryAppendTest do
     assert_receive {:standalone_add, _, 2, 3}
     assert {:ok, saved, _} = Token.decode_state(after_tools.data.token, config)
     assert saved.iteration == 2
-    assert Enum.any?(saved.context.entries, &(&1.content == "Explain later"))
+    assert Enum.any?(conversation_entries(saved.context), &(Jido.AI.Query.summarize(&1.content) == "Explain later"))
     assert {:ok, next} = ReAct.continue(after_tools.data.token, config, opts(jido))
     result = ReAct.collect_stream(next.events)
     assert result.result == "Explained"

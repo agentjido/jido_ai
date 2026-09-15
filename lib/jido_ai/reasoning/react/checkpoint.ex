@@ -1,6 +1,6 @@
 defmodule Jido.AI.Reasoning.ReAct.Checkpoint do
   @moduledoc false
-  alias Jido.AI.{Context, History, Runtime}
+  alias Jido.AI.{History, Runtime}
   alias Jido.AI.Reasoning.ReAct.{Config, PendingToolCall, State}
 
   # Store AI data only. Rebind profile, provider options, deadlines and the
@@ -157,9 +157,7 @@ defmodule Jido.AI.Reasoning.ReAct.Checkpoint do
     saved = %{
       initial
       | checkpoint: data,
-        context:
-          Context.new(system_prompt: config.system_prompt)
-          |> Context.append_messages(native.history_delta),
+        context: State.conversation(native.history_delta, config.system_prompt),
         status: status(calls, phase),
         pending_tool_calls: calls,
         active_tools: Map.new(runtime[:active_tools] || [], &{&1.name, &1.target}),
@@ -282,9 +280,7 @@ defmodule Jido.AI.Reasoning.ReAct.Checkpoint do
           status: status(pending(data.runtime, data.phase), data.phase),
           pending_tool_calls: pending(data.runtime, data.phase),
           iteration: iteration(data),
-          context:
-            Context.new(system_prompt: config.system_prompt)
-            |> Context.append_messages(data.runtime.history_delta),
+          context: State.conversation(data.runtime.history_delta, config.system_prompt),
           result: nil,
           error: nil,
           output: %{},
@@ -304,9 +300,9 @@ defmodule Jido.AI.Reasoning.ReAct.Checkpoint do
          context,
          timeout
        ) do
-    history = state.context.entries |> Enum.reverse() |> Enum.map(&Map.from_struct/1)
+    history = State.history(state.context)
 
-    with {:ok, messages} <- ReqLLM.Context.normalize(Context.to_messages(state.context)) do
+    with {:ok, messages} <- ReqLLM.Context.normalize(State.messages(state.context)) do
       {:ok,
        %{
          version: 2,

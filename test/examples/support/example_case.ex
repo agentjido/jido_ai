@@ -34,6 +34,15 @@ defmodule JidoAI.Examples.Case do
     server
   end
 
+  def conversation_entries(%Jido.Thread{} = thread) do
+    {:ok, selected} = Jido.AI.Conversation.select(thread)
+
+    Enum.map(selected.entries, fn entry ->
+      {:ok, message} = Jido.AI.Conversation.message(entry)
+      message |> Map.from_struct() |> Map.put(:refs, entry.refs)
+    end)
+  end
+
   def conversation(agent) do
     {:ok, profile} = Jido.AI.Configuration.profile(agent)
     {:ok, entries} = Jido.AI.History.read(agent.state, profile)

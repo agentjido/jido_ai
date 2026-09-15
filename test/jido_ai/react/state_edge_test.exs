@@ -64,9 +64,10 @@ defmodule Jido.AI.Reasoning.ReAct.StateEdgeTest do
     assert {:error, :invalid_checkpoint_state} = State.from_checkpoint_map(:invalid)
     assert {:error, {:missing_field, :version}} = State.from_checkpoint_map(%{})
     assert {:error, :checkpoint_version_mismatch} = State.from_checkpoint_map(%{version: 2})
-    assert {:error, {:missing_field, :run_id}} = State.from_checkpoint_map(%{version: 3})
+    assert {:error, :checkpoint_version_mismatch} = State.from_checkpoint_map(%{version: 3})
+    assert {:error, {:missing_field, :run_id}} = State.from_checkpoint_map(%{version: 4})
 
-    base = %{version: 3, run_id: "run", request_id: "req", context: Jido.AI.Context.new()}
+    base = %{version: 4, run_id: "run", request_id: "req", context: Jido.Thread.new()}
 
     assert {:error, :invalid_status} = State.from_checkpoint_map(Map.put(base, :status, :unknown))
     assert {:error, :invalid_status} = State.from_checkpoint_map(Map.put(base, :status, "unknown"))
@@ -74,5 +75,15 @@ defmodule Jido.AI.Reasoning.ReAct.StateEdgeTest do
 
     assert {:error, {:invalid_checkpoint_state, _}} =
              State.from_checkpoint_map(Map.put(base, :iteration, "invalid"))
+  end
+
+  test "minimal checkpoint carries a canonical Thread through JSON" do
+    state = State.new("hello", "Be brief", request_id: "req", run_id: "run")
+    assert %Jido.Thread{} = state.context
+    checkpoint = state |> State.minimal_checkpoint_map() |> Jason.encode!() |> Jason.decode!()
+    assert {:ok, restored} = State.from_checkpoint_map(checkpoint)
+    assert restored.context.id == state.context.id
+    assert Enum.map(State.messages(restored.context), & &1.role) == [:system, :user]
+    assert Enum.map(State.messages(restored.context), &hd(&1.content).text) == ["Be brief", "hello"]
   end
 end

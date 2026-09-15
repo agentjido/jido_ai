@@ -4,10 +4,11 @@ defmodule Jido.AI.Reasoning.ReAct.State do
   """
 
   alias Jido.AI.Reasoning.ReAct.PendingToolCall
-  alias Jido.AI.Context, as: AIContext
+  alias Jido.AI.Conversation
+  alias Jido.Thread
 
   @status_values [:running, :awaiting_tools, :completed, :failed, :cancelled]
-  @version 3
+  @version 4
 
   @schema Zoi.struct(
             __MODULE__,
@@ -19,7 +20,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
               iteration: Zoi.integer() |> Zoi.default(1),
               llm_call_id: Zoi.string() |> Zoi.nullish(),
               llm_response_id: Zoi.string() |> Zoi.nullish(),
-              context: Zoi.any(),
+              context: Thread.schema(),
               active_tools: Zoi.map() |> Zoi.default(%{}),
               pending_tool_calls: Zoi.list(PendingToolCall.schema()) |> Zoi.default([]),
               usage: Zoi.map() |> Zoi.default(%{}),
@@ -60,8 +61,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
     run_id = Keyword.get(opts, :run_id, "run_#{Jido.Signal.ID.generate!()}")
 
     context =
-      AIContext.new(system_prompt: system_prompt)
-      |> AIContext.append_user(query)
+      conversation([%{role: :user, content: query}], system_prompt)
 
     attrs = %{
       run_id: run_id,
@@ -142,7 +142,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
       iteration: state.iteration,
       llm_call_id: state.llm_call_id,
       llm_response_id: state.llm_response_id,
-      context: state.context,
+      context: Thread.encode(state.context),
       active_tools: state.active_tools,
       pending_tool_calls: state.pending_tool_calls,
       usage: state.usage,
@@ -331,13 +331,47 @@ defmodule Jido.AI.Reasoning.ReAct.State do
   end
 
   defp fetch_context(map) do
-    map
-    |> Map.get(:context, Map.get(map, "context"))
-    |> AIContext.coerce()
-    |> case do
-      {:ok, context} -> {:ok, context}
-      :error -> {:error, :invalid_context}
+    value = Map.get(map, :context, Map.get(map, "context"))
+
+    case value do
+      %Thread{} -> Thread.validate(value)
+      value when is_map(value) -> Thread.decode(value)
+      _ -> {:error, :invalid_context}
     end
+  end
+
+  @doc false
+  def conversation(entries, prompt) do
+    Enum.reduce(entries, Thread.new(metadata: %{system_prompt: prompt}), fn entry, thread ->
+      {:ok, messages} = Jido.AI.History.messages([entry])
+      {:ok, [canonical]} = Conversation.entries(messages, Map.get(entry, :refs) || %{})
+
+      canonical =
+        case Map.get(entry, :timestamp) do
+          %DateTime{} = timestamp -> %{canonical | at: DateTime.to_unix(timestamp, :millisecond)}
+          _ -> canonical
+        end
+
+      Thread.append(thread, canonical)
+    end)
+  end
+
+  @doc false
+  def history(%Thread{} = thread) do
+    {:ok, selected} = Conversation.select(thread)
+
+    Enum.map(selected.entries, fn entry ->
+      {:ok, message} = Conversation.message(entry)
+      [value] = Jido.AI.History.entries([message])
+      %{value | refs: entry.refs, timestamp: DateTime.from_unix!(entry.at, :millisecond)}
+    end)
+  end
+
+  @doc false
+  def messages(%Thread{} = thread) do
+    {:ok, messages} = Conversation.messages(thread)
+    prompt = Map.get(thread.metadata, :system_prompt, thread.metadata["system_prompt"])
+    if is_binary(prompt), do: [ReqLLM.Context.system(prompt) | messages], else: messages
   end
 
   defp normalize_status(value) when value in @status_values, do: {:ok, value}
