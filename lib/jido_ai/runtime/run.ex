@@ -24,7 +24,7 @@ defmodule Jido.AI.Runtime.Run do
            ) do
       candidate =
         candidate
-        |> Jido.AI.History.append(profile, output.history_delta)
+        |> Jido.AI.Session.Transcript.append(profile, output.history_delta)
         |> Map.put(profile.result.into, output.result)
 
       {:ok, candidate, output.effect_plan.directives}

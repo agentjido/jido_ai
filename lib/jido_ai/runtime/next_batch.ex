@@ -14,15 +14,15 @@ defmodule Jido.AI.Runtime.NextBatch do
          results =
            Enum.map(state.tool_results, fn result ->
              ReqLLM.Context.tool_result(result.id, result.name, result.content)
-             |> Jido.AI.History.bind_message(context, Map.get(result, :refs, %{}))
+             |> Jido.AI.Session.Transcript.bind_message(context, Map.get(result, :refs, %{}))
            end),
          {:ok, messages} <-
            ReqLLM.Context.append_tool_exchange(state.response.context, state.response, results),
          entries =
-           Enum.zip_with(Jido.AI.History.entries(results), state.tool_results, fn entry, result ->
+           Enum.zip_with(Jido.AI.Model.Messages.entries(results), state.tool_results, fn entry, result ->
              Map.put(entry, :refs, Map.get(result, :refs, %{}))
            end),
-         {:ok, state} <- Jido.AI.History.record(state, entries, context),
+         {:ok, state} <- Jido.AI.Session.Transcript.record(state, entries, context),
          {:ok, state} <- Jido.AI.Runtime.ToolCycle.record(%{state | messages: messages}, context),
          {:ok, state} <- Jido.AI.Reasoning.ReAct.Checkpoint.consume_queries(state, context),
          {:ok, state} <-

@@ -7,11 +7,11 @@ defmodule Jido.AI.Operations.Generate do
     do:
       Jido.AI.Error.capture(fn ->
         original = params.messages
-        provider = Jido.AI.History.provider_context(original)
+        provider = Jido.AI.Model.Messages.provider_context(original)
 
         Jido.AI.Quota.track(context, fn progress ->
           with {:ok, result} <- execute(%{params | messages: provider}, context, progress) do
-            response = Jido.AI.History.restore_response_context(result.response, provider, original)
+            response = Jido.AI.Model.Messages.restore_response_context(result.response, provider, original)
             {:ok, %{result | response: response}}
           end
         end)

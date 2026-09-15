@@ -1,6 +1,6 @@
 defmodule Jido.AI.Reasoning.ReAct.Checkpoint do
   @moduledoc false
-  alias Jido.AI.{History, Runtime}
+  alias Jido.AI.Runtime
   alias Jido.AI.Reasoning.ReAct.{Config, PendingToolCall, State}
 
   # Store AI data only. Rebind profile, provider options, deadlines and the
@@ -91,7 +91,7 @@ defmodule Jido.AI.Reasoning.ReAct.Checkpoint do
          true <- data.runtime.repairs == 0 or is_map(data.runtime[:repair_data]),
          true <- is_integer(data.remaining_ms) and data.remaining_ms >= 0,
          true <- valid_response?(data),
-         {:ok, _} <- History.messages(Map.get(data.runtime, :pending_queries, [])),
+         {:ok, _} <- Jido.AI.Model.Messages.messages(Map.get(data.runtime, :pending_queries, [])),
          true <- Enum.all?(Map.get(data.runtime, :pending_queries, []), &(&1.role == :user)),
          true <-
            Map.get(data.runtime, :pending_queries, []) == [] or
@@ -99,7 +99,7 @@ defmodule Jido.AI.Reasoning.ReAct.Checkpoint do
          {:ok, messages} <- ReqLLM.Context.normalize(data.runtime.messages),
          true <-
            Enum.all?(messages.messages, &match?({:ok, _}, Zoi.parse(ReqLLM.Message.schema(), &1))),
-         {:ok, _} <- History.messages(data.runtime.history_delta),
+         {:ok, _} <- Jido.AI.Model.Messages.messages(data.runtime.history_delta),
          true <- state.usage == data.runtime.usage,
          true <-
            state.prev_tool_signature == get_in(data.runtime, [:tool_meta, :prev_tool_signature]),
@@ -139,7 +139,7 @@ defmodule Jido.AI.Reasoning.ReAct.Checkpoint do
         :messages,
         :requests,
         Jido.AI.Configuration.key(),
-        Jido.AI.Conversation.Control.key()
+        Jido.AI.Thread.Control.key()
       ])
 
     effects = if phase == :terminal, do: [], else: native.effect_plan.directives
@@ -248,7 +248,7 @@ defmodule Jido.AI.Reasoning.ReAct.Checkpoint do
     with :ok <- verify(state, config),
          {:ok, data} <- continuation(state, config, context, timeout) do
       entries =
-        History.query(query, %{
+        Jido.AI.Session.Transcript.query(query, %{
           request_id: state.request_id,
           run_id: state.run_id,
           source: "/ai/react/standalone"
@@ -332,8 +332,8 @@ defmodule Jido.AI.Reasoning.ReAct.Checkpoint do
         {:ok, state}
 
       entries ->
-        with {:ok, messages} <- History.messages(entries),
-             {:ok, state} <- History.record(state, entries, context) do
+        with {:ok, messages} <- Jido.AI.Model.Messages.messages(entries),
+             {:ok, state} <- Jido.AI.Session.Transcript.record(state, entries, context) do
           messages = Enum.reduce(messages, state.messages, &ReqLLM.Context.append(&2, &1))
           {:ok, Map.merge(state, %{messages: messages, pending_queries: []})}
         end
@@ -341,7 +341,7 @@ defmodule Jido.AI.Reasoning.ReAct.Checkpoint do
   end
 
   defp restore_messages(state, :before_llm, initial_messages) do
-    with {:ok, history} <- History.messages(state.history_delta) do
+    with {:ok, history} <- Jido.AI.Model.Messages.messages(state.history_delta) do
       system = Enum.filter(initial_messages.messages, &(&1.role == :system))
       {:ok, %{state | messages: ReqLLM.Context.new(system ++ history)}}
     end

@@ -1,6 +1,7 @@
 defmodule JidoAI.Examples.InitialStateTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Agent, Configuration, Conversation, History, Request}
+  alias Jido.AI.{Agent, Configuration, Request}
+  alias Jido.AI.Thread.Projection
   alias JidoAI.Examples.InitialState
 
   setup do
@@ -16,7 +17,7 @@ defmodule JidoAI.Examples.InitialStateTest do
     call = ReqLLM.ToolCall.new("saved-tool", "import_echo", ~s({"value":5}))
 
     {:ok, session} =
-      Conversation.append(
+      Projection.append(
         Jido.Session.new(id: "old-session", thread: thread),
         [
           ReqLLM.Context.user([ContentPart.text("Previous question"), ContentPart.image(<<1, 2, 3>>, "image/png")]),
@@ -50,7 +51,7 @@ defmodule JidoAI.Examples.InitialStateTest do
 
       assert {:ok, agent} = Agent.from_initial_state(unquote(module), state, id: "imported")
       assert {:ok, profile} = Configuration.profile(agent, :assistant)
-      assert {:ok, messages} = History.read(agent.state, profile)
+      assert {:ok, messages} = Jido.AI.Session.Transcript.read(agent.state, profile)
       assert Enum.map(messages, & &1.role) == [:user, :assistant, :tool, :assistant]
       imported = agent.state.messages.thread.entries
       assert agent.state.messages.id == old.id
@@ -111,8 +112,8 @@ defmodule JidoAI.Examples.InitialStateTest do
   for {prompt, expected} <- [{nil, "Review prompt"}, {"Saved review", "Saved review"}] do
     test "profile selection keeps unrelated history and uses #{inspect(prompt)} prompt", %{jido: jido} do
       thread = Jido.Thread.new(metadata: %{system_prompt: unquote(prompt)})
-      {:ok, old} = Conversation.append(Jido.Session.new(thread: thread), [ReqLLM.Context.user("Old review")])
-      {:ok, primary} = Jido.AI.Conversation.append(Jido.Session.new(), [ReqLLM.Context.user("Old primary")])
+      {:ok, old} = Projection.append(Jido.Session.new(thread: thread), [ReqLLM.Context.user("Old review")])
+      {:ok, primary} = Jido.AI.Thread.Projection.append(Jido.Session.new(), [ReqLLM.Context.user("Old primary")])
       source = InitialState.Profiles.definition()
 
       assert {:ok, agent} =
@@ -120,7 +121,7 @@ defmodule JidoAI.Examples.InitialStateTest do
 
       assert agent.state.primary_messages == primary
       assert {:ok, review_profile} = Configuration.profile(agent, :review)
-      assert {:ok, messages} = History.read(agent.state, review_profile)
+      assert {:ok, messages} = Jido.AI.Session.Transcript.read(agent.state, review_profile)
       assert [%{role: :user, content: content}] = messages
       assert Jido.AI.Query.summarize(content) == "Old review"
       assert {:ok, %{instructions: "Primary prompt"}} = Configuration.profile(agent, :primary)

@@ -43,7 +43,7 @@ for {module, streaming?} <- [
       schema(
         Zoi.object(%{
           reply: Zoi.any() |> Zoi.default(nil),
-          messages: Jido.AI.Conversation.schema()
+          messages: Jido.AI.Thread.Projection.schema()
         })
       )
 

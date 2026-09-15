@@ -229,7 +229,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       :messages,
       :requests,
       Jido.AI.Configuration.key(),
-      Jido.AI.Conversation.Control.key()
+      Jido.AI.Thread.Control.key()
     ]
 
     with true <- is_map(domain) and not is_struct(domain),
@@ -243,7 +243,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
            Zoi.object(
              Map.merge(fields, %{
                result: Zoi.any() |> Zoi.default(result),
-               messages: Jido.AI.Conversation.schema() |> Zoi.default(history_session(history))
+               messages: Jido.AI.Thread.Projection.schema() |> Zoi.default(history_session(history))
              })
            )
        }}
@@ -253,7 +253,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp query(%{checkpoint: nil, context: %Jido.Thread{entries: [entry]}}) do
-    with {:ok, %{role: :user, content: content}} <- Jido.AI.Conversation.message(entry),
+    with {:ok, %{role: :user, content: content}} <- Jido.AI.Thread.Projection.message(entry),
          do: {:ok, content}
   end
 
@@ -347,7 +347,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp history_session([]), do: nil
 
   defp history_session(history) do
-    Jido.AI.History.append_entries(Jido.Session.new(), history)
+    Jido.AI.Thread.Projection.append_entries(Jido.Session.new(), history)
   end
 
   defp snapshot(state, config, server, event) do
@@ -355,7 +355,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     record = agent.state.requests[state.request_id]
 
     {:ok, profile} = Jido.AI.Configuration.profile(agent)
-    {:ok, entries} = Jido.AI.History.read(agent.state, profile)
+    {:ok, entries} = Jido.AI.Session.Transcript.read(agent.state, profile)
 
     context = State.conversation(entries, config.system_prompt)
 
@@ -379,7 +379,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
                   :messages,
                   :requests,
                   Jido.AI.Configuration.key(),
-                  Jido.AI.Conversation.Control.key()
+                  Jido.AI.Thread.Control.key()
                 ])
           }
       end

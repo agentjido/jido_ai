@@ -4,7 +4,7 @@ defmodule Jido.AI.PluginFacetsTest do
   @packages [
     Jido.AI.Runtime.Plugin,
     Jido.AI.Session.Plugin,
-    Jido.AI.Conversation.Control.Plugin,
+    Jido.AI.Thread.Control.Plugin,
     Jido.AI.Plugins.Chat,
     Jido.AI.Plugins.Planning,
     Jido.AI.Plugins.ModelRouting,

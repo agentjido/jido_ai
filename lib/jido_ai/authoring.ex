@@ -78,8 +78,8 @@ defmodule Jido.AI.Authoring do
   def lower_config(config, values) do
     ensure_plugin_compiled!(Runtime.Plugin)
     Code.ensure_compiled!(Jido.AI.Configuration.Apply)
-    Code.ensure_compiled!(Jido.AI.Conversation.Control.Apply)
-    ensure_plugin_compiled!(Jido.AI.Conversation.Control.Plugin)
+    Code.ensure_compiled!(Jido.AI.Thread.Control.Apply)
+    ensure_plugin_compiled!(Jido.AI.Thread.Control.Plugin)
     ensure_plugin_compiled!(Jido.AI.Session.Plugin)
 
     with {:ok, config} <- configured_state_size(config),
@@ -93,7 +93,7 @@ defmodule Jido.AI.Authoring do
              &(plugin_module(&1) in [
                  Runtime.Plugin,
                  Jido.AI.Session.Plugin,
-                 Jido.AI.Conversation.Control.Plugin
+                 Jido.AI.Thread.Control.Plugin
                ])
            ),
          {:ok, flows} <-
@@ -117,7 +117,7 @@ defmodule Jido.AI.Authoring do
                do: [],
                else:
                  Jido.AI.Configuration.routes() ++
-                   if(map_size(histories) == 0, do: [], else: Jido.AI.Conversation.Control.routes())
+                   if(map_size(histories) == 0, do: [], else: Jido.AI.Thread.Control.routes())
              )
            ),
          routes = routes ++ internal_routes ++ config_routes,
@@ -149,7 +149,7 @@ defmodule Jido.AI.Authoring do
       plugins =
         if map_size(histories) == 0,
           do: plugins,
-          else: plugins ++ [{Jido.AI.Conversation.Control.Plugin, [profiles: histories]}]
+          else: plugins ++ [{Jido.AI.Thread.Control.Plugin, [profiles: histories]}]
 
       {:ok, %{config | routes: routes, plugins: plugins}}
     else

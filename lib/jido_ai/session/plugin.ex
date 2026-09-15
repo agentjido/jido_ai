@@ -251,7 +251,7 @@ defmodule Jido.AI.Session.Plugin do
         state
 
       field ->
-        update_in(state, [field], &Jido.AI.Conversation.before_request(&1, record.id))
+        update_in(state, [field], &Jido.AI.Thread.Projection.before_request(&1, record.id))
     end
   end
 end

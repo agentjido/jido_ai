@@ -2,7 +2,8 @@ defmodule Jido.AI.Skill.BinaryResourcesTest do
   use ExUnit.Case, async: false
 
   alias Jido.AI.Actions.Skill.{LoadResource, LoadSkill}
-  alias Jido.AI.{Conversation, Turn}
+  alias Jido.AI.Turn
+  alias Jido.AI.Thread.Projection
   alias Jido.AI.Skill.{Activation, AgentIntegration, Registry, ResourcePolicy, ResourceProvider, Resources, Spec}
   alias ReqLLM.Message.ContentPart
 
@@ -136,8 +137,8 @@ defmodule Jido.AI.Skill.BinaryResourcesTest do
       assert {:ok, _} = Jason.decode(json)
       refute String.contains?(json, bytes)
       message = %ReqLLM.Message{role: :tool, tool_call_id: "call-1", name: LoadResource.name(), content: parts}
-      {:ok, thread} = Conversation.append(Jido.Thread.new(), [message])
-      assert {:ok, [%{content: ^parts}]} = Conversation.messages(thread)
+      {:ok, thread} = Projection.append(Jido.Thread.new(), [message])
+      assert {:ok, [%{content: ^parts}]} = Projection.messages(thread)
     end
   end
 

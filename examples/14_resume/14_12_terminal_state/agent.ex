@@ -10,7 +10,7 @@ for {module, stream} <- [
       schema(
         Zoi.object(%{
           reply: Zoi.string() |> Zoi.default(""),
-          messages: Jido.AI.Conversation.schema()
+          messages: Jido.AI.Thread.Projection.schema()
         })
       )
 

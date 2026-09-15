@@ -58,7 +58,7 @@ defmodule Jido.AI.Test.StateMigration.Agent do
         count: Zoi.integer() |> Zoi.default(0),
         label: Zoi.string() |> Zoi.default("initial"),
         data: Zoi.map() |> Zoi.default(%{}),
-        messages: Jido.AI.Conversation.schema()
+        messages: Jido.AI.Thread.Projection.schema()
       })
     )
 

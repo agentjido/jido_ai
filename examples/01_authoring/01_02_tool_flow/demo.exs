@@ -21,7 +21,7 @@ try do
          ) do
       {:ok, agent} ->
         {:ok, profile} = Jido.AI.Configuration.profile(agent)
-        {:ok, history} = Jido.AI.History.read(agent.state, profile)
+        {:ok, history} = Jido.AI.Thread.Projection.messages(agent.state[profile.memory.history])
         tools = Enum.filter(history, &(&1.role == :tool))
 
         Enum.each(tools, fn tool ->

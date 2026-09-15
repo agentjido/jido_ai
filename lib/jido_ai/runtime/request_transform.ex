@@ -60,7 +60,7 @@ defmodule Jido.AI.Runtime.RequestTransform do
              do: Output.apply_instructions(raw_messages, state.output),
              else: raw_messages
            ),
-         {:ok, messages} <- Jido.AI.History.normalize_messages(raw_messages) do
+         {:ok, messages} <- Jido.AI.Model.Messages.normalize_messages(raw_messages) do
       selected = if Jido.AI.Reasoning.tools_disabled?(state), do: [], else: selected
       opts = synchronize(llm_opts, selected, state.repairs > 0)
 
@@ -167,7 +167,7 @@ defmodule Jido.AI.Runtime.RequestTransform do
     %State{
       run_id: run_id,
       request_id: if(record, do: record.id, else: state.request_id),
-      context: State.conversation(Jido.AI.History.entries(conversation.messages), nil),
+      context: State.conversation(Jido.AI.Model.Messages.entries(conversation.messages), nil),
       iteration: Jido.AI.Reasoning.ReAct.Checkpoint.model_iteration(state),
       llm_call_id: original[:llm_call_id],
       llm_response_id: if(response, do: response.id),
@@ -193,7 +193,7 @@ defmodule Jido.AI.Runtime.RequestTransform do
   end
 
   def latest_query(context) do
-    {:ok, messages} = Jido.AI.Conversation.messages(context)
+    {:ok, messages} = Jido.AI.Thread.Projection.messages(context)
 
     case Enum.find(Enum.reverse(messages), &(&1.role == :user)) do
       %{content: content} when is_binary(content) -> content
@@ -203,5 +203,5 @@ defmodule Jido.AI.Runtime.RequestTransform do
   end
 
   defp messages(context),
-    do: Jido.AI.History.entries(context.messages)
+    do: Jido.AI.Model.Messages.entries(context.messages)
 end

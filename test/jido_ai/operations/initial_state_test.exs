@@ -1,12 +1,13 @@
 defmodule Jido.AI.InitialStateTest do
   use Jido.AI.Test.ReasoningCase, async: false
-  alias Jido.AI.{Agent, Conversation, History, Profile}
+  alias Jido.AI.{Agent, Profile}
+  alias Jido.AI.Thread.Projection
 
   defp source, do: definition(:react, tools: [], model: MockLLM.model(), system_prompt: "Configured")
 
   defp saved(prompt \\ "Saved", messages \\ [%{role: :user, content: "Previous"}]) do
     thread = Jido.Thread.new(metadata: %{system_prompt: prompt})
-    {:ok, session} = Conversation.append(Jido.Session.new(thread: thread), messages)
+    {:ok, session} = Projection.append(Jido.Session.new(thread: thread), messages)
     session
   end
 
@@ -27,7 +28,7 @@ defmodule Jido.AI.InitialStateTest do
     assert {:ok, agent} = Agent.from_initial_state(source(), %{})
     assert is_nil(agent.state.messages)
     assert {:ok, %Profile{instructions: "Configured"} = profile} = Configuration.profile(agent)
-    assert {:ok, []} = History.read(agent.state, profile)
+    assert {:ok, []} = Jido.AI.Session.Transcript.read(agent.state, profile)
     assert {:ok, empty} = Agent.from_initial_state(source(), %{messages: saved("")})
     assert {:ok, %Profile{instructions: ""}} = Configuration.profile(empty)
   end
@@ -87,13 +88,13 @@ defmodule Jido.AI.InitialStateTest do
   end
 
   test "encoded Session imports without copying entries or losing references" do
-    {:ok, session} = Conversation.append(saved(), [ReqLLM.Context.assistant("Old answer")], %{case: "one"})
+    {:ok, session} = Projection.append(saved(), [ReqLLM.Context.assistant("Old answer")], %{case: "one"})
     input = session |> Jido.Session.encode() |> Jason.encode!() |> Jason.decode!()
     assert {:ok, agent} = Agent.from_initial_state(source(), %{"messages" => input})
     assert agent.state.messages.id == session.id
     assert Enum.map(agent.state.messages.thread.entries, & &1.id) == Enum.map(session.thread.entries, & &1.id)
     assert List.last(agent.state.messages.thread.entries).refs["case"] == "one"
-    assert {:ok, projected} = Conversation.messages(agent.state.messages)
+    assert {:ok, projected} = Projection.messages(agent.state.messages)
     assert Enum.map(projected, &Jido.AI.Query.summarize(&1.content)) == ["Previous", "Old answer"]
     assert {:ok, %Profile{instructions: "Saved"}} = Configuration.profile(agent)
     assert {:error, _} = Agent.from_initial_state(source(), %{messages: Map.put(input, "version", 999)})

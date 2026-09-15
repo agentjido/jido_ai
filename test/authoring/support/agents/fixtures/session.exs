@@ -5,7 +5,7 @@ defmodule JidoAITest.Authoring.Agents.Fixtures.Session do
     schema Zoi.object(%{
              reply: Zoi.string() |> Zoi.default(""),
              case_id: Zoi.string() |> Zoi.default("case-17"),
-             messages: Jido.AI.Conversation.schema()
+             messages: Jido.AI.Thread.Projection.schema()
            })
 
     ai :assistant do

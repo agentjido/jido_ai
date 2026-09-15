@@ -117,7 +117,7 @@ defmodule Jido.AI.Test.ReasoningCase do
         last_prompt: Jido.AI.Query.schema() |> Zoi.default(""),
         last_result: Zoi.any() |> Zoi.default(nil),
         completed: Zoi.boolean() |> Zoi.default(false),
-        messages: Jido.AI.Conversation.schema(),
+        messages: Jido.AI.Thread.Projection.schema(),
         selected_strategy: Zoi.atom() |> Zoi.nullable() |> Zoi.default(nil)
       })
 

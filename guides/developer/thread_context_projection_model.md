@@ -7,8 +7,10 @@ one append-only `Jido.Thread`. The context-control Plugin stores only the active
 lane, one pending operation, and a bounded list of applied operation IDs. It
 does not store messages or a second Session.
 
-`Jido.AI.Conversation` encodes AI entries and selects provider input. It has no
-state. History reads and commits the declared Session field. In-flight provider
+`Jido.AI.Thread.Projection` encodes AI entries and selects provider input. It has no
+state. Internal `Session.Transcript` reads and commits the declared Session
+field. `Model.Messages` removes private references before provider calls and
+restores them only when the response retains the exact input prefix. In-flight provider
 messages are request snapshots, not another committed store. Core Agent state
 updates remain the commit boundary.
 
@@ -23,14 +25,14 @@ provider metadata. Entry identity, sequence, and time belong to Thread.Entry.
 `:ai_context_operation` payloads also have a version. They contain operation ID,
 lane, type, reason, optional base sequence, metadata, and an encoded canonical
 Thread snapshot for replacement. A switch has no replacement snapshot.
-`Conversation.Operation` validates and encodes this internal contract.
+`Jido.AI.Thread.Operation` validates and encodes this internal contract.
 
 Application entry kinds are retained by Thread but excluded from model input.
 Malformed AI payloads return errors rather than becoming provider messages.
 
 ## Selection and lifecycle
 
-`Conversation.select/2` chooses a named lane, or the last selected lane. A
+`Projection.select/2` chooses a named lane, or the last selected lane. A
 replacement resets the selected message view to its saved Thread entries.
 Subsequent AI entries extend that view. Selection does not mutate the audit log.
 

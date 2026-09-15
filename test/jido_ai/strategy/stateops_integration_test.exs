@@ -259,7 +259,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     server = start(jido)
 
     {:ok, context} =
-      Jido.AI.Conversation.append(
+      Jido.AI.Thread.Projection.append(
         Jido.Thread.new(metadata: %{system_prompt: "History prompt"}),
         [ReqLLM.Context.user("Hello"), ReqLLM.Context.assistant("Hi")]
       )
@@ -282,7 +282,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     initial = Agent.new!(state: %{label: "keep"})
 
     {:ok, session} =
-      Jido.AI.Conversation.append(Jido.Session.new(), [
+      Jido.AI.Thread.Projection.append(Jido.Session.new(), [
         ReqLLM.Context.user("first"),
         ReqLLM.Context.assistant("second")
       ])

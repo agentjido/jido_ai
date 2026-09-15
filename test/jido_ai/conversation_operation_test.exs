@@ -1,6 +1,6 @@
 defmodule Jido.AI.ConversationOperationTest do
   use ExUnit.Case, async: true
-  alias Jido.AI.Conversation.Operation
+  alias Jido.AI.Thread.Operation
   alias Jido.Thread
 
   test "operation payload round trips with a canonical snapshot" do

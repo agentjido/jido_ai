@@ -1,4 +1,4 @@
-defmodule Jido.AI.Conversation do
+defmodule Jido.AI.Thread.Projection do
   @moduledoc """
   AI message projection for canonical `Jido.Session` and `Jido.Thread` values.
 
@@ -7,6 +7,38 @@ defmodule Jido.AI.Conversation do
   This module holds no conversation state. References stay on Thread entries,
   outside provider messages. Binary content is stored as explicit base64 data.
   """
+  @doc false
+  def project(value) do
+    with {:ok, selected} <- select(value),
+         {:ok, messages} <- messages(selected) do
+      {:ok,
+       Enum.map(Enum.zip(selected.entries, messages), fn {entry, message} ->
+         [value] = Jido.AI.Model.Messages.entries([message])
+         %{value | refs: entry.refs, timestamp: DateTime.from_unix!(entry.at, :millisecond)}
+       end)}
+    end
+  end
+
+  @doc false
+  def append_entries(value, entries, extra_refs \\ %{}) do
+    Enum.reduce(entries, value, fn entry, value ->
+      {:ok, messages} = Jido.AI.Model.Messages.messages([entry])
+      refs = Map.merge(Map.get(entry, :refs) || %{}, extra_refs)
+      {:ok, [canonical]} = entries(messages, refs)
+
+      canonical =
+        case entry[:timestamp] do
+          %DateTime{} = timestamp -> %{canonical | at: DateTime.to_unix(timestamp, :millisecond)}
+          _ -> canonical
+        end
+
+      case value do
+        %Jido.Session{} -> Jido.Session.append(value, canonical)
+        %Jido.Thread{} -> Jido.Thread.append(value, canonical)
+      end
+    end)
+  end
+
   alias Jido.{Session, Thread}
   alias ReqLLM.Message
   alias ReqLLM.Message.ContentPart
@@ -114,7 +146,7 @@ defmodule Jido.AI.Conversation do
   def select(_, _), do: {:error, :invalid_conversation}
 
   defp operation!(entry) do
-    {:ok, operation} = Jido.AI.Conversation.Operation.decode(entry)
+    {:ok, operation} = Jido.AI.Thread.Operation.decode(entry)
     operation
   end
 

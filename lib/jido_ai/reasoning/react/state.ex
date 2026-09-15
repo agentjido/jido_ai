@@ -4,7 +4,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
   """
 
   alias Jido.AI.Reasoning.ReAct.PendingToolCall
-  alias Jido.AI.Conversation
+  alias Jido.AI.Thread.Projection
   alias Jido.Thread
 
   @status_values [:running, :awaiting_tools, :completed, :failed, :cancelled]
@@ -342,18 +342,18 @@ defmodule Jido.AI.Reasoning.ReAct.State do
 
   @doc false
   def conversation(entries, prompt) do
-    Jido.AI.History.append_entries(Thread.new(metadata: %{system_prompt: prompt}), entries)
+    Jido.AI.Thread.Projection.append_entries(Thread.new(metadata: %{system_prompt: prompt}), entries)
   end
 
   @doc false
   def history(%Thread{} = thread) do
-    {:ok, entries} = Jido.AI.History.project(thread)
+    {:ok, entries} = Jido.AI.Thread.Projection.project(thread)
     entries
   end
 
   @doc false
   def messages(%Thread{} = thread) do
-    {:ok, messages} = Conversation.messages(thread)
+    {:ok, messages} = Projection.messages(thread)
     prompt = Map.get(thread.metadata, :system_prompt, thread.metadata["system_prompt"])
     if is_binary(prompt), do: [ReqLLM.Context.system(prompt) | messages], else: messages
   end

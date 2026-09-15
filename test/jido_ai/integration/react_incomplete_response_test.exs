@@ -12,7 +12,7 @@ defmodule Jido.AI.Integration.ReActIncompleteResponseTest do
     use Jido.AI.Agent, name: "incomplete_response_test_agent"
 
     agent do
-      schema Zoi.object(%{last_result: Zoi.any() |> Zoi.default(nil), messages: Jido.AI.Conversation.schema()})
+      schema Zoi.object(%{last_result: Zoi.any() |> Zoi.default(nil), messages: Jido.AI.Thread.Projection.schema()})
 
       ai :assistant do
         model("openai:gpt-4o-mini")

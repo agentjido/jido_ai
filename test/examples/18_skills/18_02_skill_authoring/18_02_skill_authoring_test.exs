@@ -30,7 +30,7 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
         schema:
           Zoi.object(%{
             reply: Zoi.any() |> Zoi.default(nil),
-            messages: Jido.AI.Conversation.schema()
+            messages: Jido.AI.Thread.Projection.schema()
           })
       )
 
@@ -187,7 +187,7 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
       use Jido.AI.Agent, name: "runtime_location"
 
       agent do
-        schema Zoi.object(%{reply: Zoi.any() |> Zoi.default(nil), messages: Jido.AI.Conversation.schema()})
+        schema Zoi.object(%{reply: Zoi.any() |> Zoi.default(nil), messages: Jido.AI.Thread.Projection.schema()})
 
         ai :assistant do
           model(:example)
@@ -414,7 +414,7 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
           agent do
             schema Zoi.object(%{
                      reply: Zoi.any() |> Zoi.default(nil),
-                     messages: Jido.AI.Conversation.schema()
+                     messages: Jido.AI.Thread.Projection.schema()
                    })
 
             ai :assistant do
@@ -467,9 +467,9 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
         schema:
           Zoi.object(%{
             reply: Zoi.any() |> Zoi.default(nil),
-            messages: Jido.AI.Conversation.schema(),
+            messages: Jido.AI.Thread.Projection.schema(),
             review_reply: Zoi.any() |> Zoi.default(nil),
-            review_messages: Jido.AI.Conversation.schema()
+            review_messages: Jido.AI.Thread.Projection.schema()
           })
       )
 

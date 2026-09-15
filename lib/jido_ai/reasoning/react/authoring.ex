@@ -105,7 +105,7 @@ defmodule Jido.AI.Reasoning.ReAct.Authoring do
       schema:
         Zoi.object(%{
           result: Zoi.any() |> Zoi.default(nil),
-          messages: Jido.AI.Conversation.schema()
+          messages: Jido.AI.Thread.Projection.schema()
         }),
       routes: []
     }

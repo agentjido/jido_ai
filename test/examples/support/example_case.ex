@@ -35,17 +35,17 @@ defmodule JidoAI.Examples.Case do
   end
 
   def conversation_entries(%Jido.Thread{} = thread) do
-    {:ok, selected} = Jido.AI.Conversation.select(thread)
+    {:ok, selected} = Jido.AI.Thread.Projection.select(thread)
 
     Enum.map(selected.entries, fn entry ->
-      {:ok, message} = Jido.AI.Conversation.message(entry)
+      {:ok, message} = Jido.AI.Thread.Projection.message(entry)
       message |> Map.from_struct() |> Map.put(:refs, entry.refs)
     end)
   end
 
   def conversation(agent) do
     {:ok, profile} = Jido.AI.Configuration.profile(agent)
-    {:ok, entries} = Jido.AI.History.read(agent.state, profile)
+    {:ok, entries} = Jido.AI.Session.Transcript.read(agent.state, profile)
     entries
   end
 

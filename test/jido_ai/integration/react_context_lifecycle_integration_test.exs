@@ -2,7 +2,7 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
   use ExUnit.Case, async: false
   use Mimic
 
-  alias Jido.AI.{Configuration, History, Profile, Session}
+  alias Jido.AI.{Configuration, Profile, Session}
   alias Jido.Thread
   alias Jido.AI.TestSupport.StreamResponseFactory
 
@@ -19,7 +19,7 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
     use Jido.AI.Agent, name: "context_lifecycle_agent"
 
     agent do
-      schema Zoi.object(%{last_result: Zoi.any() |> Zoi.default(nil), messages: Jido.AI.Conversation.schema()})
+      schema Zoi.object(%{last_result: Zoi.any() |> Zoi.default(nil), messages: Jido.AI.Thread.Projection.schema()})
 
       ai :assistant do
         instructions("Initial prompt")
@@ -110,7 +110,7 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
            ]
 
     {:ok, replacement_context} =
-      Jido.AI.Conversation.append(
+      Jido.AI.Thread.Projection.append(
         Jido.Thread.new(metadata: %{system_prompt: "Reset prompt"}),
         [ReqLLM.Context.user("Reset seed")]
       )
@@ -137,7 +137,7 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
     state_after_reset = conversation(pid)
     assert hd(state_after_reset) == %{role: :system, content: "Reset prompt"}
     assert {:ok, %Profile{instructions: "Reset prompt"} = profile} = Configuration.profile(fetch_agent(pid))
-    assert {:ok, [%{role: :user, content: seed}]} = History.read(fetch_agent(pid).state, profile)
+    assert {:ok, [%{role: :user, content: seed}]} = Jido.AI.Session.Transcript.read(fetch_agent(pid).state, profile)
     assert Jido.AI.Query.summarize(seed) == "Reset seed"
     assert non_system_messages(state_after_reset) == [%{role: :user, content: "Reset seed"}]
 
@@ -162,7 +162,7 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
 
     # The Agent-owned log is append-only: reset is a context operation entry.
     [context_op] = Thread.filter_by_kind(session_thread, :ai_context_operation)
-    assert {:ok, operation} = Jido.AI.Conversation.Operation.decode(context_op)
+    assert {:ok, operation} = Jido.AI.Thread.Operation.decode(context_op)
     assert operation.op_id == "op_reset_demo"
     assert operation.context_ref == "default"
     assert operation.operation.type == :replace
@@ -247,12 +247,12 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
   end
 
   defp entry_role(entry) when is_map(entry) do
-    {:ok, message} = Jido.AI.Conversation.message(entry)
+    {:ok, message} = Jido.AI.Thread.Projection.message(entry)
     message.role
   end
 
   defp entry_content(entry) when is_map(entry) do
-    {:ok, message} = Jido.AI.Conversation.message(entry)
+    {:ok, message} = Jido.AI.Thread.Projection.message(entry)
     Jido.AI.Query.summarize(message.content)
   end
 end

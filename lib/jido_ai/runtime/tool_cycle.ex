@@ -1,6 +1,6 @@
 defmodule Jido.AI.Runtime.ToolCycle do
   @moduledoc false
-  alias Jido.AI.{History, Session}
+  alias Jido.AI.Session
 
   @warning "You already called the same tool(s) with identical parameters in the previous iteration. Do NOT repeat the same calls. Either use the results you already have to form a final answer, or try a different approach."
 
@@ -27,9 +27,9 @@ defmodule Jido.AI.Runtime.ToolCycle do
       if repeated? do
         message = ReqLLM.Context.user(@warning)
 
-        History.record(
+        Jido.AI.Session.Transcript.record(
           %{state | messages: ReqLLM.Context.append(state.messages, message)},
-          History.query(@warning, %{}),
+          Jido.AI.Session.Transcript.query(@warning, %{}),
           context
         )
       else

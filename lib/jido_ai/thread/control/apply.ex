@@ -1,4 +1,4 @@
-defmodule Jido.AI.Conversation.Control.Apply do
+defmodule Jido.AI.Thread.Control.Apply do
   @moduledoc false
   use Jido.Action, name: "ai_context_modify"
 
@@ -6,7 +6,7 @@ defmodule Jido.AI.Conversation.Control.Apply do
   def run(params, context) do
     Jido.AI.Error.capture(fn ->
       with {:ok, context} <- Jido.AI.Session.Plugin.context(context),
-           do: Jido.AI.Conversation.Control.modify(params, context)
+           do: Jido.AI.Thread.Control.modify(params, context)
     end)
   end
 end

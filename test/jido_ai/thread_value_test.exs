@@ -2,7 +2,7 @@ defmodule Jido.ThreadValueTest do
   use ExUnit.Case, async: true
 
   alias Jido.{Session, Thread}
-  alias Jido.AI.Conversation.Control
+  alias Jido.AI.Thread.Control
   alias Jido.Thread.Entry
 
   test "exposes schemas and empty value helpers" do

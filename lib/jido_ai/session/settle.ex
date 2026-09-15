@@ -60,7 +60,7 @@ defmodule Jido.AI.Session.Settle do
         Jido.AI.Session.Inspection.complete(record, completion[:inspection], candidate, context)
 
       with {:ok, candidate, changes} <-
-             Jido.AI.Conversation.Control.finish(candidate, record, context),
+             Jido.AI.Thread.Control.finish(candidate, record, context),
            do: {:ok, candidate, [%Change{operation: :finish, record: record} | changes ++ directives]}
     else
       _ -> {:error, :stale_request}

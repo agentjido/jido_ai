@@ -15,8 +15,8 @@ defmodule Jido.AI.Runtime.Prepare do
          {:ok, profile} <- Jido.AI.ModelRouter.select(profile, %{query: query}, context),
          {:ok, profile, adaptive} <- Jido.AI.Reasoning.select(profile, query),
          {:ok, output} <- Profile.output_contract(profile.result),
-         {:ok, history} <- Jido.AI.History.read(context.agent_state, profile),
-         {:ok, history_messages} <- Jido.AI.History.messages(history) do
+         {:ok, history} <- Jido.AI.Session.Transcript.read(context.agent_state, profile),
+         {:ok, history_messages} <- Jido.AI.Model.Messages.messages(history) do
       entry = profile.models[profile.reasoning.model]
       model = Models.resolve(entry.model)
       runtime_options = get_in(context, [:ai, id, :options]) || []
@@ -37,12 +37,17 @@ defmodule Jido.AI.Runtime.Prepare do
       messages =
         messages ++
           history_messages ++
-          [Jido.AI.History.bind_message(ReqLLM.Context.user(Jido.AI.Reasoning.query(profile, query)), context)]
+          [
+            Jido.AI.Session.Transcript.bind_message(
+              ReqLLM.Context.user(Jido.AI.Reasoning.query(profile, query)),
+              context
+            )
+          ]
 
       refs =
         case context[:jido_ai_request_record] do
           nil -> %{}
-          record -> Jido.AI.History.refs(record, context.jido_ai_input_source)
+          record -> Jido.AI.Session.Transcript.refs(record, context.jido_ai_input_source)
         end
 
       state = %{
@@ -61,7 +66,7 @@ defmodule Jido.AI.Runtime.Prepare do
         repairs: 0,
         usage: %{},
         deadline: deadline,
-        history_delta: Jido.AI.History.query(query, refs)
+        history_delta: Jido.AI.Session.Transcript.query(query, refs)
       }
 
       state = if adaptive, do: Map.put(state, :adaptive, adaptive), else: state

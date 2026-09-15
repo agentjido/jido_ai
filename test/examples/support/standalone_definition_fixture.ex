@@ -8,7 +8,7 @@ defmodule JidoAI.Examples.StandaloneAuthoring.Agent do
         Zoi.object(%{
           result: Zoi.any() |> Zoi.default(nil),
           count: Zoi.integer() |> Zoi.default(0),
-          messages: Jido.AI.Conversation.schema()
+          messages: Jido.AI.Thread.Projection.schema()
         })
     })
   end

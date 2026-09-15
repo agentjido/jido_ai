@@ -1,13 +1,13 @@
 defmodule Jido.AI.ConversationTest do
   use ExUnit.Case, async: true
-  alias Jido.AI.Conversation
+  alias Jido.AI.Thread.Projection
   alias ReqLLM.{Context, Message, ToolCall}
   alias ReqLLM.Message.ContentPart
 
   test "selection applies replacements and lane switches without changing the log" do
-    {:ok, thread} = Conversation.append(Jido.Thread.new(), [Context.user("old")])
-    {:ok, thread} = Conversation.append(thread, [Context.user("other")], %{context_ref: "other"})
-    {:ok, snapshot} = Conversation.append(Jido.Thread.new(), [Context.user("saved")])
+    {:ok, thread} = Projection.append(Jido.Thread.new(), [Context.user("old")])
+    {:ok, thread} = Projection.append(thread, [Context.user("other")], %{context_ref: "other"})
+    {:ok, snapshot} = Projection.append(Jido.Thread.new(), [Context.user("saved")])
     snapshot = Jido.Thread.append(snapshot, %{kind: :application_note, payload: %{private: "not a model message"}})
 
     replacement = %{
@@ -24,8 +24,8 @@ defmodule Jido.AI.ConversationTest do
     }
 
     thread = Jido.Thread.append(thread, %{kind: :ai_context_operation, payload: replacement})
-    {:ok, thread} = Conversation.append(thread, [Context.user("next")])
-    assert {:ok, messages} = Conversation.messages(thread)
+    {:ok, thread} = Projection.append(thread, [Context.user("next")])
+    assert {:ok, messages} = Projection.messages(thread)
     assert Enum.map(messages, &hd(&1.content).text) == ["saved", "next"]
     assert length(thread.entries) == 4
 
@@ -38,12 +38,12 @@ defmodule Jido.AI.ConversationTest do
 
     thread = Jido.Thread.append(thread, %{kind: :ai_context_operation, payload: switch})
     {:ok, restored} = thread |> Jido.Thread.encode() |> Jason.encode!() |> Jason.decode!() |> Jido.Thread.decode()
-    assert {:ok, [message]} = Conversation.messages(restored)
+    assert {:ok, [message]} = Projection.messages(restored)
     assert hd(message.content).text == "other"
-    assert {:ok, other} = Conversation.select(restored, "other")
-    assert {:ok, [^message]} = Conversation.messages(other)
-    assert {:ok, selected} = Conversation.select(restored, "default")
-    assert {:ok, messages} = Conversation.messages(selected)
+    assert {:ok, other} = Projection.select(restored, "other")
+    assert {:ok, [^message]} = Projection.messages(other)
+    assert {:ok, selected} = Projection.select(restored, "default")
+    assert {:ok, messages} = Projection.messages(selected)
     assert Enum.map(messages, &hd(&1.content).text) == ["saved", "next"]
   end
 
@@ -57,10 +57,10 @@ defmodule Jido.AI.ConversationTest do
       Context.assistant("91 cents")
     ]
 
-    {:ok, session} = Conversation.append(Jido.Session.new(), messages, %{request_id: "r1"})
+    {:ok, session} = Projection.append(Jido.Session.new(), messages, %{request_id: "r1"})
     encoded = session |> Jido.Session.encode() |> Jason.encode!() |> Jason.decode!()
     assert {:ok, restored} = Jido.Session.decode(encoded)
-    assert {:ok, [_, assistant, tool, answer]} = Conversation.messages(restored)
+    assert {:ok, [_, assistant, tool, answer]} = Projection.messages(restored)
     assert hd(assistant.tool_calls).id == tool.tool_call_id
     assert tool.name == "multiply"
     assert hd(answer.content).text == "91 cents"
@@ -74,9 +74,9 @@ defmodule Jido.AI.ConversationTest do
       %ContentPart{type: :thinking, text: "opaque", metadata: %{"signature" => "sig"}}
     ]
 
-    {:ok, thread} = Conversation.append(Jido.Thread.new(), [%Message{role: :assistant, content: parts}])
+    {:ok, thread} = Projection.append(Jido.Thread.new(), [%Message{role: :assistant, content: parts}])
     {:ok, restored} = thread |> Jido.Thread.encode() |> Jason.encode!() |> Jason.decode!() |> Jido.Thread.decode()
-    assert {:ok, [message]} = Conversation.messages(restored)
+    assert {:ok, [message]} = Projection.messages(restored)
     assert message.content == parts
     assert is_map(hd(hd(restored.entries).payload["content"]))
     refute is_struct(hd(hd(restored.entries).payload["content"]))
@@ -84,19 +84,19 @@ defmodule Jido.AI.ConversationTest do
 
   test "application entries are ignored but malformed AI entries fail" do
     thread = Jido.Thread.new() |> Jido.Thread.append(%{kind: :application_note, payload: %{text: "private"}})
-    assert {:ok, []} = Conversation.messages(thread)
+    assert {:ok, []} = Projection.messages(thread)
     invalid = Jido.Thread.append(thread, %{kind: :ai_message, payload: %{"version" => 99}})
-    assert {:error, :invalid_conversation} = Conversation.messages(invalid)
-    assert {:error, :invalid_conversation} = Jido.AI.History.project(invalid)
+    assert {:error, :invalid_conversation} = Projection.messages(invalid)
+    assert {:error, :invalid_conversation} = Jido.AI.Thread.Projection.project(invalid)
   end
 
   test "closed sessions do not accept messages" do
     session = Jido.Session.new() |> Jido.Session.close()
-    assert {:error, :invalid_conversation} = Conversation.append(session, [Context.user("hello")])
+    assert {:error, :invalid_conversation} = Projection.append(session, [Context.user("hello")])
   end
 
   test "malformed AI payloads are rejected rather than silently projected" do
-    {:ok, [entry]} = Conversation.entries([Context.user("hello")])
+    {:ok, [entry]} = Projection.entries([Context.user("hello")])
 
     for payload <- [
           Map.put(entry.payload, "role", "unknown"),
@@ -104,14 +104,14 @@ defmodule Jido.AI.ConversationTest do
           Map.put(entry.payload, "role", "tool"),
           Map.put(entry.payload, "content", [%{"type" => "text", "text" => 42}])
         ] do
-      assert {:error, :invalid_conversation} = Conversation.message(%{entry | payload: payload})
+      assert {:error, :invalid_conversation} = Projection.message(%{entry | payload: payload})
     end
   end
 
   test "internal reference metadata does not become provider input" do
     message = Context.user("hello", %{"visible" => true, :jido_ai_refs => %{request_id: "private"}})
-    {:ok, thread} = Conversation.append(Jido.Thread.new(), [message], %{request_id: "private"})
-    assert {:ok, [projected]} = Conversation.messages(thread)
+    {:ok, thread} = Projection.append(Jido.Thread.new(), [message], %{request_id: "private"})
+    assert {:ok, [projected]} = Projection.messages(thread)
     assert projected.metadata == %{"visible" => true}
     assert hd(thread.entries).refs == %{request_id: "private"}
   end
@@ -119,12 +119,12 @@ defmodule Jido.AI.ConversationTest do
   test "exchange validation rejects orphan results and preserves open checkpoint calls" do
     call = ToolCall.new("pending", "multiply", "{}")
     assistant = %Message{role: :assistant, content: [], tool_calls: [call]}
-    assert {:ok, %{"pending" => _}} = Conversation.open_tool_calls([assistant])
+    assert {:ok, %{"pending" => _}} = Projection.open_tool_calls([assistant])
 
     assert {:error, :invalid_tool_history} =
-             Conversation.open_tool_calls([Context.tool_result("orphan", "multiply", "1")])
+             Projection.open_tool_calls([Context.tool_result("orphan", "multiply", "1")])
 
-    assert {:error, :invalid_tool_history} = Conversation.open_tool_calls([assistant, Context.user("interrupt")])
-    assert {:ok, %{}} = Conversation.open_tool_calls([assistant, Context.tool_result("pending", "multiply", "1")])
+    assert {:error, :invalid_tool_history} = Projection.open_tool_calls([assistant, Context.user("interrupt")])
+    assert {:ok, %{}} = Projection.open_tool_calls([assistant, Context.tool_result("pending", "multiply", "1")])
   end
 end

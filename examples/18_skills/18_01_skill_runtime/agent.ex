@@ -5,7 +5,7 @@ defmodule JidoAI.Examples.SkillRuntime.Agent do
   agent do
     schema Zoi.object(%{
              reply: Zoi.any() |> Zoi.default(nil),
-             messages: Jido.AI.Conversation.schema()
+             messages: Jido.AI.Thread.Projection.schema()
            })
 
     ai :assistant do

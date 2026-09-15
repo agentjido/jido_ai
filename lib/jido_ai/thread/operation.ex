@@ -1,4 +1,4 @@
-defmodule Jido.AI.Conversation.Operation do
+defmodule Jido.AI.Thread.Operation do
   @moduledoc false
   alias Jido.Thread
 

@@ -1,7 +1,7 @@
 defmodule Jido.AI.Session.Inspection do
   @moduledoc false
-  alias Jido.AI.{Configuration, History, Profile}
-  alias Jido.AI.Conversation.Control
+  alias Jido.AI.{Configuration, Profile}
+  alias Jido.AI.Thread.Control
   alias Jido.AI.Runtime.Event
 
   @limit 2_000
@@ -242,7 +242,7 @@ defmodule Jido.AI.Session.Inspection do
   defp conversation(_, %{memory: %{history: nil}}), do: nil
 
   defp conversation(state, profile) do
-    case History.read(state, profile) do
+    case Jido.AI.Session.Transcript.read(state, profile) do
       {:ok, entries} ->
         messages = Enum.map(entries, &Map.drop(&1, [:timestamp]))
 

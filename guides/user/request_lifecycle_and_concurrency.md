@@ -119,7 +119,7 @@ Important:
 
 - `Jido.AI.Request`: request handles, `await/2`, `await_many/2`, request state lifecycle.
 - `Jido.AI.Turn`: normalized response shape and assistant/tool message projection.
-- `Jido.Session` and `Jido.Thread`: canonical conversation values; `Jido.AI.Conversation` projects model messages.
+- `Jido.Session` and `Jido.Thread`: canonical conversation values; `Jido.AI.Thread.Projection` projects model messages.
 - `Jido.AI.steer/3` and `Jido.AI.inject/3`: explicit control path for active ReAct runs.
 - AI model and tool work runs through Actions and the Session runtime.
 

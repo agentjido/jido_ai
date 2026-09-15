@@ -38,7 +38,7 @@ defmodule JidoAITest.Authoring.Agents.Cases do
       Zoi.object(%{
         reply: Zoi.string() |> Zoi.default(""),
         case_id: Zoi.string() |> Zoi.default("case-17"),
-        messages: Jido.AI.Conversation.schema()
+        messages: Jido.AI.Thread.Projection.schema()
       })
 
   def schema(:multi),

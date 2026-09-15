@@ -1,6 +1,6 @@
 defmodule Jido.AI.ConversationContentTest do
   use ExUnit.Case, async: true
-  alias Jido.AI.Conversation
+  alias Jido.AI.Thread.Projection
   alias ReqLLM.{Context, Message}
   alias ReqLLM.Message.ContentPart
 
@@ -15,12 +15,12 @@ defmodule Jido.AI.ConversationContentTest do
       ContentPart.file_id("file-1", "application/pdf")
     ]
 
-    {:ok, session} = Conversation.append(Jido.Session.new(), [%Message{role: :assistant, content: parts}])
+    {:ok, session} = Projection.append(Jido.Session.new(), [%Message{role: :assistant, content: parts}])
 
     assert {:ok, restored} =
              session |> Jido.Session.encode() |> Jason.encode!() |> Jason.decode!() |> Jido.Session.decode()
 
-    assert {:ok, [%{content: ^parts}]} = Conversation.messages(restored)
+    assert {:ok, [%{content: ^parts}]} = Projection.messages(restored)
   end
 
   test "multimodal tool results retain correlation and content" do
@@ -32,8 +32,8 @@ defmodule Jido.AI.ConversationContentTest do
       %Message{role: :tool, name: "calc", tool_call_id: "call", content: parts}
     ]
 
-    {:ok, thread} = Conversation.append(Jido.Thread.new(), messages)
-    assert {:ok, [_, _, %{name: "calc", tool_call_id: "call", content: ^parts}]} = Conversation.messages(thread)
+    {:ok, thread} = Projection.append(Jido.Thread.new(), messages)
+    assert {:ok, [_, _, %{name: "calc", tool_call_id: "call", content: ^parts}]} = Projection.messages(thread)
   end
 
   test "references stay on each canonical entry and survive mixed empty references" do
@@ -45,7 +45,7 @@ defmodule Jido.AI.ConversationContentTest do
 
     thread =
       Enum.reduce(input, Jido.Thread.new(), fn {message, refs}, thread ->
-        {:ok, next} = Conversation.append(thread, [message], refs)
+        {:ok, next} = Projection.append(thread, [message], refs)
         next
       end)
 
@@ -53,7 +53,7 @@ defmodule Jido.AI.ConversationContentTest do
              thread |> Jido.Thread.encode() |> Jason.encode!() |> Jason.decode!() |> Jido.Thread.decode()
 
     assert Enum.map(restored.entries, & &1.refs) == [%{"source" => "one"}, %{}, %{"source" => "three"}]
-    assert {:ok, messages} = Conversation.messages(restored)
+    assert {:ok, messages} = Projection.messages(restored)
     assert Enum.all?(messages, &(&1.metadata == %{}))
     assert Enum.map(restored.entries, & &1.id) == Enum.map(thread.entries, & &1.id)
     assert Enum.map(restored.entries, & &1.at) == Enum.map(thread.entries, & &1.at)
@@ -61,10 +61,10 @@ defmodule Jido.AI.ConversationContentTest do
 
   test "system messages are explicit and metadata does not create a second message" do
     {:ok, thread} =
-      Conversation.append(Jido.Thread.new(metadata: %{system_prompt: "metadata"}), [Context.system("explicit")])
+      Projection.append(Jido.Thread.new(metadata: %{system_prompt: "metadata"}), [Context.system("explicit")])
 
-    assert {:ok, [message]} = Conversation.messages(thread)
+    assert {:ok, [message]} = Projection.messages(thread)
     assert hd(message.content).text == "explicit"
-    assert {:ok, []} = Conversation.messages(Jido.Thread.new())
+    assert {:ok, []} = Projection.messages(Jido.Thread.new())
   end
 end

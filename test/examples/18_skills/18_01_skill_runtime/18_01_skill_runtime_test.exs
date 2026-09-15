@@ -1,6 +1,7 @@
 defmodule JidoAI.Examples.SkillRuntimeTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Conversation, Request, Session}
+  alias Jido.AI.{Request, Session}
+  alias Jido.AI.Thread.Projection
   alias Jido.AI.Actions.Skill.{LoadSkill, RuntimeContext}
   alias Jido.Thread
   alias Jido.AI.Skill.{Activation, AgentIntegration, Registry, Spec}
@@ -34,7 +35,7 @@ defmodule JidoAI.Examples.SkillRuntimeTest do
   defp entries(server) do
     agent = Server.agent(server)
     {:ok, profile} = Jido.AI.Configuration.profile(agent, :assistant)
-    {:ok, messages} = Jido.AI.History.read(agent.state, profile)
+    {:ok, messages} = Jido.AI.Session.Transcript.read(agent.state, profile)
     # These assertions inspect the most recent tool result first.
     Enum.reverse(messages)
   end
@@ -43,7 +44,7 @@ defmodule JidoAI.Examples.SkillRuntimeTest do
 
   defp compact(server) do
     {:ok, snapshot} =
-      Conversation.append(
+      Projection.append(
         Jido.Thread.new(metadata: %{system_prompt: "After compaction"}),
         [ReqLLM.Context.user("Summary")]
       )
@@ -88,7 +89,7 @@ defmodule JidoAI.Examples.SkillRuntimeTest do
              :ai_message
            )
            |> Enum.any?(fn entry ->
-             {:ok, message} = Jido.AI.Conversation.message(entry)
+             {:ok, message} = Jido.AI.Thread.Projection.message(entry)
              message.role == :tool and entry.refs[:durable]
            end)
 

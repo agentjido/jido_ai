@@ -326,7 +326,7 @@ defmodule JidoAI.Examples.SteeringTest do
       schema:
         Zoi.object(%{
           reply: Zoi.map() |> Zoi.default(%{}),
-          messages: Jido.AI.Conversation.schema()
+          messages: Jido.AI.Thread.Projection.schema()
         }),
       routes: [{"ai.ask", Jido.AI.Authoring.ai(:assistant)}]
     }

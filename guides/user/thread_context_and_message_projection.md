@@ -7,7 +7,7 @@ to the `jido_ai` package. They do not start processes or execute requests.
 
 The Profile's `memory.history` setting names an Agent field. That field holds
 one `Jido.Session`, or `nil` before the first request. Declare it with
-`Jido.AI.Conversation.schema()`. A Session owns one append-only Thread. The
+`Jido.AI.Thread.Projection.schema()`. A Session owns one append-only Thread. The
 Thread holds ordered `Jido.Thread.Entry` values, including AI messages,
 conversation operations, and application entries.
 
@@ -18,15 +18,15 @@ live API for request control and inspection; it is not the portable value.
 ## Build and project a conversation
 
 ```elixir
-alias Jido.AI.Conversation
+alias Jido.AI.Thread.Projection
 
 thread = Jido.Thread.new(metadata: %{system_prompt: "Be concise."})
-{:ok, session} = Conversation.append(Jido.Session.new(thread: thread), [
+{:ok, session} = Projection.append(Jido.Session.new(thread: thread), [
   %{role: :user, content: "Hello"},
   %{role: :assistant, content: "Hi"}
 ], %{source: "/import"})
 
-{:ok, messages} = Conversation.messages(session)
+{:ok, messages} = Projection.messages(session)
 ```
 
 `messages/1` returns ReqLLM messages in order for the selected conversation.
@@ -40,7 +40,7 @@ the selected Profile's instructions. Import and replacement can update those
 instructions from the saved Thread metadata. Do not add the same system prompt
 both as a message and as Profile instructions.
 
-Use `Conversation.select(thread, "lane-name")` to inspect a named lane. This
+Use `Projection.select(thread, "lane-name")` to inspect a named lane. This
 returns a selected Thread view without changing the original audit log. Do not
 replace the full audit log with that view unless this is your explicit intent.
 
@@ -66,7 +66,7 @@ special `:context` import input is removed.
 ## Replace, compact, or switch
 
 ```elixir
-{:ok, summary} = Conversation.append(Jido.Thread.new(), [
+{:ok, summary} = Projection.append(Jido.Thread.new(), [
   %{role: :user, content: "Summary of the earlier conversation"}
 ])
 

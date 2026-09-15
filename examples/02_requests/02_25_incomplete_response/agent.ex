@@ -6,7 +6,7 @@ defmodule JidoAI.Examples.IncompleteResponse.Agent do
     schema(
       Zoi.object(%{
         reply: Zoi.any() |> Zoi.default("untouched"),
-        messages: Jido.AI.Conversation.schema()
+        messages: Jido.AI.Thread.Projection.schema()
       })
     )
 

@@ -5,7 +5,7 @@ defmodule JidoAI.Examples.Steering.Agent do
   agent do
     schema Zoi.object(%{
              reply: Zoi.string() |> Zoi.default(""),
-             messages: Jido.AI.Conversation.schema()
+             messages: Jido.AI.Thread.Projection.schema()
            })
 
     ai :assistant do

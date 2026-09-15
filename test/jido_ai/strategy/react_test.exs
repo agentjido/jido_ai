@@ -4,9 +4,9 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
   alias Jido.AI.Reasoning.ReAct
   alias Jido.AI.Reasoning.ReAct.{Config, Token}
   alias Jido.AI.Usage
-  alias Jido.AI.{History, Profile}
+  alias Jido.AI.Profile
   alias Jido.Thread
-  alias Jido.AI.Conversation.Control, as: ContextOps
+  alias Jido.AI.Thread.Control, as: ContextOps
   alias ReqLLM.Message.ContentPart
 
   defmodule TestCalculator do
@@ -199,21 +199,21 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
   defp current_history(server) do
     agent = Server.agent(server)
     assert {:ok, profile} = Configuration.profile(agent)
-    assert {:ok, entries} = History.read(agent.state, profile)
+    assert {:ok, entries} = Jido.AI.Session.Transcript.read(agent.state, profile)
     Enum.map(entries, &message_data/1)
   end
 
   defp history_entries(%Thread{} = thread) do
     Enum.map(thread.entries, fn entry ->
-      {:ok, message} = Jido.AI.Conversation.message(entry)
-      [value] = History.entries([message])
+      {:ok, message} = Jido.AI.Thread.Projection.message(entry)
+      [value] = Jido.AI.Model.Messages.entries([message])
       message_data(%{value | refs: entry.refs})
     end)
   end
 
   defp conversation(prompt, messages) do
     Enum.reduce(messages, Thread.new(metadata: %{system_prompt: prompt}), fn message, thread ->
-      {:ok, thread} = Jido.AI.Conversation.append(thread, [message], Map.get(message, :refs, %{}))
+      {:ok, thread} = Jido.AI.Thread.Projection.append(thread, [message], Map.get(message, :refs, %{}))
       thread
     end)
   end
@@ -271,7 +271,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
     pending = context_lane(server).pending_context_op
     assert pending.operation.type == :replace
     assert %Thread{} = pending.operation.result_context
-    assert {:ok, [%{role: :user} = message]} = Jido.AI.Conversation.messages(pending.operation.result_context)
+    assert {:ok, [%{role: :user} = message]} = Jido.AI.Thread.Projection.messages(pending.operation.result_context)
     assert Jido.AI.Query.summarize(message.content) == "Recovered history"
     assert context_lane(server).applied_context_ops == []
     assert {:ok, %{instructions: "Original prompt"}} = Configuration.profile(Server.agent(server))
@@ -299,7 +299,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
     assert context_lane(server).pending_context_op == nil
     assert context_lane(server).applied_context_ops == ["deferred"]
     assert [entry] = context_operations(server)
-    assert {:ok, %{operation: %{type: :replace, reason: :manual}}} = Jido.AI.Conversation.Operation.decode(entry)
+    assert {:ok, %{operation: %{type: :replace, reason: :manual}}} = Jido.AI.Thread.Operation.decode(entry)
     assert List.last(Thread.to_list(Server.agent(server).state.messages.thread)).id == entry.id
     assert {:ok, next} = request(server, mock, :react, "Continue")
     assert {:ok, "Next answer"} = Request.await(next)
@@ -1359,7 +1359,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert current_history(server) == history_entries(replacement)
       assert {:ok, %Profile{instructions: "Keep me"}} = Configuration.profile(Server.agent(server))
       assert [entry] = context_operations(server)
-      assert {:ok, %{operation: %{result_context: snapshot}}} = Jido.AI.Conversation.Operation.decode(entry)
+      assert {:ok, %{operation: %{result_context: snapshot}}} = Jido.AI.Thread.Operation.decode(entry)
       assert snapshot.metadata.system_prompt == nil
       assert {:ok, handle} = request(server, mock, :react, "next turn")
       assert {:ok, "Done"} = Request.await(handle)
@@ -1424,7 +1424,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert context_lane(server).applied_context_ops == ["op_compact"]
       assert [entry] = context_operations(server)
       assert entry.refs == %{op_id: "op_compact", context_ref: "default"}
-      assert {:ok, operation} = Jido.AI.Conversation.Operation.decode(entry)
+      assert {:ok, operation} = Jido.AI.Thread.Operation.decode(entry)
       assert operation.op_id == "op_compact"
 
       assert Map.delete(operation.operation, :result_context) == %{
@@ -1605,7 +1605,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
       messages =
         Enum.map(entries, fn entry ->
-          assert {:ok, message} = Jido.AI.Conversation.message(entry)
+          assert {:ok, message} = Jido.AI.Thread.Projection.message(entry)
           message
         end)
 
@@ -1644,7 +1644,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert {:ok, handle} = request(server, mock, :react, "hello", extra_refs: refs)
       assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
       assert [entry] = thread_messages(server)
-      assert {:ok, %{role: :user}} = Jido.AI.Conversation.message(entry)
+      assert {:ok, %{role: :user}} = Jido.AI.Thread.Projection.message(entry)
       assert entry.refs.request_id == handle.id and entry.refs.run_id == record(server, handle).run_id
       assert Map.take(entry.refs, Map.keys(refs)) == refs
       assert [user] = current_history(server)
@@ -1714,8 +1714,8 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert {:ok, handle} = request(server, mock, :react, "hello", extra_refs: refs)
       assert {:ok, "Done"} = Request.await(handle)
       assert [user, assistant] = thread_messages(server)
-      assert {:ok, %{role: :user}} = Jido.AI.Conversation.message(user)
-      assert {:ok, %{role: :assistant}} = Jido.AI.Conversation.message(assistant)
+      assert {:ok, %{role: :user}} = Jido.AI.Thread.Projection.message(user)
+      assert {:ok, %{role: :assistant}} = Jido.AI.Thread.Projection.message(assistant)
 
       for entry <- [user, assistant] do
         assert entry.refs.request_id == handle.id and entry.refs.run_id == record(server, handle).run_id
@@ -1729,7 +1729,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "initial Session import preserves history and its saved prompt", %{jido: jido} do
       {:ok, session} =
-        Jido.AI.Conversation.append(
+        Jido.AI.Thread.Projection.append(
           Jido.Session.new(thread: Jido.Thread.new(metadata: %{system_prompt: "Restored"})),
           [
             %{role: :user, content: "Previous question"},
@@ -1740,7 +1740,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       source = definition(:react, tools: [TestCalculator], model: MockLLM.model(), system_prompt: "Configured")
       assert {:ok, agent} = Jido.AI.Agent.from_initial_state(source, %{messages: session}, id: "restored-agent")
       assert {:ok, %Profile{id: :assistant, instructions: "Restored"} = profile} = Configuration.profile(agent)
-      assert {:ok, history} = History.read(agent.state, profile)
+      assert {:ok, history} = Jido.AI.Session.Transcript.read(agent.state, profile)
       assert Enum.map(history, &Jido.AI.Query.summarize(&1.content)) == ["Previous question", "Previous answer"]
       assert agent.id == "restored-agent"
       refute Map.has_key?(agent.state, :context)
@@ -1762,7 +1762,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "initial Session import fills a nil prompt from the profile", %{jido: jido} do
       {:ok, session} =
-        Jido.AI.Conversation.append(Jido.Session.new(), [
+        Jido.AI.Thread.Projection.append(Jido.Session.new(), [
           %{role: :user, content: "Previous question"},
           %{role: :assistant, content: "Previous answer"}
         ])
@@ -1770,7 +1770,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       source = definition(:react, tools: [TestCalculator], model: MockLLM.model(), system_prompt: "Config prompt")
       assert {:ok, agent} = Jido.AI.Agent.from_initial_state(source, %{messages: session})
       assert {:ok, %Profile{instructions: "Config prompt"} = profile} = Configuration.profile(agent)
-      assert {:ok, history} = History.read(agent.state, profile)
+      assert {:ok, history} = Jido.AI.Session.Transcript.read(agent.state, profile)
       assert Enum.map(history, &Jido.AI.Query.summarize(&1.content)) == ["Previous question", "Previous answer"]
       mock = mock([%{reply: {:text, "Continued"}}])
       server = start_agent(jido, agent)
@@ -1804,7 +1804,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert agent.state.thread == thread
       assert {:ok, profile} = Configuration.profile(agent)
       assert profile.memory.history == :messages
-      assert {:ok, []} = History.read(agent.state, profile)
+      assert {:ok, []} = Jido.AI.Session.Transcript.read(agent.state, profile)
       mock = mock([%{reply: {:text, "Done"}}])
       server = start_agent(jido, agent)
       assert {:ok, handle} = request(server, mock, :react, "Hello")

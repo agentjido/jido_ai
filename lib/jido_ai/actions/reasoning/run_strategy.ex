@@ -132,7 +132,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
     fields =
       case profile.memory.history do
         nil -> fields
-        field -> Map.put(fields, field, Jido.AI.Conversation.schema())
+        field -> Map.put(fields, field, Jido.AI.Thread.Projection.schema())
       end
 
     base = %{

@@ -1,6 +1,7 @@
 defmodule Jido.AI.Agent.InitialState do
   @moduledoc false
-  alias Jido.AI.{Configuration, Conversation, Profile}
+  alias Jido.AI.{Configuration, Profile}
+  alias Jido.AI.Thread.Projection
 
   def import(source, state, opts) do
     with {:ok, opts} <- options(opts),
@@ -64,10 +65,10 @@ defmodule Jido.AI.Agent.InitialState do
 
       input ->
         with {:ok, session} <- Jido.Session.decode(input),
-             {:ok, messages} <- Conversation.messages(session),
-             {:ok, open} <- Conversation.open_tool_calls(messages),
+             {:ok, messages} <- Projection.messages(session),
+             {:ok, open} <- Projection.open_tool_calls(messages),
              true <- map_size(open) == 0,
-             {:ok, selected} <- Conversation.select(session),
+             {:ok, selected} <- Projection.select(session),
              prompt = Map.get(selected.metadata, :system_prompt, selected.metadata["system_prompt"]),
              true <- is_nil(prompt) or is_binary(prompt) do
           {:ok, Map.put(state, profile.memory.history, session), prompt}

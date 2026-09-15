@@ -200,7 +200,7 @@ saved_messages = snapshot.details.conversation
 # Import the saved conversation before Server startup:
 thread = Jido.Thread.new(metadata: %{system_prompt: saved_system_prompt})
 {:ok, session} =
-  Jido.AI.Conversation.append(Jido.Session.new(thread: thread), conversation_messages)
+  Jido.AI.Thread.Projection.append(Jido.Session.new(thread: thread), conversation_messages)
 
 {:ok, agent} = Jido.AI.Agent.from_initial_state(MyAgent, %{messages: session})
 {:ok, server} = Jido.start_agent(MyJido, agent)

@@ -59,8 +59,8 @@ defmodule JidoAI.Examples.InitialState.Profiles do
     schema(
       Zoi.object(%{
         reply: Zoi.string() |> Zoi.default(""),
-        primary_messages: Jido.AI.Conversation.schema(),
-        review_messages: Jido.AI.Conversation.schema()
+        primary_messages: Jido.AI.Thread.Projection.schema(),
+        review_messages: Jido.AI.Thread.Projection.schema()
       })
     )
 

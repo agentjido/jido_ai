@@ -1,6 +1,7 @@
-defmodule Jido.AI.Conversation.Control do
+defmodule Jido.AI.Thread.Control do
   @moduledoc "Portable context lanes, deferred operations, and their Agent-owned sessions."
-  alias Jido.AI.{Configuration, Conversation, Profile}
+  alias Jido.AI.{Configuration, Profile}
+  alias Jido.AI.Thread.Projection
   alias Jido.{Session, Thread}
   alias __MODULE__.Change
   @key :jido_ai_contexts
@@ -140,7 +141,7 @@ defmodule Jido.AI.Conversation.Control do
            replacement_context(field(operation, :result_context)),
          prompt = field(thread.metadata, :system_prompt),
          true <- is_nil(prompt) or is_binary(prompt),
-         {:ok, _} <- Conversation.messages(thread) do
+         {:ok, _} <- Projection.messages(thread) do
       {:ok, thread}
     end
   end
@@ -157,7 +158,7 @@ defmodule Jido.AI.Conversation.Control do
 
   defp apply_operation(state, profile, value, operation) do
     session = state[profile.memory.history] || Session.new()
-    {:ok, current} = Conversation.select(session)
+    {:ok, current} = Projection.select(session)
 
     result =
       case operation.operation.type do
@@ -180,7 +181,7 @@ defmodule Jido.AI.Conversation.Control do
     session =
       Session.append(session, %{
         kind: :ai_context_operation,
-        payload: Jido.AI.Conversation.Operation.encode(operation),
+        payload: Jido.AI.Thread.Operation.encode(operation),
         refs: %{op_id: operation.op_id, context_ref: operation.context_ref}
       })
 
@@ -214,7 +215,7 @@ defmodule Jido.AI.Conversation.Control do
   end
 
   defp project(thread, ref, fallback) do
-    {:ok, selected} = Conversation.select(thread, ref)
+    {:ok, selected} = Projection.select(thread, ref)
     metadata = selected.metadata
 
     metadata =
@@ -330,19 +331,19 @@ defmodule Jido.AI.Conversation.Control do
     Map.keys(value) -- [:active_context_ref, :pending_context_op, :applied_context_ops] ==
       [] and
       nonempty?(ref) and is_list(ids) and length(ids) <= 128 and Enum.all?(ids, &nonempty?/1) and
-      length(ids) == length(Enum.uniq(ids)) and (is_nil(pending) or Jido.AI.Conversation.Operation.valid?(pending))
+      length(ids) == length(Enum.uniq(ids)) and (is_nil(pending) or Jido.AI.Thread.Operation.valid?(pending))
   end
 
   defp valid_value?(_), do: false
 
   defp replacement_context(%Session{} = session) do
-    with {:ok, _} <- Session.validate(session), do: Conversation.select(session)
+    with {:ok, _} <- Session.validate(session), do: Projection.select(session)
   end
 
-  defp replacement_context(%Thread{} = thread), do: Conversation.select(thread)
+  defp replacement_context(%Thread{} = thread), do: Projection.select(thread)
 
   defp replacement_context(value) when is_map(value) do
-    with {:ok, thread} <- Thread.decode(value), do: Conversation.select(thread)
+    with {:ok, thread} <- Thread.decode(value), do: Projection.select(thread)
   end
 
   defp replacement_context(_), do: {:error, :invalid_conversation}

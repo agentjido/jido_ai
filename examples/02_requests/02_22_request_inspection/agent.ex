@@ -5,7 +5,7 @@ defmodule JidoAI.Examples.RequestInspection.Agent do
     schema(
       Zoi.object(%{
         reply: Zoi.any() |> Zoi.default(nil),
-        messages: Jido.AI.Conversation.schema()
+        messages: Jido.AI.Thread.Projection.schema()
       })
     )
 

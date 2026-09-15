@@ -1,7 +1,7 @@
 defmodule Jido.AI.Session.InspectionTest do
   use Jido.AI.Test.ReasoningCase, async: false
 
-  alias Jido.AI.{Agent, Authoring, History, Profile}
+  alias Jido.AI.{Agent, Authoring, Profile}
   alias ReqLLM.Message.ContentPart
 
   defp profile(id, history, attrs \\ %{}) do
@@ -30,8 +30,8 @@ defmodule Jido.AI.Session.InspectionTest do
                      assistant: Zoi.any() |> Zoi.default(nil),
                      primary: Zoi.any() |> Zoi.default(nil),
                      review: Zoi.any() |> Zoi.default(nil),
-                     messages: Jido.AI.Conversation.schema(),
-                     review_messages: Jido.AI.Conversation.schema()
+                     messages: Jido.AI.Thread.Projection.schema(),
+                     review_messages: Jido.AI.Thread.Projection.schema()
                    }),
                  routes: Enum.map(profiles, &{"#{&1.id}.ask", Authoring.ai(&1.id)})
                },
@@ -51,7 +51,7 @@ defmodule Jido.AI.Session.InspectionTest do
       source = source([profile])
       assert source.state == nil
       assert Agent.profile(source, :review) == profile
-      assert {:error, _} = History.read(source.state, profile)
+      assert {:error, _} = Jido.AI.Session.Transcript.read(source.state, profile)
       server = start_agent(jido, Jido.Agent.instantiate!(source))
       assert {:ok, view} = Session.snapshot(server)
       assert view.request == nil and view.live == nil
@@ -63,7 +63,7 @@ defmodule Jido.AI.Session.InspectionTest do
       assert view.details.pending_context_op == nil
       assert view.details.trace == %{events: [], truncated?: false, seq: 0, scope: :observed_prefix}
       assert view.details.trace_summary == %{}
-      assert {:ok, []} = History.read(view.agent.state, profile)
+      assert {:ok, []} = Jido.AI.Session.Transcript.read(view.agent.state, profile)
       assert view.agent.state.requests == %{}
       assert {:error, :request_not_found} = Session.snapshot(server, request_id: "absent")
     end
@@ -168,7 +168,7 @@ defmodule Jido.AI.Session.InspectionTest do
              "Reviewed"
            ]
 
-    assert {:ok, [query, answer]} = History.read(retained.agent.state, review)
+    assert {:ok, [query, answer]} = Jido.AI.Session.Transcript.read(retained.agent.state, review)
     assert query.refs.request_id == first.id and answer.refs.request_id == first.id
     assert List.last(retained.details.conversation).refs == answer.refs
     assert :ok = MockLLM.release(mock, :primary)
@@ -226,7 +226,7 @@ defmodule Jido.AI.Session.InspectionTest do
     thread = Jido.Thread.new(metadata: %{system_prompt: "Saved prompt"})
 
     {:ok, session} =
-      Jido.AI.Conversation.append(
+      Jido.AI.Thread.Projection.append(
         Jido.Session.new(thread: thread),
         [
           ReqLLM.Context.user(parts),

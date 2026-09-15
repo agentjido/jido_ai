@@ -1,6 +1,6 @@
 defmodule Jido.AI.Runtime.PendingInput do
   @moduledoc false
-  alias Jido.AI.{History, PendingInputServer, Session}
+  alias Jido.AI.{PendingInputServer, Session}
 
   def seal(context) do
     case context[:jido_ai_input_queue] do
@@ -51,10 +51,10 @@ defmodule Jido.AI.Runtime.PendingInput do
           |> Map.merge(item.refs || %{})
           |> Map.put(:source, item.source)
 
-        History.query(item.content, refs)
+        Jido.AI.Session.Transcript.query(item.content, refs)
       end)
 
-    with {:ok, state} <- History.record(state, entries, context) do
+    with {:ok, state} <- Jido.AI.Session.Transcript.record(state, entries, context) do
       Enum.reduce_while(Enum.zip(items, entries), {:ok, state}, fn {item, entry}, {:ok, state} ->
         case Session.emit(context, :input_injected, %{
                input_id: item.id,
@@ -64,7 +64,7 @@ defmodule Jido.AI.Runtime.PendingInput do
                at_ms: item.at_ms
              }) do
           :ok ->
-            message = History.bind_message(ReqLLM.Context.user(item.content), context, entry.refs)
+            message = Jido.AI.Session.Transcript.bind_message(ReqLLM.Context.user(item.content), context, entry.refs)
             messages = ReqLLM.Context.append(state.messages, message)
             {:cont, {:ok, %{state | messages: messages}}}
 

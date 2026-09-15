@@ -88,11 +88,11 @@ defmodule Jido.AI.Runtime.CallModel do
               timeout: remaining
             )},
          :ok <- Control.check(state.profile, :model, response, context, state.deadline),
-         response = Jido.AI.History.bind_response(response, context),
+         response = Jido.AI.Session.Transcript.bind_response(response, context),
          :ok <- Jido.AI.Session.account(context, response.usage),
          :ok <- terminal_response(response, request, state, context),
          {:ok, state} <-
-           Jido.AI.History.record(state, Jido.AI.History.entries([response.message]), context),
+           Jido.AI.Session.Transcript.record(state, Jido.AI.Model.Messages.entries([response.message]), context),
          true <- System.monotonic_time(:millisecond) < state.deadline do
       event = Jido.AI.Runtime.Response.event(response, state, request)
       :ok = Jido.AI.Session.emit(context, :llm_completed, event)

@@ -67,7 +67,7 @@ defmodule Jido.AI.Session.Start do
             session_id:
               if(profile.memory.history,
                 do:
-                  Jido.AI.Conversation.Control.session_id(
+                  Jido.AI.Thread.Control.session_id(
                     context.agent_state,
                     profile,
                     context.jido_ai_agent.id
@@ -101,7 +101,7 @@ defmodule Jido.AI.Session.Start do
   defp start_history(context, profile, record) do
     if Jido.AI.Reasoning.ReAct.Checkpoint.resumed?(context),
       do: {:ok, context.agent_state},
-      else: Jido.AI.History.start(context.agent_state, profile, record, context.signal.source)
+      else: Jido.AI.Session.Transcript.start(context.agent_state, profile, record, context.signal.source)
   end
 
   defp checkpoint_metadata(context) do
