@@ -1,6 +1,7 @@
 defmodule Jido.AI.Session.Inspection do
   @moduledoc false
-  alias Jido.AI.{Configuration, Context, History, Profile}
+  alias Jido.AI.{Configuration, History, Profile}
+  alias Jido.AI.Conversation.Control
   alias Jido.AI.Runtime.Event
 
   @limit 2_000
@@ -171,7 +172,7 @@ defmodule Jido.AI.Session.Inspection do
         _ -> profile && profile.id
       end
 
-    lane = get_in(snapshot.agent.state, [Context.Operations.key(), profile_id]) || %{}
+    lane = get_in(snapshot.agent.state, [Control.key(), profile_id]) || %{}
     conversation = conversation(snapshot.agent.state, profile)
 
     details = %{

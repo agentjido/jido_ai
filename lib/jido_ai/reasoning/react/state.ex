@@ -342,29 +342,13 @@ defmodule Jido.AI.Reasoning.ReAct.State do
 
   @doc false
   def conversation(entries, prompt) do
-    Enum.reduce(entries, Thread.new(metadata: %{system_prompt: prompt}), fn entry, thread ->
-      {:ok, messages} = Jido.AI.History.messages([entry])
-      {:ok, [canonical]} = Conversation.entries(messages, Map.get(entry, :refs) || %{})
-
-      canonical =
-        case Map.get(entry, :timestamp) do
-          %DateTime{} = timestamp -> %{canonical | at: DateTime.to_unix(timestamp, :millisecond)}
-          _ -> canonical
-        end
-
-      Thread.append(thread, canonical)
-    end)
+    Jido.AI.History.append_entries(Thread.new(metadata: %{system_prompt: prompt}), entries)
   end
 
   @doc false
   def history(%Thread{} = thread) do
-    {:ok, selected} = Conversation.select(thread)
-
-    Enum.map(selected.entries, fn entry ->
-      {:ok, message} = Conversation.message(entry)
-      [value] = Jido.AI.History.entries([message])
-      %{value | refs: entry.refs, timestamp: DateTime.from_unix!(entry.at, :millisecond)}
-    end)
+    {:ok, entries} = Jido.AI.History.project(thread)
+    entries
   end
 
   @doc false

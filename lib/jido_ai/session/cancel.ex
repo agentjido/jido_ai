@@ -46,7 +46,7 @@ defmodule Jido.AI.Session.Cancel do
           )
 
         with {:ok, candidate, changes} <-
-               Jido.AI.Context.Operations.finish(context.agent_state, record, context),
+               Jido.AI.Conversation.Control.finish(context.agent_state, record, context),
              do: {:ok, candidate, [%Change{operation: :finish, record: record} | changes]}
 
       nil ->

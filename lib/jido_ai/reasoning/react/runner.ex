@@ -229,7 +229,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       :messages,
       :requests,
       Jido.AI.Configuration.key(),
-      Jido.AI.Context.Operations.key()
+      Jido.AI.Conversation.Control.key()
     ]
 
     with true <- is_map(domain) and not is_struct(domain),
@@ -347,11 +347,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp history_session([]), do: nil
 
   defp history_session(history) do
-    Enum.reduce(history, Jido.Session.new(), fn entry, session ->
-      {:ok, messages} = Jido.AI.History.messages([entry])
-      {:ok, next} = Jido.AI.Conversation.append(session, messages, Map.get(entry, :refs) || %{})
-      next
-    end)
+    Jido.AI.History.append_entries(Jido.Session.new(), history)
   end
 
   defp snapshot(state, config, server, event) do
@@ -383,7 +379,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
                   :messages,
                   :requests,
                   Jido.AI.Configuration.key(),
-                  Jido.AI.Context.Operations.key()
+                  Jido.AI.Conversation.Control.key()
                 ])
           }
       end

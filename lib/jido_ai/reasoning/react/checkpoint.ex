@@ -139,7 +139,7 @@ defmodule Jido.AI.Reasoning.ReAct.Checkpoint do
         :messages,
         :requests,
         Jido.AI.Configuration.key(),
-        Jido.AI.Context.Operations.key()
+        Jido.AI.Conversation.Control.key()
       ])
 
     effects = if phase == :terminal, do: [], else: native.effect_plan.directives

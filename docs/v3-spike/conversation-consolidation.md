@@ -1,6 +1,6 @@
 # Conversation consolidation
 
-Status: active. Started 2026-09-15.
+Status: complete. Started and verified 2026-09-15.
 
 ## Goal
 
@@ -60,27 +60,66 @@ do not put ReqLLM structs or runtime resources into the portable format.
 
 ## Current status
 
-Checkpoint `d6e57354` stores each Profile conversation in one canonical Session.
-The Plugin has no duplicate Session. The checkpoint passed format, inventory,
-forced compilation, and 2,872 tests with one existing exclusion.
+The implementation now uses one canonical Session per declared conversation
+field. Standalone ReAct checkpoints and conversation controls use Threads.
+The legacy Context value, duplicate Plugin store, special Context import,
+reverse-order replacement API, and duplicated conversion loops are removed.
+Controls now live under Conversation.Control. ReqLLM owns provider messages;
+History handles the selected Profile field and shared commit conversion.
 
-The next checkpoint adds shared lane/replacement selection and a pure operation
-payload codec. Format, forced compilation, inventory, and all 2,875 tests pass
-with one existing exclusion. Log: `/tmp/jido-ai-selection-codec-full.log`.
+Checkpoint `4690ba57` passed all 2,796 tests with one existing exclusion. The
+final structural changes passed verification. The first final run found
+three stale short module names in ThreadValueTest after the control rename;
+those names are repaired. No runtime failure was identified in that run.
 
-Remaining work:
+The final live Haiku example passed in 7,504 ms. Its tool results were 91, 546,
+and 2,184, with three tool results and `committed: true`.
+Evidence: `/tmp/jido-ai-final-live-haiku.log`.
 
-1. Replace the transient Context value in standalone ReAct state, checkpoints,
-   request-transform views, initial-state import, and context controls. The
-   standalone state, checkpoints, and request-transform state views now use
-   Thread; initial-state import and context controls remain.
-2. Remove the old Context/History conversion paths and competing import forms.
-3. Reconcile public configuration, inspection, guides, and API inventories.
-4. Run the complete unit, authoring, and MockLLM example suite, then the bounded
-   live Haiku example with three dependent tool rounds and a committed answer.
-5. Commit the tested result. Do not claim release readiness from a partial gate.
+Final acceptance passed 2,796 tests with one existing exclusion. Format,
+forced compilation with warnings as errors, and source inventory checks pass.
+This work does not declare the package a stable V3 release.
+
+The final acceptance run is `/tmp/jido-ai-final-acceptance.log`. Documentation
+generation also checked the current source. It exposed one README link to a
+file not included in generated docs; that link now points to the packaged
+conversation guide. Five existing ExDoc warnings concern hidden internal
+Reasoning/Observe APIs, outside this migration. They do not affect compilation
+or runtime tests, but documentation generation is not warnings-clean.
+
+## Completion audit
+
+- ConversationRuntimeTest proves one Session store and stable request identity.
+- ConversationTest, ConversationContentTest, ConversationOperationTest, and
+  ThreadValueTest cover content, references, JSON, selection, and validation.
+- The full unit, authoring, and example suite verifies request lifecycle,
+  cancellation, steering, deferred controls, durable skills, and checkpoints.
+- All eight reasoning methods remain in Profile validation. Agent + DSL +
+  Profile remains the primary authoring contract. Dependencies are unchanged.
+- Runtime scans confirm removal of the old Context value and reverse-list API.
+  Controls and shared conversion now use the canonical conversation boundary.
+- Acceptance explicitly includes all authoring and example tests. Only the
+  existing flaky exclusion remains. Provider mocking retains the real runtime.
+- Final acceptance: `/tmp/jido-ai-final-acceptance.log`, 2,796 passed, one
+  excluded. Forced compile: `/tmp/jido-ai-final-structure-full.log`. Final
+  format and source inventory checks pass.
+- Live Haiku: `/tmp/jido-ai-final-live-haiku.log`, three dependent tool results
+  (91, 546, 2,184), committed true, 7,504 ms. No runtime code changed afterward.
+- Guides, import examples, API inventory/map, and status are updated. Five
+  unrelated hidden-API ExDoc warnings remain as noted above.
+- All checkpoint commits are scoped to jido_ai; no release-file or cross-
+  package changes were made.
 
 ## Work log (historical steps, not current status)
+
+- Final structural pass: moved controls to Conversation.Control and removed
+  the empty context folder. Standalone and Agent paths share reference/time-
+  preserving entry conversion. Fixed projection of application entries inside
+  replacement snapshots and error propagation for malformed AI payloads.
+  All 193 focused runtime tests and eight projection tests pass. Full gate:
+  `/tmp/jido-ai-final-structure-full.log`. Live Haiku evidence is being collected
+  in `/tmp/jido-ai-final-live-haiku.log`; do not claim completion before checking
+  these results and the remaining documentation/API audit.
 
 - History, request-transform views, and Session inspection now normalize
   messages directly through ReqLLM; they no longer construct Context values.

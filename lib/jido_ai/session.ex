@@ -65,7 +65,7 @@ defmodule Jido.AI.Session do
 
   @doc "Applies a context replace or switch operation, or defers it until the active request finishes."
   def modify_context(server, operation, opts \\ []),
-    do: Jido.AI.Context.Operations.live(server, operation, opts)
+    do: Jido.AI.Conversation.Control.live(server, operation, opts)
 
   @doc "Reads the live automatic skill catalogue and discovery diagnostics for one profile."
   def skill_catalog(server, profile_id \\ nil) do

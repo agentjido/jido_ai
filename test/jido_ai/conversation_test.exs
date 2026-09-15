@@ -8,6 +8,7 @@ defmodule Jido.AI.ConversationTest do
     {:ok, thread} = Conversation.append(Jido.Thread.new(), [Context.user("old")])
     {:ok, thread} = Conversation.append(thread, [Context.user("other")], %{context_ref: "other"})
     {:ok, snapshot} = Conversation.append(Jido.Thread.new(), [Context.user("saved")])
+    snapshot = Jido.Thread.append(snapshot, %{kind: :application_note, payload: %{private: "not a model message"}})
 
     replacement = %{
       "version" => 1,
@@ -86,6 +87,7 @@ defmodule Jido.AI.ConversationTest do
     assert {:ok, []} = Conversation.messages(thread)
     invalid = Jido.Thread.append(thread, %{kind: :ai_message, payload: %{"version" => 99}})
     assert {:error, :invalid_conversation} = Conversation.messages(invalid)
+    assert {:error, :invalid_conversation} = Jido.AI.History.project(invalid)
   end
 
   test "closed sessions do not accept messages" do

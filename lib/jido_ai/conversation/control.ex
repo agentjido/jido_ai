@@ -1,4 +1,4 @@
-defmodule Jido.AI.Context.Operations do
+defmodule Jido.AI.Conversation.Control do
   @moduledoc "Portable context lanes, deferred operations, and their Agent-owned sessions."
   alias Jido.AI.{Configuration, Conversation, Profile}
   alias Jido.{Session, Thread}

@@ -13,7 +13,7 @@ defmodule Jido.AI.ConversationRuntimeTest do
     state = Server.agent(server).state
     assert state.messages.id == initial.id
     assert state.messages.thread.rev == 4
-    assert state[Jido.AI.Context.Operations.key()] == %{}
+    assert state[Jido.AI.Conversation.Control.key()] == %{}
     assert {:ok, messages} = Jido.AI.Conversation.messages(state.messages)
     assert Enum.map(messages, &Jido.AI.Query.summarize(&1.content)) == ["One", "First", "Two", "Second"]
     assert_script_done(mock)
@@ -38,7 +38,7 @@ defmodule Jido.AI.ConversationRuntimeTest do
     {:ok, profile} = Configuration.profile(Server.agent(server))
     assert {:ok, [%{content: saved}]} = Jido.AI.History.read(%{messages: decoded}, profile)
     assert Jido.AI.Query.summarize(saved) == "Saved question"
-    refute Map.has_key?(state[Jido.AI.Context.Operations.key()].assistant, :session)
+    refute Map.has_key?(state[Jido.AI.Conversation.Control.key()].assistant, :session)
     assert {:ok, second} = request(server, mock, :react, "Continue")
     assert {:ok, "After replacement"} = Request.await(second)
     [_, wire] = MockLLM.report(mock).requests

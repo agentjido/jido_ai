@@ -2,7 +2,7 @@ defmodule Jido.ThreadValueTest do
   use ExUnit.Case, async: true
 
   alias Jido.{Session, Thread}
-  alias Jido.AI.Context.Operations
+  alias Jido.AI.Conversation.Control
   alias Jido.Thread.Entry
 
   test "exposes schemas and empty value helpers" do
@@ -236,11 +236,11 @@ defmodule Jido.ThreadValueTest do
   end
 
   test "context operation helpers expose keys and active refs" do
-    assert Operations.key() == :jido_ai_contexts
-    assert Operations.type() == "jido.ai.context.modify"
-    assert Operations.active_ref(%{}, :assistant) == "default"
+    assert Control.key() == :jido_ai_contexts
+    assert Control.type() == "jido.ai.context.modify"
+    assert Control.active_ref(%{}, :assistant) == "default"
 
-    assert Operations.active_ref(%{Operations.key() => %{assistant: %{active_context_ref: "saved"}}}, :assistant) ==
+    assert Control.active_ref(%{Control.key() => %{assistant: %{active_context_ref: "saved"}}}, :assistant) ==
              "saved"
   end
 
@@ -251,18 +251,18 @@ defmodule Jido.ThreadValueTest do
       applied_context_ops: []
     }
 
-    assert :ok = Operations.validate_state(%{assistant: lane}, %{assistant: %{}}, nil)
-    assert {:error, "Expected context lanes"} = Operations.validate_state(:invalid, %{}, nil)
+    assert :ok = Control.validate_state(%{assistant: lane}, %{assistant: %{}}, nil)
+    assert {:error, "Expected context lanes"} = Control.validate_state(:invalid, %{}, nil)
 
     assert {:error, "Expected portable context lanes for declared profiles"} =
-             Operations.validate_state(%{assistant: %{}}, %{assistant: %{}}, nil)
+             Control.validate_state(%{assistant: %{}}, %{assistant: %{}}, nil)
 
     assert {:error, "Invalid saved context data"} =
-             Operations.validate_state(%{assistant: lane}, :invalid, nil)
+             Control.validate_state(%{assistant: lane}, :invalid, nil)
   end
 
   test "context lanes reject a duplicate conversation store" do
     lane = %{active_context_ref: "default", pending_context_op: nil, applied_context_ops: [], session: Session.new()}
-    assert {:error, _} = Operations.validate_state(%{assistant: lane}, %{assistant: %{}}, nil)
+    assert {:error, _} = Control.validate_state(%{assistant: lane}, %{assistant: %{}}, nil)
   end
 end

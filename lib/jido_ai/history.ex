@@ -36,14 +36,7 @@ defmodule Jido.AI.History do
         {:ok, []}
 
       %Jido.Session{} = session ->
-        with {:ok, selected} <- Conversation.select(session) do
-          {:ok,
-           Enum.map(selected.entries, fn entry ->
-             {:ok, message} = Conversation.message(entry)
-             [value] = entries([message])
-             %{value | refs: entry.refs, timestamp: DateTime.from_unix!(entry.at, :millisecond)}
-           end)}
-        end
+        project(session)
 
       _ ->
         Profile.error("memory.history", "Expected a Jido.Session value")
@@ -51,6 +44,18 @@ defmodule Jido.AI.History do
   end
 
   def read(_, _), do: Profile.error("memory.history", "Expected initialized Agent state")
+
+  @doc false
+  def project(value) do
+    with {:ok, selected} <- Conversation.select(value),
+         {:ok, messages} <- Conversation.messages(selected) do
+      {:ok,
+       Enum.map(Enum.zip(selected.entries, messages), fn {entry, message} ->
+         [value] = entries([message])
+         %{value | refs: entry.refs, timestamp: DateTime.from_unix!(entry.at, :millisecond)}
+       end)}
+    end
+  end
 
   # A complete exchange has one result for every announced call. A pending
   # after-model pause is the only supported position with an open exchange.
@@ -141,24 +146,29 @@ defmodule Jido.AI.History do
 
   def append(state, profile, entries) do
     session = Map.get(state, profile.memory.history) || Jido.Session.new()
-    ref = Jido.AI.Context.Operations.active_ref(state, profile.id)
+    ref = Jido.AI.Conversation.Control.active_ref(state, profile.id)
 
-    session =
-      Enum.reduce(entries, session, fn entry, session ->
-        {:ok, messages} = messages([entry])
-        refs = Map.put(Map.get(entry, :refs) || %{}, :context_ref, ref)
-        {:ok, [canonical]} = Conversation.entries(messages, refs)
+    Map.put(state, profile.memory.history, append_entries(session, entries, %{context_ref: ref}))
+  end
 
-        canonical =
-          case entry[:timestamp] do
-            %DateTime{} = timestamp -> %{canonical | at: DateTime.to_unix(timestamp, :millisecond)}
-            _ -> canonical
-          end
+  @doc false
+  def append_entries(value, entries, extra_refs \\ %{}) do
+    Enum.reduce(entries, value, fn entry, value ->
+      {:ok, messages} = messages([entry])
+      refs = Map.merge(Map.get(entry, :refs) || %{}, extra_refs)
+      {:ok, [canonical]} = Conversation.entries(messages, refs)
 
-        Jido.Session.append(session, canonical)
-      end)
+      canonical =
+        case entry[:timestamp] do
+          %DateTime{} = timestamp -> %{canonical | at: DateTime.to_unix(timestamp, :millisecond)}
+          _ -> canonical
+        end
 
-    Map.put(state, profile.memory.history, session)
+      case value do
+        %Jido.Session{} -> Jido.Session.append(value, canonical)
+        %Jido.Thread{} -> Jido.Thread.append(value, canonical)
+      end
+    end)
   end
 
   def record(state, entries, context) do

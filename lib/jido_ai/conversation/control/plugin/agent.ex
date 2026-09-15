@@ -1,8 +1,8 @@
-defmodule Jido.AI.Context.Operations.Plugin.Agent do
+defmodule Jido.AI.Conversation.Control.Plugin.Agent do
   @moduledoc false
   use Jido.Agent.Plugin
 
-  alias Jido.AI.Context.Operations, as: Ops
+  alias Jido.AI.Conversation.Control, as: Ops
 
   @impl Jido.Agent.Plugin
   def state_spec(opts),

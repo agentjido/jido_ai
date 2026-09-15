@@ -2,6 +2,15 @@
 
 ## Current simplification checkpoint
 
+Conversation consolidation now uses one canonical Session per declared field,
+with Thread values for standalone checkpoints and controls. The old Context
+value, duplicate Plugin store, and reverse-order import/replacement paths are
+removed. The live Haiku tool example returned 91, 546, and 2,184 across three
+dependent tool calls and committed its answer. See the
+[consolidation record](conversation-consolidation.md) for the completed audit.
+Final acceptance passed 2,796 tests with one existing exclusion. This is not a
+stable V3 release declaration; five unrelated hidden-API ExDoc warnings remain.
+
 The runtime simplification and callable Profile migration are implemented.
 `jido_ai` owns `Jido.Session`, `Jido.Thread`, and `Jido.Thread.Entry`; their
 module names stay unchanged. The execution CLI and root strategy inspection

@@ -6,7 +6,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
   alias Jido.AI.Usage
   alias Jido.AI.{History, Profile}
   alias Jido.Thread
-  alias Jido.AI.Context.Operations, as: ContextOps
+  alias Jido.AI.Conversation.Control, as: ContextOps
   alias ReqLLM.Message.ContentPart
 
   defmodule TestCalculator do

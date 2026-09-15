@@ -1,4 +1,4 @@
-defmodule Jido.AI.Context.Operations.Change do
+defmodule Jido.AI.Conversation.Control.Change do
   @moduledoc false
   use Jido.Agent.Directive
   defstruct [:profile_id, :value]

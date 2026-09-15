@@ -90,7 +90,8 @@ defmodule Jido.AI.Conversation do
               {true, kind} when kind in [:ai_context_operation, "ai_context_operation"] ->
                 case operation!(entry).operation do
                   %{type: :replace, result_context: snapshot} ->
-                    {Enum.reverse(snapshot.entries), snapshot.metadata}
+                    entries = Enum.filter(snapshot.entries, &(&1.kind in [:ai_message, "ai_message"]))
+                    {Enum.reverse(entries), snapshot.metadata}
 
                   %{type: :switch} ->
                     acc

@@ -100,7 +100,7 @@ defmodule Jido.AI.Runtime.Plugin do
       Map.drop(context.agent_state, [
         Jido.AI.Configuration.key(),
         :requests,
-        Jido.AI.Context.Operations.key()
+        Jido.AI.Conversation.Control.key()
       ])
 
     schema = Zoi.object(Map.new(domain_state, fn {key, _} -> {key, Zoi.any()} end))
@@ -118,8 +118,8 @@ defmodule Jido.AI.Runtime.Plugin do
       |> Map.new(fn {id, profile} -> {id, profile.memory.history} end)
 
     plugins =
-      if Map.has_key?(context.agent_state, Jido.AI.Context.Operations.key()),
-        do: plugins ++ [{Jido.AI.Context.Operations.Plugin, [profiles: histories]}],
+      if Map.has_key?(context.agent_state, Jido.AI.Conversation.Control.key()),
+        do: plugins ++ [{Jido.AI.Conversation.Control.Plugin, [profiles: histories]}],
         else: plugins
 
     struct(Jido.Agent, %{

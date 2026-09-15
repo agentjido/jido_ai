@@ -67,7 +67,7 @@ defmodule Jido.AI.Session.Start do
             session_id:
               if(profile.memory.history,
                 do:
-                  Jido.AI.Context.Operations.session_id(
+                  Jido.AI.Conversation.Control.session_id(
                     context.agent_state,
                     profile,
                     context.jido_ai_agent.id
