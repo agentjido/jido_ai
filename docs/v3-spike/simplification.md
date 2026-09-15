@@ -18,10 +18,13 @@ This record covers `jido_ai` on `v3-spike` only.
 5. `af68e568` removes the root strategy inspection helpers. Session
    inspection reads the selected Profile and committed History. Snapshot
    fields and request execution remain the same.
-6. This checkpoint extracts internal Profile reference resolution into
+6. `6736c6c4` extracts internal Profile reference resolution into
    `Jido.AI.Profile.References.resolve/2`. Profile keeps defaults, canonical
    policy validation, schema construction, and public errors. No additional
-   feature is removed. Session.Runtime and dependency versions are unchanged.
+  feature is removed. Session.Runtime and dependency versions are unchanged.
+7. This checkpoint rejects invalid scalar model inputs in Profile before
+   ReqLLM model validation. Valid aliases and native model specifications keep
+   their existing behavior. The ReqLLM pin is unchanged.
 
 ## Inventory and caller evidence
 
@@ -195,6 +198,41 @@ recovery, deferred context replacement, checkpoints, and trace truncation.
   state, bounded checks, and deferred suites. Broader documentation remains
   deferred. This step adds no public authoring API or execution framework.
 
+## Profile model input validation
+
+- `Profile.model_input/1` now rejects explicit `nil`, booleans, integers, and
+  floats with `{:error, %Jido.AI.Error.Validation.Invalid{field: "models"}}`.
+  The message remains `models: Invalid ReqLLM model input`. An omitted model
+  still uses the normal default. Callable reasoning still treats `nil` as an
+  omitted option, but rejects `false` and numbers through Profile.
+- Defect ownership: Profile owns the tagged policy validation boundary. Its
+  fallback passed these unsupported values to the pinned ReqLLM's
+  `model/1` fallback (`deps/req_llm/lib/req_llm.ex:367`). That fallback calls
+  `Validation.Error.exception(message: ...)`, but the error type declares
+  only `tag`, `reason`, and `context` (`lib/req_llm/error.ex:100`). This caused
+  `KeyError` before Profile could return its validation error. The local fix
+  rejects these values; it does not change provider code or catch all errors.
+- Five regression tests cover scalar values, named model entries, validation
+  order, the callable Action, inert atom aliases, registered string aliases,
+  native string specifications, both tuple forms, inline maps, and
+  `LLMDB.Model` values. The two initial rejection tests reproduced the crash
+  before the fix. Callers now receive the existing tagged error for invalid
+  scalar inputs. No valid model-input migration is required.
+
+## Released V3 dependency check
+
+On 2026-09-15, the Hex package and release APIs reported these latest V3 betas:
+
+| Package | Latest V3 beta | Current requirement and lock |
+| --- | --- | --- |
+| [jido](https://hex.pm/api/packages/jido/releases/3.0.0-beta.1) | `3.0.0-beta.1` | Matches |
+| [jido_action](https://hex.pm/api/packages/jido_action/releases/3.0.0-beta.11) | `3.0.0-beta.11` | Matches |
+| [jido_signal](https://hex.pm/api/packages/jido_signal/releases/3.0.0-beta.4) | `3.0.0-beta.4` | Matches |
+
+None is retired. Core's release metadata requires these Action and Signal
+betas. There is no newer compatible V3 beta to install. `mix.exs`, `mix.lock`,
+the ReqLLM Git pin, and unrelated dependencies are unchanged.
+
 ## Unit coverage and verification
 
 The unit file selection is `test/jido_ai/**/*_test.exs`, excluding
@@ -257,6 +295,12 @@ Authoring and example suites remain deferred. Dev/test compilation needed no
 example source or support repairs. After verification, `rmdir` removed the two
 empty test fixture directories listed above and 160 empty directories under
 `tmp/`. No build, dependency, or Git directory was touched.
+
+Scalar model validation result: 144 files; 1,837 passed, 1 excluded; no
+failures or skips. The selected run took 17.8 seconds with seed 0 and warnings
+as errors. Format and forced compile with warnings as errors passed; the dev
+compile compiled 337 files. Five tests were added. Authoring and example
+suites remain deferred; their compiled source and support needed no repair.
 
 The 15 tests added at the model-call checkpoint cover default ReqLLM calls,
 callback data and delegation,

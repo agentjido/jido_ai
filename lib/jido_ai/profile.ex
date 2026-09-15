@@ -400,6 +400,9 @@ defmodule Jido.AI.Profile do
 
   defp model_input(value) when is_atom(value) and value not in [nil, true, false], do: {:ok, value}
 
+  defp model_input(value) when value in [nil, true, false] or is_number(value),
+    do: error("models", "Invalid ReqLLM model input")
+
   defp model_input(value) when is_binary(value) and not is_struct(value) do
     aliases = Jido.AI.Models.aliases()
 
