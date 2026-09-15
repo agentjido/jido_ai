@@ -185,52 +185,6 @@ defmodule Jido.AI do
     end
   end
 
-  @doc "Returns an effective configuration view for the selected AI profile."
-  @spec get_strategy_config(Jido.Agent.t()) :: map()
-  def get_strategy_config(agent), do: get_strategy_config(agent, nil)
-
-  @doc "Returns current configuration for one declared AI profile."
-  def get_strategy_config(%Jido.Agent{} = agent, profile_id) do
-    case Configuration.profile(agent, profile_id) do
-      {:ok, profile} ->
-        entry = profile.models[profile.reasoning.model]
-
-        Map.get(profile.reasoning, :options, %{})
-        |> Map.merge(Map.new(entry.generation))
-        |> Map.merge(%{
-          model: entry.model,
-          system_prompt: profile.instructions,
-          base_tool_context: profile.tool_context,
-          tools: Enum.map(profile.tools, & &1.target),
-          actions_by_name: Map.new(profile.tools, &{&1.name, &1.target}),
-          reqllm_tools: Jido.AI.ToolCatalog.definitions(profile.tools),
-          max_iterations: profile.controls.max_iterations,
-          max_tool_calls: profile.controls.max_tool_calls,
-          request_policy: profile.requests.on_busy,
-          streaming: profile.requests.streaming
-        })
-
-      {:error, _} ->
-        %{}
-    end
-  end
-
-  @doc "Returns committed domain history as an AI Context; active private work remains runtime-owned."
-  @spec get_strategy_context(Jido.Agent.t()) :: Jido.AI.Context.t() | nil
-  def get_strategy_context(agent), do: get_strategy_context(agent, nil)
-
-  @doc "Returns committed Context for one declared AI profile."
-  def get_strategy_context(%Jido.Agent{} = agent, profile_id) do
-    with {:ok, profile} <- Configuration.profile(agent, profile_id),
-         false <- is_nil(profile.memory.history),
-         {:ok, entries} <- Jido.AI.History.read(agent.state, profile) do
-      Jido.AI.Context.new(id: "#{agent.id}:#{profile.id}", system_prompt: profile.instructions)
-      |> Jido.AI.Context.append_messages(entries)
-    else
-      _ -> nil
-    end
-  end
-
   @doc "Replaces committed history using Context's reverse entry order; already-started work keeps its snapshot."
   @spec update_context_entries(Jido.Agent.t(), list()) :: Jido.Agent.t()
   def update_context_entries(%Jido.Agent{} = agent, entries) when is_list(entries) do

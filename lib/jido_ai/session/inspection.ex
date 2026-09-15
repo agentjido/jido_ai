@@ -1,5 +1,6 @@
 defmodule Jido.AI.Session.Inspection do
   @moduledoc false
+  alias Jido.AI.{Configuration, Context, History, Profile}
   alias Jido.AI.Runtime.Event
 
   @limit 2_000
@@ -158,20 +159,20 @@ defmodule Jido.AI.Session.Inspection do
     inspection = if live, do: live.inspection, else: inspection
     meta = if live, do: live.meta, else: meta
 
-    profile_id =
-      case request do
-        %{profile_id: id} ->
-          id
-
-        _ ->
-          case Jido.AI.Configuration.profile(snapshot.agent) do
-            {:ok, profile} -> profile.id
-            _ -> nil
-          end
+    profile =
+      case Configuration.profile(snapshot.agent, request && Map.get(request, :profile_id)) do
+        {:ok, profile} -> profile
+        {:error, _} -> nil
       end
 
-    lane = get_in(snapshot.agent.state, [Jido.AI.Context.Operations.key(), profile_id]) || %{}
-    context = Jido.AI.get_strategy_context(snapshot.agent, profile_id)
+    profile_id =
+      case request do
+        %{profile_id: id} -> id
+        _ -> profile && profile.id
+      end
+
+    lane = get_in(snapshot.agent.state, [Context.Operations.key(), profile_id]) || %{}
+    conversation = conversation(snapshot.agent.state, profile)
 
     details = %{
       phase: phase(request, inspection, live),
@@ -190,7 +191,7 @@ defmodule Jido.AI.Session.Inspection do
       tool_results: Map.get(meta, :tool_results, []),
       current_llm_call_id: inspection[:llm_call_id],
       active_request_id: if(request && request.status == :pending, do: request.id),
-      active_context_ref: if(context, do: Map.get(lane, :active_context_ref, "default")),
+      active_context_ref: if(conversation, do: Map.get(lane, :active_context_ref, "default")),
       pending_context_op: lane[:pending_context_op],
       checkpoint_token: inspection[:checkpoint_token],
       cancel_reason: cancel_reason(request),
@@ -204,8 +205,8 @@ defmodule Jido.AI.Session.Inspection do
 
           {id, %{events: length(trace.events), truncated?: trace.truncated?}}
         end),
-      config: Jido.AI.get_strategy_config(snapshot.agent, profile_id),
-      conversation: if(context, do: Jido.AI.Context.to_messages(context), else: [])
+      config: config(profile),
+      conversation: conversation || []
     }
 
     Map.merge(snapshot, %{
@@ -213,6 +214,42 @@ defmodule Jido.AI.Session.Inspection do
       details: details,
       live: live && Map.drop(live, [:inspection, :meta, :reasoning])
     })
+  end
+
+  defp config(nil), do: %{}
+
+  defp config(%Profile{} = profile) do
+    entry = profile.models[profile.reasoning.model]
+
+    Map.get(profile.reasoning, :options, %{})
+    |> Map.merge(Map.new(entry.generation))
+    |> Map.merge(%{
+      model: entry.model,
+      system_prompt: profile.instructions,
+      base_tool_context: profile.tool_context,
+      tools: Enum.map(profile.tools, & &1.target),
+      actions_by_name: Map.new(profile.tools, &{&1.name, &1.target}),
+      reqllm_tools: Jido.AI.ToolCatalog.definitions(profile.tools),
+      max_iterations: profile.controls.max_iterations,
+      max_tool_calls: profile.controls.max_tool_calls,
+      request_policy: profile.requests.on_busy,
+      streaming: profile.requests.streaming
+    })
+  end
+
+  defp conversation(_, nil), do: nil
+  defp conversation(_, %{memory: %{history: nil}}), do: nil
+
+  defp conversation(state, profile) do
+    case History.read(state, profile) do
+      {:ok, entries} ->
+        Context.new(system_prompt: profile.instructions)
+        |> Context.append_messages(entries)
+        |> Context.to_messages()
+
+      {:error, _} ->
+        nil
+    end
   end
 
   defp phase(nil, _, _), do: :idle

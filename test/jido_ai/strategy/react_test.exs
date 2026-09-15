@@ -4,7 +4,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
   alias Jido.AI.Reasoning.ReAct
   alias Jido.AI.Reasoning.ReAct.{Config, Token}
   alias Jido.AI.Usage
-  alias Jido.AI.Context
+  alias Jido.AI.{Context, History, Profile}
   alias Jido.Thread
   alias Jido.AI.Context.Operations, as: ContextOps
   alias ReqLLM.Message.ContentPart
@@ -196,7 +196,14 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
     %{reply: {:tools, [%{id: "calc", name: "calculator", arguments: %{operation: "add", a: 2, b: 3}}]}}
   end
 
-  defp current_context(server), do: Jido.AI.get_strategy_context(Server.agent(server))
+  defp current_history(server) do
+    agent = Server.agent(server)
+    assert {:ok, profile} = Configuration.profile(agent)
+    assert {:ok, entries} = History.read(agent.state, profile)
+    entries
+  end
+
+  defp history_entries(context), do: context.entries |> Enum.reverse() |> Enum.map(&Map.from_struct/1)
   defp context_lane(server), do: Server.agent(server).state[ContextOps.key()].assistant
   defp thread_messages(server), do: Thread.filter_by_kind(context_lane(server).session.thread, :ai_message)
   defp context_operations(server), do: Thread.filter_by_kind(context_lane(server).session.thread, :ai_context_operation)
@@ -227,10 +234,10 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       end
 
     monitor = Process.monitor(worker)
-    before = current_context(server)
+    before = current_history(server)
     replacement = Context.new(system_prompt: "Recovered prompt") |> Context.append_user("Recovered history")
     assert {:ok, _} = replace_context(server, replacement, op_id: "deferred", context_ref: "recovered")
-    assert current_context(server) == before
+    assert current_history(server) == before
     pending = context_lane(server).pending_context_op
     assert pending.operation.type == :replace and pending.operation.result_context == replacement
     assert context_lane(server).applied_context_ops == []
@@ -254,8 +261,8 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
     end
 
     assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 2_000
-    assert current_context(server).entries == replacement.entries
-    assert current_context(server).system_prompt == "Recovered prompt"
+    assert current_history(server) == history_entries(replacement)
+    assert {:ok, %Profile{instructions: "Recovered prompt"}} = Configuration.profile(Server.agent(server))
     assert context_lane(server).pending_context_op == nil
     assert context_lane(server).applied_context_ops == ["deferred"]
     assert [entry] = context_operations(server)
@@ -1303,8 +1310,8 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
         |> Context.append_messages([%{role: :user, content: "Hello"}, %{role: :assistant, content: "Hi there"}])
 
       assert {:ok, _} = replace_context(server, replacement, op_id: "replace")
-      assert current_context(server).entries == replacement.entries
-      assert current_context(server).system_prompt == "Restored prompt"
+      assert current_history(server) == history_entries(replacement)
+      assert {:ok, %Profile{instructions: "Restored prompt"}} = Configuration.profile(Server.agent(server))
       assert {:ok, handle} = request(server, mock, :react, "Continue")
       assert {:ok, "Done"} = Request.await(handle)
       [wire] = MockLLM.report(mock).requests
@@ -1317,8 +1324,8 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       server = start_reasoning(jido, :react, tools: [], system_prompt: "Keep me")
       replacement = Context.append_user(Context.new(), "test")
       assert {:ok, _} = replace_context(server, replacement, op_id: "nil-prompt")
-      assert current_context(server).entries == replacement.entries
-      assert current_context(server).system_prompt == "Keep me"
+      assert current_history(server) == history_entries(replacement)
+      assert {:ok, %Profile{instructions: "Keep me"}} = Configuration.profile(Server.agent(server))
       assert [entry] = context_operations(server)
       assert entry.payload.operation.result_context.system_prompt == nil
       assert {:ok, handle} = request(server, mock, :react, "next turn")
@@ -1354,7 +1361,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
       assert {:error, _} = replace_context(server, "not a context", op_id: "invalid")
       assert Server.agent(server).state == before
-      assert current_context(server).system_prompt == "Original"
+      assert {:ok, %Profile{instructions: "Original"}} = Configuration.profile(Server.agent(server))
       assert MockLLM.report(mock).requests == []
       assert_script_done(mock)
     end
@@ -1378,8 +1385,8 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
                  context_ref: "default"
                )
 
-      assert current_context(server).entries == replacement.entries
-      assert current_context(server).system_prompt == "Compacted prompt"
+      assert current_history(server) == history_entries(replacement)
+      assert {:ok, %Profile{instructions: "Compacted prompt"}} = Configuration.profile(Server.agent(server))
       assert context_lane(server).active_context_ref == "default"
       assert context_lane(server).applied_context_ops == ["op_compact"]
       assert [entry] = context_operations(server)
@@ -1457,8 +1464,9 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
                  op_id: "op_durable"
                )
 
-      compacted = current_context(server)
-      messages = Jido.AI.Context.to_messages(compacted)
+      compacted = current_history(server)
+      assert {:ok, view} = Session.snapshot(server)
+      messages = view.details.conversation
 
       assistant = Enum.find(messages, &(&1[:role] == :assistant))
       assert [%{id: "call_skill", name: "load_skill"}] = assistant.tool_calls
@@ -1466,7 +1474,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       refute Enum.any?(messages, &(&1[:role] == :tool and &1[:name] == "calculator"))
       refute Enum.any?(messages, &(&1[:content] == "spoofed durable user entry"))
       refute Enum.any?(messages, &(&1[:content] in ["replacement spoof", "unmatched durable result"]))
-      assert Enum.any?(compacted.entries, &(get_in(&1.refs, [:skill_name]) == "insights"))
+      assert Enum.any?(compacted, &(get_in(&1.refs, [:skill_name]) == "insights"))
       assert {:ok, handle} = request(server, mock, :react, "Continue")
       assert {:ok, "Compacted"} = Request.await(handle)
       [wire] = MockLLM.report(mock).requests
@@ -1484,7 +1492,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       before = Server.agent(server).state
       assert {:ok, _} = replace_context(server, second, op_id: "op_dup")
       assert Server.agent(server).state == before
-      assert current_context(server).entries == first.entries
+      assert current_history(server) == history_entries(first)
       assert length(context_operations(server)) == 1
       assert {:ok, handle} = request(server, mock, :react, "Continue")
       assert {:ok, "Done"} = Request.await(handle)
@@ -1502,19 +1510,19 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert {:ok, _} = replace_context(server, beta, context_ref: "beta", op_id: "beta")
       assert {:ok, _} = Session.modify_context(server, %{type: :switch}, context_ref: "alpha", op_id: "switch-alpha")
       assert context_lane(server).active_context_ref == "alpha"
-      assert current_context(server).entries == alpha.entries
+      assert current_history(server) == history_entries(alpha)
       assert length(context_operations(server)) == 3
       assert {:ok, first} = request(server, mock, :react, "Alpha query")
       assert {:ok, "Alpha answer"} = Request.await(first)
       assert {:ok, _} = Session.modify_context(server, %{type: :switch}, context_ref: "beta", op_id: "switch-beta")
-      assert current_context(server).entries == beta.entries
+      assert current_history(server) == history_entries(beta)
       assert {:ok, next} = request(server, mock, :react, "Beta query")
       assert {:ok, "Beta answer"} = Request.await(next)
       [a, b] = MockLLM.report(mock).requests
       assert Enum.map(a.body["messages"], & &1["content"]) == ["Alpha", "alpha", "Alpha query"]
       assert Enum.map(b.body["messages"], & &1["content"]) == ["Beta", "beta", "Beta query"]
       assert {:ok, _} = Session.modify_context(server, %{type: :switch}, context_ref: "alpha", op_id: "back")
-      assert Enum.map(current_context(server).entries, & &1.content) == ["Alpha answer", "Alpha query", "alpha"]
+      assert Enum.map(current_history(server), & &1.content) == ["alpha", "Alpha query", "Alpha answer"]
       assert_script_done(mock)
     end
 
@@ -1524,14 +1532,14 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert {:ok, first} = request(server, mock, :react, "Q1")
       assert {:ok, "A1"} = Request.await(first)
       assert {:ok, _} = Session.modify_context(server, %{type: :switch}, context_ref: "fresh", op_id: "fresh")
-      assert current_context(server).entries == []
-      assert current_context(server).system_prompt == "Original prompt"
+      assert current_history(server) == []
+      assert {:ok, %Profile{instructions: "Original prompt"}} = Configuration.profile(Server.agent(server))
       assert {:ok, next} = request(server, mock, :react, "Q2")
       assert {:ok, "A2"} = Request.await(next)
       [_, wire] = MockLLM.report(mock).requests
       assert Enum.map(wire.body["messages"], & &1["content"]) == ["Original prompt", "Q2"]
       assert {:ok, _} = Session.modify_context(server, %{type: :switch}, context_ref: "default", op_id: "back")
-      assert Enum.map(current_context(server).entries, & &1.content) == ["A1", "Q1"]
+      assert Enum.map(current_history(server), & &1.content) == ["Q1", "A1"]
       assert_script_done(mock)
     end
 
@@ -1668,9 +1676,10 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
       source = definition(:react, tools: [TestCalculator], model: MockLLM.model(), system_prompt: "Configured")
       assert {:ok, agent} = Jido.AI.Agent.from_initial_state(source, %{context: context}, id: "restored-agent")
-      restored = Jido.AI.get_strategy_context(agent)
-      assert restored.entries == context.entries and restored.system_prompt == "Restored"
-      assert restored.id == "restored-agent:assistant"
+      assert {:ok, %Profile{id: :assistant, instructions: "Restored"} = profile} = Configuration.profile(agent)
+      assert {:ok, history} = History.read(agent.state, profile)
+      assert history == history_entries(context)
+      assert agent.id == "restored-agent"
       refute Map.has_key?(agent.state, :context)
       mock = mock([%{reply: {:text, "Continued"}}])
       server = start_agent(jido, agent)
@@ -1698,8 +1707,9 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
       source = definition(:react, tools: [TestCalculator], model: MockLLM.model(), system_prompt: "Config prompt")
       assert {:ok, agent} = Jido.AI.Agent.from_initial_state(source, %{context: context})
-      restored = Jido.AI.get_strategy_context(agent)
-      assert restored.entries == context.entries and restored.system_prompt == "Config prompt"
+      assert {:ok, %Profile{instructions: "Config prompt"} = profile} = Configuration.profile(agent)
+      assert {:ok, history} = History.read(agent.state, profile)
+      assert history == history_entries(context)
       mock = mock([%{reply: {:text, "Continued"}}])
       server = start_agent(jido, agent)
       assert {:ok, handle} = request(server, mock, :react, "Next question")
@@ -1730,8 +1740,9 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       thread = %{id: "thread_1", rev: 2}
       assert {:ok, agent} = Jido.AI.Agent.from_initial_state(source, %{thread: thread})
       assert agent.state.thread == thread
-      assert %Context{entries: []} = context = Jido.AI.get_strategy_context(agent)
-      assert context.id != "thread_1"
+      assert {:ok, profile} = Configuration.profile(agent)
+      assert profile.memory.history == :messages
+      assert {:ok, []} = History.read(agent.state, profile)
       mock = mock([%{reply: {:text, "Done"}}])
       server = start_agent(jido, agent)
       assert {:ok, handle} = request(server, mock, :react, "Hello")

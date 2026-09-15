@@ -1,6 +1,6 @@
 defmodule Jido.AI.InitialStateTest do
   use Jido.AI.Test.ReasoningCase, async: false
-  alias Jido.AI.{Agent, Context}
+  alias Jido.AI.{Agent, Context, History, Profile}
 
   defp source do
     definition(:react, tools: [], model: MockLLM.model(), system_prompt: "Configured")
@@ -23,9 +23,12 @@ defmodule Jido.AI.InitialStateTest do
     source = source()
     assert {:ok, agent} = Agent.from_initial_state(source, %{})
     assert agent.state.messages == []
-    assert Jido.AI.get_strategy_context(agent).system_prompt == "Configured"
+    assert {:ok, %Profile{instructions: "Configured"} = profile} = Configuration.profile(agent)
+    assert {:ok, []} = History.read(agent.state, profile)
+    assert Agent.profile(source, :assistant).instructions == "Configured"
     assert {:ok, empty} = Agent.from_initial_state(source, %{context: %{context() | system_prompt: ""}})
-    assert Jido.AI.get_strategy_context(empty).system_prompt == ""
+    assert {:ok, %Profile{instructions: ""} = profile} = Configuration.profile(empty)
+    assert {:ok, [%{role: :user, content: "Previous"}]} = History.read(empty.state, profile)
   end
 
   test "import rejects old runtime state, Plugin state, unknown fields and duplicate field aliases" do
@@ -98,7 +101,9 @@ defmodule Jido.AI.InitialStateTest do
     assert {:ok, agent} = Agent.from_initial_state(source(), %{"context" => input})
     assert Enum.map(agent.state.messages, & &1.content) == ["Old question", "Old answer"]
     assert List.last(agent.state.messages).refs == %{"case" => "one"}
-    assert Jido.AI.get_strategy_context(agent).system_prompt == "Imported"
+    assert {:ok, %Profile{instructions: "Imported"} = profile} = Configuration.profile(agent)
+    assert {:ok, history} = History.read(agent.state, profile)
+    assert history == agent.state.messages
     assert {:error, _} = Agent.from_initial_state(source(), %{context: Map.put(input, "version", 999)})
     assert {:error, _} = Agent.from_initial_state(source(), %{context: Map.put(input, :id, "conflicting")})
   end

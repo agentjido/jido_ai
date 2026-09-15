@@ -12,9 +12,12 @@ This record covers `jido_ai` on `v3-spike` only.
    It does not change the reasoning engines or request runtime.
 3. `20cd98d1` puts source files at paths that match module names and
    splits mixed files. It preserves module names, contracts, and behavior.
-4. This checkpoint removes direct test-script dependencies from Request,
+4. `2dd33ebb` removes direct test-script dependencies from Request,
    Runtime.ModelCall, and ReAct.Runner. It preserves the public test helpers
    through an internal model-call boundary.
+5. This checkpoint removes the root strategy inspection helpers. Session
+   inspection reads the selected Profile and committed History. Snapshot
+   fields and request execution remain the same.
 
 ## Inventory and caller evidence
 
@@ -35,7 +38,7 @@ Source paths below are relative to `lib/jido_ai/` unless they start with
 | Remove; complete | `mix jido_ai` and `Mix.Tasks.JidoAi` | The execution task was the CLI entry point. Its option parsing, stdin batches, output formatting, and telemetry display have no other runtime caller. |
 | Remove; complete | `Jido.AI.CLI.Adapter`, `Jido.AI.CLI.EphemeralAgent`, eight `CLIAdapter` modules | Adapter resolution and temporary module creation were called only by the task, adapters, and CLI tests. No retained source, example, or authoring fixture calls them. |
 | Remove; complete | `Jido.AI.Tools.Arithmetic` and Add, Subtract, Multiply, Divide, Square | ReAct's CLI adapter was the only runtime caller. The CLI task documentation was the only other use outside that implementation. Examples already have their own Actions. |
-| Simplify; proposed | `Jido.AI.get_strategy_config/1,2` and `get_strategy_context/1,2` | `Session.Inspection` still calls both. Four unit test files and two example test files also use them. Move internal reads to Profile/history before removing these V2-style public names. |
+| Remove; complete | `Jido.AI.get_strategy_config/1,2` and `get_strategy_context/1,2` | `Session.Inspection` now reads Profile and History directly. Four unit test files now use supported Agent, Profile, Session, and History behavior. Two example test files still need migration; their exact paths are recorded below. |
 | Simplify; proposed | Generated `ask`, `ask_sync`, `ask_stream`, `await`, `cancel`, `steer` helpers | `agent/definition.ex` generates them; `agent/interface.ex` resolves routes. Native Agent unit tests and examples still call them. Review overlap with route `define` helpers as a separate change. |
 | Move; proposed | Historical API and CLI obligations | Old audit files still describe the CLI as retained work. Keep historical evidence separate from the current supported API inventory. This record supersedes their CLI retention decision. |
 | Move; proposed | Any future execution shell or arithmetic demonstration | Put application-specific command behavior in a consumer application, and teaching Actions in examples. There is no retained caller that requires a replacement package now. |
@@ -53,6 +56,7 @@ Source paths below are relative to `lib/jido_ai/` unless they start with
   `start_agent/3`, `submit/3`, `await/3`, `stop/1`, and
   `create_ephemeral_agent/1`.
 - `Jido.AI.Tools.Arithmetic` and its five Action modules.
+- `Jido.AI.get_strategy_config/1,2` and `Jido.AI.get_strategy_context/1,2`.
 
 Use a declared AI Agent and its request API for application execution.
 No replacement command or compatibility adapter is added. No dependency was
@@ -113,6 +117,58 @@ used only by the CLI, so this removal does not change the dependency list.
   text streams, and object streams. Tests exercise all five paths through the
   local HTTP server. No live provider request was needed for these checks.
 
+## Strategy inspection removal
+
+- `Session.Inspection` resolves the current Profile once through
+  `Configuration.profile/2`. Its private configuration projection retains the
+  same keys and merge order: method options, model generation options, then
+  shared Profile fields. Tool targets, names, and ReqLLM definitions retain
+  their order. The root helpers have no replacement root API.
+- Conversation messages come from `History.read/2` on the committed Agent
+  state. Context still projects those entries to message maps. It retains
+  system prompts, chronological order, content parts, tool calls, and refs.
+  Live inspection does not supply private conversation state.
+- Snapshot selection still uses the selected request's profile. An idle Agent
+  selects `:assistant`, or its only profile. An idle Agent with multiple
+  profiles and no `:assistant` returns empty configuration and conversation.
+  An Agent without AI profiles also returns an empty idle view.
+- Before a lane switch, empty configured history has the `"default"` context
+  reference.
+  A profile without history has no context reference or conversation, even
+  if it has instructions. Nil instructions add no system message. Empty text
+  adds an explicit empty system message. Existing lane references and pending
+  context operations retain their meaning.
+- Snapshot configuration and conversation reflect current committed state,
+  including for a retained request. Already-started work keeps its admission
+  configuration. The request record, live sample, events, and completion
+  behavior are unchanged.
+
+Migration paths:
+
+| Prior use | Supported path |
+| --- | --- |
+| Declared configuration before startup | `Jido.AI.Agent.profile(source, id)` or `profiles/1` returns declared Profile values. This does not include runtime overrides. |
+| Current configuration on an Agent value | `Jido.AI.Configuration.profile(agent, id)` returns a tagged current Profile, including committed overrides. Read `instructions`, `models[reasoning.model].generation`, `tools`, `controls`, and `requests` as needed. |
+| Running Agent inspection | `Jido.AI.Session.snapshot(server, request_id: id)` returns `details.config` and `details.conversation`. Omit `request_id` for the normal selection. |
+| Committed history for one profile | Select the Profile, then call `Jido.AI.History.read(agent.state, profile)`. The result contains chronological entry maps. The system prompt is `profile.instructions`. |
+| Old Context entry comparison | Compare History entries with `context.entries \|> Enum.reverse() \|> Enum.map(&Map.from_struct/1)`. History returns maps, not Context.Entry structs. |
+| Synthetic Context identity | Assert the Agent ID and selected Profile ID. The removed helper's `agent_id:profile_id` Context ID is no longer an inspection contract. |
+
+The affected unit files retain their runtime and state assertions:
+
+- `test/jido_ai/operations/initial_state_test.exs`
+- `test/jido_ai/strategy/react_test.exs`
+- `test/jido_ai/strategy/stateops_integration_test.exs`
+- `test/jido_ai/integration/react_context_lifecycle_integration_test.exs`
+
+`test/jido_ai/session/inspection_test.exs` adds ten snapshot tests. They cover
+nil, empty, and saved prompts before the first request; absent history;
+no profiles; method and generation fields; default and explicit profile
+selection; current overrides during active work; retained request selection;
+and imported content parts, tool messages, refs, and context lane switches.
+Existing tests still cover pending tools, stream text, cancellation, failure,
+recovery, deferred context replacement, checkpoints, and trace truncation.
+
 ## Unit coverage and verification
 
 The unit file selection is `test/jido_ai/**/*_test.exs`, excluding
@@ -151,7 +207,20 @@ or skips. The run took 18.7 seconds with seed 0 and warnings as errors.
 `mix compile --force --warnings-as-errors` passed. The existing flaky
 exclusion is unchanged. All existing unit tests remain.
 
-The 15 added tests cover default ReqLLM calls, callback data and delegation,
+Strategy inspection removal result: 142 files; 1,820 passed, 1 excluded;
+no failures or skips. The full selected run took 18.9 seconds with seed 0
+and warnings as errors. `mix format --check-formatted` and
+`mix compile --force --warnings-as-errors` passed; the forced dev compile
+compiled 336 files. The existing flaky exclusion is unchanged. All previous
+unit tests remain, and ten snapshot tests were added. The focused snapshot
+run also passed all ten tests with seed 0 and warnings as errors.
+Authoring and example suites were not run. Their compiled source and support
+needed no repair. After the checks, safe `rmdir` removed the empty
+`test/fixtures/skills` and `test/jido_ai/fixtures` directories left by tests.
+There were no empty source directories.
+
+The 15 tests added at the model-call checkpoint cover default ReqLLM calls,
+callback data and delegation,
 explicit option precedence, quota admission and accounting, cancellation,
 binding through Task callers, use after the binder owner exits, native request
 isolation, explicit helpers outside the caller tree, and plain text inputs.
@@ -185,27 +254,47 @@ request, reasoning, standalone, Plugin, and task tests remain.
   evidence, not a fresh run for this checkpoint.
 - The model-call boundary required no authoring or example source repairs.
   Those suites remain deferred. Broader guide and API work remains below;
-  no capability, strategy helper, or other public API is removed in this step.
-- Removing strategy inspection helpers later affects example tests 14_11 and
-  18_01. Record or update that work in its own checkpoint.
+  no capability, strategy helper, or other public API was removed in that
+  model-call checkpoint.
+- Strategy inspection removal leaves exactly two example test files to migrate:
+  - `test/examples/14_resume/14_11_initial_state/14_11_initial_state_test.exs`
+    calls the removed Context helper at lines 43-45 and 101. Use
+    `Configuration.profile/2` and `History.read/2` for imported prompt and entry
+    assertions. Compare chronological maps and assert Agent/Profile IDs.
+    Keep explicit `:review` selection and unrelated history assertions.
+  - `test/examples/18_skills/18_01_skill_runtime/18_01_skill_runtime_test.exs`
+    calls it in `entries/1` at line 34. Read the selected Profile's History.
+    Review callers that expect reverse order or Context.Entry structs; preserve
+    skill refs, durable entries, compaction, and request isolation assertions.
+
+  There are no calls in `test/authoring`, `test/jido_ai/authoring`, example
+  source, or compiled example support. No compile repair was required.
+  These two files are unchanged and still need the migration before their
+  suites can pass. Authoring and example suites remain deferred by request.
 
 ## Recommended remaining pieces
 
-1. **Next: retire the two root strategy inspection helpers.** Change
-   `Session.Inspection` to read Profile configuration and committed history
-   directly. Preserve `Session.snapshot/2` output. Transfer the four affected
-   unit test files to supported Profile/Session/history APIs, then remove
-   `get_strategy_config/1,2` and `get_strategy_context/1,2`. Do not change method
-   execution or initial-state conversion in that step.
+1. **Next: extract Profile reference resolution.** Move the private
+   `resolve_references/2` group in `profile.ex` (currently lines 221-444) to
+   an internal `Jido.AI.Profile.References` module with one `resolve/2`
+   entry point. This group resolves explicit registry references for
+   instructions, tools, schemas, repair Actions, model routers, and controls.
+   It also separates tool-source inputs. Its only entry caller is Profile
+   construction. Keep defaults, canonical validation, schema construction,
+   and public errors in Profile. Preserve map and Codec.Registry behavior.
+   This separates input reference resolution from policy validation with a
+   bounded, inert contract. No new provider, process, or public root API is
+   needed. This recommendation is not implemented here.
 2. Review generated Agent request helpers against route `define` helpers.
    Choose one normal calling form. Keep request admission, stream, and cancel
    behavior covered before removing any helper.
 3. Review capability and callable-reasoning defaults against Profile fields.
    Remove duplicate option translation only where callers can use the shared
    validation. Keep Plugin composition and all reasoning methods.
-4. Review Profile validation and Session.Runtime in separate, focused pieces.
-   Define clear internal responsibilities before extracting functions. Their
-   size alone is not a reason to split them. Resolve the intended ownership
+4. Session.Runtime was also reviewed. It coordinates jobs, recovery,
+   completion commits, input queues, and observed events. Keep those process
+   and commit boundaries together for now; no Runtime extraction is included
+   in this recommendation. Resolve the intended ownership
    of `Jido.Session` and `Jido.Thread` before any package transfer.
 5. Reconcile current guides and API inventories. Run the deferred authoring
    and example suites after the API decisions are complete.

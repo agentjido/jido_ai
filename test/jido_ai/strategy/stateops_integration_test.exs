@@ -206,7 +206,8 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     server = start(jido)
     assert {:ok, _} = Jido.AI.register_tool(server, Double)
     assert {:ok, _} = Jido.AI.register_tool(server, Double)
-    config = Jido.AI.get_strategy_config(Server.agent(server))
+    assert {:ok, view} = Session.snapshot(server)
+    config = view.details.config
     assert config.tools == [Double, Update]
     assert config.actions_by_name == %{"state_update" => Update, "state_double" => Double}
     assert Enum.map(config.reqllm_tools, & &1.name) == ["state_double", "state_update"]
@@ -226,7 +227,8 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     assert Jason.decode!(tool["content"])["result"] == %{"result" => 10}
     assert {:ok, _} = Jido.AI.unregister_tool(server, "state_update")
     assert {:ok, _} = Jido.AI.unregister_tool(server, "state_double")
-    empty = Jido.AI.get_strategy_config(Server.agent(server))
+    assert {:ok, view} = Session.snapshot(server)
+    empty = view.details.config
     assert empty.tools == [] and empty.actions_by_name == %{} and empty.reqllm_tools == []
     assert {:ok, next} = ask(server, mock, "No tools")
     assert {:ok, "Empty"} = Request.await(next)
@@ -237,7 +239,11 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
   test "model generation and tool options come from the normalized profile", %{jido: jido} do
     mock = mock([%{reply: {:text, "Done"}}])
     server = start_reasoning(jido, :react, tools: [], max_tokens: 40, temperature: 0.2)
-    config = Jido.AI.get_strategy_config(Server.agent(server))
+    assert {:ok, view} = Session.snapshot(server)
+    config = view.details.config
+    assert {:ok, profile} = Configuration.profile(view.agent)
+    generation = profile.models[profile.reasoning.model].generation
+    assert generation[:max_tokens] == 40 and generation[:temperature] == 0.2
     assert config.max_tokens == 40 and config.temperature == 0.2
     assert config.tools == [] and config.actions_by_name == %{} and config.reqllm_tools == []
     assert {:ok, handle} = ask(server, mock)

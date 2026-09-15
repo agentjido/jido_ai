@@ -2,7 +2,7 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
   use ExUnit.Case, async: false
   use Mimic
 
-  alias Jido.AI.Context
+  alias Jido.AI.{Configuration, Context, History, Profile, Session}
   alias Jido.Thread
   alias Jido.AI.Context.Operations
   alias Jido.AI.TestSupport.StreamResponseFactory
@@ -100,8 +100,8 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
     assert user_contents(second_messages) == ["Q1", "Q2"]
     assert assistant_contents(second_messages) == ["A1"]
 
-    # Inspect the materialized ReAct context before reset.
-    state_before_reset = strategy_context(pid)
+    # Inspect the committed conversation before reset.
+    state_before_reset = conversation(pid)
 
     assert non_system_messages(state_before_reset) == [
              %{role: :user, content: "Q1"},
@@ -114,7 +114,7 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
       Context.new(system_prompt: "Reset prompt")
       |> Context.append_user("Reset seed")
 
-    # Reset context through the canonical strategy command surface.
+    # Reset context through the Session context command.
     reset_signal =
       Jido.Signal.new!(
         "jido.ai.context.modify",
@@ -132,10 +132,11 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
 
     assert {:ok, _agent} = Jido.AgentServer.call(pid, reset_signal, 5_000)
 
-    # After reset, materialized strategy context is replaced immediately.
-    state_after_reset = strategy_context(pid)
-    assert state_after_reset.system_prompt == "Reset prompt"
-    assert Jido.AI.get_strategy_config(fetch_agent(pid)).system_prompt == "Reset prompt"
+    # After reset, committed conversation is replaced immediately.
+    state_after_reset = conversation(pid)
+    assert hd(state_after_reset) == %{role: :system, content: "Reset prompt"}
+    assert {:ok, %Profile{instructions: "Reset prompt"} = profile} = Configuration.profile(fetch_agent(pid))
+    assert {:ok, [%{role: :user, content: "Reset seed"}]} = History.read(fetch_agent(pid).state, profile)
     assert non_system_messages(state_after_reset) == [%{role: :user, content: "Reset seed"}]
 
     # Turn 3 should project only from reset context, not from pre-reset turns.
@@ -146,8 +147,8 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
     refute "Q1" in user_contents(third_messages)
     refute "Q2" in user_contents(third_messages)
 
-    # Materialized strategy context now reflects post-reset conversation only.
-    state_final = strategy_context(pid)
+    # Committed conversation now reflects post-reset conversation only.
+    state_final = conversation(pid)
 
     assert non_system_messages(state_final) == [
              %{role: :user, content: "Reset seed"},
@@ -175,7 +176,10 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
     refute Enum.any?(ai_messages, &(entry_content(&1) == "Reset seed"))
   end
 
-  defp strategy_context(pid), do: pid |> fetch_agent() |> Jido.AI.get_strategy_context()
+  defp conversation(pid) do
+    assert {:ok, view} = Session.snapshot(pid)
+    view.details.conversation
+  end
 
   defp session_thread(pid) do
     lanes = fetch_agent(pid).state[Operations.key()]
@@ -187,9 +191,8 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
     Jido.AgentServer.agent(pid)
   end
 
-  defp non_system_messages(%Context{} = context) do
-    context
-    |> Context.to_messages()
+  defp non_system_messages(messages) do
+    messages
     |> Enum.reject(&(message_role(&1) == :system))
     |> Enum.map(fn message ->
       %{
