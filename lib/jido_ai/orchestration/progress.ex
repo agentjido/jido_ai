@@ -1,4 +1,4 @@
-defmodule Jido.AI.Session.Progress do
+defmodule Jido.AI.Orchestration.Progress do
   @moduledoc false
   use Jido.Action,
     name: "ai_session_progress",
@@ -9,10 +9,10 @@ defmodule Jido.AI.Session.Progress do
         ticket: Zoi.string()
       })
 
-  alias Jido.AI.Session.Change
+  alias Jido.AI.Orchestration.Change
 
   def run(params, context) do
-    with {:ok, context} <- Jido.AI.Session.Plugin.context(context),
+    with {:ok, context} <- Jido.AI.Orchestration.Plugin.context(context),
          do: execute(params, context)
   end
 

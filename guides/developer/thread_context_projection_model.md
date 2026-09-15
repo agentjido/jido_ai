@@ -67,7 +67,7 @@ in memory. Optional method and phase fields stay absent until needed.
 `Runtime.Checkpoint` owns the portable execution subset, remaining deadline,
 effect validation, and pause/ack lifecycle. Its internal format adapter owns
 the standalone value and token. The ReAct adapter implements this contract;
-other methods do not gain resume support from this separation. Session.Runtime
+other methods do not gain resume support from this separation. Orchestration.Coordinator
 still owns the process and commit lifecycle. No new worker process is added.
 
 ## Contract evidence

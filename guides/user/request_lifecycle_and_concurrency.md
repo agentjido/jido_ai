@@ -182,7 +182,7 @@ has it available. Common keys are:
 Example:
 
 ```elixir
-{:ok, status} = Jido.AI.Session.snapshot(pid)
+{:ok, status} = Jido.AI.Orchestration.snapshot(pid)
 status.request.meta
 # %{usage: %{...}, reasoning_details: [...], ...}
 ```
@@ -191,7 +191,7 @@ The status snapshot separates the final assistant answer from completed tool
 outputs:
 
 ```elixir
-{:ok, status} = Jido.AI.Session.snapshot(pid)
+{:ok, status} = Jido.AI.Orchestration.snapshot(pid)
 
 answer = status.request.result
 tool_results = status.details[:tool_results] || []

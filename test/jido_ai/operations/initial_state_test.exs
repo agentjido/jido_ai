@@ -28,7 +28,7 @@ defmodule Jido.AI.InitialStateTest do
     assert {:ok, agent} = Agent.from_initial_state(source(), %{})
     assert is_nil(agent.state.messages)
     assert {:ok, %Profile{instructions: "Configured"} = profile} = Configuration.profile(agent)
-    assert {:ok, []} = Jido.AI.Session.Transcript.read(agent.state, profile)
+    assert {:ok, []} = Jido.AI.Orchestration.Transcript.read(agent.state, profile)
     assert {:ok, empty} = Agent.from_initial_state(source(), %{messages: saved("")})
     assert {:ok, %Profile{instructions: ""}} = Configuration.profile(empty)
   end

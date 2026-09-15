@@ -2,713 +2,11 @@
   "scope": "Current declared source under lib; not a compatibility promise or expanded BEAM export list.",
   "files": [
     {
-      "path": "lib/jido/session.ex",
-      "modules": [
-        "Jido.Session"
-      ],
-      "sha256": "74efabe1226527ff0d54bee4de793007ba6f87298f94f9d8187072655b3ba223",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.Session",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.Session",
-          "name": "moduledoc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 31,
-          "module": "Jido.Session",
-          "source": "[Zoi.Struct.struct_fields(@schema)]",
-          "kind": "defstruct",
-          "quoted": false
-        },
-        {
-          "line": 33,
-          "module": "Jido.Session",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 35,
-          "module": "Jido.Session",
-          "name": "schema",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            0
-          ],
-          "clause_lines": [
-            35
-          ]
-        },
-        {
-          "line": 37,
-          "module": "Jido.Session",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 39,
-          "module": "Jido.Session",
-          "name": "new",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            0,
-            1
-          ],
-          "clause_lines": [
-            39
-          ]
-        },
-        {
-          "line": 59,
-          "module": "Jido.Session",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 61,
-          "module": "Jido.Session",
-          "name": "from_thread",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1,
-            2
-          ],
-          "clause_lines": [
-            61
-          ]
-        },
-        {
-          "line": 77,
-          "module": "Jido.Session",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 79,
-          "module": "Jido.Session",
-          "name": "append",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            79,
-            82,
-            84
-          ]
-        },
-        {
-          "line": 96,
-          "module": "Jido.Session",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 98,
-          "module": "Jido.Session",
-          "name": "put_metadata",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            98
-          ]
-        },
-        {
-          "line": 109,
-          "module": "Jido.Session",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 111,
-          "module": "Jido.Session",
-          "name": "close",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            111,
-            113
-          ]
-        },
-        {
-          "line": 118,
-          "module": "Jido.Session",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 120,
-          "module": "Jido.Session",
-          "name": "open?",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            120
-          ]
-        },
-        {
-          "line": 122,
-          "module": "Jido.Session",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 124,
-          "module": "Jido.Session",
-          "name": "encode",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            124
-          ]
-        },
-        {
-          "line": 140,
-          "module": "Jido.Session",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 142,
-          "module": "Jido.Session",
-          "name": "decode",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            142,
-            144,
-            167
-          ]
-        },
-        {
-          "line": 169,
-          "module": "Jido.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 171,
-          "module": "Jido.Session",
-          "name": "validate",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            171,
-            184
-          ]
-        }
-      ]
-    },
-    {
-      "path": "lib/jido/thread.ex",
-      "modules": [
-        "Jido.Thread"
-      ],
-      "sha256": "45ba5c1bb2ae1345a01b201b71521a3949c4d493a9d81ea1ff50934ad82a374c",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.Thread",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.Thread",
-          "name": "moduledoc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 31,
-          "module": "Jido.Thread",
-          "source": "[Zoi.Struct.struct_fields(@schema)]",
-          "kind": "defstruct",
-          "quoted": false
-        },
-        {
-          "line": 33,
-          "module": "Jido.Thread",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 35,
-          "module": "Jido.Thread",
-          "name": "schema",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            0
-          ],
-          "clause_lines": [
-            35
-          ]
-        },
-        {
-          "line": 37,
-          "module": "Jido.Thread",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 39,
-          "module": "Jido.Thread",
-          "name": "new",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            0,
-            1
-          ],
-          "clause_lines": [
-            39
-          ]
-        },
-        {
-          "line": 55,
-          "module": "Jido.Thread",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 57,
-          "module": "Jido.Thread",
-          "name": "append",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            57,
-            59
-          ]
-        },
-        {
-          "line": 81,
-          "module": "Jido.Thread",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 83,
-          "module": "Jido.Thread",
-          "name": "entry_count",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            83
-          ]
-        },
-        {
-          "line": 85,
-          "module": "Jido.Thread",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 87,
-          "module": "Jido.Thread",
-          "name": "last",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            87,
-            88
-          ]
-        },
-        {
-          "line": 90,
-          "module": "Jido.Thread",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 92,
-          "module": "Jido.Thread",
-          "name": "get_entry",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            92
-          ]
-        },
-        {
-          "line": 94,
-          "module": "Jido.Thread",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 96,
-          "module": "Jido.Thread",
-          "name": "to_list",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            96
-          ]
-        },
-        {
-          "line": 98,
-          "module": "Jido.Thread",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 100,
-          "module": "Jido.Thread",
-          "name": "filter_by_kind",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            100,
-            102,
-            105
-          ]
-        },
-        {
-          "line": 109,
-          "module": "Jido.Thread",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 111,
-          "module": "Jido.Thread",
-          "name": "slice",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3
-          ],
-          "clause_lines": [
-            111
-          ]
-        },
-        {
-          "line": 115,
-          "module": "Jido.Thread",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 117,
-          "module": "Jido.Thread",
-          "name": "encode",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            117
-          ]
-        },
-        {
-          "line": 132,
-          "module": "Jido.Thread",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 134,
-          "module": "Jido.Thread",
-          "name": "decode",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            134,
-            138,
-            160
-          ]
-        },
-        {
-          "line": 162,
-          "module": "Jido.Thread",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 164,
-          "module": "Jido.Thread",
-          "name": "validate",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            164,
-            184
-          ]
-        }
-      ]
-    },
-    {
-      "path": "lib/jido/thread/entry.ex",
-      "modules": [
-        "Jido.Thread.Entry"
-      ],
-      "sha256": "0a29c8ebe37e1f1ca1fcf2480b5cec300464e0e377c89e2cb8996c66c4dff71d",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.Thread.Entry",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.Thread.Entry",
-          "name": "moduledoc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 21,
-          "module": "Jido.Thread.Entry",
-          "source": "[Zoi.Struct.struct_fields(@schema)]",
-          "kind": "defstruct",
-          "quoted": false
-        },
-        {
-          "line": 23,
-          "module": "Jido.Thread.Entry",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 25,
-          "module": "Jido.Thread.Entry",
-          "name": "schema",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            0
-          ],
-          "clause_lines": [
-            25
-          ]
-        },
-        {
-          "line": 27,
-          "module": "Jido.Thread.Entry",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 29,
-          "module": "Jido.Thread.Entry",
-          "name": "new",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            29,
-            31
-          ]
-        },
-        {
-          "line": 46,
-          "module": "Jido.Thread.Entry",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 48,
-          "module": "Jido.Thread.Entry",
-          "name": "encode",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            48
-          ]
-        },
-        {
-          "line": 59,
-          "module": "Jido.Thread.Entry",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 61,
-          "module": "Jido.Thread.Entry",
-          "name": "decode",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            61,
-            63,
-            80
-          ]
-        },
-        {
-          "line": 82,
-          "module": "Jido.Thread.Entry",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 84,
-          "module": "Jido.Thread.Entry",
-          "name": "validate",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            84,
-            95
-          ]
-        },
-        {
-          "line": 97,
-          "module": "Jido.Thread.Entry",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 99,
-          "module": "Jido.Thread.Entry",
-          "name": "normalize",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3
-          ],
-          "clause_lines": [
-            99,
-            111
-          ]
-        }
-      ]
-    },
-    {
       "path": "lib/jido_ai.ex",
       "modules": [
         "Jido.AI"
       ],
-      "sha256": "fb67ffa160b7e5c619b2fecf57f9ae4a98f6ce00ad78478134553505ffd05f52",
+      "sha256": "7a8bf0da208541e27d0247b0ce79b4ac0ef1c369fc227e47c623d00908177a71",
       "declarations": [
         {
           "line": 1,
@@ -3027,7 +2325,7 @@
       "modules": [
         "Jido.AI.Actions.Reasoning.RunStrategy"
       ],
-      "sha256": "0d3ad5cdedaf11323d69dc345f56bca5a0c02ffc7daf40219680018775371e0d",
+      "sha256": "86c7f9b36f5c7447c9ef7b1366a2d3547a9a673bab8e964e13f2ac22a38ff55c",
       "declarations": [
         {
           "line": 1,
@@ -4624,7 +3922,7 @@
       "modules": [
         "Jido.AI.Agent.Interface"
       ],
-      "sha256": "076e7bb2e33b86e17b0adc92ec69fccaee8585ef5cc2105ec220e237907db75c",
+      "sha256": "e3dacb668a00492bfe27d0f827f01e20e7f0e4013fc6d54420b705db1b472a9e",
       "declarations": [
         {
           "line": 1,
@@ -4701,7 +3999,7 @@
         "Jido.AI.Authoring",
         "Jido.AI.Authoring.Ref"
       ],
-      "sha256": "0379057b785bcab2700a4692f74c50d99e2d48641503e1340a84b7b9a4eb335e",
+      "sha256": "ceb94e131a60713fcb7999441cc7ff62fecf679288c7e5fc361825c2de0ec40a",
       "declarations": [
         {
           "line": 1,
@@ -5324,7 +4622,7 @@
       "modules": [
         "Jido.AI.Configuration.Apply"
       ],
-      "sha256": "1e4036792ddcde89664dcd0532f0a16068172e90f01eb7adef3e4ddb06a85233",
+      "sha256": "757b65826ca93f250bc2e0b727d3cec548bc5a0723748854ed3f7541c39a56f3",
       "declarations": [
         {
           "line": 1,
@@ -7312,7 +6610,7 @@
       "modules": [
         "Jido.AI.Model.Generate"
       ],
-      "sha256": "5529f3091c9915662a20a82f563107c961f7155f5d40b2e96c13fed658449edf",
+      "sha256": "bc70d7a29182150053a20954d0962e647bb00e3ad8af9d81ebcbbf32fb333250",
       "declarations": [
         {
           "line": 1,
@@ -8382,6 +7680,2306 @@
           ],
           "clause_lines": [
             122
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_ai/orchestration.ex",
+      "modules": [
+        "Jido.AI.Orchestration"
+      ],
+      "sha256": "52a49f842b914aa6393224e7758e803c82b49f0b9197ec959e7184f896c3a833",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Orchestration",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Orchestration",
+          "name": "moduledoc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 36,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 51,
+          "module": "Jido.AI.Orchestration",
+          "name": "snapshot",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1,
+            2
+          ],
+          "clause_lines": [
+            51
+          ]
+        },
+        {
+          "line": 78,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 79,
+          "module": "Jido.AI.Orchestration",
+          "name": "modify_context",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2,
+            3
+          ],
+          "clause_lines": [
+            79
+          ]
+        },
+        {
+          "line": 82,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 83,
+          "module": "Jido.AI.Orchestration",
+          "name": "skill_catalog",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1,
+            2
+          ],
+          "clause_lines": [
+            83
+          ]
+        },
+        {
+          "line": 97,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 98,
+          "module": "Jido.AI.Orchestration",
+          "name": "publish_type",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            0
+          ],
+          "clause_lines": [
+            98
+          ]
+        },
+        {
+          "line": 99,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 100,
+          "module": "Jido.AI.Orchestration",
+          "name": "ignore_type",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            0
+          ],
+          "clause_lines": [
+            100
+          ]
+        },
+        {
+          "line": 101,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 102,
+          "module": "Jido.AI.Orchestration",
+          "name": "observation_type?",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            102
+          ]
+        },
+        {
+          "line": 104,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 105,
+          "module": "Jido.AI.Orchestration",
+          "name": "delivery_status",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            105
+          ]
+        },
+        {
+          "line": 114,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 115,
+          "module": "Jido.AI.Orchestration",
+          "name": "settle_signal",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            115
+          ]
+        },
+        {
+          "line": 118,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 119,
+          "module": "Jido.AI.Orchestration",
+          "name": "routes",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            119,
+            121
+          ]
+        },
+        {
+          "line": 151,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 152,
+          "module": "Jido.AI.Orchestration",
+          "name": "settle_type",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            0
+          ],
+          "clause_lines": [
+            152
+          ]
+        },
+        {
+          "line": 153,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 154,
+          "module": "Jido.AI.Orchestration",
+          "name": "cancel_type",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            0
+          ],
+          "clause_lines": [
+            154
+          ]
+        },
+        {
+          "line": 155,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 156,
+          "module": "Jido.AI.Orchestration",
+          "name": "history_type",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            0
+          ],
+          "clause_lines": [
+            156
+          ]
+        },
+        {
+          "line": 157,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 158,
+          "module": "Jido.AI.Orchestration",
+          "name": "progress_type",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            0
+          ],
+          "clause_lines": [
+            158
+          ]
+        },
+        {
+          "line": 160,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 161,
+          "module": "Jido.AI.Orchestration",
+          "name": "publish_selection",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3
+          ],
+          "clause_lines": [
+            161,
+            163,
+            179
+          ]
+        },
+        {
+          "line": 181,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 182,
+          "module": "Jido.AI.Orchestration",
+          "name": "caller_context",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            182
+          ]
+        },
+        {
+          "line": 210,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 211,
+          "module": "Jido.AI.Orchestration",
+          "name": "steer",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2,
+            3
+          ],
+          "clause_lines": [
+            211
+          ]
+        },
+        {
+          "line": 212,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 213,
+          "module": "Jido.AI.Orchestration",
+          "name": "inject",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2,
+            3
+          ],
+          "clause_lines": [
+            213
+          ]
+        },
+        {
+          "line": 215,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 216,
+          "module": "Jido.AI.Orchestration",
+          "name": "control_agent",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            4
+          ],
+          "clause_lines": [
+            216
+          ]
+        },
+        {
+          "line": 258,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 259,
+          "module": "Jido.AI.Orchestration",
+          "name": "publish_history",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            259
+          ]
+        },
+        {
+          "line": 289,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 290,
+          "module": "Jido.AI.Orchestration",
+          "name": "admission_target",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            290
+          ]
+        },
+        {
+          "line": 295,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 296,
+          "module": "Jido.AI.Orchestration",
+          "name": "submit",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            4
+          ],
+          "clause_lines": [
+            296
+          ]
+        },
+        {
+          "line": 369,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 370,
+          "module": "Jido.AI.Orchestration",
+          "name": "cancel",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1,
+            2
+          ],
+          "clause_lines": [
+            370
+          ]
+        },
+        {
+          "line": 387,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 388,
+          "module": "Jido.AI.Orchestration",
+          "name": "await",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3
+          ],
+          "clause_lines": [
+            388,
+            396
+          ]
+        },
+        {
+          "line": 446,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 447,
+          "module": "Jido.AI.Orchestration",
+          "name": "inspect_reasoning",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            447,
+            449
+          ]
+        },
+        {
+          "line": 456,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 457,
+          "module": "Jido.AI.Orchestration",
+          "name": "reasoning_iteration",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            457
+          ]
+        },
+        {
+          "line": 467,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 468,
+          "module": "Jido.AI.Orchestration",
+          "name": "failure_type",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            468
+          ]
+        },
+        {
+          "line": 475,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 476,
+          "module": "Jido.AI.Orchestration",
+          "name": "account",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            476
+          ]
+        },
+        {
+          "line": 483,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 484,
+          "module": "Jido.AI.Orchestration",
+          "name": "failed_metadata",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            484
+          ]
+        },
+        {
+          "line": 490,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 491,
+          "module": "Jido.AI.Orchestration",
+          "name": "output",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            4
+          ],
+          "clause_lines": [
+            491
+          ]
+        },
+        {
+          "line": 508,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 509,
+          "module": "Jido.AI.Orchestration",
+          "name": "event_state",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            509
+          ]
+        },
+        {
+          "line": 516,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 517,
+          "module": "Jido.AI.Orchestration",
+          "name": "activity",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1,
+            2
+          ],
+          "clause_lines": [
+            517
+          ]
+        },
+        {
+          "line": 524,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 525,
+          "module": "Jido.AI.Orchestration",
+          "name": "tool_signature",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            525
+          ]
+        },
+        {
+          "line": 532,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 533,
+          "module": "Jido.AI.Orchestration",
+          "name": "emit",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2,
+            3
+          ],
+          "clause_lines": [
+            533
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_ai/orchestration/activity.ex",
+      "modules": [
+        "Jido.AI.Orchestration.Activity"
+      ],
+      "sha256": "c25855569a7c6d397b5fd20e123937fd1771f89aeb11192f4b9552a256118a4b",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Orchestration.Activity",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Orchestration.Activity",
+          "name": "moduledoc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 5,
+          "module": "Jido.AI.Orchestration.Activity",
+          "name": "new",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3
+          ],
+          "clause_lines": [
+            5
+          ]
+        },
+        {
+          "line": 22,
+          "module": "Jido.AI.Orchestration.Activity",
+          "name": "event",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3
+          ],
+          "clause_lines": [
+            22
+          ]
+        },
+        {
+          "line": 32,
+          "module": "Jido.AI.Orchestration.Activity",
+          "name": "touch",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            32,
+            33
+          ]
+        },
+        {
+          "line": 40,
+          "module": "Jido.AI.Orchestration.Activity",
+          "name": "tool_finished",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            40,
+            45
+          ]
+        },
+        {
+          "line": 47,
+          "module": "Jido.AI.Orchestration.Activity",
+          "name": "heartbeat",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            47,
+            52
+          ]
+        },
+        {
+          "line": 54,
+          "module": "Jido.AI.Orchestration.Activity",
+          "name": "current?",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3
+          ],
+          "clause_lines": [
+            54,
+            57
+          ]
+        },
+        {
+          "line": 59,
+          "module": "Jido.AI.Orchestration.Activity",
+          "name": "fired",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            59
+          ]
+        },
+        {
+          "line": 61,
+          "module": "Jido.AI.Orchestration.Activity",
+          "name": "stop",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            61,
+            62
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_ai/orchestration/cancel.ex",
+      "modules": [
+        "Jido.AI.Orchestration.Cancel"
+      ],
+      "sha256": "66b1dc39bffed56f6065a58707468a31175a0b0071e82aa34b9484be6bf9ab2d",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Orchestration.Cancel",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Orchestration.Cancel",
+          "name": "moduledoc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 3,
+          "module": "Jido.AI.Orchestration.Cancel",
+          "source": "[\n  Jido.Action,\n  [\n    name: \"ai_session_cancel\",\n    schema:\n      Zoi.object(%{\n        request_id: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),\n        reason: Zoi.any() |> Zoi.default(nil)\n      })\n  ]\n]",
+          "kind": "use",
+          "quoted": false
+        },
+        {
+          "line": 13,
+          "module": "Jido.AI.Orchestration.Cancel",
+          "name": "run",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            13
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_ai/orchestration/change.ex",
+      "modules": [
+        "Jido.AI.Orchestration.Change"
+      ],
+      "sha256": "6770412c3b0052c7da4686c1787cbdffe601f5f9b294533b94d15f33058d4418",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Orchestration.Change",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Orchestration.Change",
+          "name": "moduledoc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 3,
+          "module": "Jido.AI.Orchestration.Change",
+          "source": "[Jido.Agent.Directive]",
+          "kind": "use",
+          "quoted": false
+        },
+        {
+          "line": 14,
+          "module": "Jido.AI.Orchestration.Change",
+          "source": "[Zoi.Struct.struct_fields(@schema)]",
+          "kind": "defstruct",
+          "quoted": false
+        },
+        {
+          "line": 15,
+          "module": "Jido.AI.Orchestration.Change",
+          "name": "schema",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            0
+          ],
+          "clause_lines": [
+            15
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_ai/orchestration/control_action.ex",
+      "modules": [
+        "Jido.AI.Orchestration.ControlAction"
+      ],
+      "sha256": "441041ee915fb9b8a54dec857ad2b7b070b72c831c287ae21fb6a1b0cec5cd22",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Orchestration.ControlAction",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Orchestration.ControlAction",
+          "name": "moduledoc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 3,
+          "module": "Jido.AI.Orchestration.ControlAction",
+          "source": "[\n  Jido.Action,\n  [\n    name: \"ai_session_control\",\n    schema:\n      Zoi.object(%{\n        control_id: Zoi.string(),\n        kind: Zoi.enum([:steer, :inject]),\n        content: Zoi.string(),\n        expected_request_id: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),\n        source: Zoi.string() |> Zoi.default(\"/ai/react\"),\n        extra_refs: Zoi.map() |> Zoi.default(%{})\n      })\n  ]\n]",
+          "kind": "use",
+          "quoted": false
+        },
+        {
+          "line": 15,
+          "module": "Jido.AI.Orchestration.ControlAction",
+          "name": "run",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            15
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_ai/orchestration/coordinator.ex",
+      "modules": [
+        "Jido.AI.Orchestration.Coordinator"
+      ],
+      "sha256": "4d6fc341871ddecd1c5172efbbe8e8591dd2d5ce7a3c9928706d44513344ca45",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Orchestration.Coordinator",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Orchestration.Coordinator",
+          "name": "moduledoc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 3,
+          "module": "Jido.AI.Orchestration.Coordinator",
+          "source": "[GenServer]",
+          "kind": "use",
+          "quoted": false
+        },
+        {
+          "line": 10,
+          "module": "Jido.AI.Orchestration.Coordinator",
+          "name": "start_link",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            10
+          ]
+        },
+        {
+          "line": 13,
+          "module": "Jido.AI.Orchestration.Coordinator",
+          "name": "init",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            13
+          ]
+        },
+        {
+          "line": 27,
+          "module": "Jido.AI.Orchestration.Coordinator",
+          "name": "handle_continue",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            27
+          ]
+        },
+        {
+          "line": 58,
+          "module": "Jido.AI.Orchestration.Coordinator",
+          "name": "handle_call",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3
+          ],
+          "clause_lines": [
+            58,
+            59,
+            60,
+            62,
+            65,
+            68,
+            71,
+            81,
+            104,
+            113,
+            132,
+            142,
+            163,
+            224,
+            227,
+            230,
+            249,
+            289,
+            335,
+            358,
+            363,
+            379,
+            407,
+            418,
+            428,
+            441,
+            457,
+            468,
+            481,
+            493,
+            504
+          ]
+        },
+        {
+          "line": 516,
+          "module": "Jido.AI.Orchestration.Coordinator",
+          "name": "handle_info",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            516,
+            543,
+            548,
+            559,
+            562
+          ]
+        },
+        {
+          "line": 938,
+          "module": "Jido.AI.Orchestration.Coordinator",
+          "name": "terminate",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            938
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_ai/orchestration/delivery.ex",
+      "modules": [
+        "Jido.AI.Orchestration.Delivery"
+      ],
+      "sha256": "b32475870213cb611d5dd3a87f50ce1333426a1b4460da75573a8aa5165f3e45",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Orchestration.Delivery",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Orchestration.Delivery",
+          "name": "moduledoc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 3,
+          "module": "Jido.AI.Orchestration.Delivery",
+          "source": "[GenServer]",
+          "kind": "use",
+          "quoted": false
+        },
+        {
+          "line": 9,
+          "module": "Jido.AI.Orchestration.Delivery",
+          "name": "start_link",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            9
+          ]
+        },
+        {
+          "line": 11,
+          "module": "Jido.AI.Orchestration.Delivery",
+          "name": "register",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3
+          ],
+          "clause_lines": [
+            11
+          ]
+        },
+        {
+          "line": 14,
+          "module": "Jido.AI.Orchestration.Delivery",
+          "name": "enqueue",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            14,
+            15
+          ]
+        },
+        {
+          "line": 16,
+          "module": "Jido.AI.Orchestration.Delivery",
+          "name": "claim",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3
+          ],
+          "clause_lines": [
+            16
+          ]
+        },
+        {
+          "line": 17,
+          "module": "Jido.AI.Orchestration.Delivery",
+          "name": "consume",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3
+          ],
+          "clause_lines": [
+            17
+          ]
+        },
+        {
+          "line": 18,
+          "module": "Jido.AI.Orchestration.Delivery",
+          "name": "receipt",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3
+          ],
+          "clause_lines": [
+            18
+          ]
+        },
+        {
+          "line": 19,
+          "module": "Jido.AI.Orchestration.Delivery",
+          "name": "status",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            19
+          ]
+        },
+        {
+          "line": 27,
+          "module": "Jido.AI.Orchestration.Delivery",
+          "name": "init",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            27
+          ]
+        },
+        {
+          "line": 57,
+          "module": "Jido.AI.Orchestration.Delivery",
+          "name": "handle_call",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3
+          ],
+          "clause_lines": [
+            57,
+            81,
+            91,
+            125,
+            134,
+            137,
+            145,
+            148,
+            157
+          ]
+        },
+        {
+          "line": 160,
+          "module": "Jido.AI.Orchestration.Delivery",
+          "name": "handle_info",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            160,
+            168,
+            170,
+            193,
+            196,
+            199,
+            202
+          ]
+        },
+        {
+          "line": 204,
+          "module": "Jido.AI.Orchestration.Delivery",
+          "name": "terminate",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            204
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_ai/orchestration/delivery_receipt.ex",
+      "modules": [
+        "Jido.AI.Orchestration.DeliveryReceipt"
+      ],
+      "sha256": "6e586d86dd203ffda0462df2e9f9e36a5304021f2deaed5c9f1d4cbdd03e9bc2",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Orchestration.DeliveryReceipt",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Orchestration.DeliveryReceipt",
+          "name": "moduledoc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 3,
+          "module": "Jido.AI.Orchestration.DeliveryReceipt",
+          "source": "[Jido.Agent.Directive]",
+          "kind": "use",
+          "quoted": false
+        },
+        {
+          "line": 10,
+          "module": "Jido.AI.Orchestration.DeliveryReceipt",
+          "source": "[Zoi.Struct.struct_fields(@schema)]",
+          "kind": "defstruct",
+          "quoted": false
+        },
+        {
+          "line": 11,
+          "module": "Jido.AI.Orchestration.DeliveryReceipt",
+          "name": "schema",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            0
+          ],
+          "clause_lines": [
+            11
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_ai/orchestration/history_action.ex",
+      "modules": [
+        "Jido.AI.Orchestration.HistoryAction"
+      ],
+      "sha256": "d240210cc419d46d70444ba493e3ffab3241eb8807a500a7e01a45f763bb128c",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Orchestration.HistoryAction",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Orchestration.HistoryAction",
+          "name": "moduledoc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 3,
+          "module": "Jido.AI.Orchestration.HistoryAction",
+          "source": "[\n  Jido.Action,\n  [\n    name: \"ai_session_history\",\n    schema: Zoi.object(%{request_id: Zoi.string(), batch_id: Zoi.string()})\n  ]\n]",
+          "kind": "use",
+          "quoted": false
+        },
+        {
+          "line": 9,
+          "module": "Jido.AI.Orchestration.HistoryAction",
+          "name": "run",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            9
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_ai/orchestration/ignore_signal.ex",
+      "modules": [
+        "Jido.AI.Orchestration.IgnoreSignal"
+      ],
+      "sha256": "35b562b7e193d4bc039518c8699ae6dbc10c555752a0dc3cfb8887886927b9f7",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Orchestration.IgnoreSignal",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Orchestration.IgnoreSignal",
+          "name": "moduledoc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 3,
+          "module": "Jido.AI.Orchestration.IgnoreSignal",
+          "source": "[Jido.Action, [name: \"ai_ignore_unhandled_observation\"]]",
+          "kind": "use",
+          "quoted": false
+        },
+        {
+          "line": 4,
+          "module": "Jido.AI.Orchestration.IgnoreSignal",
+          "name": "run",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_ai/orchestration/inspection.ex",
+      "modules": [
+        "Jido.AI.Orchestration.Inspection"
+      ],
+      "sha256": "a6fdfa2d2637c1dc585317c02c3e266fe8bbb3b5e0304a11a7a9ea372c603db2",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Orchestration.Inspection",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Orchestration.Inspection",
+          "name": "moduledoc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 10,
+          "module": "Jido.AI.Orchestration.Inspection",
+          "name": "empty",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            0
+          ],
+          "clause_lines": [
+            10
+          ]
+        },
+        {
+          "line": 22,
+          "module": "Jido.AI.Orchestration.Inspection",
+          "name": "record",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            22
+          ]
+        },
+        {
+          "line": 115,
+          "module": "Jido.AI.Orchestration.Inspection",
+          "name": "complete",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            4
+          ],
+          "clause_lines": [
+            115
+          ]
+        },
+        {
+          "line": 127,
+          "module": "Jido.AI.Orchestration.Inspection",
+          "name": "fit",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3
+          ],
+          "clause_lines": [
+            127
+          ]
+        },
+        {
+          "line": 141,
+          "module": "Jido.AI.Orchestration.Inspection",
+          "name": "selected",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            141
+          ]
+        },
+        {
+          "line": 153,
+          "module": "Jido.AI.Orchestration.Inspection",
+          "name": "snapshot",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3
+          ],
+          "clause_lines": [
+            153
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_ai/orchestration/plugin.ex",
+      "modules": [
+        "Jido.AI.Orchestration.Plugin"
+      ],
+      "sha256": "960e3690486da909c856995ea28825a1b7bfb823154707e867f0678297d71e8c",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Orchestration.Plugin",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Orchestration.Plugin",
+          "name": "moduledoc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 3,
+          "module": "Jido.AI.Orchestration.Plugin",
+          "source": "[\n  Jido.Plugin,\n  [\n    agent: Jido.AI.Orchestration.Plugin.Agent,\n    agent_server: Jido.AI.Orchestration.Plugin.AgentServer\n  ]\n]",
+          "kind": "use",
+          "quoted": false
+        },
+        {
+          "line": 9,
+          "module": "Jido.AI.Orchestration.Plugin",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 10,
+          "module": "Jido.AI.Orchestration.Plugin",
+          "name": "prepare_admission",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3
+          ],
+          "clause_lines": [
+            10
+          ]
+        },
+        {
+          "line": 103,
+          "module": "Jido.AI.Orchestration.Plugin",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 104,
+          "module": "Jido.AI.Orchestration.Plugin",
+          "name": "context",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            104
+          ]
+        },
+        {
+          "line": 122,
+          "module": "Jido.AI.Orchestration.Plugin",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 123,
+          "module": "Jido.AI.Orchestration.Plugin",
+          "name": "prepare_command",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            123
+          ]
+        },
+        {
+          "line": 162,
+          "module": "Jido.AI.Orchestration.Plugin",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 163,
+          "module": "Jido.AI.Orchestration.Plugin",
+          "name": "reduce_records",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            163
+          ]
+        },
+        {
+          "line": 194,
+          "module": "Jido.AI.Orchestration.Plugin",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 195,
+          "module": "Jido.AI.Orchestration.Plugin",
+          "name": "dispatch_directive",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3
+          ],
+          "clause_lines": [
+            195,
+            209,
+            243
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_ai/orchestration/plugin/agent.ex",
+      "modules": [
+        "Jido.AI.Orchestration.Plugin.Agent"
+      ],
+      "sha256": "2a6e3118987dcd84400258c94d16fec93f2542d1725145b28dca6c25000be1cb",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Orchestration.Plugin.Agent",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Orchestration.Plugin.Agent",
+          "name": "moduledoc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 3,
+          "module": "Jido.AI.Orchestration.Plugin.Agent",
+          "source": "[Jido.Agent.Plugin]",
+          "kind": "use",
+          "quoted": false
+        },
+        {
+          "line": 8,
+          "module": "Jido.AI.Orchestration.Plugin.Agent",
+          "name": "state_spec",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            8
+          ]
+        },
+        {
+          "line": 11,
+          "module": "Jido.AI.Orchestration.Plugin.Agent",
+          "name": "directives",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            11
+          ]
+        },
+        {
+          "line": 14,
+          "module": "Jido.AI.Orchestration.Plugin.Agent",
+          "name": "prepare",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            14
+          ]
+        },
+        {
+          "line": 22,
+          "module": "Jido.AI.Orchestration.Plugin.Agent",
+          "name": "reduce",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            22
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_ai/orchestration/plugin/agent_server.ex",
+      "modules": [
+        "Jido.AI.Orchestration.Plugin.AgentServer"
+      ],
+      "sha256": "2c547688e99a8ffee14d52f88bb7f05f0ba1e704df19afb13bdbb4731eb1b4fd",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Orchestration.Plugin.AgentServer",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Orchestration.Plugin.AgentServer",
+          "name": "moduledoc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 3,
+          "module": "Jido.AI.Orchestration.Plugin.AgentServer",
+          "source": "[Jido.AgentServer.Plugin]",
+          "kind": "use",
+          "quoted": false
+        },
+        {
+          "line": 7,
+          "module": "Jido.AI.Orchestration.Plugin.AgentServer",
+          "name": "child_spec",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            7
+          ]
+        },
+        {
+          "line": 10,
+          "module": "Jido.AI.Orchestration.Plugin.AgentServer",
+          "name": "await_ready",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            10
+          ]
+        },
+        {
+          "line": 13,
+          "module": "Jido.AI.Orchestration.Plugin.AgentServer",
+          "name": "admit",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3
+          ],
+          "clause_lines": [
+            13
+          ]
+        },
+        {
+          "line": 16,
+          "module": "Jido.AI.Orchestration.Plugin.AgentServer",
+          "name": "dispatch",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            4
+          ],
+          "clause_lines": [
+            16
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_ai/orchestration/progress.ex",
+      "modules": [
+        "Jido.AI.Orchestration.Progress"
+      ],
+      "sha256": "fd3bc1914d5ffd20f30330c00b01a66ecdc5660cd98bbe34f6e51bd69c97b1a9",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Orchestration.Progress",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Orchestration.Progress",
+          "name": "moduledoc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 3,
+          "module": "Jido.AI.Orchestration.Progress",
+          "source": "[\n  Jido.Action,\n  [\n    name: \"ai_session_progress\",\n    schema: Zoi.object(%{request_id: Zoi.string(), run_id: Zoi.string(), ticket: Zoi.string()})\n  ]\n]",
+          "kind": "use",
+          "quoted": false
+        },
+        {
+          "line": 14,
+          "module": "Jido.AI.Orchestration.Progress",
+          "name": "run",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            14
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_ai/orchestration/publish.ex",
+      "modules": [
+        "Jido.AI.Orchestration.Publish"
+      ],
+      "sha256": "ef97e622179a1f856da92cf149c568ae2bdee2e3ca25b3694ac7e0466e85ab85",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Orchestration.Publish",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Orchestration.Publish",
+          "name": "moduledoc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 3,
+          "module": "Jido.AI.Orchestration.Publish",
+          "source": "[Jido.Action, [name: \"ai_session_publish\", schema: Zoi.object(%{batch_id: Zoi.string()})]]",
+          "kind": "use",
+          "quoted": false
+        },
+        {
+          "line": 5,
+          "module": "Jido.AI.Orchestration.Publish",
+          "name": "run",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            5
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_ai/orchestration/record.ex",
+      "modules": [
+        "Jido.AI.Orchestration.Record"
+      ],
+      "sha256": "93a4f435cea264a61b8b22f2fb53ccaf20775047742722659d2adc6b645260f3",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Orchestration.Record",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Orchestration.Record",
+          "name": "moduledoc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 28,
+          "module": "Jido.AI.Orchestration.Record",
+          "name": "schema",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            0
+          ],
+          "clause_lines": [
+            28
+          ]
+        },
+        {
+          "line": 32,
+          "module": "Jido.AI.Orchestration.Record",
+          "name": "completion_reserve",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            0
+          ],
+          "clause_lines": [
+            32
+          ]
+        },
+        {
+          "line": 34,
+          "module": "Jido.AI.Orchestration.Record",
+          "name": "records_schema",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            0
+          ],
+          "clause_lines": [
+            34
+          ]
+        },
+        {
+          "line": 40,
+          "module": "Jido.AI.Orchestration.Record",
+          "name": "portable_records",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            40
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_ai/orchestration/request_scope.ex",
+      "modules": [
+        "Jido.AI.Orchestration.RequestScope"
+      ],
+      "sha256": "ac3c983c39ddeeefb93455db6b4a7c2ad752bf3727a7bb1310dd5b7af9383f13",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Orchestration.RequestScope",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Orchestration.RequestScope",
+          "name": "moduledoc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 6,
+          "module": "Jido.AI.Orchestration.RequestScope",
+          "name": "profile",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3
+          ],
+          "clause_lines": [
+            6
+          ]
+        },
+        {
+          "line": 27,
+          "module": "Jido.AI.Orchestration.RequestScope",
+          "name": "stream_options",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            27
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_ai/orchestration/settle.ex",
+      "modules": [
+        "Jido.AI.Orchestration.Settle"
+      ],
+      "sha256": "f5c195866c8d6c3e096d075a4b3be308b6aa5aabac487a80a65017b8022ce5d1",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Orchestration.Settle",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Orchestration.Settle",
+          "name": "moduledoc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 3,
+          "module": "Jido.AI.Orchestration.Settle",
+          "source": "[Jido.Action, [name: \"ai_session_settle\", schema: Zoi.object(%{request_id: Zoi.string()})]]",
+          "kind": "use",
+          "quoted": false
+        },
+        {
+          "line": 6,
+          "module": "Jido.AI.Orchestration.Settle",
+          "name": "run",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            6
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_ai/orchestration/start.ex",
+      "modules": [
+        "Jido.AI.Orchestration.Start"
+      ],
+      "sha256": "5e9ca644b2da1d400d37d3e9cab6c3bdd6e885d059ddc923bab15db85c4df2b8",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Orchestration.Start",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Orchestration.Start",
+          "name": "moduledoc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 3,
+          "module": "Jido.AI.Orchestration.Start",
+          "source": "[\n  Jido.Action,\n  [\n    name: \"ai_session_start\",\n    schema: Zoi.object(%{query: Jido.AI.Query.schema(), request_id: Zoi.string() |> Zoi.min(1)})\n  ]\n]",
+          "kind": "use",
+          "quoted": false
+        },
+        {
+          "line": 10,
+          "module": "Jido.AI.Orchestration.Start",
+          "name": "run",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            10
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_ai/orchestration/transcript.ex",
+      "modules": [
+        "Jido.AI.Orchestration.Transcript"
+      ],
+      "sha256": "248370f21a432be2131c47958f13e7e14895021196b6646f3b1ef2e596e7b6be",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Orchestration.Transcript",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Orchestration.Transcript",
+          "name": "moduledoc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 8,
+          "module": "Jido.AI.Orchestration.Transcript",
+          "name": "query",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            8
+          ]
+        },
+        {
+          "line": 11,
+          "module": "Jido.AI.Orchestration.Transcript",
+          "name": "refs",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            11
+          ]
+        },
+        {
+          "line": 19,
+          "module": "Jido.AI.Orchestration.Transcript",
+          "name": "read",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            19,
+            21,
+            34
+          ]
+        },
+        {
+          "line": 36,
+          "module": "Jido.AI.Orchestration.Transcript",
+          "name": "request_refs",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1,
+            2
+          ],
+          "clause_lines": [
+            36
+          ]
+        },
+        {
+          "line": 43,
+          "module": "Jido.AI.Orchestration.Transcript",
+          "name": "start",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            4
+          ],
+          "clause_lines": [
+            43
+          ]
+        },
+        {
+          "line": 48,
+          "module": "Jido.AI.Orchestration.Transcript",
+          "name": "append",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3
+          ],
+          "clause_lines": [
+            48,
+            50
+          ]
+        },
+        {
+          "line": 57,
+          "module": "Jido.AI.Orchestration.Transcript",
+          "name": "record",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3
+          ],
+          "clause_lines": [
+            57
           ]
         }
       ]
@@ -11015,7 +12613,7 @@
       "modules": [
         "Jido.AI.Portable"
       ],
-      "sha256": "803e6c57d72a479f15552abe179adcb30b5b905de553c63ec6b3fbb9a00d4228",
+      "sha256": "95ac495dff46156e58aff342cc4102cd645252e22829c90e5e17f1eedfcb7da8",
       "declarations": [
         {
           "line": 1,
@@ -14461,7 +16059,7 @@
       "modules": [
         "Jido.AI.Reasoning.ReAct"
       ],
-      "sha256": "d947543ecec7048d028255c961d925eb2b6af93397c7ad109d70339a087e4366",
+      "sha256": "f4e9333caf3f3d09ccfa7aea2f7c07bccface83b5f86743b8d0b01dd6905892a",
       "declarations": [
         {
           "line": 1,
@@ -15270,7 +16868,7 @@
       "modules": [
         "Jido.AI.Reasoning.ReAct.Checkpoint"
       ],
-      "sha256": "b3c7db0e1f53690eb825fdb4f1e0d2cfc0a29d47999ce3f2f11ac73897046cdb",
+      "sha256": "e64d4cdf21db5c82acfb8a865b794d5e5cd2e800fbe41728432fa9f8ffb28620",
       "declarations": [
         {
           "line": 1,
@@ -15734,7 +17332,7 @@
       "modules": [
         "Jido.AI.Reasoning.ReAct.Runner"
       ],
-      "sha256": "f7844c903d4bdd1c2f35c91a44d0568855c5bafe5de96fade0fc879702457882",
+      "sha256": "c9b51981123a40486f88a1994e2df3365cdb0b80e3ae865739113ad4d52d9bbe",
       "declarations": [
         {
           "line": 1,
@@ -18896,7 +20494,7 @@
         "Jido.AI.Request",
         "Jido.AI.Request.Handle"
       ],
-      "sha256": "513c36ddd3f0f28897863550b9fa615924c644a7d378a96611329dbf18ec6ffb",
+      "sha256": "e5c48709e588bacd81d2374f7b0e757d60c229556aded4381242b1bb7ae621a7",
       "declarations": [
         {
           "line": 1,
@@ -19505,7 +21103,7 @@
       "modules": [
         "Jido.AI.Runtime.Binding"
       ],
-      "sha256": "29ac6639aeb1f75a349038e8a0e6a2627f7df189cf01f5cdae80f39d88738f0d",
+      "sha256": "bb4bc591e6d213cacb15936a475807d7e18770374eaf90813c0b26cb7c8ba4ea",
       "declarations": [
         {
           "line": 1,
@@ -19556,7 +21154,7 @@
       "modules": [
         "Jido.AI.Runtime.CallModel"
       ],
-      "sha256": "ff9fa110bd323d4db7960f1dd94576e8e9b4d3fda2ef900cc3152c4d1c78975f",
+      "sha256": "9eda06c06463accb067ee4fd3cff9c69c7e8f19b8ea804a572789423c8319e39",
       "declarations": [
         {
           "line": 1,
@@ -19644,7 +21242,7 @@
       "modules": [
         "Jido.AI.Runtime.Checkpoint"
       ],
-      "sha256": "385a83b57af55016f94f957e277deb2cdbdbbd73a6caf93183168a9d0c00e913",
+      "sha256": "90526629c109decb3cee511884721f9f369a7b529b949f418c712835057c0fb0",
       "declarations": [
         {
           "line": 1,
@@ -19883,7 +21481,7 @@
       "modules": [
         "Jido.AI.Runtime.Decide"
       ],
-      "sha256": "8a5e2fd00e4510446161359852fcca3c603f8a0e768c154ff7a8f950974a4b5b",
+      "sha256": "71b816d7c53e64b371a2319f1d1344eedae55e3bbd94a64bb1ac2360f1d6498b",
       "declarations": [
         {
           "line": 1,
@@ -20034,7 +21632,7 @@
       "modules": [
         "Jido.AI.Runtime.ExecuteTool"
       ],
-      "sha256": "b8d7d43482841b2db34f8edeedead0583e291bc3f0331454d2c597d45920002c",
+      "sha256": "e4ba269df78a7c891527d382972cea1cc0b31ebe2cb1e7882dc805e20e9e2f5f",
       "declarations": [
         {
           "line": 1,
@@ -20115,7 +21713,7 @@
       "modules": [
         "Jido.AI.Runtime.NextBatch"
       ],
-      "sha256": "5122c1cf39bf71aeacf47b9239d23d4336e5bdfa097946d9200e9fb976ff8962",
+      "sha256": "ef2992ffbc2829f5becc593fb8ed8190e10b147ad9f4009b0f7c10cc115f0363",
       "declarations": [
         {
           "line": 1,
@@ -20159,7 +21757,7 @@
       "modules": [
         "Jido.AI.Runtime.OutputState"
       ],
-      "sha256": "b0a3067fdf7d5d28b9cef45f073cf1fd42cec29e49865e1490ce1933ed95b06e",
+      "sha256": "a3c897c81bcb9f8f71f825e783e2e4f77967af17178eb1d6994ad223a1dd4736",
       "declarations": [
         {
           "line": 1,
@@ -20273,7 +21871,7 @@
       "modules": [
         "Jido.AI.Runtime.PendingInput"
       ],
-      "sha256": "110b0c4ff29a73091519a58c56fec7c124d614228905d213f8de76d15515fba4",
+      "sha256": "c0d09fb009c457ba66c66e6b7f8b6cc430be0fc51373d78e38e7f74a3322bda0",
       "declarations": [
         {
           "line": 1,
@@ -20336,7 +21934,7 @@
       "modules": [
         "Jido.AI.Runtime.Plugin"
       ],
-      "sha256": "0e913b67dda38a5d36edf1be89d404ceaba9ea04727f6b2e778c998381b005cd",
+      "sha256": "9f1111f5db65a93ec4dda8f87765f77b07def5d749abc76adfd4cacd7c7a0ad7",
       "declarations": [
         {
           "line": 1,
@@ -20599,7 +22197,7 @@
       "modules": [
         "Jido.AI.Runtime.Preflight"
       ],
-      "sha256": "f029639c61b0fc47ce677127225b10626d59b8872aed15a5b6c455b04b6776f5",
+      "sha256": "42f8d8e8b68aa03d82660ed42d343fc9608a8c9bd126341693df2da0cc3a1231",
       "declarations": [
         {
           "line": 1,
@@ -20636,7 +22234,7 @@
       "modules": [
         "Jido.AI.Runtime.Prepare"
       ],
-      "sha256": "0e310d4ea8991665f27d828a494de04646fe5f14e32449f31c0c503b5e92db35",
+      "sha256": "d6a4eba46d399c66fa6f10f6a3548044514774a3374ecae87cba3499a41633f4",
       "declarations": [
         {
           "line": 1,
@@ -20711,7 +22309,7 @@
       "modules": [
         "Jido.AI.Runtime.RequestTransform"
       ],
-      "sha256": "cdab9dc4b880133081926f4b0b88605f82febd619d62b6c21d7bc77fd4f7ee56",
+      "sha256": "f42c8e727a9df5adacfccbad30716b7a51d2bf3359d20c7f2d0ef569b559a8f2",
       "declarations": [
         {
           "line": 1,
@@ -20774,7 +22372,7 @@
       "modules": [
         "Jido.AI.Runtime.Run"
       ],
-      "sha256": "12f068ef437481ac205b2d820cc9d49299dd1bb23fc7e2791df2620ae77aecf2",
+      "sha256": "81f12d76904935eb1e32b58b6ac2975d13fef3a84abf96ba8242973eef21c84b",
       "declarations": [
         {
           "line": 1,
@@ -21083,7 +22681,7 @@
       "modules": [
         "Jido.AI.Runtime.ToolCycle"
       ],
-      "sha256": "86a59836209161dab00b54435e2def258b822e78d1a2267ab70193e5aeeccb4f",
+      "sha256": "15af3de21f526ad2bc5ee232816647fdb72196885efbfcacd5fc9edd53f71e05",
       "declarations": [
         {
           "line": 1,
@@ -21164,7 +22762,7 @@
       "modules": [
         "Jido.AI.Runtime.ToolInterception"
       ],
-      "sha256": "d667173dd89744180de87e46df3fdd72bb84f84e10c3782941f4f0d751732e45",
+      "sha256": "72b848ede4a2b01b9a8ea667633d8a36bc6ef0e2722d2f25725b3ab84db40da6",
       "declarations": [
         {
           "line": 1,
@@ -21366,2306 +22964,6 @@
             97,
             106,
             120
-          ]
-        }
-      ]
-    },
-    {
-      "path": "lib/jido_ai/session.ex",
-      "modules": [
-        "Jido.AI.Session"
-      ],
-      "sha256": "ae405a69c559f7cc0edd2d9b138b6e893992f00647ba105080204472e0dc7f63",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.AI.Session",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.AI.Session",
-          "name": "moduledoc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 24,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 39,
-          "module": "Jido.AI.Session",
-          "name": "snapshot",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1,
-            2
-          ],
-          "clause_lines": [
-            39
-          ]
-        },
-        {
-          "line": 66,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 67,
-          "module": "Jido.AI.Session",
-          "name": "modify_context",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2,
-            3
-          ],
-          "clause_lines": [
-            67
-          ]
-        },
-        {
-          "line": 70,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 71,
-          "module": "Jido.AI.Session",
-          "name": "skill_catalog",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1,
-            2
-          ],
-          "clause_lines": [
-            71
-          ]
-        },
-        {
-          "line": 85,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 86,
-          "module": "Jido.AI.Session",
-          "name": "publish_type",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            0
-          ],
-          "clause_lines": [
-            86
-          ]
-        },
-        {
-          "line": 87,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 88,
-          "module": "Jido.AI.Session",
-          "name": "ignore_type",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            0
-          ],
-          "clause_lines": [
-            88
-          ]
-        },
-        {
-          "line": 89,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 90,
-          "module": "Jido.AI.Session",
-          "name": "observation_type?",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            90
-          ]
-        },
-        {
-          "line": 92,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 93,
-          "module": "Jido.AI.Session",
-          "name": "delivery_status",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            93
-          ]
-        },
-        {
-          "line": 102,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 103,
-          "module": "Jido.AI.Session",
-          "name": "settle_signal",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            103
-          ]
-        },
-        {
-          "line": 106,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 107,
-          "module": "Jido.AI.Session",
-          "name": "routes",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            107,
-            109
-          ]
-        },
-        {
-          "line": 139,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 140,
-          "module": "Jido.AI.Session",
-          "name": "settle_type",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            0
-          ],
-          "clause_lines": [
-            140
-          ]
-        },
-        {
-          "line": 141,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 142,
-          "module": "Jido.AI.Session",
-          "name": "cancel_type",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            0
-          ],
-          "clause_lines": [
-            142
-          ]
-        },
-        {
-          "line": 143,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 144,
-          "module": "Jido.AI.Session",
-          "name": "history_type",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            0
-          ],
-          "clause_lines": [
-            144
-          ]
-        },
-        {
-          "line": 145,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 146,
-          "module": "Jido.AI.Session",
-          "name": "progress_type",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            0
-          ],
-          "clause_lines": [
-            146
-          ]
-        },
-        {
-          "line": 148,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 149,
-          "module": "Jido.AI.Session",
-          "name": "publish_selection",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3
-          ],
-          "clause_lines": [
-            149,
-            151,
-            167
-          ]
-        },
-        {
-          "line": 169,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 170,
-          "module": "Jido.AI.Session",
-          "name": "caller_context",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            170
-          ]
-        },
-        {
-          "line": 198,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 199,
-          "module": "Jido.AI.Session",
-          "name": "steer",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2,
-            3
-          ],
-          "clause_lines": [
-            199
-          ]
-        },
-        {
-          "line": 200,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 201,
-          "module": "Jido.AI.Session",
-          "name": "inject",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2,
-            3
-          ],
-          "clause_lines": [
-            201
-          ]
-        },
-        {
-          "line": 203,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 204,
-          "module": "Jido.AI.Session",
-          "name": "control_agent",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            4
-          ],
-          "clause_lines": [
-            204
-          ]
-        },
-        {
-          "line": 246,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 247,
-          "module": "Jido.AI.Session",
-          "name": "publish_history",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            247
-          ]
-        },
-        {
-          "line": 277,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 278,
-          "module": "Jido.AI.Session",
-          "name": "admission_target",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            278
-          ]
-        },
-        {
-          "line": 283,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 284,
-          "module": "Jido.AI.Session",
-          "name": "submit",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            4
-          ],
-          "clause_lines": [
-            284
-          ]
-        },
-        {
-          "line": 357,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 358,
-          "module": "Jido.AI.Session",
-          "name": "cancel",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1,
-            2
-          ],
-          "clause_lines": [
-            358
-          ]
-        },
-        {
-          "line": 375,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 376,
-          "module": "Jido.AI.Session",
-          "name": "await",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3
-          ],
-          "clause_lines": [
-            376,
-            384
-          ]
-        },
-        {
-          "line": 434,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 435,
-          "module": "Jido.AI.Session",
-          "name": "inspect_reasoning",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            435,
-            437
-          ]
-        },
-        {
-          "line": 444,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 445,
-          "module": "Jido.AI.Session",
-          "name": "reasoning_iteration",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            445
-          ]
-        },
-        {
-          "line": 455,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 456,
-          "module": "Jido.AI.Session",
-          "name": "failure_type",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            456
-          ]
-        },
-        {
-          "line": 463,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 464,
-          "module": "Jido.AI.Session",
-          "name": "account",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            464
-          ]
-        },
-        {
-          "line": 471,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 472,
-          "module": "Jido.AI.Session",
-          "name": "failed_metadata",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            472
-          ]
-        },
-        {
-          "line": 478,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 479,
-          "module": "Jido.AI.Session",
-          "name": "output",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            4
-          ],
-          "clause_lines": [
-            479
-          ]
-        },
-        {
-          "line": 496,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 497,
-          "module": "Jido.AI.Session",
-          "name": "event_state",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            497
-          ]
-        },
-        {
-          "line": 504,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 505,
-          "module": "Jido.AI.Session",
-          "name": "activity",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1,
-            2
-          ],
-          "clause_lines": [
-            505
-          ]
-        },
-        {
-          "line": 512,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 513,
-          "module": "Jido.AI.Session",
-          "name": "tool_signature",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            513
-          ]
-        },
-        {
-          "line": 520,
-          "module": "Jido.AI.Session",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 521,
-          "module": "Jido.AI.Session",
-          "name": "emit",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2,
-            3
-          ],
-          "clause_lines": [
-            521
-          ]
-        }
-      ]
-    },
-    {
-      "path": "lib/jido_ai/session/activity.ex",
-      "modules": [
-        "Jido.AI.Session.Activity"
-      ],
-      "sha256": "f12ba4f98d2439ede8b9d64ca2f15c5fea9cbf68eccac7a7f526f514a98b612c",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.AI.Session.Activity",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.AI.Session.Activity",
-          "name": "moduledoc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 5,
-          "module": "Jido.AI.Session.Activity",
-          "name": "new",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3
-          ],
-          "clause_lines": [
-            5
-          ]
-        },
-        {
-          "line": 22,
-          "module": "Jido.AI.Session.Activity",
-          "name": "event",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3
-          ],
-          "clause_lines": [
-            22
-          ]
-        },
-        {
-          "line": 32,
-          "module": "Jido.AI.Session.Activity",
-          "name": "touch",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            32,
-            33
-          ]
-        },
-        {
-          "line": 40,
-          "module": "Jido.AI.Session.Activity",
-          "name": "tool_finished",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            40,
-            45
-          ]
-        },
-        {
-          "line": 47,
-          "module": "Jido.AI.Session.Activity",
-          "name": "heartbeat",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            47,
-            52
-          ]
-        },
-        {
-          "line": 54,
-          "module": "Jido.AI.Session.Activity",
-          "name": "current?",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3
-          ],
-          "clause_lines": [
-            54,
-            57
-          ]
-        },
-        {
-          "line": 59,
-          "module": "Jido.AI.Session.Activity",
-          "name": "fired",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            59
-          ]
-        },
-        {
-          "line": 61,
-          "module": "Jido.AI.Session.Activity",
-          "name": "stop",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            61,
-            62
-          ]
-        }
-      ]
-    },
-    {
-      "path": "lib/jido_ai/session/cancel.ex",
-      "modules": [
-        "Jido.AI.Session.Cancel"
-      ],
-      "sha256": "b0829d298ab16a7ac16b7a552cf7cfac4eef63854d7400d1cd53d283927cecb6",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.AI.Session.Cancel",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.AI.Session.Cancel",
-          "name": "moduledoc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 3,
-          "module": "Jido.AI.Session.Cancel",
-          "source": "[\n  Jido.Action,\n  [\n    name: \"ai_session_cancel\",\n    schema:\n      Zoi.object(%{\n        request_id: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),\n        reason: Zoi.any() |> Zoi.default(nil)\n      })\n  ]\n]",
-          "kind": "use",
-          "quoted": false
-        },
-        {
-          "line": 13,
-          "module": "Jido.AI.Session.Cancel",
-          "name": "run",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            13
-          ]
-        }
-      ]
-    },
-    {
-      "path": "lib/jido_ai/session/change.ex",
-      "modules": [
-        "Jido.AI.Session.Change"
-      ],
-      "sha256": "de093612db3cf5535edcf8fef8c120c4a410c4d35b2bba1a22e843336fc780a9",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.AI.Session.Change",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.AI.Session.Change",
-          "name": "moduledoc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 3,
-          "module": "Jido.AI.Session.Change",
-          "source": "[Jido.Agent.Directive]",
-          "kind": "use",
-          "quoted": false
-        },
-        {
-          "line": 14,
-          "module": "Jido.AI.Session.Change",
-          "source": "[Zoi.Struct.struct_fields(@schema)]",
-          "kind": "defstruct",
-          "quoted": false
-        },
-        {
-          "line": 15,
-          "module": "Jido.AI.Session.Change",
-          "name": "schema",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            0
-          ],
-          "clause_lines": [
-            15
-          ]
-        }
-      ]
-    },
-    {
-      "path": "lib/jido_ai/session/control_action.ex",
-      "modules": [
-        "Jido.AI.Session.ControlAction"
-      ],
-      "sha256": "c3060ab347f56ba2e7d95844a6bef41dab54292eeac646d0cdcd6202a6554e1c",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.AI.Session.ControlAction",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.AI.Session.ControlAction",
-          "name": "moduledoc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 3,
-          "module": "Jido.AI.Session.ControlAction",
-          "source": "[\n  Jido.Action,\n  [\n    name: \"ai_session_control\",\n    schema:\n      Zoi.object(%{\n        control_id: Zoi.string(),\n        kind: Zoi.enum([:steer, :inject]),\n        content: Zoi.string(),\n        expected_request_id: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),\n        source: Zoi.string() |> Zoi.default(\"/ai/react\"),\n        extra_refs: Zoi.map() |> Zoi.default(%{})\n      })\n  ]\n]",
-          "kind": "use",
-          "quoted": false
-        },
-        {
-          "line": 15,
-          "module": "Jido.AI.Session.ControlAction",
-          "name": "run",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            15
-          ]
-        }
-      ]
-    },
-    {
-      "path": "lib/jido_ai/session/delivery.ex",
-      "modules": [
-        "Jido.AI.Session.Delivery"
-      ],
-      "sha256": "8fbec451b61886ff6392e30fefef87b0d85fdb4b73ca3993a1a7c91998371b8b",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.AI.Session.Delivery",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.AI.Session.Delivery",
-          "name": "moduledoc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 3,
-          "module": "Jido.AI.Session.Delivery",
-          "source": "[GenServer]",
-          "kind": "use",
-          "quoted": false
-        },
-        {
-          "line": 9,
-          "module": "Jido.AI.Session.Delivery",
-          "name": "start_link",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            9
-          ]
-        },
-        {
-          "line": 11,
-          "module": "Jido.AI.Session.Delivery",
-          "name": "register",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3
-          ],
-          "clause_lines": [
-            11
-          ]
-        },
-        {
-          "line": 14,
-          "module": "Jido.AI.Session.Delivery",
-          "name": "enqueue",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            14,
-            15
-          ]
-        },
-        {
-          "line": 16,
-          "module": "Jido.AI.Session.Delivery",
-          "name": "claim",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3
-          ],
-          "clause_lines": [
-            16
-          ]
-        },
-        {
-          "line": 17,
-          "module": "Jido.AI.Session.Delivery",
-          "name": "consume",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3
-          ],
-          "clause_lines": [
-            17
-          ]
-        },
-        {
-          "line": 18,
-          "module": "Jido.AI.Session.Delivery",
-          "name": "receipt",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3
-          ],
-          "clause_lines": [
-            18
-          ]
-        },
-        {
-          "line": 19,
-          "module": "Jido.AI.Session.Delivery",
-          "name": "status",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            19
-          ]
-        },
-        {
-          "line": 27,
-          "module": "Jido.AI.Session.Delivery",
-          "name": "init",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            27
-          ]
-        },
-        {
-          "line": 57,
-          "module": "Jido.AI.Session.Delivery",
-          "name": "handle_call",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3
-          ],
-          "clause_lines": [
-            57,
-            81,
-            91,
-            125,
-            134,
-            137,
-            145,
-            148,
-            157
-          ]
-        },
-        {
-          "line": 160,
-          "module": "Jido.AI.Session.Delivery",
-          "name": "handle_info",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            160,
-            168,
-            170,
-            193,
-            196,
-            199,
-            202
-          ]
-        },
-        {
-          "line": 204,
-          "module": "Jido.AI.Session.Delivery",
-          "name": "terminate",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            204
-          ]
-        }
-      ]
-    },
-    {
-      "path": "lib/jido_ai/session/delivery_receipt.ex",
-      "modules": [
-        "Jido.AI.Session.DeliveryReceipt"
-      ],
-      "sha256": "ba4c52a4b9a870f498edbecf9b94390e27fdb3c9f5fab85012bc97e3e6408d84",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.AI.Session.DeliveryReceipt",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.AI.Session.DeliveryReceipt",
-          "name": "moduledoc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 3,
-          "module": "Jido.AI.Session.DeliveryReceipt",
-          "source": "[Jido.Agent.Directive]",
-          "kind": "use",
-          "quoted": false
-        },
-        {
-          "line": 10,
-          "module": "Jido.AI.Session.DeliveryReceipt",
-          "source": "[Zoi.Struct.struct_fields(@schema)]",
-          "kind": "defstruct",
-          "quoted": false
-        },
-        {
-          "line": 11,
-          "module": "Jido.AI.Session.DeliveryReceipt",
-          "name": "schema",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            0
-          ],
-          "clause_lines": [
-            11
-          ]
-        }
-      ]
-    },
-    {
-      "path": "lib/jido_ai/session/history_action.ex",
-      "modules": [
-        "Jido.AI.Session.HistoryAction"
-      ],
-      "sha256": "9af9f6efdfe528c6913b9ad061d49b82a707f381168cf41a5b14557e9f04f4de",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.AI.Session.HistoryAction",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.AI.Session.HistoryAction",
-          "name": "moduledoc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 3,
-          "module": "Jido.AI.Session.HistoryAction",
-          "source": "[\n  Jido.Action,\n  [\n    name: \"ai_session_history\",\n    schema: Zoi.object(%{request_id: Zoi.string(), batch_id: Zoi.string()})\n  ]\n]",
-          "kind": "use",
-          "quoted": false
-        },
-        {
-          "line": 9,
-          "module": "Jido.AI.Session.HistoryAction",
-          "name": "run",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            9
-          ]
-        }
-      ]
-    },
-    {
-      "path": "lib/jido_ai/session/ignore_signal.ex",
-      "modules": [
-        "Jido.AI.Session.IgnoreSignal"
-      ],
-      "sha256": "c2e971d2ea5f19e2233a2efda92118b4fab33ced238530d0159ed7da7efd48bc",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.AI.Session.IgnoreSignal",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.AI.Session.IgnoreSignal",
-          "name": "moduledoc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 3,
-          "module": "Jido.AI.Session.IgnoreSignal",
-          "source": "[Jido.Action, [name: \"ai_ignore_unhandled_observation\"]]",
-          "kind": "use",
-          "quoted": false
-        },
-        {
-          "line": 4,
-          "module": "Jido.AI.Session.IgnoreSignal",
-          "name": "run",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            4
-          ]
-        }
-      ]
-    },
-    {
-      "path": "lib/jido_ai/session/inspection.ex",
-      "modules": [
-        "Jido.AI.Session.Inspection"
-      ],
-      "sha256": "b27ce0fa73e619db4d72b354978dd1885e82c9a9145e26ce2bfe301b7d7df606",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.AI.Session.Inspection",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.AI.Session.Inspection",
-          "name": "moduledoc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 10,
-          "module": "Jido.AI.Session.Inspection",
-          "name": "empty",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            0
-          ],
-          "clause_lines": [
-            10
-          ]
-        },
-        {
-          "line": 22,
-          "module": "Jido.AI.Session.Inspection",
-          "name": "record",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            22
-          ]
-        },
-        {
-          "line": 115,
-          "module": "Jido.AI.Session.Inspection",
-          "name": "complete",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            4
-          ],
-          "clause_lines": [
-            115
-          ]
-        },
-        {
-          "line": 127,
-          "module": "Jido.AI.Session.Inspection",
-          "name": "fit",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3
-          ],
-          "clause_lines": [
-            127
-          ]
-        },
-        {
-          "line": 141,
-          "module": "Jido.AI.Session.Inspection",
-          "name": "selected",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            141
-          ]
-        },
-        {
-          "line": 153,
-          "module": "Jido.AI.Session.Inspection",
-          "name": "snapshot",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3
-          ],
-          "clause_lines": [
-            153
-          ]
-        }
-      ]
-    },
-    {
-      "path": "lib/jido_ai/session/plugin.ex",
-      "modules": [
-        "Jido.AI.Session.Plugin"
-      ],
-      "sha256": "bb30fa18a0f8003b67bd8c519efe05a470126923e300e1eabb94d41da1ac54dd",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.AI.Session.Plugin",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.AI.Session.Plugin",
-          "name": "moduledoc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 3,
-          "module": "Jido.AI.Session.Plugin",
-          "source": "[\n  Jido.Plugin,\n  [agent: Jido.AI.Session.Plugin.Agent, agent_server: Jido.AI.Session.Plugin.AgentServer]\n]",
-          "kind": "use",
-          "quoted": false
-        },
-        {
-          "line": 9,
-          "module": "Jido.AI.Session.Plugin",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 10,
-          "module": "Jido.AI.Session.Plugin",
-          "name": "prepare_admission",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3
-          ],
-          "clause_lines": [
-            10
-          ]
-        },
-        {
-          "line": 103,
-          "module": "Jido.AI.Session.Plugin",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 104,
-          "module": "Jido.AI.Session.Plugin",
-          "name": "context",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            104
-          ]
-        },
-        {
-          "line": 122,
-          "module": "Jido.AI.Session.Plugin",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 123,
-          "module": "Jido.AI.Session.Plugin",
-          "name": "prepare_command",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            123
-          ]
-        },
-        {
-          "line": 162,
-          "module": "Jido.AI.Session.Plugin",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 163,
-          "module": "Jido.AI.Session.Plugin",
-          "name": "reduce_records",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            163
-          ]
-        },
-        {
-          "line": 194,
-          "module": "Jido.AI.Session.Plugin",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 195,
-          "module": "Jido.AI.Session.Plugin",
-          "name": "dispatch_directive",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3
-          ],
-          "clause_lines": [
-            195,
-            209,
-            243
-          ]
-        }
-      ]
-    },
-    {
-      "path": "lib/jido_ai/session/plugin/agent.ex",
-      "modules": [
-        "Jido.AI.Session.Plugin.Agent"
-      ],
-      "sha256": "9fada1a390d808b7f30c5094cab93351ebb38bff9a7506284460f670b5effe2b",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.AI.Session.Plugin.Agent",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.AI.Session.Plugin.Agent",
-          "name": "moduledoc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 3,
-          "module": "Jido.AI.Session.Plugin.Agent",
-          "source": "[Jido.Agent.Plugin]",
-          "kind": "use",
-          "quoted": false
-        },
-        {
-          "line": 8,
-          "module": "Jido.AI.Session.Plugin.Agent",
-          "name": "state_spec",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            8
-          ]
-        },
-        {
-          "line": 11,
-          "module": "Jido.AI.Session.Plugin.Agent",
-          "name": "directives",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            11
-          ]
-        },
-        {
-          "line": 14,
-          "module": "Jido.AI.Session.Plugin.Agent",
-          "name": "prepare",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            14
-          ]
-        },
-        {
-          "line": 22,
-          "module": "Jido.AI.Session.Plugin.Agent",
-          "name": "reduce",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            22
-          ]
-        }
-      ]
-    },
-    {
-      "path": "lib/jido_ai/session/plugin/agent_server.ex",
-      "modules": [
-        "Jido.AI.Session.Plugin.AgentServer"
-      ],
-      "sha256": "dc9eaf36426d412231dfcd9f9624b81528059bc493e463ba2bc91eb554b3b9ec",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.AI.Session.Plugin.AgentServer",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.AI.Session.Plugin.AgentServer",
-          "name": "moduledoc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 3,
-          "module": "Jido.AI.Session.Plugin.AgentServer",
-          "source": "[Jido.AgentServer.Plugin]",
-          "kind": "use",
-          "quoted": false
-        },
-        {
-          "line": 7,
-          "module": "Jido.AI.Session.Plugin.AgentServer",
-          "name": "child_spec",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            7
-          ]
-        },
-        {
-          "line": 10,
-          "module": "Jido.AI.Session.Plugin.AgentServer",
-          "name": "await_ready",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            10
-          ]
-        },
-        {
-          "line": 13,
-          "module": "Jido.AI.Session.Plugin.AgentServer",
-          "name": "admit",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3
-          ],
-          "clause_lines": [
-            13
-          ]
-        },
-        {
-          "line": 16,
-          "module": "Jido.AI.Session.Plugin.AgentServer",
-          "name": "dispatch",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            4
-          ],
-          "clause_lines": [
-            16
-          ]
-        }
-      ]
-    },
-    {
-      "path": "lib/jido_ai/session/progress.ex",
-      "modules": [
-        "Jido.AI.Session.Progress"
-      ],
-      "sha256": "901450e92fa1e7ba8877233cc82bae84e9e8e1d78717e8bb23180343504a70ae",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.AI.Session.Progress",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.AI.Session.Progress",
-          "name": "moduledoc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 3,
-          "module": "Jido.AI.Session.Progress",
-          "source": "[\n  Jido.Action,\n  [\n    name: \"ai_session_progress\",\n    schema: Zoi.object(%{request_id: Zoi.string(), run_id: Zoi.string(), ticket: Zoi.string()})\n  ]\n]",
-          "kind": "use",
-          "quoted": false
-        },
-        {
-          "line": 14,
-          "module": "Jido.AI.Session.Progress",
-          "name": "run",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            14
-          ]
-        }
-      ]
-    },
-    {
-      "path": "lib/jido_ai/session/publish.ex",
-      "modules": [
-        "Jido.AI.Session.Publish"
-      ],
-      "sha256": "cd7c568b8d1a541bf31fadecbe99cc115a4a02736999d4b016fa5e10cb890ad5",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.AI.Session.Publish",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.AI.Session.Publish",
-          "name": "moduledoc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 3,
-          "module": "Jido.AI.Session.Publish",
-          "source": "[Jido.Action, [name: \"ai_session_publish\", schema: Zoi.object(%{batch_id: Zoi.string()})]]",
-          "kind": "use",
-          "quoted": false
-        },
-        {
-          "line": 5,
-          "module": "Jido.AI.Session.Publish",
-          "name": "run",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            5
-          ]
-        }
-      ]
-    },
-    {
-      "path": "lib/jido_ai/session/record.ex",
-      "modules": [
-        "Jido.AI.Session.Record"
-      ],
-      "sha256": "c0fd3e0a769e037b5329c9acd123f79aba33424e3ac45841dd1ae7f7ddde2ab7",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.AI.Session.Record",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.AI.Session.Record",
-          "name": "moduledoc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 28,
-          "module": "Jido.AI.Session.Record",
-          "name": "schema",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            0
-          ],
-          "clause_lines": [
-            28
-          ]
-        },
-        {
-          "line": 32,
-          "module": "Jido.AI.Session.Record",
-          "name": "completion_reserve",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            0
-          ],
-          "clause_lines": [
-            32
-          ]
-        },
-        {
-          "line": 34,
-          "module": "Jido.AI.Session.Record",
-          "name": "records_schema",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            0
-          ],
-          "clause_lines": [
-            34
-          ]
-        },
-        {
-          "line": 40,
-          "module": "Jido.AI.Session.Record",
-          "name": "portable_records",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            40
-          ]
-        }
-      ]
-    },
-    {
-      "path": "lib/jido_ai/session/request_scope.ex",
-      "modules": [
-        "Jido.AI.Session.RequestScope"
-      ],
-      "sha256": "7798baa103ed0984e3bd91b3ac0305ab2ffe89cf74d0bb64b0344ad4aca7bd48",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.AI.Session.RequestScope",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.AI.Session.RequestScope",
-          "name": "moduledoc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 6,
-          "module": "Jido.AI.Session.RequestScope",
-          "name": "profile",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3
-          ],
-          "clause_lines": [
-            6
-          ]
-        },
-        {
-          "line": 27,
-          "module": "Jido.AI.Session.RequestScope",
-          "name": "stream_options",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            27
-          ]
-        }
-      ]
-    },
-    {
-      "path": "lib/jido_ai/session/runtime.ex",
-      "modules": [
-        "Jido.AI.Session.Runtime"
-      ],
-      "sha256": "b0ead5e0d2f5a93141e4c4a9f8075d5c8925e7cda5495fbbcd6f274eb1a162c1",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.AI.Session.Runtime",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.AI.Session.Runtime",
-          "name": "moduledoc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 3,
-          "module": "Jido.AI.Session.Runtime",
-          "source": "[GenServer]",
-          "kind": "use",
-          "quoted": false
-        },
-        {
-          "line": 10,
-          "module": "Jido.AI.Session.Runtime",
-          "name": "start_link",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            10
-          ]
-        },
-        {
-          "line": 13,
-          "module": "Jido.AI.Session.Runtime",
-          "name": "init",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            13
-          ]
-        },
-        {
-          "line": 27,
-          "module": "Jido.AI.Session.Runtime",
-          "name": "handle_continue",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            27
-          ]
-        },
-        {
-          "line": 58,
-          "module": "Jido.AI.Session.Runtime",
-          "name": "handle_call",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3
-          ],
-          "clause_lines": [
-            58,
-            59,
-            60,
-            62,
-            65,
-            68,
-            71,
-            81,
-            104,
-            113,
-            132,
-            142,
-            163,
-            224,
-            227,
-            230,
-            249,
-            289,
-            335,
-            358,
-            363,
-            379,
-            407,
-            418,
-            428,
-            441,
-            457,
-            468,
-            481,
-            493,
-            504
-          ]
-        },
-        {
-          "line": 516,
-          "module": "Jido.AI.Session.Runtime",
-          "name": "handle_info",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            516,
-            543,
-            548,
-            559,
-            562
-          ]
-        },
-        {
-          "line": 938,
-          "module": "Jido.AI.Session.Runtime",
-          "name": "terminate",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            938
-          ]
-        }
-      ]
-    },
-    {
-      "path": "lib/jido_ai/session/settle.ex",
-      "modules": [
-        "Jido.AI.Session.Settle"
-      ],
-      "sha256": "1503159671a64238246d8832b1bbbd3e2dcdf4e2fbb30c44e0e34d0fb908e109",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.AI.Session.Settle",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.AI.Session.Settle",
-          "name": "moduledoc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 3,
-          "module": "Jido.AI.Session.Settle",
-          "source": "[Jido.Action, [name: \"ai_session_settle\", schema: Zoi.object(%{request_id: Zoi.string()})]]",
-          "kind": "use",
-          "quoted": false
-        },
-        {
-          "line": 6,
-          "module": "Jido.AI.Session.Settle",
-          "name": "run",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            6
-          ]
-        }
-      ]
-    },
-    {
-      "path": "lib/jido_ai/session/start.ex",
-      "modules": [
-        "Jido.AI.Session.Start"
-      ],
-      "sha256": "5f3f8cd994d170912bbc0ebf60bdfb7341bb2b379b38f7da8b3e52ee07f19293",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.AI.Session.Start",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.AI.Session.Start",
-          "name": "moduledoc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 3,
-          "module": "Jido.AI.Session.Start",
-          "source": "[\n  Jido.Action,\n  [\n    name: \"ai_session_start\",\n    schema: Zoi.object(%{query: Jido.AI.Query.schema(), request_id: Zoi.string() |> Zoi.min(1)})\n  ]\n]",
-          "kind": "use",
-          "quoted": false
-        },
-        {
-          "line": 10,
-          "module": "Jido.AI.Session.Start",
-          "name": "run",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            10
-          ]
-        }
-      ]
-    },
-    {
-      "path": "lib/jido_ai/session/transcript.ex",
-      "modules": [
-        "Jido.AI.Session.Transcript"
-      ],
-      "sha256": "81ddd95078263cce9fed82c987822de95ad67fa4ef971c79d05fe21eab2cf79a",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.AI.Session.Transcript",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.AI.Session.Transcript",
-          "name": "moduledoc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 8,
-          "module": "Jido.AI.Session.Transcript",
-          "name": "query",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            8
-          ]
-        },
-        {
-          "line": 11,
-          "module": "Jido.AI.Session.Transcript",
-          "name": "refs",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            11
-          ]
-        },
-        {
-          "line": 19,
-          "module": "Jido.AI.Session.Transcript",
-          "name": "read",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            19,
-            21,
-            34
-          ]
-        },
-        {
-          "line": 36,
-          "module": "Jido.AI.Session.Transcript",
-          "name": "request_refs",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1,
-            2
-          ],
-          "clause_lines": [
-            36
-          ]
-        },
-        {
-          "line": 43,
-          "module": "Jido.AI.Session.Transcript",
-          "name": "start",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            4
-          ],
-          "clause_lines": [
-            43
-          ]
-        },
-        {
-          "line": 48,
-          "module": "Jido.AI.Session.Transcript",
-          "name": "append",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3
-          ],
-          "clause_lines": [
-            48,
-            50
-          ]
-        },
-        {
-          "line": 57,
-          "module": "Jido.AI.Session.Transcript",
-          "name": "record",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3
-          ],
-          "clause_lines": [
-            57
           ]
         }
       ]
@@ -29036,7 +28334,7 @@
       "modules": [
         "Jido.AI.Thread.Control.Apply"
       ],
-      "sha256": "378dcabce781448bad1ef27d9a3ae895896431c2eec9026970942b62398756c3",
+      "sha256": "ce272b1ef409e736c47bdd8a4f60ba2f1c6e6a74c70b22a738a0302911bccda8",
       "declarations": [
         {
           "line": 1,
@@ -31395,6 +30693,708 @@
       ]
     },
     {
+      "path": "lib/jido_session.ex",
+      "modules": [
+        "Jido.Session"
+      ],
+      "sha256": "3b697c27a1dfb4a76a8f27c6b42a54eeb4e763135482ff508aa6cf1ac1d2a09d",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.Session",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.Session",
+          "name": "moduledoc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 31,
+          "module": "Jido.Session",
+          "source": "[Zoi.Struct.struct_fields(@schema)]",
+          "kind": "defstruct",
+          "quoted": false
+        },
+        {
+          "line": 33,
+          "module": "Jido.Session",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 35,
+          "module": "Jido.Session",
+          "name": "schema",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            0
+          ],
+          "clause_lines": [
+            35
+          ]
+        },
+        {
+          "line": 37,
+          "module": "Jido.Session",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 39,
+          "module": "Jido.Session",
+          "name": "new",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            0,
+            1
+          ],
+          "clause_lines": [
+            39
+          ]
+        },
+        {
+          "line": 59,
+          "module": "Jido.Session",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 61,
+          "module": "Jido.Session",
+          "name": "from_thread",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1,
+            2
+          ],
+          "clause_lines": [
+            61
+          ]
+        },
+        {
+          "line": 77,
+          "module": "Jido.Session",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 79,
+          "module": "Jido.Session",
+          "name": "append",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            79,
+            82,
+            84
+          ]
+        },
+        {
+          "line": 96,
+          "module": "Jido.Session",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 98,
+          "module": "Jido.Session",
+          "name": "put_metadata",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            98
+          ]
+        },
+        {
+          "line": 109,
+          "module": "Jido.Session",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 111,
+          "module": "Jido.Session",
+          "name": "close",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            111,
+            113
+          ]
+        },
+        {
+          "line": 118,
+          "module": "Jido.Session",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 120,
+          "module": "Jido.Session",
+          "name": "open?",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            120
+          ]
+        },
+        {
+          "line": 122,
+          "module": "Jido.Session",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 124,
+          "module": "Jido.Session",
+          "name": "encode",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            124
+          ]
+        },
+        {
+          "line": 140,
+          "module": "Jido.Session",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 142,
+          "module": "Jido.Session",
+          "name": "decode",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            142,
+            144,
+            167
+          ]
+        },
+        {
+          "line": 169,
+          "module": "Jido.Session",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 171,
+          "module": "Jido.Session",
+          "name": "validate",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            171,
+            184
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_thread.ex",
+      "modules": [
+        "Jido.Thread"
+      ],
+      "sha256": "45ba5c1bb2ae1345a01b201b71521a3949c4d493a9d81ea1ff50934ad82a374c",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.Thread",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.Thread",
+          "name": "moduledoc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 31,
+          "module": "Jido.Thread",
+          "source": "[Zoi.Struct.struct_fields(@schema)]",
+          "kind": "defstruct",
+          "quoted": false
+        },
+        {
+          "line": 33,
+          "module": "Jido.Thread",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 35,
+          "module": "Jido.Thread",
+          "name": "schema",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            0
+          ],
+          "clause_lines": [
+            35
+          ]
+        },
+        {
+          "line": 37,
+          "module": "Jido.Thread",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 39,
+          "module": "Jido.Thread",
+          "name": "new",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            0,
+            1
+          ],
+          "clause_lines": [
+            39
+          ]
+        },
+        {
+          "line": 55,
+          "module": "Jido.Thread",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 57,
+          "module": "Jido.Thread",
+          "name": "append",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            57,
+            59
+          ]
+        },
+        {
+          "line": 81,
+          "module": "Jido.Thread",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 83,
+          "module": "Jido.Thread",
+          "name": "entry_count",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            83
+          ]
+        },
+        {
+          "line": 85,
+          "module": "Jido.Thread",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 87,
+          "module": "Jido.Thread",
+          "name": "last",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            87,
+            88
+          ]
+        },
+        {
+          "line": 90,
+          "module": "Jido.Thread",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 92,
+          "module": "Jido.Thread",
+          "name": "get_entry",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            92
+          ]
+        },
+        {
+          "line": 94,
+          "module": "Jido.Thread",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 96,
+          "module": "Jido.Thread",
+          "name": "to_list",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            96
+          ]
+        },
+        {
+          "line": 98,
+          "module": "Jido.Thread",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 100,
+          "module": "Jido.Thread",
+          "name": "filter_by_kind",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            100,
+            102,
+            105
+          ]
+        },
+        {
+          "line": 109,
+          "module": "Jido.Thread",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 111,
+          "module": "Jido.Thread",
+          "name": "slice",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3
+          ],
+          "clause_lines": [
+            111
+          ]
+        },
+        {
+          "line": 115,
+          "module": "Jido.Thread",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 117,
+          "module": "Jido.Thread",
+          "name": "encode",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            117
+          ]
+        },
+        {
+          "line": 132,
+          "module": "Jido.Thread",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 134,
+          "module": "Jido.Thread",
+          "name": "decode",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            134,
+            138,
+            160
+          ]
+        },
+        {
+          "line": 162,
+          "module": "Jido.Thread",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 164,
+          "module": "Jido.Thread",
+          "name": "validate",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            164,
+            184
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_thread/entry.ex",
+      "modules": [
+        "Jido.Thread.Entry"
+      ],
+      "sha256": "0a29c8ebe37e1f1ca1fcf2480b5cec300464e0e377c89e2cb8996c66c4dff71d",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.Thread.Entry",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.Thread.Entry",
+          "name": "moduledoc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 21,
+          "module": "Jido.Thread.Entry",
+          "source": "[Zoi.Struct.struct_fields(@schema)]",
+          "kind": "defstruct",
+          "quoted": false
+        },
+        {
+          "line": 23,
+          "module": "Jido.Thread.Entry",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 25,
+          "module": "Jido.Thread.Entry",
+          "name": "schema",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            0
+          ],
+          "clause_lines": [
+            25
+          ]
+        },
+        {
+          "line": 27,
+          "module": "Jido.Thread.Entry",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 29,
+          "module": "Jido.Thread.Entry",
+          "name": "new",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            29,
+            31
+          ]
+        },
+        {
+          "line": 46,
+          "module": "Jido.Thread.Entry",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 48,
+          "module": "Jido.Thread.Entry",
+          "name": "encode",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            48
+          ]
+        },
+        {
+          "line": 59,
+          "module": "Jido.Thread.Entry",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 61,
+          "module": "Jido.Thread.Entry",
+          "name": "decode",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            61,
+            63,
+            80
+          ]
+        },
+        {
+          "line": 82,
+          "module": "Jido.Thread.Entry",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 84,
+          "module": "Jido.Thread.Entry",
+          "name": "validate",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            84,
+            95
+          ]
+        },
+        {
+          "line": 97,
+          "module": "Jido.Thread.Entry",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 99,
+          "module": "Jido.Thread.Entry",
+          "name": "normalize",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3
+          ],
+          "clause_lines": [
+            99,
+            111
+          ]
+        }
+      ]
+    },
+    {
       "path": "lib/mix/tasks/jido_ai.install.ex",
       "modules": [
         "Mix.Tasks.JidoAi.Install.Docs",
@@ -31674,7 +31674,7 @@
   ],
   "historical_inventory": "api-inventory-v2.json",
   "contract_map": "public-api-map.md",
-  "source_digest": "a67f53bb6b25368d8dfeaf6d94a5bf5dd43ae1a524d56e13fc1ff135f94a0b3e",
+  "source_digest": "9fc417fc2b08b4c301879ab48e6f3998dc2cd97e144540b9226cec5eb1e67d0d",
   "file_count": 255,
   "ownership": {
     "Jido.Session": "jido_ai",

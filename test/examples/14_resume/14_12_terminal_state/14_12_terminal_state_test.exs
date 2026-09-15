@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.TerminalStateTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Request, Session, Usage}
+  alias Jido.AI.{Request, Orchestration, Usage}
   alias Jido.AI.Reasoning.ReAct
   alias JidoAI.Examples.TerminalState
 
@@ -71,7 +71,7 @@ defmodule JidoAI.Examples.TerminalStateTest do
       assert Request.await(request) == expected
       assert_receive {:example_action_started, "terminal_echo"}, 2_000
       refute_received {:example_action_started, "terminal_echo"}
-      assert {:ok, view} = Session.snapshot(server)
+      assert {:ok, view} = Orchestration.snapshot(server)
       assert view.live == nil and view.details.active_request_id == nil
       assert view.request.status == status
       assert view.request.error == raw
@@ -103,7 +103,7 @@ defmodule JidoAI.Examples.TerminalStateTest do
       assert :ok = Server.stop(server, :normal)
       assert {:ok, agent} = Jido.Agent.restore(unquote(module), copy)
       restored = start_agent(jido, agent)
-      assert {:ok, saved} = Session.snapshot(restored, request_id: request.id)
+      assert {:ok, saved} = Orchestration.snapshot(restored, request_id: request.id)
       assert saved.request == view.request and saved.details.trace == view.details.trace
       assert saved.live == nil and saved.details.active_request_id == nil
       assert saved.details.phase == phase
@@ -112,9 +112,9 @@ defmodule JidoAI.Examples.TerminalStateTest do
 
       assert {:ok, next} = submit(restored, context, "Continue")
       assert {:ok, "Next"} = Request.await(next)
-      assert {:ok, old} = Session.snapshot(restored, request_id: request.id)
+      assert {:ok, old} = Orchestration.snapshot(restored, request_id: request.id)
       assert old.request == view.request
-      assert {:ok, fresh} = Session.snapshot(restored, request_id: next.id)
+      assert {:ok, fresh} = Orchestration.snapshot(restored, request_id: next.id)
       assert Usage.token_counts(fresh.details.usage) == %{input_tokens: 1, output_tokens: 1, total_tokens: 2}
       assert fresh.details.tool_results == []
       wires = MockLLM.report(mock).requests

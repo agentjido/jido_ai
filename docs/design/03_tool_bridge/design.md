@@ -1,6 +1,20 @@
 > Target seam design. This document is pending approval.
 
-# Tool bridge and effect policy design
+# Tools, sources, and effect policy design
+
+## Architecture and contract status
+
+- Architecture category: [Tools, sources, and effect policy](../ARCHITECTURE.md).
+- Owning subsystem: ToolCatalog, ToolAdapter, ToolSource, ToolContext, ToolInterceptor, ToolResult, Tools.Executor, and Effects.
+- Complete target: Preserve static and advanced tool sources, provider-native tools, interception, approvals, bounded results, and replay-aware effect semantics. Separate tool policy from batch scheduling and Agent commit.
+- Decision boundary: Define executable source contracts separately from declaration support; settle retry delay and stable effect identity with 04/11.
+- Current implementation, module links, example proof, and exact differences:
+  [alignment](alignment.md). This design is a target, not an API reference.
+
+The requirements and proposed signatures below remain pending approval.
+Illustrative types are not evidence that a module or function exists. A
+requirement is not removed merely because the current implementation differs.
+Use the alignment matrix to distinguish current behavior from the full target.
 
 ## Scope and owner
 

@@ -4,7 +4,7 @@ defmodule Jido.AI.Configuration.Apply do
   alias Jido.AI.Configuration
 
   def run(params, context) do
-    with {:ok, context} <- Jido.AI.Session.Plugin.context(context),
+    with {:ok, context} <- Jido.AI.Orchestration.Plugin.context(context),
          do: apply_change(params, context)
   end
 

@@ -1,4 +1,4 @@
-defmodule Jido.AI.Session.ControlAction do
+defmodule Jido.AI.Orchestration.ControlAction do
   @moduledoc false
   use Jido.Action,
     name: "ai_session_control",
@@ -13,12 +13,12 @@ defmodule Jido.AI.Session.ControlAction do
       })
 
   def run(input, context) do
-    with {:ok, context} <- Jido.AI.Session.Plugin.context(context),
+    with {:ok, context} <- Jido.AI.Orchestration.Plugin.context(context),
          :ok <- Jido.Action.validate_static_data(input),
          %{status: :queued, request_id: id} = result <-
            GenServer.call(context.jido_ai_session_runtime, {:control, input}) do
       record = Map.put(context.agent_state.requests[id], :last_control, result)
-      {:ok, context.agent_state, [%Jido.AI.Session.Change{operation: :control, record: record}]}
+      {:ok, context.agent_state, [%Jido.AI.Orchestration.Change{operation: :control, record: record}]}
     else
       %{status: :rejected} = result ->
         {:error, Jido.Action.Error.validation_error("AI control rejected", %{control: result})}

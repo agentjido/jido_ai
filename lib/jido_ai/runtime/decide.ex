@@ -27,7 +27,7 @@ defmodule Jido.AI.Runtime.Decide do
             {:continue, next, Jido.AI.Runtime.ReasonFlow}
 
           {:done, next} ->
-            with :ok <- Jido.AI.Session.inspect_reasoning(context, Jido.AI.Reasoning.inspection(next)),
+            with :ok <- Jido.AI.Orchestration.inspect_reasoning(context, Jido.AI.Reasoning.inspection(next)),
                  do: finish(next, context)
 
           {:error, reason} ->

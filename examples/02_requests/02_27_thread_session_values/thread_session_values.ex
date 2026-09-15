@@ -5,7 +5,7 @@ defmodule JidoAI.Examples.ThreadSessionValues do
 
   This module does not start an Agent, a Plugin, or a model request. It shows
   how an application can use the portable values before it binds them to live
-  `Jido.AI.Session` request work.
+  `Jido.AI.Orchestration` request work.
   """
 
   alias Jido.{Session, Thread}

@@ -8,8 +8,8 @@ defmodule Jido.AI.Runtime.CallModel do
     Jido.AI.Error.capture(fn ->
       position = Jido.AI.Runtime.State.model_iteration(params)
 
-      with :ok <- Jido.AI.Session.reasoning_iteration(context, position),
-           :ok <- Jido.AI.Session.inspect_reasoning(context, Jido.AI.Reasoning.inspection(params)),
+      with :ok <- Jido.AI.Orchestration.reasoning_iteration(context, position),
+           :ok <- Jido.AI.Orchestration.inspect_reasoning(context, Jido.AI.Reasoning.inspection(params)),
            do: execute(params, context)
     end)
   end
@@ -65,7 +65,7 @@ defmodule Jido.AI.Runtime.CallModel do
 
   defp generate(state, request, active_tools, context, remaining) do
     with :ok <-
-           Jido.AI.Session.emit(
+           Jido.AI.Orchestration.emit(
              context,
              :llm_started,
              Map.merge(
@@ -88,14 +88,15 @@ defmodule Jido.AI.Runtime.CallModel do
               timeout: remaining
             )},
          :ok <- Control.check(state.profile, :model, response, context, state.deadline),
-         response = Jido.AI.Model.Messages.bind_response(response, Jido.AI.Session.Transcript.request_refs(context)),
-         :ok <- Jido.AI.Session.account(context, response.usage),
+         response =
+           Jido.AI.Model.Messages.bind_response(response, Jido.AI.Orchestration.Transcript.request_refs(context)),
+         :ok <- Jido.AI.Orchestration.account(context, response.usage),
          :ok <- terminal_response(response, request, state, context),
          {:ok, state} <-
-           Jido.AI.Session.Transcript.record(state, Jido.AI.Model.Messages.entries([response.message]), context),
+           Jido.AI.Orchestration.Transcript.record(state, Jido.AI.Model.Messages.entries([response.message]), context),
          true <- System.monotonic_time(:millisecond) < state.deadline do
       event = Jido.AI.Runtime.Event.model_response(response, state, request)
-      :ok = Jido.AI.Session.emit(context, :llm_completed, event)
+      :ok = Jido.AI.Orchestration.emit(context, :llm_completed, event)
 
       response_meta =
         Jido.AI.Request.Metadata.record_turn(Map.get(state, :response_meta, %{}), event)
@@ -171,7 +172,7 @@ defmodule Jido.AI.Runtime.CallModel do
 
     case result do
       {:error, reason} ->
-        :ok = Jido.AI.Session.failure_type(context, :llm_response)
+        :ok = Jido.AI.Orchestration.failure_type(context, :llm_response)
 
         received =
           state

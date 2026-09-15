@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.RequestInspectionTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Request, Session}
+  alias Jido.AI.{Request, Orchestration}
   alias JidoAI.Examples.RequestInspection.Agent
 
   defp submit(server, context, opts \\ []) do
@@ -41,7 +41,7 @@ defmodule JidoAI.Examples.RequestInspectionTest do
     Jido.Agent.instantiate!(definition)
   end
 
-  defp owner(server), do: Server.children(server)[{:plugin, Session.Plugin}].pid
+  defp owner(server), do: Server.children(server)[{:plugin, Orchestration.Plugin}].pid
   defp events(request), do: Enum.to_list(Request.Stream.events(request))
 
   defp tools,
@@ -51,12 +51,12 @@ defmodule JidoAI.Examples.RequestInspectionTest do
 
   test "idle inspection uses the core revision and an unknown request is an error", %{jido: jido} do
     server = start_agent(jido, Agent.new!())
-    assert {:ok, view} = Session.snapshot(server)
+    assert {:ok, view} = Orchestration.snapshot(server)
     assert Map.take(view, [:agent, :state_version]) == Server.snapshot(server)
     assert view.details.phase == :idle
     assert view.details.trace.events == []
     assert view.request == nil and view.live == nil
-    assert {:error, :request_not_found} = Session.snapshot(server, request_id: "absent")
+    assert {:error, :request_not_found} = Orchestration.snapshot(server, request_id: "absent")
   end
 
   test "a held model has live identity and a separate committed request", %{jido: jido} do
@@ -64,7 +64,7 @@ defmodule JidoAI.Examples.RequestInspectionTest do
     server = start_agent(jido, Agent.new!())
     {:ok, request} = submit(server, context)
     assert_receive {:mock_llm_waiting, ^mock, :model, _}, 2_000
-    assert {:ok, view} = Session.snapshot(server)
+    assert {:ok, view} = Orchestration.snapshot(server)
     assert view.request.id == request.id
     assert view.request.status == :pending
     assert view.details.phase == :awaiting_llm
@@ -91,7 +91,7 @@ defmodule JidoAI.Examples.RequestInspectionTest do
     server = start_agent(jido, fixture_agent())
     {:ok, request} = submit(server, context)
     assert_receive {:inspection_tool, tool}, 2_000
-    {:ok, view} = Session.snapshot(server, request_id: request.id)
+    {:ok, view} = Orchestration.snapshot(server, request_id: request.id)
     assert view.details.phase == :executing_tool
 
     assert [%{id: "held", name: "inspect_hold", status: :running, arguments: args}] =
@@ -101,7 +101,7 @@ defmodule JidoAI.Examples.RequestInspectionTest do
     assert view.details.usage.total_tokens == 15
     send(tool, :release)
     assert_receive {:mock_llm_waiting, ^mock, :final, _}, 2_000
-    {:ok, view} = Session.snapshot(server)
+    {:ok, view} = Orchestration.snapshot(server)
     assert view.details.tool_calls == []
     assert [%{id: "held", status: :ok}] = view.details.tool_results
     assert view.details.model_calls == 2
@@ -130,7 +130,7 @@ defmodule JidoAI.Examples.RequestInspectionTest do
       server = start_agent(jido, unquote(module).new!())
       assert {:ok, request} = submit(server, context)
       assert_receive {:inspection_tool, tool}, 2_000
-      assert {:ok, held} = Session.snapshot(server)
+      assert {:ok, held} = Orchestration.snapshot(server)
 
       assert Enum.find(held.details.tool_calls, &(&1.id == "held")) == %{
                id: "held",
@@ -142,7 +142,7 @@ defmodule JidoAI.Examples.RequestInspectionTest do
 
       send(tool, :release)
       assert_receive {:mock_llm_waiting, ^mock, :final, _}, 2_000
-      assert {:ok, before} = Session.snapshot(server)
+      assert {:ok, before} = Orchestration.snapshot(server)
       replay = Enum.find(before.details.trace.events, &(&1.kind == :tool_completed and &1.tool_call_id == "held"))
       assert replay != nil
 
@@ -153,14 +153,14 @@ defmodule JidoAI.Examples.RequestInspectionTest do
                    {:event, request.id, before.request.run_id, :tool_completed, replay.data}
                  )
 
-        assert {:ok, view} = Session.snapshot(server)
+        assert {:ok, view} = Orchestration.snapshot(server)
         assert view.details.phase == :awaiting_llm
         assert view.details.tool_results == before.details.tool_results
       end
 
       assert :ok = MockLLM.release(mock, :final)
       assert {:ok, "Checked"} = Request.await(request)
-      assert {:ok, done} = Session.snapshot(server)
+      assert {:ok, done} = Orchestration.snapshot(server)
       assert done.details.phase == :request_completed and done.live == nil
       assert done.details.tool_calls == []
 
@@ -177,13 +177,13 @@ defmodule JidoAI.Examples.RequestInspectionTest do
       assert :ok =
                GenServer.call(owner(server), {:event, request.id, before.request.run_id, :tool_completed, replay.data})
 
-      assert {:ok, retained} = Session.snapshot(server, request_id: request.id)
+      assert {:ok, retained} = Orchestration.snapshot(server, request_id: request.id)
       assert retained.request == done.request
       assert {:ok, next} = submit(server, context)
       assert_receive {:mock_llm_waiting, ^mock, :next, _}, 2_000
-      assert {:ok, fresh} = Session.snapshot(server)
+      assert {:ok, fresh} = Orchestration.snapshot(server)
       assert fresh.details.tool_results == [] and fresh.details.tool_calls == []
-      assert {:ok, retained} = Session.snapshot(server, request_id: request.id)
+      assert {:ok, retained} = Orchestration.snapshot(server, request_id: request.id)
       assert retained.details.tool_results == done.details.tool_results
       assert :ok = MockLLM.release(mock, :next)
       assert {:ok, "Next"} = Request.await(next)
@@ -203,7 +203,7 @@ defmodule JidoAI.Examples.RequestInspectionTest do
     {:ok, first} = submit(server, context, stream_to: self())
     assert {:ok, "First"} = Request.await(first)
     streamed = events(first)
-    {:ok, view} = Session.snapshot(server, request_id: first.id)
+    {:ok, view} = Orchestration.snapshot(server, request_id: first.id)
     assert view.details.trace.events == Enum.take(streamed, view.details.trace.seq)
     assert view.details.trace.scope == :observed_prefix
     assert view.details.phase == :request_completed
@@ -215,9 +215,9 @@ defmodule JidoAI.Examples.RequestInspectionTest do
     refute view.details.trace.truncated?
     {:ok, next} = submit(server, context)
     assert {:ok, "Next"} = Request.await(next)
-    {:ok, latest} = Session.snapshot(server)
+    {:ok, latest} = Orchestration.snapshot(server)
     assert latest.request.id == next.id
-    {:ok, retained} = Session.snapshot(server, request_id: first.id)
+    {:ok, retained} = Orchestration.snapshot(server, request_id: first.id)
     assert retained.request == view.request
     assert retained.details.trace == view.details.trace
     assert map_size(retained.details.trace_summary) == 2
@@ -230,10 +230,10 @@ defmodule JidoAI.Examples.RequestInspectionTest do
     {:ok, request} = submit(server, context, stream_to: self())
     assert_receive {:mock_llm_waiting, ^mock, :cancel, provider}, 2_000
     monitor = Process.monitor(provider)
-    assert :ok = Session.cancel(request, reason: :operator_stop)
+    assert :ok = Orchestration.cancel(request, reason: :operator_stop)
     assert_receive {:DOWN, ^monitor, :process, ^provider, _}, 2_000
     assert {:error, {:cancelled, :operator_stop}} = Request.await(request)
-    {:ok, view} = Session.snapshot(server)
+    {:ok, view} = Orchestration.snapshot(server)
     assert view.request.error == {:cancelled, :operator_stop}
     assert view.details.cancel_reason == :operator_stop
     assert view.details.phase == :request_cancelled
@@ -249,10 +249,10 @@ defmodule JidoAI.Examples.RequestInspectionTest do
     server = start_agent(jido, fixture_agent())
     {:ok, request} = submit(server, context, stream_to: self())
     assert_receive {:mock_llm_waiting, ^mock, :crash, _}, 2_000
-    {:ok, view} = Session.snapshot(server)
+    {:ok, view} = Orchestration.snapshot(server)
     Process.exit(view.live.worker_pid, :kill)
     assert {:error, :worker_crash} = Request.await(request)
-    {:ok, failed} = Session.snapshot(server)
+    {:ok, failed} = Orchestration.snapshot(server)
     assert failed.request.error == :worker_crash
     assert failed.details.phase == :request_failed
     assert failed.details.trace.events == Enum.take(events(request), failed.details.trace.seq)
@@ -260,7 +260,7 @@ defmodule JidoAI.Examples.RequestInspectionTest do
     assert_script_done(mock)
   end
 
-  test "Session recovery retains the last committed trace without live handles or tool replay", %{
+  test "Orchestration recovery retains the last committed trace without live handles or tool replay", %{
     jido: jido
   } do
     {mock, context} = mock([tools(), %{reply: {:wait, :recovery, {:text, "Unused"}}}])
@@ -273,7 +273,7 @@ defmodule JidoAI.Examples.RequestInspectionTest do
     assert length(before.inspection.events) > 2
     Process.exit(owner(server), :kill)
     assert {:error, :request_interrupted} = Request.await(request)
-    {:ok, restored} = Session.snapshot(server)
+    {:ok, restored} = Orchestration.snapshot(server)
 
     assert Enum.take(restored.details.trace.events, length(before.inspection.events)) ==
              before.inspection.events
@@ -293,7 +293,7 @@ defmodule JidoAI.Examples.RequestInspectionTest do
     server = start_agent(jido, fixture_agent())
     {:ok, request} = submit(server, context)
     assert_receive {:mock_llm_waiting, ^mock, :overflow, _}, 2_000
-    {:ok, view} = Session.snapshot(server)
+    {:ok, view} = Orchestration.snapshot(server)
     runtime = owner(server)
 
     for n <- 1..2_010,
@@ -303,14 +303,14 @@ defmodule JidoAI.Examples.RequestInspectionTest do
             {:event, request.id, view.request.run_id, :llm_delta, %{delta: "x", chunk_type: :content, n: n}}
           )
 
-    {:ok, active} = Session.snapshot(server)
+    {:ok, active} = Orchestration.snapshot(server)
     assert length(active.details.trace.events) == 2_000
     assert active.details.trace.truncated?
     assert Enum.map(active.details.trace.events, & &1.seq) == Enum.to_list(1..2_000)
     assert active.details.trace.seq == 2_012
     :ok = MockLLM.release(mock, :overflow)
     assert {:ok, "Done"} = Request.await(request)
-    {:ok, done} = Session.snapshot(server)
+    {:ok, done} = Orchestration.snapshot(server)
     assert done.details.trace.events == active.details.trace.events
     assert done.details.trace.truncated?
     assert done.details.trace.seq > active.details.trace.seq
@@ -324,7 +324,7 @@ defmodule JidoAI.Examples.RequestInspectionTest do
     server = start_agent(jido, fixture_agent())
     {:ok, request} = submit(server, context)
     assert_receive {:mock_llm_waiting, ^mock, :wrong_run, _}, 2_000
-    {:ok, before} = Session.snapshot(server)
+    {:ok, before} = Orchestration.snapshot(server)
 
     assert :ok =
              GenServer.call(
@@ -332,11 +332,11 @@ defmodule JidoAI.Examples.RequestInspectionTest do
                {:event, request.id, "wrong", :llm_delta, %{delta: "forged"}}
              )
 
-    {:ok, after_view} = Session.snapshot(server)
+    {:ok, after_view} = Orchestration.snapshot(server)
     assert before.details.trace == after_view.details.trace
     :ok = MockLLM.release(mock, :wrong_run)
     assert {:ok, "Done"} = Request.await(request)
-    {:ok, done} = Session.snapshot(server)
+    {:ok, done} = Orchestration.snapshot(server)
     refute inspect(done.details.trace) =~ "forged"
     assert_script_done(mock)
   end
@@ -366,7 +366,7 @@ defmodule JidoAI.Examples.RequestInspectionTest do
     server = start_agent(jido, fixture_agent())
     {:ok, request} = submit(server, context)
     assert {:ok, "Checked"} = Request.await(request)
-    {:ok, view} = Session.snapshot(server)
+    {:ok, view} = Orchestration.snapshot(server)
     assert view.details.streaming_text == "Checked"
     assert view.details.streaming_thinking == "Synthetic inspection thought"
 
@@ -402,7 +402,7 @@ defmodule JidoAI.Examples.RequestInspectionTest do
     assert length(saved.inspection.events) == 3
     assert :ok = Jido.Action.validate_static_data(saved)
     next_server = start_agent(jido, restored)
-    {:ok, view} = Session.snapshot(next_server, request_id: request.id)
+    {:ok, view} = Orchestration.snapshot(next_server, request_id: request.id)
     assert view.request == saved
     assert view.details.trace.events == saved.inspection.events
     assert view.live == nil
@@ -446,8 +446,8 @@ defmodule JidoAI.Examples.RequestInspectionTest do
     assert_receive {:mock_llm_waiting, ^mock, :cancel_race, provider}, 2_000
     monitor = Process.monitor(provider)
     runtime = owner(server)
-    {:ok, before} = Session.snapshot(server)
-    task = Task.async(fn -> Session.cancel(request) end)
+    {:ok, before} = Orchestration.snapshot(server)
+    task = Task.async(fn -> Orchestration.cancel(request) end)
     assert_receive {:cancel_admission, gate}, 2_000
 
     assert :ok =
@@ -464,7 +464,7 @@ defmodule JidoAI.Examples.RequestInspectionTest do
     assert Enum.map(streamed, & &1.seq) == [1, 2, 3, 4]
     assert Enum.at(streamed, 2).data.delta == "late"
     assert List.last(streamed).kind == :request_cancelled
-    {:ok, view} = Session.snapshot(server)
+    {:ok, view} = Orchestration.snapshot(server)
     assert view.details.trace.seq == 2
     assert view.details.trace.events == Enum.take(streamed, 2)
     assert view.request.error == :cancelled

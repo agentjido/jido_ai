@@ -290,7 +290,7 @@ defmodule Jido.AI.Authoring.FullSpecParityTest do
 
     assert Enum.any?(imported.routes, fn route ->
              route.path == "support.ask" and
-               route.target == {Jido.AI.Session.Start, %{profile_id: :support}}
+               route.target == {Jido.AI.Orchestration.Start, %{profile_id: :support}}
            end)
   end
 end

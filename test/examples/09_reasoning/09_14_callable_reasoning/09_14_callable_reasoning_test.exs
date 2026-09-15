@@ -34,7 +34,7 @@ defmodule JidoAI.Examples.CallableReasoningTest do
     execution = Jido.Exec.run_async(RunStrategy, %{prompt: "Task"}, bind(context, jido), timeout: 8_000)
     assert_receive {:mock_llm_waiting, ^mock, :held, provider}, 2_000
     [{_, server}] = Jido.list_agents(jido)
-    session = Server.children(server)[{:plugin, Jido.AI.Session.Plugin}].pid
+    session = Server.children(server)[{:plugin, Jido.AI.Orchestration.Plugin}].pid
     refs = for pid <- [server, session, provider], do: {Process.monitor(pid), pid}
     assert :ok = Jido.Exec.cancel(execution)
     for {ref, pid} <- refs, do: assert_receive({:DOWN, ^ref, :process, ^pid, _}, 2_000)

@@ -197,7 +197,7 @@ defmodule Jido.AI.TestHelpersTest do
       assert {:ok, handle} = EchoAgent.ask(server, "cancel", llm_opts: [jido_ai_model_call: callback])
       assert_receive {:model_call_started, model_task}, 5_000
       monitor = Process.monitor(model_task)
-      assert :ok = Jido.AI.Session.cancel(handle)
+      assert :ok = Jido.AI.Orchestration.cancel(handle)
       assert_receive {:DOWN, ^monitor, :process, ^model_task, _}, 5_000
       assert {:error, _} = EchoAgent.await(handle)
     end

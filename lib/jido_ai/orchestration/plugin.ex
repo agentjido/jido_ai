@@ -1,10 +1,10 @@
-defmodule Jido.AI.Session.Plugin do
+defmodule Jido.AI.Orchestration.Plugin do
   @moduledoc "Owns portable request records and starts work only after an admission commit."
   use Jido.Plugin,
-    agent: Jido.AI.Session.Plugin.Agent,
-    agent_server: Jido.AI.Session.Plugin.AgentServer
+    agent: Jido.AI.Orchestration.Plugin.Agent,
+    agent_server: Jido.AI.Orchestration.Plugin.AgentServer
 
-  alias Jido.AI.Session.Change
+  alias Jido.AI.Orchestration.Change
 
   @doc false
   def prepare_admission(runtime, admission, opts) do
@@ -47,7 +47,7 @@ defmodule Jido.AI.Session.Plugin do
     caller_context = admission.caller_context
 
     grant =
-      if signal.type == Jido.AI.Session.publish_type() do
+      if signal.type == Jido.AI.Orchestration.publish_type() do
         case GenServer.call(
                runtime,
                {:claim_delivery, signal.data[:batch_id], caller_context[:jido_ai_delivery_ticket]}
@@ -58,17 +58,17 @@ defmodule Jido.AI.Session.Plugin do
       end
 
     completion =
-      if signal.type == Jido.AI.Session.settle_type(),
+      if signal.type == Jido.AI.Orchestration.settle_type(),
         do: GenServer.call(runtime, {:completion, signal.data[:request_id]}),
         else: nil
 
     metadata =
-      if signal.type == Jido.AI.Session.cancel_type(),
+      if signal.type == Jido.AI.Orchestration.cancel_type(),
         do: GenServer.call(runtime, {:metadata_snapshot, signal.data[:request_id]}),
         else: %{meta: %{}, inspection: %{}}
 
     progress =
-      if signal.type == Jido.AI.Session.progress_type(),
+      if signal.type == Jido.AI.Orchestration.progress_type(),
         do:
           GenServer.call(runtime, {
             :claim_selection,
@@ -79,7 +79,7 @@ defmodule Jido.AI.Session.Plugin do
         else: nil
 
     batch =
-      if signal.type == Jido.AI.Session.history_type(),
+      if signal.type == Jido.AI.Orchestration.history_type(),
         do:
           GenServer.call(
             runtime,
@@ -147,7 +147,7 @@ defmodule Jido.AI.Session.Plugin do
              |> Map.put(:jido_ai_profiles, profiles)
              |> Jido.AI.Skill.Source.context(binding, catalogs),
            {:ok, profile} <-
-             Jido.AI.Session.RequestScope.profile(
+             Jido.AI.Orchestration.RequestScope.profile(
                profiles[profile_id],
                resources,
                context
@@ -194,7 +194,7 @@ defmodule Jido.AI.Session.Plugin do
   @doc false
   def dispatch_directive(
         runtime,
-        %Jido.AI.Session.DeliveryReceipt{batch_id: id, ticket: receipt_ticket},
+        %Jido.AI.Orchestration.DeliveryReceipt{batch_id: id, ticket: receipt_ticket},
         context
       ) do
     ticket = receipt_ticket || get_in(context.turn_context, [:jido_ai_delivery_grant, :ticket])

@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.SessionTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Request, Session}
+  alias Jido.AI.{Request, Orchestration}
   alias Jido.AI.Request.Stream
   alias JidoAI.Examples.Session.Agent
 
@@ -163,13 +163,13 @@ defmodule JidoAI.Examples.SessionTest do
     assert {:ok, request, events} = Agent.ask_stream(server, "Wait", context: context)
     assert_receive {:tool_waiting, worker, 1}, 2_000
     monitor = Process.monitor(worker)
-    assert :ok = Session.cancel(request)
+    assert :ok = Orchestration.cancel(request)
     assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 2_000
     assert {:error, :cancelled} = Request.await(request)
     assert Enum.count(events, &(&1.kind == :request_cancelled)) == 1
     assert Server.agent(server).state.requests[request.id].meta.usage.total_tokens > 0
     assert {:ok, next} = Agent.ask(server, "Next", context: context)
-    assert {:error, %{details: %{reason: :request_already_finished}}} = Session.cancel(request)
+    assert {:error, %{details: %{reason: :request_already_finished}}} = Orchestration.cancel(request)
     assert {:ok, "Next"} = Request.await(next)
     assert_script_done(mock)
   end
@@ -207,7 +207,7 @@ defmodule JidoAI.Examples.SessionTest do
     before = request_state(server)
 
     assert {:error, %{details: %{reason: :stale_request}}} =
-             Server.call(server, Session.settle_signal(request.id),
+             Server.call(server, Orchestration.settle_signal(request.id),
                context: %{jido_ai_completion: %{outcome: {:ok, %{result: "Fake", meta: %{}}}}}
              )
 
@@ -266,7 +266,7 @@ defmodule JidoAI.Examples.SessionTest do
              &(&1["role"] == "tool" and &1["tool_call_id"] == "multiply")
            )
 
-    assert {:ok, %{request: saved}} = Session.snapshot(server, request_id: request.id)
+    assert {:ok, %{request: saved}} = Orchestration.snapshot(server, request_id: request.id)
     assert saved.extra_refs == %{case: "42"}
     assert saved.result == "Twelve"
     assert_script_done(mock)
@@ -286,7 +286,7 @@ defmodule JidoAI.Examples.SessionTest do
     [old, two, three] = requests
     assert {:error, :request_not_found} = Request.await(old)
     assert [{:ok, "Three"}, {:ok, "Two"}] = Request.await_many([three, two], timeout: :infinity)
-    assert {:ok, records} = Server.plugin_state(server, Session.Plugin)
+    assert {:ok, records} = Server.plugin_state(server, Orchestration.Plugin)
     assert map_size(records) == 2
     assert_script_done(mock)
   end
@@ -354,7 +354,7 @@ defmodule JidoAI.Examples.SessionTest do
     {:ok, request} = Agent.ask(server, "Stream", context: context, stream_to: self())
     assert_receive {:mock_llm_waiting, ^mock, :cancel, worker}, 2_000
     monitor = Process.monitor(worker)
-    assert :ok = Session.cancel(request)
+    assert :ok = Orchestration.cancel(request)
     assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 2_000
     assert_receive {:mock_llm_closed, ^mock, ^worker}, 2_000
     assert {:error, :cancelled} = Request.await(request)
@@ -421,7 +421,7 @@ defmodule JidoAI.Examples.SessionTest do
   end
 
   test "restored request records reject runtime resources and mismatched IDs" do
-    schema = Session.Record.records_schema()
+    schema = Orchestration.Record.records_schema()
     assert {:error, _} = Zoi.parse(schema, %{"bad" => %{stream_to: self()}})
 
     record = %{

@@ -3,7 +3,7 @@ defmodule Jido.Session do
   A portable interaction session that owns one `Jido.Thread`.
 
   A Session can span many AI requests. It does not own a process, live request,
-  stream, Plugin, AgentServer, or persistence adapter. `Jido.AI.Session` owns
+  stream, Plugin, AgentServer, or persistence adapter. `Jido.AI.Orchestration` owns
   the live AI request API.
   """
 

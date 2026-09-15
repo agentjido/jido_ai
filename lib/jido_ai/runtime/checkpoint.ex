@@ -182,7 +182,7 @@ defmodule Jido.AI.Runtime.Checkpoint do
 
       entries ->
         with {:ok, messages} <- Jido.AI.Model.Messages.messages(entries),
-             {:ok, state} <- Jido.AI.Session.Transcript.record(state, entries, context) do
+             {:ok, state} <- Jido.AI.Orchestration.Transcript.record(state, entries, context) do
           messages = Enum.reduce(messages, state.messages, &ReqLLM.Context.append(&2, &1))
           {:ok, Map.merge(state, %{messages: messages, pending_queries: []})}
         end

@@ -1,4 +1,4 @@
-defmodule Jido.AI.Session.Transcript do
+defmodule Jido.AI.Orchestration.Transcript do
   @moduledoc false
   # Agent field access and request-owned commits. This module owns no value.
   alias Jido.AI.Profile
@@ -76,7 +76,7 @@ defmodule Jido.AI.Session.Transcript do
 
     result =
       if Map.get(context, :jido_ai_session, false) and state.profile.memory.history != nil,
-        do: Jido.AI.Session.publish_history(context, entries),
+        do: Jido.AI.Orchestration.publish_history(context, entries),
         else: :ok
 
     with :ok <- result, do: {:ok, %{state | history_delta: state.history_delta ++ entries}}

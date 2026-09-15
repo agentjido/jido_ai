@@ -2,7 +2,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyLifecycleTest do
   use Jido.AI.Test.CallableReasoningCase, async: false
   use Mimic
   alias Jido.AI.Actions.Reasoning.RunStrategy
-  alias Jido.AI.{Configuration, Session}
+  alias Jido.AI.{Configuration, Orchestration}
   alias Jido.AgentServer, as: Server
 
   setup :set_mimic_from_context
@@ -63,7 +63,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyLifecycleTest do
 
     ids =
       for {_, server} <- servers do
-        {:ok, records} = Server.plugin_state(server, Session.Plugin)
+        {:ok, records} = Server.plugin_state(server, Orchestration.Plugin)
         [record] = Map.values(records)
         {record.id, record.run_id}
       end
@@ -72,7 +72,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyLifecycleTest do
 
     refs2 =
       for {_, server} <- servers,
-          pid <- [server, Server.children(server)[{:plugin, Session.Plugin}].pid],
+          pid <- [server, Server.children(server)[{:plugin, Orchestration.Plugin}].pid],
           do: {Process.monitor(pid), pid}
 
     refs2 = [{Process.monitor(provider), provider} | refs2]
@@ -178,7 +178,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyLifecycleTest do
     owner = self()
 
     stub(Server, :stop, fn server, reason, timeout ->
-      session = Server.children(server)[{:plugin, Session.Plugin}].pid
+      session = Server.children(server)[{:plugin, Orchestration.Plugin}].pid
       send(owner, {:cleanup_owners, server, session})
       :ok = :sys.suspend(server)
       Mimic.call_original(Server, :stop, [server, reason, timeout])
@@ -211,7 +211,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyLifecycleTest do
     assert Map.keys(tool["function"]["parameters"]["properties"]) == ["prompt"]
   end
 
-  test "parent Session cancellation stops nested callable work", %{jido: jido} do
+  test "parent Orchestration cancellation stops nested callable work", %{jido: jido} do
     mock =
       start_supervised!(
         {MockLLM, script: [reason_tool_reply(), %{reply: {:wait, :nested, {:text, "Late child"}}}], observer: self()}
@@ -220,9 +220,9 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyLifecycleTest do
     {parent, handle} = nested_request(jido, mock)
     assert_receive {:mock_llm_waiting, ^mock, :nested, provider}, 2_000
     [{_, child}] = Enum.reject(Jido.list_agents(jido), fn {_, pid} -> pid == parent end)
-    session = Server.children(child)[{:plugin, Session.Plugin}].pid
+    session = Server.children(child)[{:plugin, Orchestration.Plugin}].pid
     refs = for pid <- [child, session, provider], do: {Process.monitor(pid), pid}
-    assert :ok = Session.cancel(handle)
+    assert :ok = Orchestration.cancel(handle)
     for {ref, pid} <- refs, do: assert_receive({:DOWN, ^ref, :process, ^pid, _}, 3_000)
     assert [{_, ^parent}] = Jido.list_agents(jido)
     assert {:error, _} = Jido.AI.Request.await(handle, timeout: 1_000)
@@ -292,7 +292,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyLifecycleTest do
   defp owners(mock, jido, barrier) do
     assert_receive {:mock_llm_waiting, ^mock, ^barrier, provider}, 2_000
     [{_, server}] = Jido.list_agents(jido)
-    session = Server.children(server)[{:plugin, Session.Plugin}].pid
+    session = Server.children(server)[{:plugin, Orchestration.Plugin}].pid
     for pid <- [server, session, provider], do: {Process.monitor(pid), pid}
   end
 

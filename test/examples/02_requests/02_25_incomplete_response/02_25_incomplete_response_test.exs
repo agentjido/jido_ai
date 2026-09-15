@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.IncompleteResponseTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Request, Session, Usage}
+  alias Jido.AI.{Request, Orchestration, Usage}
   alias Jido.AI.Reasoning.ReAct
   alias Jido.AI.Reasoning.ReAct.{Config, Token}
   alias JidoAI.Examples.IncompleteResponse.Agent
@@ -94,7 +94,7 @@ defmodule JidoAI.Examples.IncompleteResponseTest do
     agent = Server.agent(server)
     record = agent.state.requests[request.id]
     if record.status == :failed, do: assert(agent.state.reply == "untouched")
-    assert {:ok, %{live: nil}} = Session.snapshot(server)
+    assert {:ok, %{live: nil}} = Orchestration.snapshot(server)
     assert :ok = Jido.Action.validate_static_data(agent.state)
     %{outcome: outcome, status: record.status, events: events, usage: record.meta.usage, messages: conversation(agent)}
   end

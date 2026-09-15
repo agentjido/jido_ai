@@ -37,7 +37,7 @@ defmodule JidoAI.Examples.ToolFlow.MultiRoundTest do
     end
 
     {:ok, profile} = Jido.AI.Configuration.profile(agent)
-    {:ok, history} = Jido.AI.Session.Transcript.read(agent.state, profile)
+    {:ok, history} = Jido.AI.Orchestration.Transcript.read(agent.state, profile)
     assert Enum.count(history, &(&1.role == :tool)) == 3
     assert_script_done(mock)
   end

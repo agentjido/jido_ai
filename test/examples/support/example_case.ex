@@ -45,7 +45,7 @@ defmodule JidoAI.Examples.Case do
 
   def conversation(agent) do
     {:ok, profile} = Jido.AI.Configuration.profile(agent)
-    {:ok, entries} = Jido.AI.Session.Transcript.read(agent.state, profile)
+    {:ok, entries} = Jido.AI.Orchestration.Transcript.read(agent.state, profile)
     entries
   end
 

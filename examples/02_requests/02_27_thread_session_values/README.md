@@ -26,7 +26,7 @@ Appending returns a new Thread or Session. Encode/decode preserves portable entr
 
 ## Limits
 
-`Jido.Session` is data; `Jido.AI.Session` controls live requests. Closing a value does not cancel work. This lesson starts no model or Agent process.
+`Jido.Session` is data; `Jido.AI.Orchestration` controls live requests. Closing a value does not cancel work. This lesson starts no model or Agent process.
 
 ## Files
 

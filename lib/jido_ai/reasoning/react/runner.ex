@@ -1,13 +1,13 @@
 defmodule Jido.AI.Reasoning.ReAct.Runner do
   @moduledoc """
-  A lazy standalone stream backed by a private v3 Agent and its Session.
+  A lazy standalone stream backed by a private v3 Agent and its Orchestration.
 
   Enumeration owns the Agent lifetime. The shared Agent/Flow runtime executes
   all model and tool work. Terminal tokens contain AI data, never Exec values.
   Model and tool checkpoints resume through the shared Flow with fresh runtime
   resources.
   """
-  alias Jido.AI.{Request, Session}
+  alias Jido.AI.{Request, Orchestration}
   alias Jido.AI.Reasoning.ReAct.{Authoring, Checkpoint, Config, State, Token}
   alias Jido.AI.Runtime.Event
   alias Jido.AgentServer, as: Server
@@ -183,7 +183,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
                  stream_to: self(),
                  context:
                    context
-                   |> Session.caller_context()
+                   |> Orchestration.caller_context()
                    |> Map.merge(Map.take(context, [:jido_ai_quota]))
                    |> Map.merge(model_context)
                    |> Map.put(:jido_ai_checkpoint, %{
@@ -297,7 +297,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         fail(owner, ref, state, config, {:standalone_agent_stopped, reason})
 
       {:react_checkpoint_ack, ^ref, event_id} ->
-        case Server.children(request.server)[{:plugin, Jido.AI.Session.Plugin}] do
+        case Server.children(request.server)[{:plugin, Jido.AI.Orchestration.Plugin}] do
           %{pid: runtime} ->
             # Completion can win the race with the consumer's next pull.
             # Its terminal event is already queued; a stale ack must not
@@ -318,7 +318,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   # A token's expiry controls later continuation, not the current live Flow.
-  # Do not decode our own output to observe an event from the Session.
+  # Do not decode our own output to observe an event from the Orchestration.
   defp observe(state, event) do
     state = %{
       state
@@ -360,7 +360,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     record = agent.state.requests[state.request_id]
 
     {:ok, profile} = Jido.AI.Configuration.profile(agent)
-    {:ok, entries} = Jido.AI.Session.Transcript.read(agent.state, profile)
+    {:ok, entries} = Jido.AI.Orchestration.Transcript.read(agent.state, profile)
 
     context = State.conversation(entries, config.system_prompt)
 
@@ -478,7 +478,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp cancel(request, reason) do
-    Session.cancel(request, reason: reason)
+    Orchestration.cancel(request, reason: reason)
   catch
     :exit, _ -> :ok
   end

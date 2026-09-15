@@ -93,13 +93,13 @@ defmodule JidoAITest.Authoring.Agents.OutputLimitsTest do
     assert {:ok, _} = call(server, mock, "timed")
     assert_receive {:mock_llm_waiting, ^mock, :deadline, provider}, 5_000
     monitor = Process.monitor(provider)
-    assert {:ok, record} = Jido.AI.Session.await(server, "timed", 5_000)
+    assert {:ok, record} = Jido.AI.Orchestration.await(server, "timed", 5_000)
     assert record.status in [:failed, :timeout]
     assert record.error != nil
     assert_receive {:DOWN, ^monitor, :process, ^provider, _}, 5_000
     assert Jido.AgentServer.agent(server).state.reply == ""
     assert {:ok, _} = call(server, mock, "next")
-    assert {:ok, %{status: :completed, result: "Next"}} = Jido.AI.Session.await(server, "next", 5_000)
+    assert {:ok, %{status: :completed, result: "Next"}} = Jido.AI.Orchestration.await(server, "next", 5_000)
     assert %{remaining: [], unexpected: [], requests: [_, _]} = MockLLM.report(mock)
   end
 

@@ -6,7 +6,7 @@ defmodule Jido.AI.Test.ReasoningCase do
     quote do
       import Jido.AI.Test.ReasoningCase
       alias Jido.AgentServer, as: Server
-      alias Jido.AI.{Configuration, Request, Session}
+      alias Jido.AI.{Configuration, Request, Orchestration}
       alias Jido.AI.Test.MockLLM
     end
   end
@@ -179,7 +179,7 @@ defmodule Jido.AI.Test.ReasoningCase do
   def events(request),
     do: request |> Jido.AI.Request.Stream.events(stream_event_timeout_ms: 1_000) |> Enum.to_list()
 
-  def owner(server), do: Jido.AgentServer.children(server)[{:plugin, Jido.AI.Session.Plugin}].pid
+  def owner(server), do: Jido.AgentServer.children(server)[{:plugin, Jido.AI.Orchestration.Plugin}].pid
 
   def assert_script_done(mock) do
     assert %{remaining: [], unexpected: [], waiting: []} = Jido.AI.Test.MockLLM.report(mock)

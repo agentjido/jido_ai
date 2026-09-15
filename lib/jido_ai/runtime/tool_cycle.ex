@@ -1,6 +1,6 @@
 defmodule Jido.AI.Runtime.ToolCycle do
   @moduledoc false
-  alias Jido.AI.Session
+  alias Jido.AI.Orchestration
 
   @warning "You already called the same tool(s) with identical parameters in the previous iteration. Do NOT repeat the same calls. Either use the results you already have to form a final answer, or try a different approach."
 
@@ -23,13 +23,13 @@ defmodule Jido.AI.Runtime.ToolCycle do
     repeated? = meta[:prev_tool_signature] == signature
     state = Map.put(state, :tool_meta, Map.put(meta, :prev_tool_signature, signature))
 
-    with :ok <- Session.tool_signature(context, signature) do
+    with :ok <- Orchestration.tool_signature(context, signature) do
       if repeated? do
         message = ReqLLM.Context.user(@warning)
 
-        Jido.AI.Session.Transcript.record(
+        Jido.AI.Orchestration.Transcript.record(
           %{state | messages: ReqLLM.Context.append(state.messages, message)},
-          Jido.AI.Session.Transcript.query(@warning, %{}),
+          Jido.AI.Orchestration.Transcript.query(@warning, %{}),
           context
         )
       else

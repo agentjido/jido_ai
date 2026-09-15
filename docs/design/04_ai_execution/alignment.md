@@ -1,110 +1,172 @@
-# 04 — AI Execution Alignment
+> Seam alignment review. Pending approval.
 
-> Seam alignment plan. This document and its design are pending approval.
+# Shared AI execution alignment
 
 ## Status
 
-- Design reviewed: 2026-09-09 for alignment only.
-- Code reviewed: 17c97ca04d97b26a1c7017250c90053ad674f33f.
-- Prerequisites: seams 00 through 03.
-- Alignment state: Blocked.
-- Blockers: design approval and the package compile failure.
+- Reviewed: 2026-09-15.
+- Code: `v3-spike`, HEAD `c4e57c8d34d09ffc922c37fb41cccc2e1491123e`, plus the uncommitted Orchestration and canonical-value file reorganization.
+- Prerequisite alignments used: [02 Model integration and request preparation](../02_model_gateway/alignment.md), [03 Tools, sources, and effect policy](../03_tool_bridge/alignment.md).
+- Alignment state: Draft. Current ownership is mapped; target decisions and full acceptance proof remain.
+- Verification: source and test inspection in this documentation task. The preceding code-change run reported 2,809 passing tests and one existing exclusion, including authoring and MockLLM examples. That run is not proof of every target requirement; no Elixir tests were rerun here.
 
-Proven means that current source and a direct executable test assertion exist. It does not mean that the current package test suite passes.
+## Current architecture
 
-## Inputs And Evidence
+One internal validated execution map carries Profile, ReqLLM context, counters, deadlines, and optional method state. Shared Actions and Flows run the model/tool cycle. ToolAttempt uses a bounded continuation plus sleep; output repair is separate runtime logic. Orchestration owns live request lifetime and settlement, not these step modules.
 
-- Target design: design.md.
-- Canonical Flow construction: lib/jido_ai/authoring/authoring.ex:231-243.
-- Model, decision, tool, and final stages: lib/jido_ai/operations/runtime.ex:324-985.
-- Standalone compatibility runner: lib/jido_ai/operations/react_runner.ex.
-- Stream sequence and terminal kinds: lib/jido_ai/request/stream.ex:13-144.
-- Session stream projection: lib/jido_ai/session/runtime.ex:830-864.
-- V3 examples: 01_02_tool_flow_test.exs, 01_05_streaming_test.exs, 02_13_tool_limits_test.exs, 02_14_stream_activity_test.exs, 02_20_call_counts_test.exs, and 02_24_stream_usage_test.exs.
-- Runtime correlation test: test/jido_ai/react/runtime_runner_test.exs:394-417.
+- Current owner: Runtime.State, Flow, ReasonFlow, Prepare, CallModel, Decide, ToolsFlow, ToolAttempt, and OutputState.
+- Cross-package ownership: core Jido owns Agent commit and topology; Flow/Exec and Signal internals remain in their respective packages.
+- Overall placement: [architecture overview](../ARCHITECTURE.md).
+- Full target: [design](design.md). Keep one bounded execution path for all authoring forms and methods. Preserve advanced streaming, cancellation, retry, and effect contracts without making temporary execution state a portable conversation value.
 
-## Retained Baseline
+## Inputs and evidence
 
-- Keep one shared AI Flow for model, decision, tool, and final stages.
-- Keep Jido.Exec as the Action execution owner.
-- Keep stable request, run, model call, and tool call IDs.
-- Keep ordered request stream sequence numbers and one terminal event.
-- Keep bounded model calls, tool rounds, tool calls, and structured repair.
-- Keep partial usage on terminal failure.
+### Canonical code
 
-## Gap Register
+| Source | Evidence scope |
+| --- | --- |
+| [lib/jido_ai/runtime/state.ex](../../../lib/jido_ai/runtime/state.ex) | Validated temporary execution map |
+| [lib/jido_ai/runtime/flow.ex](../../../lib/jido_ai/runtime/flow.ex) | Canonical Flow |
+| [lib/jido_ai/runtime/tools_flow.ex](../../../lib/jido_ai/runtime/tools_flow.ex) | Tool Map and continuation |
+| [lib/jido_ai/runtime/next_batch.ex](../../../lib/jido_ai/runtime/next_batch.ex) | Batch partitioning |
+| [lib/jido_ai/runtime/tool_attempt.ex](../../../lib/jido_ai/runtime/tool_attempt.ex) | Retry policy |
+| [lib/jido_ai/runtime/output_state.ex](../../../lib/jido_ai/runtime/output_state.ex) | Output validation and repair |
 
-| Gap | Requirement | Current evidence | Difference | Disposition |
+### Examples and tests
+
+- [Example briefing](../../../examples/01_authoring/01_02_tool_flow/README.md): public behavior and documented limits.
+- [Matching example tests](../../../test/examples/01_authoring/01_02_tool_flow): deterministic example evidence.
+- [test/jido_ai/runtime/state_test.exs](../../../test/jido_ai/runtime/state_test.exs): detailed boundary evidence.
+- [test/examples/01_authoring/01_02_tool_flow/multi_round_test.exs](../../../test/examples/01_authoring/01_02_tool_flow/multi_round_test.exs): detailed boundary evidence.
+
+These are evidence entry points, not blanket acceptance claims. The requirement
+matrix below separates target decisions from implemented behavior whose full
+proof is still incomplete. Inert declaration support is not runtime support.
+
+## Retained baseline
+
+Keep one bounded execution path for all authoring forms and methods. Preserve advanced streaming, cancellation, retry, and effect contracts without making temporary execution state a portable conversation value.
+
+Preserve current public behavior unless an approved decision includes a
+migration. No runtime or example changes are authorized by this review.
+Advanced requirements remain in the target even when they are not implemented.
+
+## Gap register
+
+Existing gap IDs remain stable. Superseded rows identify resolved historical
+findings, not removed target requirements. Old acceptance labels and erroneous
+requirement associations are not carried forward as proof.
+
+| Gap | Requirement or proposal | Current evidence or difference | State | Required outcome and owner |
 | --- | --- | --- | --- | --- |
-| EXE-GAP-001 | EXE-REQ-005, EXE-REQ-006 | runtime.ex:324-985 | Stage inputs exist, but a full portable public ExecutionState contract is not proved. | Define the state value and validate every stage transition. |
-| EXE-GAP-002 | EXE-REQ-009, EXE-REQ-012, EXE-REQ-013 | runtime events and stream projection | IDs exist, but full correlation and attempt metadata are not uniform for every event. | Use one event schema from execution through stream projection. |
-| EXE-GAP-003 | EXE-REQ-015, EXE-REQ-017 | runtime.ex:733-846 | Repair and tool retry use internal loops, and tool retry sleeps inside the worker. | Lower retries to scheduler-visible Flow work. |
-| EXE-GAP-004 | EXE-REQ-023, EXE-REQ-024 | session/runtime.ex and react_runner.ex | Cancellation stops a Task. There is no persisted public Jido.Exec cancellation handle contract. | Define cancellation ownership and prove no late settlement. |
-| EXE-GAP-005 | EXE-REQ-025, EXE-REQ-029 | request_stream.ex and session/runtime.ex | Backpressure and caller-down behavior are present in parts, but not proved as one contract. | Add slow-consumer, caller-down, and mailbox-bound tests. |
-| EXE-GAP-006 | EXE-REQ-014, EXE-REQ-016, EXE-REQ-022 | current runtime options | Limits exist, but finite hard maxima and limit provenance are not uniform. | Add approved maxima and record the effective source. |
+| `EXE-GAP-001` | `EXE-REQ-004`, `EXE-REQ-005`, `EXE-REQ-006` | Runtime.State now exists as an internal map with provider values. It is not the proposed portable public Execution.Input/State. | Decision required | Separate temporary state from portable snapshots; review the public abstraction before adding it. |
+| `EXE-GAP-002` | `EXE-REQ-018`, `EXE-REQ-019`, `EXE-REQ-020` | Runtime events carry correlation, but one shared schema for all attempts and projections is not established. | Implemented; evidence incomplete | Complete correlation evidence in 12. |
+| `EXE-GAP-003` | `EXE-REQ-015`, `EXE-REQ-016`, `EXE-REQ-017` | Retry uses a continuation with bounded worker sleep; output repair has its own bounded path. | Decision required | Resolve EXE-REQ-015/017 without creating a generic retry engine. |
+| `EXE-GAP-004` | `EXE-REQ-023`, `EXE-REQ-024` | Coordinator owns cancellation and worker cleanup through the current integration. The target names a public Exec cancellation contract. | Decision required | Verify the exact lower-level API and cancellation races before changing ownership. |
+| `EXE-GAP-005` | `EXE-REQ-019`, `EXE-REQ-021`, `EXE-REQ-022` | Stream and caller-loss paths exist, but full slow-consumer, backpressure, caller-down, and mailbox-bound guarantees need direct proof. | Implemented; evidence incomplete | Retain slow-consumer and cleanup acceptance cases with 07/12. |
+| `EXE-GAP-006` | `EXE-REQ-012`, `EXE-REQ-013`, `EXE-REQ-014` | Profile and method limits exist. A uniform account of hard maxima and limit provenance remains broader than the current controls. | Partially implemented | Retain limit source and most-restrictive-bound acceptance cases. |
 
-## High-Level Work Sequence
+## Selected-direction gap
 
-This sequence defines outcomes and gates. Detailed implementation planning comes after design approval.
+`EXE-GAP-007` — [EXE-DEC-005](design.md#selected-direction-complete-the-runtime-split)
+is selected but not implemented. [RequestTransform](../../../lib/jido_ai/runtime/request_transform.ex)
+constructs ReAct Config/State views. [Decide](../../../lib/jido_ai/runtime/decide.ex)
+uses that view to obtain the repair query. Runtime.State names GoT/TRM machine
+types. These are remaining dependencies on method-specific state.
 
-1. Approve ExecutionState, stage result, event, and terminal result contracts.
-2. Make all stage transitions and effective limits explicit.
-3. Lower repair and tool retry to scheduler-visible Flow steps.
-4. Define the Jido.Exec cancellation handle and race rules.
-5. Complete backpressure, caller-down, and terminal-settlement tests.
-6. Run model, tool, streaming, limit, cancellation, and lifecycle acceptance tests.
+Required evidence for the later change: all eight methods keep their current
+behavior; shared transformers use a common view; repair works without ReAct
+State construction; method-state validation rejects invalid state. ReAct
+adapter and token tests cover compatibility. No such checks were run here.
+Seams 02, 05, 06, and 11 depend on this boundary. Callback migration is open.
 
-## Acceptance Matrix
+## Request adapter review gap
 
-| Requirement | Current evidence | Required evidence | State |
+The [boundary proposal](design.md#proposed-execution-to-orchestration-boundary)
+is not implemented. Runtime uses multiple Orchestration helpers and direct
+Coordinator messages. [PendingInput](../../../lib/jido_ai/runtime/pending_input.ex)
+reads the queue from context and calls it directly.
+[Checkpoint](../../../lib/jido_ai/runtime/checkpoint.ex) calls Coordinator.
+
+Future evidence covers tagged request/run identity, stale messages, safe
+boundary positions, input order, commit waits, and unknown commit results.
+Resolve seam 01 batch data and seam 07 replies before implementation planning.
+No generic adapter framework is needed by this proposal.
+
+## Decisions and dependency gates
+
+Resolve portable public Execution types, explicit Map concurrency, and the exact public cancellation contract against current core APIs.
+
+- Prerequisites: [02 Model integration and request preparation](../02_model_gateway/alignment.md), [03 Tools, sources, and effect policy](../03_tool_bridge/alignment.md).
+- Dependents: 05, 06, 11.
+- Blocker: approval of the affected target decisions, not a historical package compile failure.
+- Assumption: the current public lower-package contracts remain the integration boundary. A proposed API in this design is not evidence of an upstream API.
+- Re-review dependents when an owning contract changes. Do not infer approval from a passing test or a category rename.
+
+## High-level work sequence
+
+1. Resolve prerequisite ownership and the decisions above. Exit: each changed contract has an explicit decision and compatibility scope.
+2. Align current public contracts and retained target requirements. Exit: current behavior and intended changes are distinct, with no fictional API presented as implemented.
+3. Specify acceptance cases for each approved change, including examples, failure paths, and cleanup. Exit: each requirement has direct evidence or a named missing test outcome.
+4. Review dependent seams, migrations, and release implications. Exit: no dependent document assumes an unapproved guarantee.
+
+This is a dependency and outcome plan, not a formal implementation task list.
+Implementation planning follows approval of the seam intent and requirements.
+
+## Acceptance matrix
+
+This table is rebuilt from the actual requirement IDs in `design.md`; earlier
+tables sometimes mapped evidence to the wrong requirement. “Implemented;
+evidence incomplete” means the subsystem has relevant code, not that every
+clause is met. No row below grants approval or claims a fresh test run.
+
+| Requirement | Evidence state | Current evidence | Required acceptance outcome |
 | --- | --- | --- | --- |
-| EXE-REQ-001 | shared Flow exists | Passing canonical Flow tests | Proven |
-| EXE-REQ-002 | authoring uses Flow.Builder | Passing authoring lowering tests | Proven |
-| EXE-REQ-003 | model Action uses Jido.Exec | Passing execution ownership tests | Proven |
-| EXE-REQ-004 | tool Actions use Jido.Exec | Passing execution ownership tests | Proven |
-| EXE-REQ-005 | runtime state maps exist | Approved portable ExecutionState | Partial |
-| EXE-REQ-006 | stages return tagged forms | Full transition validation tests | Partial |
-| EXE-REQ-007 | model stage has stable call ID | Passing call correlation tests | Proven |
-| EXE-REQ-008 | decision stage classifies response | Passing decision-form tests | Proven |
-| EXE-REQ-009 | tool IDs and order exist | Full event correlation proof | Partial |
-| EXE-REQ-010 | final stage normalizes output | Passing terminal output tests | Proven |
-| EXE-REQ-011 | sequence numbers are monotonic | Passing ordered stream tests | Proven |
-| EXE-REQ-012 | event metadata exists | One complete approved schema | Partial |
-| EXE-REQ-013 | attempts exist in parts | Attempt metadata on every retry event | Partial |
-| EXE-REQ-014 | model and tool limits exist | Approved hard maxima and provenance | Partial |
-| EXE-REQ-015 | repair and retry use loops | Flow-visible retry transitions | Conflict |
-| EXE-REQ-016 | timeout values exist | Uniform finite timeout policy | Partial |
-| EXE-REQ-017 | tool retry uses Process.sleep | No worker sleep or hidden scheduling | Conflict |
-| EXE-REQ-018 | terminal settlement is guarded | Passing one-terminal-event tests | Proven |
-| EXE-REQ-019 | partial usage is retained | Passing failure usage tests | Proven |
-| EXE-REQ-020 | incomplete response support exists | Passing incomplete-response tests | Proven |
-| EXE-REQ-021 | call counters exist | Passing limit and count tests | Proven |
-| EXE-REQ-022 | several limits are enforced | All approved limits and reasons | Partial |
-| EXE-REQ-023 | Task cancellation is used | Jido.Exec cancellation handle contract | Conflict |
-| EXE-REQ-024 | settlement guards exist | Full cancellation race proof | Partial |
-| EXE-REQ-025 | stream buffering exists | Slow-consumer and mailbox-bound proof | Partial |
-| EXE-REQ-026 | stream events have sequence IDs | Passing ordering and correlation tests | Proven |
-| EXE-REQ-027 | one terminal event is produced | Passing success and failure tests | Proven |
-| EXE-REQ-028 | stream usage is aggregated | Passing stream usage tests | Proven |
-| EXE-REQ-029 | caller lifecycle handling exists | Full caller-down contract tests | Partial |
-| EXE-REQ-030 | worker lifecycle tests exist | Passing no-leak lifecycle tests | Proven |
+| `EXE-REQ-001` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Every multi-step AI request shall execute as a validated `Jido.Flow` through the public `Jido.Exec` contract. |
+| `EXE-REQ-002` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: A profile lowerer shall build the same semantic Flow for module DSL, direct profile, and codec authoring forms. |
+| `EXE-REQ-003` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Developer-authored AI Flows shall use the standard `Jido.Flow` module DSL and AI Actions; Jido AI shall not define a competing graph DSL. |
+| `EXE-REQ-004` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Runtime profile data shall enter Flow input or Exec context and shall not be captured as changing data in a compiled Flow module. |
+| `EXE-REQ-005` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: The execution Flow shall have one declared output that is a normalized terminal result or a normalized error. |
+| `EXE-REQ-006` | Decision required | See current contract and gap register | Verify the target behavior: A model-call Action shall return a normalized Turn and shall not execute a tool. |
+| `EXE-REQ-007` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: A decision Action shall select finalization, a tool batch, another approved model operation, or a terminal error. |
+| `EXE-REQ-008` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: A dynamic decision shall use `Jido.Flow.Dispatch` or an equivalent public Flow component and shall not invoke an internal workflow runner. |
+| `EXE-REQ-009` | Decision required | See current contract and gap register | Verify the target behavior: When the model selects multiple independent tools, the execution Flow shall use `Jido.Flow.Map` with an explicit positive `max_concurrency`. |
+| `EXE-REQ-010` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Tool results added to context shall retain the original model call order, independent of completion order. |
+| `EXE-REQ-011` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: After a tool batch completes, a continuation Action shall add the assistant tool-call turn and all tool results to context before the next model call. |
+| `EXE-REQ-012` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Each execution shall have positive limits for total timeout, model calls, tool calls, reasoning iterations, and Flow continuations. |
+| `EXE-REQ-013` | Decision required | See current contract and gap register | Verify the target behavior: The effective limit shall be the most restrictive value from package policy, profile policy, trusted request policy, and Exec options. |
+| `EXE-REQ-014` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When any limit is reached, execution shall stop with a stable resource-limit error and a partial safe usage summary. |
+| `EXE-REQ-015` | Decision required | See current contract and gap register | Verify the target behavior: When model or tool policy permits another attempt, the execution Flow shall represent the attempt as a bounded continuation or Iterate step. |
+| `EXE-REQ-016` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Jido AI execution code shall not start an independent retry supervisor or persist live retry state. |
+| `EXE-REQ-017` | Decision required | See current contract and gap register | Verify the target behavior: When retry policy requests a delay, execution shall use an approved host Action or return an unsupported-policy error; it shall not sleep inside the tool bridge. |
+| `EXE-REQ-018` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: One execution shall assign stable request, run, model-call, and tool-call identifiers before related events are emitted. |
+| `EXE-REQ-019` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: The event stream shall preserve causal order for one model call and monotonic sequence order for its deltas. |
+| `EXE-REQ-020` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: A parallel tool batch can emit completion events in completion order, but its batch result shall preserve authored call order. |
+| `EXE-REQ-021` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: A stream shall emit exactly one terminal item: completed, failed, cancelled, or interrupted. |
+| `EXE-REQ-022` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Token and progress events shall be bounded and shall use seam 12 sanitization before transport. |
+| `EXE-REQ-023` | Decision required | See current contract and gap register | Verify the target behavior: When the owner cancels live execution, Jido AI shall call the public Exec cancellation contract and shall not send a private worker message. |
+| `EXE-REQ-024` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Cancellation shall stop pending continuations and child tool work according to Exec cleanup rules. |
+| `EXE-REQ-025` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: A terminal success shall contain the final typed value, final context update, usage, safe metadata, and proposed effects. |
+| `EXE-REQ-026` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: The execution result shall not commit Agent state or dispatch post-commit Directives. |
+| `EXE-REQ-027` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Turn mode and session mode shall use the same canonical AI Flow, model gateway, tool bridge, limits, and terminal result contract. |
+| `EXE-REQ-028` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Differences between Turn mode and session mode shall be limited to admission, process lifetime, streaming transport, and commit timing. |
+| `EXE-REQ-029` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When a host stores or transports a custom AI Flow, it shall use `Jido.Flow.Codec` with a trusted Flow registry and shall not use a Jido AI-specific graph format. |
+| `EXE-REQ-030` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When Jido AI constructs a Flow directly, it shall use public canonical Flow component constructors and the same validation as DSL, Builder, and Codec forms. |
 
-## Migration And Compatibility
+## Migration and compatibility
 
-- Keep current request and result APIs while they delegate to the approved Flow.
-- Keep existing event names through a projection adapter.
-- Treat react_runner.ex as compatibility code and do not add new process ownership to it.
-- Resume only from portable execution inputs, not a live Task or Jido.Exec state.
+Resolve portable public Execution types, explicit Map concurrency, and the exact public cancellation contract against current core APIs.
 
-## Assumptions And Blockers
+Keep existing request, data, Signal, and provider contracts until a change is
+approved. A documentation rename does not authorize a wire-format change.
+Retained advanced proposals need their own migration and operational review.
+Source paths above replace old `operations/`, `shared/`, live Session, and
+`examples/v3/` references as evidence; historical paths are not current owners.
 
-- Jido Flow supports the required retry and cancellation lowering.
-- Session remains the durable request owner.
-- Package compile failure blocks complete execution verification.
+## Completion criteria
 
-## Completion Criteria
-
-- One Flow defines all execution stages and retries.
-- Jido.Exec owns every model and tool Action execution and exposes an approved cancellation path.
-- Events have stable IDs, sequence, attempt data, and exactly one terminal result.
-- All finite limits, timeouts, backpressure rules, and race cases pass tests.
+- [ ] All approved requirements have direct implementation and acceptance evidence.
+- [ ] All material decisions have an explicit owner and resolution.
+- [ ] Examples state what they prove and do not claim unsupported target features.
+- [ ] Migrations and dependent seam reviews are complete.
+- [ ] No previous test result is used as proof of an untested target requirement.

@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.ToTTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Authoring, Request, Session}
+  alias Jido.AI.{Authoring, Request, Orchestration}
   alias Jido.AI.Reasoning.TreeOfThoughts.{Machine, Result}
   alias JidoAI.Examples.ToT
 
@@ -430,7 +430,7 @@ defmodule JidoAI.Examples.ToTTest do
     server = start(jido)
     assert {:ok, handle} = request(server, context)
     assert_receive {:mock_llm_waiting, ^mock, :held_tree, _}, 2_000
-    assert :ok = Session.cancel(handle, reason: :changed_task)
+    assert :ok = Orchestration.cancel(handle, reason: :changed_task)
     assert {:error, {:cancelled, :changed_task}} = Request.await(handle)
     MockLLM.release(mock, :held_tree)
     assert {:ok, next} = request(server, context)
@@ -559,7 +559,7 @@ defmodule JidoAI.Examples.ToTTest do
     assert {:ok, handle} = request(server, context)
     assert_receive {:mock_llm_waiting, ^mock, :lost_tree, provider}, 2_000
     monitor = Process.monitor(provider)
-    Process.exit(Server.children(server)[{:plugin, Session.Plugin}].pid, :kill)
+    Process.exit(Server.children(server)[{:plugin, Orchestration.Plugin}].pid, :kill)
     assert_receive {:DOWN, ^monitor, :process, ^provider, _}, 2_000
     assert {:error, :stream_interrupted} = Request.await(handle)
     assert record(server, handle).method == :tree_of_thoughts

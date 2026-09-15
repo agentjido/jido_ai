@@ -1,4 +1,4 @@
-defmodule Jido.AI.Session.Inspection do
+defmodule Jido.AI.Orchestration.Inspection do
   @moduledoc false
   alias Jido.AI.{Configuration, Profile}
   alias Jido.AI.Thread.Control
@@ -242,7 +242,7 @@ defmodule Jido.AI.Session.Inspection do
   defp conversation(_, %{memory: %{history: nil}}), do: nil
 
   defp conversation(state, profile) do
-    case Jido.AI.Session.Transcript.read(state, profile) do
+    case Jido.AI.Orchestration.Transcript.read(state, profile) do
       {:ok, entries} ->
         messages = Enum.map(entries, &Map.drop(&1, [:timestamp]))
 

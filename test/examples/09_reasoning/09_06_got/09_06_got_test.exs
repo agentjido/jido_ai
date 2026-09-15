@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.GoTTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Authoring, Request, Session}
+  alias Jido.AI.{Authoring, Request, Orchestration}
   alias Jido.AI.Reasoning.GraphOfThoughts.Machine
   alias JidoAI.Examples.GoT
 
@@ -386,7 +386,7 @@ defmodule JidoAI.Examples.GoTTest do
 
     assert {:error, :busy} = request(server, context)
 
-    assert :ok = Session.cancel(handle, reason: :changed_task)
+    assert :ok = Orchestration.cancel(handle, reason: :changed_task)
     assert {:error, {:cancelled, :changed_task}} = Request.await(handle)
     assert_receive {:DOWN, ^monitor, :process, ^provider, _}, 2_000
     assert {:ok, next} = request(server, context)
@@ -412,7 +412,7 @@ defmodule JidoAI.Examples.GoTTest do
     assert {:ok, handle} = request(server, context)
     assert_receive {:mock_llm_waiting, ^mock, :lost_graph, provider}, 2_000
     monitor = Process.monitor(provider)
-    Process.exit(Server.children(server)[{:plugin, Session.Plugin}].pid, :kill)
+    Process.exit(Server.children(server)[{:plugin, Orchestration.Plugin}].pid, :kill)
     assert_receive {:DOWN, ^monitor, :process, ^provider, _}, 2_000
     assert {:error, :stream_interrupted} = Request.await(handle)
     assert {:ok, next} = request(server, context)

@@ -2,7 +2,7 @@ defmodule Jido.AI.Test.CallableReasoningCase do
   @moduledoc false
   use ExUnit.CaseTemplate
 
-  alias Jido.AI.{Configuration, Reasoning, Session}
+  alias Jido.AI.{Configuration, Reasoning, Orchestration}
   alias Jido.AI.Actions.Reasoning.RunStrategy
   alias Jido.AI.Test.MockLLM
   alias Jido.AgentServer
@@ -35,7 +35,7 @@ defmodule Jido.AI.Test.CallableReasoningCase do
     task = Task.async(fn -> Jido.Exec.run(RunStrategy, params, context, timeout: 15_000) end)
     assert_receive {:mock_llm_waiting, ^mock, :started, provider}, 5_000
     [{_id, server}] = Jido.list_agents(jido)
-    session = AgentServer.children(server)[{:plugin, Session.Plugin}].pid
+    session = AgentServer.children(server)[{:plugin, Orchestration.Plugin}].pid
     monitors = for pid <- [server, session, provider], do: {Process.monitor(pid), pid}
 
     {:ok, profile} = Configuration.profile(AgentServer.agent(server), profile.id)

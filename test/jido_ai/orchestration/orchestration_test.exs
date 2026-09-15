@@ -1,8 +1,8 @@
-defmodule Jido.AI.SessionTest do
+defmodule Jido.AI.OrchestrationTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Request.Handle
-  alias Jido.AI.Session
+  alias Jido.AI.Orchestration
 
   test "cancel returns a stable error when the server is unavailable" do
     server = spawn(fn -> :ok end)
@@ -11,6 +11,6 @@ defmodule Jido.AI.SessionTest do
 
     handle = Handle.new("req_cancel", server, "query")
 
-    assert {:error, :agent_server_unavailable} = Session.cancel(handle)
+    assert {:error, :agent_server_unavailable} = Orchestration.cancel(handle)
   end
 end

@@ -1,6 +1,20 @@
 > Target seam design. This document is pending approval.
 
-# AI authoring and portable definitions design
+# Authoring and portable definitions design
+
+## Architecture and contract status
+
+- Architecture category: [Authoring and portable definitions](../ARCHITECTURE.md).
+- Owning subsystem: Agent, DSL, Profile, Authoring, Portable, Configuration, and trusted reference resolution.
+- Complete target: Preserve complete module/direct/codec authoring parity, advanced source declarations, safe registries, explicit defaults, and one lowering path. Avoid a second Agent or Flow DSL.
+- Decision boundary: Reconcile target type names with the real Profile schema. Distinguish static declaration support, safe preflight, and executable behavior in every authoring form.
+- Current implementation, module links, example proof, and exact differences:
+  [alignment](alignment.md). This design is a target, not an API reference.
+
+The requirements and proposed signatures below remain pending approval.
+Illustrative types are not evidence that a module or function exists. A
+requirement is not removed merely because the current implementation differs.
+Use the alignment matrix to distinguish current behavior from the full target.
 
 ## Scope and owner
 

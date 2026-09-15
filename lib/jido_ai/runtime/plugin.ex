@@ -84,7 +84,7 @@ defmodule Jido.AI.Runtime.Plugin do
                context.signal.type == "reasoning.run" do
             target =
               if profile.requests.mode == :session,
-                do: Jido.AI.Session.Start,
+                do: Jido.AI.Orchestration.Start,
                 else: Jido.AI.Runtime.Run
 
             [{context.signal.type, {target, %{profile_id: id}}}]
@@ -109,7 +109,7 @@ defmodule Jido.AI.Runtime.Plugin do
 
     plugins =
       if Map.has_key?(context.agent_state, :requests),
-        do: plugins ++ [{Jido.AI.Session.Plugin, []}],
+        do: plugins ++ [{Jido.AI.Orchestration.Plugin, []}],
         else: plugins
 
     histories =

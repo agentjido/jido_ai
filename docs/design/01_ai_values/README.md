@@ -1,46 +1,54 @@
-> Seam review entry point. This document is pending approval.
+> Seam review entry point. Pending approval.
 
-# 01 — AI values and result contracts
+# 01 — Canonical interaction and AI values
 
 ## Briefing
 
-Jido AI has query, context, turn, output, usage, and error modules, but their complete public and portable boundary is not in one contract. The target is one stable value layer for all later seams. The main change is to keep provider types and process resources out of public AI data.
+Jido.Session owns a Thread of Entry values. These values are process-free and have explicit codecs. Thread.Projection adapts them for AI use; Orchestration.Transcript connects them to a selected Agent field. Turn no longer executes tools. Error uses Splode classes and a runtime envelope with type, message, details, and retryable? rather than the proposed single category/code struct.
+
+This seam retains the complete target, not only current functionality. Detailed
+current evidence and gaps are in [alignment](alignment.md); proposed contracts
+and stable requirement IDs are in [design](design.md).
 
 ## Why this seam exists
 
-- Owner: `Jido.AI.Query`, `Jido.AI.Context`, `Jido.AI.Turn`, `Jido.AI.Output`, `Jido.AI.Usage`, and `Jido.AI.Error`.
-- Owns: Portable AI input, content, history, turn, output, usage, metadata, and errors.
-- Does not own: Provider calls, processes, stores, request admission, Flow scheduling, or Agent commit.
+- Owner: Jido.Session, Jido.Thread, Jido.Thread.Entry, Query, Turn, Output, Usage, Error, and Thread.Projection.
+- Owns: canonical interaction and ai values within [the package architecture](../ARCHITECTURE.md).
+- Does not own: contracts assigned to other seams or private lower-package internals.
 
 ## Current and target state
 
 | Area | Current | Target |
 | --- | --- | --- |
-| Values | Implemented across shared modules | One documented and versioned public value layer |
-| Provider data | Adapter boundaries exist, but the full leak test is not defined | Provider data stays behind adapters |
-| Errors | AI normalization exists | Stable error codes, causes, and safe inspection rules |
+| Architecture | The module and state ownership above is the code baseline | Use canonical Session/Thread values for conversation data. Preserve multimodal content, correlation, output validation, safe errors, and explicit portable encodings. Broader constructor uniformity and strict provider-neutral content remain decisions. |
+| Evidence | Linked example and boundary tests cover specific cases | Direct requirement-level acceptance, including advanced paths |
+| Compatibility | Current APIs remain authoritative | Explicit migration for approved contract changes |
 
 ## Major gaps and work remaining
 
-| Gap | Why it matters | Required outcome | Owner seam |
+| Gap | Why it matters | Required outcome | Owner |
 | --- | --- | --- | --- |
-| Public struct list is not approved | Consumers cannot know what is stable | Approved public value list | 01 |
-| Codec and version rules are incomplete | Resume and remote input can become unsafe | Explicit codec and version rules | 01 |
+| [VAL-GAP-001](alignment.md#gap-register) | Constructors have established return contracts; Session.new returns a value. The universal tagged-error proposal would be a migration. | Specify constructor families rather than silently changing them. | 01; dependencies below |
+| [VAL-GAP-002](alignment.md#gap-register) | Session/Thread codecs and projection replace Context. The former gap cited output requirements as context requirements. | Use VAL-REQ-008/009/021/022 for ordering, projection, and encoding evidence. | 01; dependencies below |
+| [VAL-GAP-004](alignment.md#gap-register) | Current errors use Splode and type/message/details/retryable? envelopes, not one category/code value. | Decide taxonomy and compatibility in the target. | 01; dependencies below |
+| [VAL-GAP-005](alignment.md#gap-register) | Error and observation sanitizers exist; an old leak claim is not carried forward as a current defect without reproduction. | Audit all projections and match tests to VAL-REQ-020. | 01; dependencies below |
+| [VAL-GAP-006](alignment.md#gap-register) | Canonical conversation codecs are versioned. A universal encoding contract for every public value is broader. | Define which values are encoded and which remain runtime-only. | 01; dependencies below |
 
 ## Decisions requested
 
-1. **Public values:** Approve a small stable set of public structs.
-   Effect: Other seams can depend on portable data without provider coupling.
-2. **Output repair:** Choose whether repair belongs to this value seam or to the model gateway.
-   Effect: Output behavior has one owner.
+Resolve tagged constructor uniformity, provider-native content acceptance, and the proposed error taxonomy without reintroducing Context or History stores.
+
+The [target design decisions](design.md#open-design-decisions) remain pending.
+No advanced capability is removed by this reconciliation.
 
 ## Dependencies
 
-- Prerequisites: [00 — Package boundary and invariants](../00_boundary_invariants/README.md).
-- Dependents: 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, and 12.
-- Blockers: Public value and version decisions.
+- Prerequisites: [00 Package boundary and invariants](../00_boundary_invariants/alignment.md).
+- Dependents: 02, 03, 06.
+- Blockers: unresolved target and prerequisite decisions. Current implementation can be inspected without treating proposed contracts as approved.
 
 ## Documents
 
 - [Target design](design.md).
-- [Alignment plan](alignment.md).
+- [Current evidence and alignment](alignment.md).
+- [Overall architecture](../ARCHITECTURE.md).

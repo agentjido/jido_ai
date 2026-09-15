@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.MethodAPITest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Request, Session}
+  alias Jido.AI.{Request, Orchestration}
   alias Jido.AI.Reasoning.{ChainOfDraft, ChainOfThought}
 
   defp start(jido) do
@@ -69,7 +69,7 @@ defmodule JidoAI.Examples.MethodAPITest do
     assert ChainOfThought.get_conclusion(agent) == nil
     assert ChainOfThought.get_steps(agent) == []
     assert ChainOfThought.get_conclusion(agent, first.id) == "first"
-    assert :ok = Session.cancel(next)
+    assert :ok = Orchestration.cancel(next)
     assert {:error, :cancelled} = Request.await(next)
     assert_receive {:DOWN, ^monitor, :process, ^provider, _}, 2_000
     assert ChainOfThought.get_raw_response(Server.agent(server)) == nil

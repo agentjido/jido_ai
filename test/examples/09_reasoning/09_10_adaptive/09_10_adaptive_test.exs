@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.AdaptiveTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Authoring, Request, Session}
+  alias Jido.AI.{Authoring, Request, Orchestration}
   alias Jido.AI.Reasoning.Adaptive.Selection
   alias JidoAI.Examples.Adaptive
 
@@ -321,7 +321,7 @@ defmodule JidoAI.Examples.AdaptiveTest do
     monitor = Process.monitor(provider)
     assert record(server, handle).status == :pending
     assert {:error, :busy} = request(server, context, "Busy")
-    assert :ok = Session.cancel(handle, reason: :changed_task)
+    assert :ok = Orchestration.cancel(handle, reason: :changed_task)
     assert {:error, {:cancelled, :changed_task}} = Request.await(handle)
     assert_receive {:DOWN, ^monitor, :process, ^provider, _}, 2_000
     assert record(server, handle).meta.adaptive.strategy == :trm
@@ -343,7 +343,7 @@ defmodule JidoAI.Examples.AdaptiveTest do
     assert {:ok, handle} = request(server, context, "Combine perspectives")
     assert_receive {:mock_llm_waiting, ^mock, :adaptive_owner, provider}, 2_000
     monitor = Process.monitor(provider)
-    Process.exit(Server.children(server)[{:plugin, Session.Plugin}].pid, :kill)
+    Process.exit(Server.children(server)[{:plugin, Orchestration.Plugin}].pid, :kill)
     assert_receive {:DOWN, ^monitor, :process, ^provider, _}, 2_000
     assert {:error, :stream_interrupted} = Request.await(handle)
     assert {:ok, next} = request(server, context, "What is two plus two?")

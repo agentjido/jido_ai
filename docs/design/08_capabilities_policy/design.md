@@ -1,6 +1,50 @@
 > Target seam design. This document is pending approval.
 
-# AI capabilities and policy design
+# Capabilities and policy design
+
+## Architecture and contract status
+
+- Architecture category: [Capabilities and policy](../ARCHITECTURE.md).
+- Owning subsystem: Capability, ReasoningCapability, optional Plugins, ModelRouter, Quota, Retrieval.Store, and capability Actions.
+- Complete target: Preserve advanced capability composition, contribution validation, deterministic ordering, bounded retrieval, routing diagnostics, and quota policy. Use core Plugin contracts rather than a parallel Plugin framework.
+- Decision boundary: Decide whether a new contribution descriptor simplifies the two current input contracts. Define store ownership and versioning without implying durable billing or workflow guarantees.
+- Current implementation, module links, example proof, and exact differences:
+  [alignment](alignment.md). This design is a target, not an API reference.
+
+The requirements and proposed signatures below remain pending approval.
+Illustrative types are not evidence that a module or function exists. A
+requirement is not removed merely because the current implementation differs.
+Use the alignment matrix to distinguish current behavior from the full target.
+
+## Selected policy-stage direction
+
+`CAP-DEC-005` — User-selected on 2026-09-15: explicit required stages,
+required stages only, and explicit rejection without implicit behavior.
+This selects a direction, not approval of this document.
+
+Profile-bound and defaults-bound inputs remain distinct. Both lead to one
+internal preparation result: Action, parameters, context, and result field.
+Simple non-model capabilities do not need an AI Profile. Live admission stays
+in core Plugin contracts; quota checks remain at each provider call.
+
+Recommended order, still subject to core callback review: input/result-field
+validation, admission checks, retrieval, model routing, guarded execution,
+usage accounting, result placement. Authors do not supply arbitrary order.
+This is not a new generic stage framework. Preserve canonical Session/Thread,
+Agent + DSL + Profile, native ReqLLM contracts, all eight methods, advanced
+capabilities, and core topology ownership.
+
+`CAP-REQ-028`: Each capability shall declare its required policy stages.
+
+`CAP-REQ-029`: Shared capability preparation shall validate the required-stage declaration.
+
+`CAP-REQ-030`: Shared capability preparation shall apply required stages in the fixed semantic policy order.
+
+`CAP-REQ-031`: Shared capability preparation shall apply only the capability's required policy stages.
+
+`CAP-REQ-032`: If a required stage is unavailable, then shared capability preparation shall return a structured error identifying the capability, stage, and reason.
+
+`CAP-REQ-033`: Shared capability preparation shall reject an unavailable required stage without skipping it or choosing an implicit fallback.
 
 ## Scope and owner
 

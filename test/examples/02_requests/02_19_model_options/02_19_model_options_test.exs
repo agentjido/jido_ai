@@ -95,7 +95,7 @@ defmodule JidoAI.Examples.ModelOptionsTest do
     events = request |> Request.Stream.events(stream_event_timeout_ms: 2_000) |> Enum.to_list()
     record = Server.agent(server).state.requests[request.id]
     assert record.meta.model_calls == 3
-    assert {:ok, %{live: nil}} = Jido.AI.Session.snapshot(server)
+    assert {:ok, %{live: nil}} = Jido.AI.Orchestration.snapshot(server)
     assert :ok = Jido.Action.validate_static_data(Server.agent(server).state)
     {events, record.meta.usage}
   end

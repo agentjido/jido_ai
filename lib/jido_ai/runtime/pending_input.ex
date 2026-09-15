@@ -1,6 +1,6 @@
 defmodule Jido.AI.Runtime.PendingInput do
   @moduledoc false
-  alias Jido.AI.{PendingInputServer, Session}
+  alias Jido.AI.{PendingInputServer, Orchestration}
 
   def seal(context) do
     case context[:jido_ai_input_queue] do
@@ -33,7 +33,7 @@ defmodule Jido.AI.Runtime.PendingInput do
   end
 
   defp queue_result({:error, _} = error, context) do
-    :ok = Session.failure_type(context, :runtime)
+    :ok = Orchestration.failure_type(context, :runtime)
     error
   end
 
@@ -51,12 +51,12 @@ defmodule Jido.AI.Runtime.PendingInput do
           |> Map.merge(item.refs || %{})
           |> Map.put(:source, item.source)
 
-        Jido.AI.Session.Transcript.query(item.content, refs)
+        Jido.AI.Orchestration.Transcript.query(item.content, refs)
       end)
 
-    with {:ok, state} <- Jido.AI.Session.Transcript.record(state, entries, context) do
+    with {:ok, state} <- Jido.AI.Orchestration.Transcript.record(state, entries, context) do
       Enum.reduce_while(Enum.zip(items, entries), {:ok, state}, fn {item, entry}, {:ok, state} ->
-        case Session.emit(context, :input_injected, %{
+        case Orchestration.emit(context, :input_injected, %{
                input_id: item.id,
                content: item.content,
                source: item.source,
@@ -67,7 +67,7 @@ defmodule Jido.AI.Runtime.PendingInput do
             message =
               Jido.AI.Model.Messages.put_refs(
                 ReqLLM.Context.user(item.content),
-                Jido.AI.Session.Transcript.request_refs(context, entry.refs)
+                Jido.AI.Orchestration.Transcript.request_refs(context, entry.refs)
               )
 
             messages = ReqLLM.Context.append(state.messages, message)

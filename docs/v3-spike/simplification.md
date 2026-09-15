@@ -61,7 +61,7 @@ line coverage remain unverified.
 6. `6736c6c4` extracts internal Profile reference resolution into
    `Jido.AI.Profile.References.resolve/2`. Profile keeps defaults, canonical
    policy validation, schema construction, and public errors. No additional
-  feature is removed. Session.Runtime and dependency versions are unchanged.
+  feature is removed. Orchestration.Coordinator and dependency versions are unchanged.
 7. `bf5c9785` rejects invalid scalar model inputs in Profile before
    ReqLLM model validation. Valid aliases and native model specifications keep
    their existing behavior. The ReqLLM pin is unchanged.
@@ -88,7 +88,7 @@ Source paths below are relative to `lib/jido_ai/` unless they start with
 | Keep | Standalone ReAct Config, State, Token, Runner and Actions | `reasoning/react.ex` provides run, stream, resume, collect, and cancel. `reasoning/react/authoring.ex` lowers Config to a native Agent. `examples/14_resume` and ReAct unit tests call these APIs. |
 | Keep | Capability Plugins, planning, retrieval, quota, skills | `plugins/*` supplies core Agent composition. Examples in groups 07, 08, 13, 16, and 18 use it. `RunStrategy` is also a callable tool in 09_14 and 09_16. |
 | Replace; complete | Callable configuration | `RunStrategy` takes only prompt input and a host-bound resolved Profile. Seven fixed-method Plugins use `[profile: profile]`. The Action validates the binding; Authoring also validates it when it lowers the private Agent. |
-| Keep; owned by `jido_ai` | Session/Thread values and AI Context | This `jido_ai` repository owns `Jido.Session`, `Jido.Thread`, and `Jido.Thread.Entry`. They were in `lib/jido_session.ex` and `lib/jido_thread.ex`; they now use `lib/jido/session.ex`, `lib/jido/thread.ex`, and `lib/jido/thread/entry.ex`. The prior claim that core Jido owns them was incorrect. AI history, initial-state conversion, and unit tests use these values. No module moves to another repository and no value API is removed here. |
+| Keep; owned by `jido_ai` | Session/Thread values and AI Context | This `jido_ai` repository owns `Jido.Session`, `Jido.Thread`, and `Jido.Thread.Entry`. They were in `lib/jido_session.ex` and `lib/jido_thread.ex`; they now use `lib/jido_session.ex`, `lib/jido_thread.ex`, and `lib/jido_thread/entry.ex`. The prior claim that core Jido owns them was incorrect. AI history, initial-state conversion, and unit tests use these values. No module moves to another repository and no value API is removed here. |
 | Keep | Install, skill, and quality Mix tasks | These configure applications, manage skills, or run quality checks. They have separate unit tests and no dependency on `Mix.Tasks.JidoAi` or its adapters. |
 | Remove; complete | `mix jido_ai` and `Mix.Tasks.JidoAi` | The execution task was the CLI entry point. Its option parsing, stdin batches, output formatting, and telemetry display have no other runtime caller. |
 | Remove; complete | `Jido.AI.CLI.Adapter`, `Jido.AI.CLI.EphemeralAgent`, eight `CLIAdapter` modules | Adapter resolution and temporary module creation were called only by the task, adapters, and CLI tests. No retained source, example, or authoring fixture calls them. |
@@ -142,7 +142,7 @@ used only by the CLI, so this removal does not change the dependency list.
 - At the source organization checkpoint, all 266 top-level module bodies matched the prior source after removal of
   whitespace between modules. No function implementation, module name, or
   contract changed at that checkpoint. Profile reference resolution is now
-  extracted as described below. Session.Runtime internals remain unchanged.
+  extracted as described below. Orchestration.Coordinator internals remain unchanged.
 - One unit source-layout check covers AI module paths. It allows the two
   existing groups of small error values and the established ReAct spelling.
 
@@ -205,7 +205,7 @@ Migration paths:
 | --- | --- |
 | Declared configuration before startup | `Jido.AI.Agent.profile(source, id)` or `profiles/1` returns declared Profile values. This does not include runtime overrides. |
 | Current configuration on an Agent value | `Jido.AI.Configuration.profile(agent, id)` returns a tagged current Profile, including committed overrides. Read `instructions`, `models[reasoning.model].generation`, `tools`, `controls`, and `requests` as needed. |
-| Running Agent inspection | `Jido.AI.Session.snapshot(server, request_id: id)` returns `details.config` and `details.conversation`. Omit `request_id` for the normal selection. |
+| Running Agent inspection | `Jido.AI.Orchestration.snapshot(server, request_id: id)` returns `details.config` and `details.conversation`. Omit `request_id` for the normal selection. |
 | Committed history for one profile | Select the Profile, then call `Jido.AI.History.read(agent.state, profile)`. The result contains chronological entry maps. The system prompt is `profile.instructions`. |
 | Old Context entry comparison | Compare History entries with `context.entries \|> Enum.reverse() \|> Enum.map(&Map.from_struct/1)`. History returns maps, not Context.Entry structs. |
 | Synthetic Context identity | Assert the Agent ID and selected Profile ID. The removed helper's `agent_id:profile_id` Context ID is no longer an inspection contract. |
@@ -217,7 +217,7 @@ The affected unit files retain their runtime and state assertions:
 - `test/jido_ai/strategy/stateops_integration_test.exs`
 - `test/jido_ai/integration/react_context_lifecycle_integration_test.exs`
 
-`test/jido_ai/session/inspection_test.exs` adds ten snapshot tests. They cover
+`test/jido_ai/orchestration/inspection_test.exs` adds ten snapshot tests. They cover
 nil, empty, and saved prompts before the first request; absent history;
 no profiles; method and generation fields; default and explicit profile
 selection; current overrides during active work; retained request selection;
@@ -644,7 +644,7 @@ now approved. Keep further changes focused on simpler supported contracts.
    remains an optional API decision, not a required runtime change.
 2. The callable Profile migration and consumer repairs are complete and tested.
    Keep Plugin composition and all reasoning methods.
-3. Session.Runtime was also reviewed. It coordinates jobs, recovery,
+3. Orchestration.Coordinator was also reviewed. It coordinates jobs, recovery,
    completion commits, input queues, and observed events. Keep those process
    and commit boundaries together for now; no Runtime extraction is included
    in this recommendation. `jido_ai` owns `Jido.Session` and `Jido.Thread`;

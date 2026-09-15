@@ -1,28 +1,125 @@
-# Jido AI V3 design seams
+> Design navigation and implementation status index.
+> Code in `lib/`, public module documentation, and executable tests define current behavior.
 
-Status: Seam map approved; target designs and alignment plans pending review
+# Jido AI V3 design
 
-This directory defines the proposed Jido AI V3 architecture. The V2 package is the capability baseline. The V3 target uses canonical Jido Agent, Plugin, Turn, Directive, Flow, Exec, Signal, and DSL contracts.
+Adapted from the core Jido design index. Start with
+[the architecture overview](ARCHITECTURE.md) for the current seams, modules,
+state owners, and the distinction between implemented and proposed behavior.
+Follow [the design instructions](AGENTS.md) for reviews and edits.
 
-Current source and executable tests remain the canonical evidence for implemented behavior. The `design.md` files state a proposed target. They do not state that the target is implemented.
+The numbered folders define the review areas. They are not a claim that every
+target contract is implemented. When design and code differ, code remains the
+current baseline until a design change is approved and implemented.
 
-## Dependency tree
+The complete target remains in scope. This reconciliation is not an MVP cut.
+Advanced work stays visible even when it needs a decision or has no runtime
+implementation.
 
-Arrows point from a prerequisite seam to a seam that builds on it.
+## Subsystem map
+
+Existing folder names and requirement prefixes remain stable. Seam 07 is now
+described as request orchestration; its existing folder name is retained to
+avoid breaking links. `Jido.Session` belongs to seam 01, not the live API in 07.
+
+| Order | Architectural seam | Folder | Requirement prefix |
+| --- | --- | --- | --- |
+| 00 | Package boundary and invariants | [00_boundary_invariants](00_boundary_invariants/README.md) | `BND` |
+| 01 | Canonical interaction and AI values | [01_ai_values](01_ai_values/README.md) | `VAL` |
+| 02 | Model integration and request preparation | [02_model_gateway](02_model_gateway/README.md) | `MDL` |
+| 03 | Tools, sources, and effect policy | [03_tool_bridge](03_tool_bridge/README.md) | `TLS` |
+| 04 | Shared AI execution | [04_ai_execution](04_ai_execution/README.md) | `EXE` |
+| 05 | Reasoning and planning methods | [05_reasoning_planning](05_reasoning_planning/README.md) | `RSN` |
+| 06 | Core runtime and Signal integration | [06_runtime_signal_integration](06_runtime_signal_integration/README.md) | `INT` |
+| 07 | Request orchestration and active input | [07_request_sessions](07_request_sessions/README.md) | `SES` |
+| 08 | Capabilities and policy | [08_capabilities_policy](08_capabilities_policy/README.md) | `CAP` |
+| 09 | Skills and resources | [09_skills_resources](09_skills_resources/README.md) | `SKL` |
+| 10 | Authoring and portable definitions | [10_authoring_definitions](10_authoring_definitions/README.md) | `AUT` |
+| 11 | Checkpoints and resume | [11_checkpoints_resume](11_checkpoints_resume/README.md) | `RES` |
+| 12 | Observation and diagnostics | [12_observation_diagnostics](12_observation_diagnostics/README.md) | `OBS` |
+| 90 | Migration and delivery | [90_migration_delivery](90_migration_delivery/README.md) | `DEL` |
+
+Delegation is a cross-seam target: 07 owns linked request behavior, 03 owns
+model-facing tool adaptation, 06 owns core topology integration, 11 owns resume
+and uncertain effects, and 12 owns lineage observations. There is no separate
+implemented delegation subsystem. A dedicated folder is an open organization
+decision, not a new runtime requirement.
+
+## Review method
+
+Review each seam against the same five questions:
+
+1. What does the current implementation do?
+2. What complete target design do we want?
+3. What differences exist between current and target behavior?
+4. Which decisions are needed before implementation?
+5. What evidence will show that the seam is aligned?
+
+Cross-system decisions belong in [boundary design](00_boundary_invariants/design.md).
+Current cross-system evidence and gaps belong in
+[boundary alignment](00_boundary_invariants/alignment.md). Detailed rules belong
+in the folder that owns the concept.
+
+Do not turn an old proposal into a mandatory implementation task merely because
+its alignment file says “Missing.” Do not delete it merely because it is missing.
+
+## Current evidence and target status
+
+Approval, implementation, and evidence are separate.
+
+| Evidence state | Meaning |
+| --- | --- |
+| Implemented and evidenced | Current code and a direct test support the stated behavior |
+| Implemented; evidence incomplete | Implementation exists, but the complete assertion is not proved |
+| Partially implemented | Only part of the target contract exists |
+| Proposed; not implemented | Retained target work, not a current capability |
+| Decision required | A material contract or ownership difference needs review |
+| Superseded | An explicit decision replaces the requirement; retain its ID and replacement link |
+| Not revalidated | An older assessment has not been checked against current source |
+
+Record each claim with code, example, and test links where applicable. An
+example is proof of its documented case, not a complete requirement matrix.
+Keep detailed edge-case proof in unit and authoring tests.
+
+All 14 seam briefings, target designs, and alignment files have been reconciled
+with the current architecture map. Acceptance tables are rebuilt from the
+actual target requirement IDs, not the old migration assessments. Evidence
+states distinguish relevant implementation from complete requirement proof.
+The review does not certify every target requirement or grant design approval.
+
+## Seam document pattern
+
+Use [the architectural seam template](SEAM_TEMPLATE.md):
+
+- `README.md`: briefing, ownership, decisions, and major gaps.
+- `design.md`: complete target contract and EARS requirements.
+- `alignment.md`: current evidence, gap register, ordered work packages,
+  migration, and acceptance matrix.
+
+Do not create separate briefing, gap-analysis, or evidence files. Keep each
+fact in its owning document and link to it. Formal implementation plans follow
+approval of seam intent and requirements; they are not part of this
+documentation-only reconciliation.
+
+## Alignment dependency order
+
+The arrows are planning prerequisites, not runtime call direction. Read
+cross-cutting authoring and observation contracts early; finalize their full
+alignment after the contracts they expose are settled.
 
 ```mermaid
 flowchart TB
-    S00["00 Boundary and invariants"]
-    S01["01 AI values"]
-    S02["02 Model gateway"]
-    S03["03 Tool bridge"]
-    S04["04 AI execution"]
-    S05["05 Reasoning and planning"]
-    S06["06 Runtime and Signal integration"]
-    S07["07 Request sessions"]
+    S00["00 Package boundary and invariants"]
+    S01["01 Canonical interaction and AI values"]
+    S02["02 Model integration and request preparation"]
+    S03["03 Tools, sources, and effect policy"]
+    S04["04 Shared AI execution"]
+    S05["05 Reasoning and planning methods"]
+    S06["06 Core runtime and Signal integration"]
+    S07["07 Request orchestration and active input"]
     S08["08 Capabilities and policy"]
     S09["09 Skills and resources"]
-    S10["10 Authoring and definitions"]
+    S10["10 Authoring and portable definitions"]
     S11["11 Checkpoints and resume"]
     S12["12 Observation and diagnostics"]
     S90["90 Migration and delivery"]
@@ -66,42 +163,102 @@ flowchart TB
     class S90 delivery
 ```
 
-## Build order
-
-| Stage | Seams | Result |
+| Stage | Seams | Review outcome |
 | --- | --- | --- |
-| Foundation | 00, 01 | Stable ownership, invariants, values, and errors |
-| Provider and tool boundaries | 02, 03 | Provider-neutral model calls and safe Action tools |
-| Execution | 04, 05 | One Flow-based AI loop and method-specific reasoning |
-| Core integration | 06, 07 | Correct Agent, Plugin, Signal, and request lifecycle use |
-| Composition | 08, 09 | Capability Plugins and bounded skills |
-| Authoring and recovery | 10, 11 | Portable DSL definitions and portable resume data |
-| Operations and release | 12, 90 | Safe observation, migration, and release gates |
+| Foundation | 00, 01 | Package ownership, canonical values, and error boundaries |
+| Integration | 02, 03 | Native model contracts, tools, sources, and effects |
+| Execution | 04, 05 | Shared execution and all reasoning methods |
+| Runtime ownership | 06, 07 | Core integration, orchestration, and delegation boundaries |
+| Composition | 08, 09 | Capabilities, policy, skills, and resources |
+| Authoring and recovery | 10, 11 | Complete authoring and recovery contracts |
+| Operations and release | 12, 90 | Observation, migration, and release evidence |
 
-Seams in the same stage can be reviewed in parallel only when their listed prerequisites are approved.
+Advanced work participates in this same graph. Dependency order does not
+exclude it from the target.
 
-## Seam index
+## Requirement format
 
-| Seam | Briefing | Target design | Alignment plan | Prefix |
-| --- | --- | --- | --- | --- |
-| 00 — Package boundary and invariants | [README](00_boundary_invariants/README.md) | [Design](00_boundary_invariants/design.md) | [Alignment](00_boundary_invariants/alignment.md) | `BND` |
-| 01 — AI values and result contracts | [README](01_ai_values/README.md) | [Design](01_ai_values/design.md) | [Alignment](01_ai_values/alignment.md) | `VAL` |
-| 02 — Model gateway and request preparation | [README](02_model_gateway/README.md) | [Design](02_model_gateway/design.md) | [Alignment](02_model_gateway/alignment.md) | `MDL` |
-| 03 — Tool bridge and effect policy | [README](03_tool_bridge/README.md) | [Design](03_tool_bridge/design.md) | [Alignment](03_tool_bridge/alignment.md) | `TLS` |
-| 04 — Bounded AI execution and streaming | [README](04_ai_execution/README.md) | [Design](04_ai_execution/design.md) | [Alignment](04_ai_execution/alignment.md) | `EXE` |
-| 05 — Reasoning and planning methods | [README](05_reasoning_planning/README.md) | [Design](05_reasoning_planning/design.md) | [Alignment](05_reasoning_planning/alignment.md) | `RSN` |
-| 06 — Core runtime and Signal integration | [README](06_runtime_signal_integration/README.md) | [Design](06_runtime_signal_integration/design.md) | [Alignment](06_runtime_signal_integration/alignment.md) | `INT` |
-| 07 — Request sessions and active input | [README](07_request_sessions/README.md) | [Design](07_request_sessions/design.md) | [Alignment](07_request_sessions/alignment.md) | `SES` |
-| 08 — AI capabilities and policy | [README](08_capabilities_policy/README.md) | [Design](08_capabilities_policy/design.md) | [Alignment](08_capabilities_policy/alignment.md) | `CAP` |
-| 09 — Skills and resource augmentation | [README](09_skills_resources/README.md) | [Design](09_skills_resources/design.md) | [Alignment](09_skills_resources/alignment.md) | `SKL` |
-| 10 — AI authoring and portable definitions | [README](10_authoring_definitions/README.md) | [Design](10_authoring_definitions/design.md) | [Alignment](10_authoring_definitions/alignment.md) | `AUT` |
-| 11 — AI checkpoints and resume | [README](11_checkpoints_resume/README.md) | [Design](11_checkpoints_resume/design.md) | [Alignment](11_checkpoints_resume/alignment.md) | `RES` |
-| 12 — Observation and diagnostics | [README](12_observation_diagnostics/README.md) | [Design](12_observation_diagnostics/design.md) | [Alignment](12_observation_diagnostics/alignment.md) | `OBS` |
-| 90 — Migration, delivery, and consumer support | [README](90_migration_delivery/README.md) | [Design](90_migration_delivery/design.md) | [Alignment](90_migration_delivery/alignment.md) | `DEL` |
+Use EARS, the Easy Approach to Requirements Syntax, for required target behavior:
 
-## Review rule
+| Pattern | Form |
+| --- | --- |
+| Ubiquitous | `The <owner> shall <required response>.` |
+| Event-driven | `When <trigger>, the <owner> shall <required response>.` |
+| State-driven | `While <state>, the <owner> shall <required response>.` |
+| Unwanted behavior | `If <unwanted condition>, then the <owner> shall <required response>.` |
+| Optional feature | `Where <feature is enabled>, the <owner> shall <required response>.` |
+| Combined | `Where <feature>, while <state>, when <trigger>, the <owner> shall <required response>.` |
 
-Review the briefing first. Review the target design only after its prerequisite seams are acceptable. All target designs and alignment plans remain pending until they receive explicit approval. An alignment plan can record current evidence before approval, but implementation work stays blocked until the matching design is approved.
+Give each requirement a stable ID, such as `SES-REQ-001`, and one observable
+behavior. Name its owner. Use measurable limits. Link it to current evidence
+or a required acceptance test. Retire IDs explicitly; do not reuse them.
 
-- [Architecture research and seam map](architecture-seams.md)
-- [Seam document template](SEAM_TEMPLATE.md)
+An EARS statement does not grant approval or prove implementation.
+
+## Document review status
+
+This table is the source of truth for document approval. Only explicit approval
+of a named document changes its status to `Approved`. Approval of a general
+direction does not approve every document. No core Jido approval status is
+inherited by this package.
+
+| Document | Status |
+| --- | --- |
+| [Design index](README.md) | Pending approval |
+| [Design instructions](AGENTS.md) | Pending approval |
+| [Architecture overview](ARCHITECTURE.md) | Pending approval |
+| [Seam template](SEAM_TEMPLATE.md) | Pending approval |
+| [Retained architecture research](architecture-seams.md) | Pending approval |
+| [Package boundary and invariants: briefing](00_boundary_invariants/README.md) | Pending approval |
+| [Package boundary and invariants: design](00_boundary_invariants/design.md) | Pending approval |
+| [Package boundary and invariants: alignment](00_boundary_invariants/alignment.md) | Pending approval |
+| [Canonical interaction and AI values: briefing](01_ai_values/README.md) | Pending approval |
+| [Canonical interaction and AI values: design](01_ai_values/design.md) | Pending approval |
+| [Canonical interaction and AI values: alignment](01_ai_values/alignment.md) | Pending approval |
+| [Model integration and request preparation: briefing](02_model_gateway/README.md) | Pending approval |
+| [Model integration and request preparation: design](02_model_gateway/design.md) | Pending approval |
+| [Model integration and request preparation: alignment](02_model_gateway/alignment.md) | Pending approval |
+| [Tools, sources, and effect policy: briefing](03_tool_bridge/README.md) | Pending approval |
+| [Tools, sources, and effect policy: design](03_tool_bridge/design.md) | Pending approval |
+| [Tools, sources, and effect policy: alignment](03_tool_bridge/alignment.md) | Pending approval |
+| [Shared AI execution: briefing](04_ai_execution/README.md) | Pending approval |
+| [Shared AI execution: design](04_ai_execution/design.md) | Pending approval |
+| [Shared AI execution: alignment](04_ai_execution/alignment.md) | Pending approval |
+| [Reasoning and planning methods: briefing](05_reasoning_planning/README.md) | Pending approval |
+| [Reasoning and planning methods: design](05_reasoning_planning/design.md) | Pending approval |
+| [Reasoning and planning methods: alignment](05_reasoning_planning/alignment.md) | Pending approval |
+| [Core runtime and Signal integration: briefing](06_runtime_signal_integration/README.md) | Pending approval |
+| [Core runtime and Signal integration: design](06_runtime_signal_integration/design.md) | Pending approval |
+| [Core runtime and Signal integration: alignment](06_runtime_signal_integration/alignment.md) | Pending approval |
+| [Request orchestration and active input: briefing](07_request_sessions/README.md) | Pending approval |
+| [Request orchestration and active input: design](07_request_sessions/design.md) | Pending approval |
+| [Request orchestration and active input: alignment](07_request_sessions/alignment.md) | Pending approval |
+| [Capabilities and policy: briefing](08_capabilities_policy/README.md) | Pending approval |
+| [Capabilities and policy: design](08_capabilities_policy/design.md) | Pending approval |
+| [Capabilities and policy: alignment](08_capabilities_policy/alignment.md) | Pending approval |
+| [Skills and resources: briefing](09_skills_resources/README.md) | Pending approval |
+| [Skills and resources: design](09_skills_resources/design.md) | Pending approval |
+| [Skills and resources: alignment](09_skills_resources/alignment.md) | Pending approval |
+| [Authoring and portable definitions: briefing](10_authoring_definitions/README.md) | Pending approval |
+| [Authoring and portable definitions: design](10_authoring_definitions/design.md) | Pending approval |
+| [Authoring and portable definitions: alignment](10_authoring_definitions/alignment.md) | Pending approval |
+| [Checkpoints and resume: briefing](11_checkpoints_resume/README.md) | Pending approval |
+| [Checkpoints and resume: design](11_checkpoints_resume/design.md) | Pending approval |
+| [Checkpoints and resume: alignment](11_checkpoints_resume/alignment.md) | Pending approval |
+| [Observation and diagnostics: briefing](12_observation_diagnostics/README.md) | Pending approval |
+| [Observation and diagnostics: design](12_observation_diagnostics/design.md) | Pending approval |
+| [Observation and diagnostics: alignment](12_observation_diagnostics/alignment.md) | Pending approval |
+| [Migration and delivery: briefing](90_migration_delivery/README.md) | Pending approval |
+| [Migration and delivery: design](90_migration_delivery/design.md) | Pending approval |
+| [Migration and delivery: alignment](90_migration_delivery/alignment.md) | Pending approval |
+
+## Delivery evidence
+
+[Delivery alignment](90_migration_delivery/alignment.md) owns release readiness.
+The [source API inventory](../v3-spike/api-inventory.json) and
+[current API map](../v3-spike/public-api-map.md) help locate current contracts.
+Neither an API inventory nor a passing example proves the complete target.
+
+Historical proposals and unique rationale remain in
+[the retained architecture research](architecture-seams.md) and the seam designs.
+No advanced requirement is removed by this index update.

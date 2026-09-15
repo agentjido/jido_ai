@@ -1,46 +1,54 @@
-> Seam review entry point. This document is pending approval.
+> Seam review entry point. Pending approval.
 
-# 10 — AI authoring and portable definitions
+# 10 — Authoring and portable definitions
 
 ## Briefing
 
-The current V3 authoring layer has profiles, an Agent DSL, Plugin stack assembly, and lowering to core Agent and Flow values. The target is one inert and portable definition model with parity across module, direct-data, and codec forms. The main change is to make authoring assemble approved behavior without creating new runtime behavior.
+Agent plus DSL plus Profile is the main authoring form. Profile uses Zoi and validated map fields; the illustrative nested target structs are not the actual schema. Portable codecs use trusted references. Tool-source declarations can round-trip without proving their runtime adapters. Generated helpers use current Request/Orchestration paths.
+
+This seam retains the complete target, not only current functionality. Detailed
+current evidence and gaps are in [alignment](alignment.md); proposed contracts
+and stable requirement IDs are in [design](design.md).
 
 ## Why this seam exists
 
-- Owner: Profile, Authoring, Agent DSL, codec, portable definition, and convenience-agent modules.
-- Owns: Profile data, authoring parity, lowering, route targets, Plugin stack assembly, defaults, and convenience request calls.
-- Does not own: Compile-time effects, a second Flow DSL, provider clients, store supervision, or format-specific behavior.
+- Owner: Agent, DSL, Profile, Authoring, Portable, Configuration, and trusted reference resolution.
+- Owns: authoring and portable definitions within [the package architecture](../ARCHITECTURE.md).
+- Does not own: contracts assigned to other seams or private lower-package internals.
 
 ## Current and target state
 
 | Area | Current | Target |
 | --- | --- | --- |
-| Profile | Broad portable fields and validation exist | Approved versioned profile contract |
-| Lowering | Profiles lower to core Agents, Plugins, and Flows | One deterministic lowering result |
-| Formats | DSL parity tests exist | Module, data, and codec forms have full behavior parity |
+| Architecture | The module and state ownership above is the code baseline | Preserve complete module/direct/codec authoring parity, advanced source declarations, safe registries, explicit defaults, and one lowering path. Avoid a second Agent or Flow DSL. |
+| Evidence | Linked example and boundary tests cover specific cases | Direct requirement-level acceptance, including advanced paths |
+| Compatibility | Current APIs remain authoritative | Explicit migration for approved contract changes |
 
 ## Major gaps and work remaining
 
-| Gap | Why it matters | Required outcome | Owner seam |
+| Gap | Why it matters | Required outcome | Owner |
 | --- | --- | --- | --- |
-| Defaults are not approved | Small changes can break consumers | Stable default and compatibility policy | 10 and 90 |
-| Callback portability is not final | Encoded profiles can contain unsafe or local behavior | Explicit callback and codec rule | 10 |
+| [AUT-GAP-001](alignment.md#gap-register) | The V2 option-based authoring path is removed; the current Agent/DSL path and rejection tests remain. | Preserve the current single authoring form. | 10; dependencies below |
+| [AUT-GAP-002](alignment.md#gap-register) | Inline Action authoring is supported; boundary tests exist. Full input/output/context permutations need explicit mapping. | Retain complete inline authoring conformance. | 10; dependencies below |
+| [AUT-GAP-003](alignment.md#gap-register) | Boundary tests cover duplicate routes, result fields, managed Plugins, initialized hosts, and trusted defaults. | Complete the broader Plugin/directive collision matrix. | 10; dependencies below |
+| [AUT-GAP-004](alignment.md#gap-register) | A generated API inventory and current map exist. They are not approval of every public contract. | Use actual exported APIs and distinguish static sources from execution support. | 10; dependencies below |
+| [AUT-GAP-005](alignment.md#gap-register) | The preceding code run passed compile and the full authoring/example-inclusive suite. | Keep the same checks; this documentation task does not rerun them. | 10; dependencies below |
 
 ## Decisions requested
 
-1. **Authoring model:** Approve one profile value as the canonical authoring form.
-   Effect: All input formats can lower through one validation path.
-2. **Callbacks:** Reject anonymous functions in portable encoded profiles.
-   Effect: Definitions remain safe to inspect and move.
+Reconcile target type names with the real Profile schema. Distinguish static declaration support, safe preflight, and executable behavior in every authoring form.
+
+The [target design decisions](design.md#open-design-decisions) remain pending.
+No advanced capability is removed by this reconciliation.
 
 ## Dependencies
 
-- Prerequisites: 00 through 09.
-- Dependents: 12 and 90.
-- Blockers: Defaults, alias portability, callbacks, and codec safety.
+- Prerequisites: [05 Reasoning and planning methods](../05_reasoning_planning/alignment.md), [08 Capabilities and policy](../08_capabilities_policy/alignment.md), [09 Skills and resources](../09_skills_resources/alignment.md).
+- Dependents: 12.
+- Blockers: unresolved target and prerequisite decisions. Current implementation can be inspected without treating proposed contracts as approved.
 
 ## Documents
 
 - [Target design](design.md).
-- [Alignment plan](alignment.md).
+- [Current evidence and alignment](alignment.md).
+- [Overall architecture](../ARCHITECTURE.md).

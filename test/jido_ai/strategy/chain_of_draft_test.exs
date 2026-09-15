@@ -27,7 +27,7 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.StrategyTest do
     assert {:ok, handle} = request(server, mock, :chain_of_draft, "Solve quickly")
     assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
     assert %{status: :pending, method: :chain_of_draft, query: "Solve quickly"} = record(server, handle)
-    assert {:ok, view} = Session.snapshot(server)
+    assert {:ok, view} = Orchestration.snapshot(server)
     assert view.request.id == handle.id
     assert view.details.phase == :awaiting_llm
     assert Process.alive?(view.live.worker_pid)
@@ -45,7 +45,7 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.StrategyTest do
     assert record(server, handle).status == :completed
     assert ChainOfDraft.get_conclusion(Server.agent(server)) == "8"
     assert record(server, handle).meta.termination_reason == :success
-    assert {:ok, %{live: nil}} = Session.snapshot(server)
+    assert {:ok, %{live: nil}} = Orchestration.snapshot(server)
     assert_script_done(mock)
   end
 
@@ -58,7 +58,7 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.StrategyTest do
     assert error.message =~ "Rate limited"
     assert record(server, handle).error == error
     assert record(server, handle).status == :failed
-    assert {:ok, %{live: nil, details: %{phase: :request_failed}}} = Session.snapshot(server)
+    assert {:ok, %{live: nil, details: %{phase: :request_failed}}} = Orchestration.snapshot(server)
     assert_script_done(mock)
   end
 

@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.AoTTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Authoring, Request, Session}
+  alias Jido.AI.{Authoring, Request, Orchestration}
   alias Jido.AI.Reasoning.AlgorithmOfThoughts, as: Method
   alias JidoAI.Examples.AoT
 
@@ -64,7 +64,7 @@ defmodule JidoAI.Examples.AoTTest do
 
   defp delivered(server, request) do
     eventually(fn ->
-      match?({:ok, %{status: :delivered}}, Session.delivery_status(server, request.id))
+      match?({:ok, %{status: :delivered}}, Orchestration.delivery_status(server, request.id))
     end)
 
     signals()
@@ -444,7 +444,7 @@ defmodule JidoAI.Examples.AoTTest do
     assert {:ok, handle} = request(server, context)
     assert_receive {:mock_llm_waiting, ^mock, :held, provider}, 2_000
     monitor = Process.monitor(provider)
-    Process.exit(Server.children(server)[{:plugin, Session.Plugin}].pid, :kill)
+    Process.exit(Server.children(server)[{:plugin, Orchestration.Plugin}].pid, :kill)
     assert_receive {:DOWN, ^monitor, :process, ^provider, _}, 2_000
     assert {:error, :stream_interrupted} = Request.await(handle)
     assert record(server, handle).method == Method.method()
@@ -546,7 +546,7 @@ defmodule JidoAI.Examples.AoTTest do
       end
 
       assert List.last(events(handle)).kind == :request_failed
-      assert {:ok, %{status: :disabled}} = Session.delivery_status(server, handle.id)
+      assert {:ok, %{status: :disabled}} = Orchestration.delivery_status(server, handle.id)
     end
 
     refute_receive {:signal, _}, 50

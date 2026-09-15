@@ -3,7 +3,7 @@ defmodule Jido.AI.Runtime.Run do
   use Jido.Action, name: "ai_agent_run", schema: Zoi.object(%{query: Jido.AI.Query.schema()})
 
   def run(params, context) do
-    with {:ok, context} <- Jido.AI.Session.Plugin.context(context) do
+    with {:ok, context} <- Jido.AI.Orchestration.Plugin.context(context) do
       Jido.AI.Error.capture(fn ->
         execute(Jido.AI.Plugins.Retrieval.apply_input(params, context), context)
       end)
@@ -24,7 +24,7 @@ defmodule Jido.AI.Runtime.Run do
            ) do
       candidate =
         candidate
-        |> Jido.AI.Session.Transcript.append(profile, output.history_delta)
+        |> Jido.AI.Orchestration.Transcript.append(profile, output.history_delta)
         |> Map.put(profile.result.into, output.result)
 
       {:ok, candidate, output.effect_plan.directives}

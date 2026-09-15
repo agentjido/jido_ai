@@ -29,7 +29,7 @@ defmodule Jido.AI.Model.Generate do
         callbacks = [
           on_chunk: fn chunk ->
             progress.(Map.get(chunk.metadata, :usage, %{}))
-            Jido.AI.Session.activity(context)
+            Jido.AI.Orchestration.activity(context)
 
             case Jido.AI.Turn.stream_content_part(chunk) do
               {:ok, part} -> delta(context, model, :content_part, part)
@@ -60,7 +60,7 @@ defmodule Jido.AI.Model.Generate do
 
   defp delta(context, model, kind, text),
     do:
-      Jido.AI.Session.emit(context, :llm_delta, %{
+      Jido.AI.Orchestration.emit(context, :llm_delta, %{
         chunk_type: kind,
         delta: text,
         model: Jido.AI.Models.label(model)

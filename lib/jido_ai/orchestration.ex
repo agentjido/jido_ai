@@ -1,7 +1,19 @@
-defmodule Jido.AI.Session do
-  @moduledoc "Request admission and completion through the core Agent and Plugin APIs."
+defmodule Jido.AI.Orchestration do
+  @moduledoc """
+  Live request admission, control, inspection, and completion.
+
+  `Jido.Session` is the portable interaction value. This module manages active
+  work through core Agent and Plugin APIs; it does not define a Session value.
+  `Jido.AI.Orchestration.Coordinator` keeps worker lifetime and ordered commits
+  together. `Jido.AI.Runtime` executes each prepared request.
+
+  Agent topology and child process ownership belong to core Jido. Future
+  delegation must link requests without treating a peer as a supervised child
+  or sharing mutable conversation state. This module does not yet provide a
+  delegation API.
+  """
   alias Jido.AI.Request.{Handle, Stream}
-  alias Jido.AI.Session.Plugin
+  alias Jido.AI.Orchestration.Plugin
 
   @settle "jido.ai.session.settle"
   @cancel "jido.ai.session.cancel"
@@ -39,13 +51,13 @@ defmodule Jido.AI.Session do
   def snapshot(server, opts \\ []) do
     timeout = Keyword.get(opts, :timeout, 5_000)
     snapshot = Jido.AgentServer.snapshot(server, timeout)
-    request = Jido.AI.Session.Inspection.selected(snapshot.agent, opts[:request_id])
+    request = Jido.AI.Orchestration.Inspection.selected(snapshot.agent, opts[:request_id])
 
     if opts[:request_id] && is_nil(request) do
       {:error, :request_not_found}
     else
       live = live_inspection(server, request, timeout)
-      {:ok, Jido.AI.Session.Inspection.snapshot(snapshot, request, live)}
+      {:ok, Jido.AI.Orchestration.Inspection.snapshot(snapshot, request, live)}
     end
   catch
     :exit, {:timeout, _} -> {:error, :timeout}
@@ -109,29 +121,29 @@ defmodule Jido.AI.Session do
   def routes(_) do
     Enum.each(
       [
-        Jido.AI.Session.Settle,
-        Jido.AI.Session.Cancel,
-        Jido.AI.Session.ControlAction,
-        Jido.AI.Session.HistoryAction,
-        Jido.AI.Session.Publish,
-        Jido.AI.Session.IgnoreSignal,
-        Jido.AI.Session.Progress,
+        Jido.AI.Orchestration.Settle,
+        Jido.AI.Orchestration.Cancel,
+        Jido.AI.Orchestration.ControlAction,
+        Jido.AI.Orchestration.HistoryAction,
+        Jido.AI.Orchestration.Publish,
+        Jido.AI.Orchestration.IgnoreSignal,
+        Jido.AI.Orchestration.Progress,
         Plugin
       ],
       &Code.ensure_compiled!/1
     )
 
-    with {:ok, settle} <- Jido.Agent.Authoring.route(@settle, Jido.AI.Session.Settle, []),
-         {:ok, cancel} <- Jido.Agent.Authoring.route(@cancel, Jido.AI.Session.Cancel, []),
-         {:ok, control} <- Jido.Agent.Authoring.route(@control, Jido.AI.Session.ControlAction, []),
-         {:ok, history} <- Jido.Agent.Authoring.route(@history, Jido.AI.Session.HistoryAction, []),
-         {:ok, publish} <- Jido.Agent.Authoring.route(@publish, Jido.AI.Session.Publish, []),
-         {:ok, ignore} <- Jido.Agent.Authoring.route(@ignore, Jido.AI.Session.IgnoreSignal, []),
-         {:ok, progress} <- Jido.Agent.Authoring.route(@progress, Jido.AI.Session.Progress, []),
+    with {:ok, settle} <- Jido.Agent.Authoring.route(@settle, Jido.AI.Orchestration.Settle, []),
+         {:ok, cancel} <- Jido.Agent.Authoring.route(@cancel, Jido.AI.Orchestration.Cancel, []),
+         {:ok, control} <- Jido.Agent.Authoring.route(@control, Jido.AI.Orchestration.ControlAction, []),
+         {:ok, history} <- Jido.Agent.Authoring.route(@history, Jido.AI.Orchestration.HistoryAction, []),
+         {:ok, publish} <- Jido.Agent.Authoring.route(@publish, Jido.AI.Orchestration.Publish, []),
+         {:ok, ignore} <- Jido.Agent.Authoring.route(@ignore, Jido.AI.Orchestration.IgnoreSignal, []),
+         {:ok, progress} <- Jido.Agent.Authoring.route(@progress, Jido.AI.Orchestration.Progress, []),
          {:ok, observations} <-
            Jido.AI.Profile.traverse(
              @observations,
-             &Jido.Agent.Authoring.route(&1, Jido.AI.Session.IgnoreSignal, [])
+             &Jido.Agent.Authoring.route(&1, Jido.AI.Orchestration.IgnoreSignal, [])
            ),
          do: {:ok, [settle, cancel, control, history, publish, ignore, progress] ++ observations}
   end
@@ -276,8 +288,8 @@ defmodule Jido.AI.Session do
 
   @doc false
   def admission_target(profile) do
-    Code.ensure_compiled!(Jido.AI.Session.Start)
-    {:ok, {Jido.AI.Session.Start, %{profile_id: profile.id}}}
+    Code.ensure_compiled!(Jido.AI.Orchestration.Start)
+    {:ok, {Jido.AI.Orchestration.Start, %{profile_id: profile.id}}}
   end
 
   @doc false

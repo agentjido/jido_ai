@@ -1,49 +1,55 @@
-> Seam review entry point. This document is pending approval.
+> Seam review entry point. Pending approval.
 
-# 90 — Migration, delivery, and consumer support
+# 90 — Migration and delivery
 
 ## Briefing
 
-The V3 migration has history records, examples, CLI code, test helpers, and a
-large test baseline. The target is a release gate tied to approved seam
-requirements and one V3 package set. V3 does not preserve V2 source or data
-formats.
+The execution CLI is removed. Install, skill, and quality Mix tasks and consumer test helpers remain. The package is version 2.3.0 using V3 beta Hex dependencies and a pinned ReqLLM Git source. Current guides/examples use V3 authoring. The preceding full verification passed 2,809 tests with one existing exclusion; it is not a complete stable-release rehearsal.
+
+This seam retains the complete target, not only current functionality. Detailed
+current evidence and gaps are in [alignment](alignment.md); proposed contracts
+and stable requirement IDs are in [design](design.md).
 
 ## Why this seam exists
 
-- Owner: Package release, documentation, CLI, and test-support maintainers.
-- Owns: V2 migration notes, package metadata, removals, CLI, test helpers, guides, release checks, and sibling-package verification.
-- Does not own: New production behavior, hidden runtime shims, mixed V2/V3 dependencies, or release before required contracts pass.
+- Owner: Package metadata, guides, examples, public test helpers, Mix tasks, and release evidence.
+- Owns: migration and delivery within [the package architecture](../ARCHITECTURE.md).
+- Does not own: contracts assigned to other seams or private lower-package internals.
 
 ## Current and target state
 
 | Area | Current | Target |
 | --- | --- | --- |
-| Migration | V2 source and V3 migration records coexist | Explicit retain, replace, move, defer, and remove list |
-| Verification | Focused tests pass, but root status is not fully green | Requirement-linked full release matrix |
-| Metadata and docs | Some ownership text is stale | Current package boundary and examples |
+| Architecture | The module and state ownership above is the code baseline | Preserve the complete capability/disposition inventory, migrations, compatibility decisions, deterministic consumer support, and release/security/performance/operational gates. |
+| Evidence | Linked example and boundary tests cover specific cases | Direct requirement-level acceptance, including advanced paths |
+| Compatibility | Current APIs remain authoritative | Explicit migration for approved contract changes |
 
 ## Major gaps and work remaining
 
-| Gap | Why it matters | Required outcome | Owner seam |
+| Gap | Why it matters | Required outcome | Owner |
 | --- | --- | --- | --- |
-| V2 removal list is incomplete | Old paths can remain active | Complete V2 removal inventory | 90 |
-| Release gate is not final | A migration can ship with unknown failures | Exact required suite and package matrix | 90 |
+| [DEL-GAP-001](alignment.md#gap-register) | Current API and feature inventories exist; complete approved V2 disposition and target acceptance coverage remains. | Preserve every capability until disposition is explicit. | 90; dependencies below |
+| [DEL-GAP-002](alignment.md#gap-register) | V3 beta Hex dependencies replace the old sibling-path assumption. Version and package description still need release decisions. | Review source policy, version matrix, and metadata. | 90; dependencies below |
+| [DEL-GAP-003](alignment.md#gap-register) | Full code tests previously passed; documentation generation, packaging, security, load, and release rehearsal are separate gates. | Keep a complete release evidence ledger. | 90; dependencies below |
+| [DEL-GAP-005](alignment.md#gap-register) | The execution CLI is removed while DEL-REQ-025/026 and DEL-DEC-003 describe a CLI target. | Retain the proposal for explicit disposition; do not restore a CLI from docs alone. | 90; dependencies below |
+| [DEL-GAP-006](alignment.md#gap-register) | A complete approved performance/security/operational readiness package is not established by unit tests. | Retain budgets, threat checks, load tests, and rollback gates. | 90; dependencies below |
+| [DEL-GAP-007](alignment.md#gap-register) | Local verification is not a clean multi-package release rehearsal. | Keep dependency-order release verification and external package ownership explicit. | 90; dependencies below |
 
 ## Decisions requested
 
-1. **V2 removal:** Remove source and data compatibility paths.
-   Effect: V3 has one contract.
-2. **Release gate:** Require all approved seam acceptance tests and the compatible V3 package matrix to pass.
-   Effect: The release result is measurable.
+Reconcile old CLI and reduced-method release recommendations explicitly. Separate current tested functionality from an approved stable release surface.
+
+The [target design decisions](design.md#open-design-decisions) remain pending.
+No advanced capability is removed by this reconciliation.
 
 ## Dependencies
 
-- Prerequisites: All approved production seams.
+- Prerequisites: [12 Observation and diagnostics](../12_observation_diagnostics/alignment.md).
 - Dependents: None.
-- Blockers: CLI scope, checkpoint status, and full-suite gate.
+- Blockers: unresolved target and prerequisite decisions. Current implementation can be inspected without treating proposed contracts as approved.
 
 ## Documents
 
 - [Target design](design.md).
-- [Alignment plan](alignment.md).
+- [Current evidence and alignment](alignment.md).
+- [Overall architecture](../ARCHITECTURE.md).

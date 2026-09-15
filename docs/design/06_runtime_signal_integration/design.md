@@ -2,6 +2,32 @@
 
 # Core runtime and Signal integration design
 
+## Architecture and contract status
+
+- Architecture category: [Core runtime and Signal integration](../ARCHITECTURE.md).
+- Owning subsystem: Runtime.Plugin and Orchestration.Plugin Agent/AgentServer facets, route/directive adapters, and typed Signal data.
+- Complete target: Use only public core Plugin, Agent, Flow, and Signal contracts. Preserve route validation, trusted runtime binding, post-commit work, event transport, and topology integration.
+- Decision boundary: Review delivery defaults and callback purity against current core contracts. AI delegation must not introduce a second topology owner.
+- Current implementation, module links, example proof, and exact differences:
+  [alignment](alignment.md). This design is a target, not an API reference.
+
+The requirements and proposed signatures below remain pending approval.
+Illustrative types are not evidence that a module or function exists. A
+requirement is not removed merely because the current implementation differs.
+Use the alignment matrix to distinguish current behavior from the full target.
+
+## Selected AI runtime resource ownership
+
+Use one supervised AI resource owner per AgentServer through the existing
+core Plugin runtime child contract. Selected bindings enter core Plugin runtime
+context once before execution and pass explicitly to workers. Request workers
+use the selected Jido Task Supervisor. Orchestration.Coordinator retains
+cancellation, completion, and ordered commit responsibilities.
+
+See [Session activation scope](../09_skills_resources/design.md#selected-resource-and-activation-ownership).
+No new supervisor framework or core topology ownership is introduced. Exact
+resource-owner module placement and restart activation policy remain open.
+
 ## Scope and owner
 
 - Owner: Jido AI Agent extension, runtime Plugin, session Plugin integration, route targets, AI Directives, and typed AI Signal definitions.
@@ -40,7 +66,7 @@ For Turn mode, a query route targets the generated AI Flow directly. For session
 
 `Jido.AI.Runtime.Plugin` owns one portable AI configuration state key and pure command preparation. It resolves effective profiles from declared profiles plus approved portable overrides. It binds trusted request resources into Turn context. It does not need a child process for normal Turn mode.
 
-`Jido.AI.Session.Plugin` owns one portable `:requests` state key and one optional runtime root. The runtime root owns live session tasks, Exec handles, stream sinks, control queues, and transient delivery state. These values never enter Agent state.
+`Jido.AI.Orchestration.Plugin` owns one portable `:requests` state key and one optional runtime root. The runtime root owns live session tasks, Exec handles, stream sinks, control queues, and transient delivery state. These values never enter Agent state.
 
 Capability Plugins from seam 08 each own their documented state key and optional runtime root.
 
@@ -163,7 +189,7 @@ Recommended Plugin ownership:
 | Plugin | Portable state key | Runtime root |
 | --- | --- | --- |
 | `Jido.AI.Runtime.Plugin` | `:ai_config` | None by default |
-| `Jido.AI.Session.Plugin` | `:requests` | Yes for session profiles |
+| `Jido.AI.Orchestration.Plugin` | `:requests` | Yes for session profiles |
 | Capability Plugin | One declared capability key or none | Only when the capability needs live state |
 
 Recommended public event types:

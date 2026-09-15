@@ -44,7 +44,7 @@ defmodule JidoTest.AI.RequestTest do
 
     def handle_call(:agent, _from, state), do: {:reply, agent(), state}
 
-    def handle_call({:plugin_state, Jido.AI.Session.Plugin}, _from, state) do
+    def handle_call({:plugin_state, Jido.AI.Orchestration.Plugin}, _from, state) do
       if state.await_delay_ms > 0, do: Process.sleep(state.await_delay_ms)
       {:ok, record} = state.await_result
       {:reply, {:ok, %{state.request_id => record}}, state}
@@ -64,7 +64,7 @@ defmodule JidoTest.AI.RequestTest do
         name: "request_transport_fixture",
         schema: Zoi.object(%{}),
         state: %{requests: %{}},
-        plugins: [{Jido.AI.Session.Plugin, []}]
+        plugins: [{Jido.AI.Orchestration.Plugin, []}]
       }
     end
   end

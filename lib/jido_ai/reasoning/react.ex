@@ -1,6 +1,6 @@
 defmodule Jido.AI.Reasoning.ReAct do
   @moduledoc """
-  Public API for standalone ReAct execution through a v3 Agent and Session.
+  Public API for standalone ReAct execution through a V3 Agent and Orchestration.
 
   This module provides streaming execution for actions and strategies. Native
   checkpoints can resume after a model response or a complete tool round.
@@ -150,7 +150,7 @@ defmodule Jido.AI.Reasoning.ReAct do
   @spec steer(GenServer.server(), String.t(), keyword()) ::
           {:ok, Jido.Agent.t()} | {:error, term()}
   def steer(agent_server, content, opts \\ []) when is_binary(content) and is_list(opts) do
-    Jido.AI.Session.control_agent(agent_server, content, :steer, opts)
+    Jido.AI.Orchestration.control_agent(agent_server, content, :steer, opts)
   end
 
   @doc """
@@ -162,7 +162,7 @@ defmodule Jido.AI.Reasoning.ReAct do
   @spec inject(GenServer.server(), String.t(), keyword()) ::
           {:ok, Jido.Agent.t()} | {:error, term()}
   def inject(agent_server, content, opts \\ []) when is_binary(content) and is_list(opts) do
-    Jido.AI.Session.control_agent(agent_server, content, :inject, opts)
+    Jido.AI.Orchestration.control_agent(agent_server, content, :inject, opts)
   end
 
   @doc """

@@ -1,6 +1,80 @@
 > Target seam design. This document is pending approval.
 
-# AI checkpoints and resume design
+# Checkpoints and resume design
+
+## Architecture and contract status
+
+- Architecture category: [Checkpoints and resume](../ARCHITECTURE.md).
+- Owning subsystem: Runtime.Checkpoint, standalone ReAct Checkpoint/State/Token, and Orchestration recovery integration.
+- Complete target: Preserve advanced atomic resource restoration, linked resume identity, no-repeat completed work, bounded codecs, and uncertain-effect decisions. Storage and durable deduplication services remain host concerns.
+- Decision boundary: Decide new-run lineage, effect identity, and atomic binding restoration without assuming exactly-once effects or extending resume to all methods automatically.
+- Current implementation, module links, example proof, and exact differences:
+  [alignment](alignment.md). This design is a target, not an API reference.
+
+The requirements and proposed signatures below remain pending approval.
+Illustrative types are not evidence that a module or function exists. A
+requirement is not removed merely because the current implementation differs.
+Use the alignment matrix to distinguish current behavior from the full target.
+
+## Proposed batch and boundary recovery contract
+
+The [private request boundary](../07_request_sessions/design.md#proposed-data-boundary)
+separates receipt, commit, and checkpoint acknowledgment. Stable batch and
+entry IDs can link commits, snapshots, and recovery, but do not prove durable
+deduplication or exactly-once behavior. An unknown commit result is not
+permission to retry.
+
+Runtime identifies safe positions; Orchestration coordinates checkpoint
+handling and request lifetime; core owns validation and commit. Durable
+storage remains host-owned. Sharing pending-input and checkpoint control at
+safe positions remains a proposal. Recovery lookup, duplicate handling,
+snapshot/batch consistency, and durability evidence need explicit contracts.
+Preserve standalone ReAct token behavior and retained advanced recovery work.
+
+## Recovery versus completed conversation
+
+Under the [selected commit policy](../07_request_sessions/design.md#selected-conversation-commit-policy),
+active, failed, or cancelled work can remain recovery evidence without
+advancing the completed conversation. Resume evidence and default model input
+are different views of the same canonical log. Recovery does not imply
+successful settlement. Exact snapshot/promotion references remain open.
+
+## Selected attempt and retry policy
+
+The [request identity decision](../07_request_sessions/design.md#selected-request-and-attempt-meanings)
+separates logical requests from execution attempts. The former requirement for
+a new run_id is replaced by a new attempt identity; current ReAct run_id can
+remain an adapter value. Exact representation and migration remain open.
+
+`RES-REQ-030`: When execution restarts or resumes, Orchestration shall retain the logical request ID and assign a new execution attempt ID.
+
+`RES-REQ-031`: Orchestration shall preserve prior execution attempt outcomes.
+
+`RES-REQ-032`: If an external effect is uncertain, then the retry or resume owner shall block automatic repetition until evidence proves no effect occurred, a supported deduplication guarantee makes retry safe, or the caller explicitly authorizes repetition.
+
+Cancellation is not proof of effect termination. An uncertain core commit
+remains subject to the existing no-retry rule; external-effect permission does
+not imply permission to repeat an unknown Agent commit. Preserve native ReqLLM,
+canonical Session/Thread, all methods, and advanced recovery capabilities.
+No new structs or named-document approval are selected.
+
+## Content permission constraint
+
+Apply the [selected content permissions](../12_observation_diagnostics/design.md#selected-content-permissions).
+Retained evidence does not authorize rich-content or reasoning storage.
+Storage needs its own permission; stream permission is insufficient. Preserve
+permitted identity, ordering, outcomes, and bounded metadata without forbidden
+payloads. Redacted data does not imply sufficient recovery input; resolve that
+case explicitly rather than reconstructing missing content. Native ReqLLM
+execution data remains unchanged.
+
+## Unresolved Session activation restart policy
+
+[Session-scoped activation](../09_skills_resources/design.md#selected-resource-and-activation-ownership)
+survives ordinary request completion, cancellation, and worker failure.
+Survival across AgentServer/resource-owner restart is not decided. Do not
+assume activation restoration or clearing from the retained checkpoint targets.
+The preliminary rebuild-and-clear proposal is not an approved recovery policy.
 
 ## Scope and owner
 
@@ -41,7 +115,7 @@ An optional AI execution checkpoint is portable method progress:
   request_id: String.t(),
   run_id: String.t(),
   phase: atom(),
-  context: Jido.AI.Context.t(),
+  context: Jido.Session.t(),
   method_state: map(),
   result_state: map(),
   completed_calls: [map()],
@@ -104,7 +178,7 @@ Completed external effects have at-least-once uncertainty. If an external effect
 
 `RES-REQ-016`: Resume shall validate Agent identity, Agent version, AI checkpoint version, profile ID, method compatibility, skill versions, registry references, and remaining limits before work starts.
 
-`RES-REQ-017`: Resume shall retain the logical request ID or create a related request ID according to policy and shall always create a new run ID.
+`RES-REQ-017`: Resume shall retain the logical request ID and create a new execution attempt ID.
 
 `RES-REQ-018`: Resume shall create a new canonical Flow execution and shall not reconstruct a live Exec or Runic state.
 
@@ -112,7 +186,7 @@ Completed external effects have at-least-once uncertainty. If an external effect
 
 `RES-REQ-020`: If a required prior result is absent or incompatible, resume shall fail or restart from an explicitly approved safe phase; it shall not guess.
 
-`RES-REQ-021`: Resume shall report the original run ID, new run ID, resumed phase, skipped completed work, and delivery-risk metadata.
+`RES-REQ-021`: Resume shall report the previous and new execution attempt IDs, resumed phase, skipped completed work, and delivery-risk metadata.
 
 ### Delivery and idempotency
 

@@ -1,14 +1,14 @@
-defmodule Jido.AI.Session.Plugin.Agent do
+defmodule Jido.AI.Orchestration.Plugin.Agent do
   @moduledoc false
   use Jido.Agent.Plugin
 
-  alias Jido.AI.Session.{Change, Plugin}
+  alias Jido.AI.Orchestration.{Change, Plugin}
 
   @impl Jido.Agent.Plugin
-  def state_spec(_opts), do: {:requests, Jido.AI.Session.Record.records_schema()}
+  def state_spec(_opts), do: {:requests, Jido.AI.Orchestration.Record.records_schema()}
 
   @impl Jido.Agent.Plugin
-  def directives(_opts), do: [Change, Jido.AI.Session.DeliveryReceipt]
+  def directives(_opts), do: [Change, Jido.AI.Orchestration.DeliveryReceipt]
 
   @impl Jido.Agent.Plugin
   def prepare(preparation, _opts),

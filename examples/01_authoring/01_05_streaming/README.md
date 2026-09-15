@@ -6,7 +6,7 @@ Observe text while an AI request runs, and cancel it through the public session 
 
 Read [the Agent](agent.ex), then the tests. `Agent.ask_stream/3` returns the
 request handle and event stream. Use `Jido.AI.Request.await/2` for the final
-result and `Jido.AI.Session.cancel/2` to cancel owned work.
+result and `Jido.AI.Orchestration.cancel/2` to cancel owned work.
 
 ## Run it
 

@@ -5,7 +5,7 @@ defmodule Jido.AI.Runtime.Binding do
     with {:ok, router} <- Jido.Signal.Router.new(routes),
          {:ok, [{target, %{profile_id: id} = defaults}]} <-
            Jido.Signal.Router.route(router, signal),
-         true <- target in [Jido.AI.Runtime.Run, Jido.AI.Session.Start] do
+         true <- target in [Jido.AI.Runtime.Run, Jido.AI.Orchestration.Start] do
       %{
         id: id,
         mode: if(target == Jido.AI.Runtime.Run, do: :turn, else: :session),

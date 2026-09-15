@@ -2,6 +2,33 @@
 
 # Package boundary and invariants design
 
+## Architecture and contract status
+
+- Architecture category: [Package boundary and invariants](../ARCHITECTURE.md).
+- Owning subsystem: Jido.AI package boundary; core Jido, jido_action, jido_signal, and host interfaces.
+- Complete target: Preserve the complete AI capability set above public lower-package contracts. Separate in-memory coordination from host-owned durability and external-effect guarantees.
+- Decision boundary: Confirm the retry-delay boundary and the external-effect contract before changing execution mechanics. Release metadata is separate delivery work.
+- Current implementation, module links, example proof, and exact differences:
+  [alignment](alignment.md). This design is a target, not an API reference.
+
+The requirements and proposed signatures below remain pending approval.
+Illustrative types are not evidence that a module or function exists. A
+requirement is not removed merely because the current implementation differs.
+Use the alignment matrix to distinguish current behavior from the full target.
+
+## Selected direction: data-focused foundation
+
+User direction recorded on 2026-09-15: validated data, stable identity, explicit
+order, and explicit state changes form the foundation. Processes and adapters
+apply those contracts. This does not approve any named document.
+
+Preserve all advanced capabilities, all eight reasoning methods, canonical
+Session/Thread/Entry in this package, Agent + DSL + Profile, native ReqLLM
+contracts, and core Jido topology, validation, and commit ownership.
+The [request boundary proposal](../07_request_sessions/design.md#proposed-data-boundary)
+applies this direction without a new generic framework, public execution
+model, duplicate conversation store, or event store.
+
 ## Scope and owner
 
 - Owner: Jido AI maintainers. Shared package boundaries require review from the owner of the affected package.

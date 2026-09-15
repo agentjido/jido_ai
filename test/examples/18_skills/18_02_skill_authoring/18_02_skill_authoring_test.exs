@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.SkillAuthoringTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Authoring, Profile, Request, Session}
+  alias Jido.AI.{Authoring, Profile, Request, Orchestration}
   alias Jido.AI.Skill.{Registry, Spec}
   alias JidoAI.Examples.SkillAuthoring.{Echo, Public, Review, Trust}
   alias JidoAI.Examples.SkillRuntime.Provider
@@ -89,7 +89,7 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
     calls = [load(), %{id: "echo", name: "skill_echo", arguments: %{text: "Checked"}}]
     {mock, context} = mock([%{reply: {:tools, calls}}, %{reply: {:text, "Done"}}])
     server = start_agent(jido, Public.new!())
-    assert {:ok, %{specs: [loaded], index: index}} = Session.skill_catalog(server)
+    assert {:ok, %{specs: [loaded], index: index}} = Orchestration.skill_catalog(server)
     assert loaded.source == {:module, Review}
     assert loaded.metadata == %{owner: :native_module}
     assert index =~ "review"
@@ -120,7 +120,7 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
     {mock, context} = mock([%{reply: {:tools, [load()]}}, %{reply: {:text, "Done"}}])
     server = start_agent(jido, Public.new!())
     assert {:ok, "Done"} = request(server, context)
-    assert {:ok, %{specs: [%{name: "review"}]}} = Session.skill_catalog(server)
+    assert {:ok, %{specs: [%{name: "review"}]}} = Orchestration.skill_catalog(server)
     assert text(List.last(MockLLM.report(mock).requests)) =~ "Module review instructions"
     assert_script_done(mock)
   end
@@ -164,7 +164,7 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
       assert definition == direct
       server = start_agent(jido, Jido.Agent.instantiate!(definition))
       assert {:ok, "Done"} = request(server, context)
-      assert {:ok, %{index: index}} = Session.skill_catalog(server)
+      assert {:ok, %{index: index}} = Orchestration.skill_catalog(server)
       assert index =~ "review"
     end
 
@@ -215,7 +215,7 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
     server = File.cd!(runtime, fn -> start_agent(jido, agent) end)
 
     assert {:ok, %{specs: [%{name: "runtime-only"}], index: index}} =
-             Session.skill_catalog(server)
+             Orchestration.skill_catalog(server)
 
     refute index =~ "Build body"
 
@@ -237,7 +237,7 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
     test "disabled source #{inspect(disabled)} adds no tools or index", %{jido: jido} do
       {mock, context} = mock([%{reply: {:text, "Done"}}])
       server = start(jido, unquote(Macro.escape(disabled)))
-      assert {:error, :automatic_skills_disabled} = Session.skill_catalog(server)
+      assert {:error, :automatic_skills_disabled} = Orchestration.skill_catalog(server)
       assert {:ok, "Done"} = request(server, context)
       assert [wire] = MockLLM.report(mock).requests
       assert names(wire) == []
@@ -252,7 +252,7 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
     Registry.register(spec("global", "Global body"))
     {mock, context} = mock([%{reply: {:text, "Done"}}])
     server = start(jido, %{paths: []})
-    assert {:ok, %{specs: [], index: ""}} = Session.skill_catalog(server)
+    assert {:ok, %{specs: [], index: ""}} = Orchestration.skill_catalog(server)
     assert {:ok, "Done"} = request(server, context)
     assert [wire] = MockLLM.report(mock).requests
     assert names(wire) == []
@@ -328,7 +328,7 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
     source = %{paths: [tmp], trust: {Trust, :allow, [Path.basename(tmp)]}}
     {mock, context} = mock([%{reply: {:text, "Done"}}])
     server = start(jido, source)
-    assert {:ok, %{specs: [%{name: "review"}]}} = Session.skill_catalog(server)
+    assert {:ok, %{specs: [%{name: "review"}]}} = Orchestration.skill_catalog(server)
     assert {:ok, "Done"} = request(server, context)
     assert_script_done(mock)
   end
@@ -358,7 +358,7 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
              )
   end
 
-  test "automatic skills reject pure Session admission without a live owner" do
+  test "automatic skills reject pure Orchestration admission without a live owner" do
     agent = Jido.Agent.instantiate!(definition(%{specs: [spec()]}))
 
     assert {:error, _} =
@@ -500,12 +500,12 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
     assert {:ok, "Second"} = request(server, context, signal_type: "review.ask")
 
     assert {:ok, %{specs: [%{body_ref: {:inline, "Assistant instructions"}}]}} =
-             Session.skill_catalog(server)
+             Orchestration.skill_catalog(server)
 
     assert {:ok, %{specs: [%{body_ref: {:inline, "Reviewer instructions"}}]}} =
-             Session.skill_catalog(server, :review)
+             Orchestration.skill_catalog(server, :review)
 
-    assert {:error, _} = Session.skill_catalog(server, :missing)
+    assert {:error, _} = Orchestration.skill_catalog(server, :missing)
     [_, first_wire, _, second_wire] = MockLLM.report(mock).requests
     assert text(first_wire) =~ "Assistant instructions"
     refute text(first_wire) =~ "Reviewer instructions"
@@ -544,7 +544,7 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
       )
       |> then(&start_agent(jido, &1))
 
-    assert {:ok, %{index: index}} = Session.skill_catalog(restored)
+    assert {:ok, %{index: index}} = Orchestration.skill_catalog(restored)
     assert index =~ "New description."
     assert {:ok, "Second"} = request(restored, context)
     assert text(List.last(MockLLM.report(mock).requests)) =~ "New instructions"
@@ -583,7 +583,7 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
     write_skill(tmp, "review", "File instructions")
     {mock, context} = mock([%{reply: {:tools, [load()]}}, %{reply: {:text, "Done"}}])
     server = start(jido, %{paths: [tmp], trust: true, specs: [spec()], modules: [Review]})
-    assert {:ok, %{specs: [chosen], diagnostics: diagnostics}} = Session.skill_catalog(server)
+    assert {:ok, %{specs: [chosen], diagnostics: diagnostics}} = Orchestration.skill_catalog(server)
     assert chosen.body_ref == {:inline, "Runtime instructions"}
     assert Enum.count(diagnostics.warnings, &(&1.type == :shadowed_skill)) == 2
     assert {:ok, "Done"} = request(server, context)

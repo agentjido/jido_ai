@@ -1,6 +1,6 @@
 defmodule Jido.AI.Request do
   @moduledoc """
-  Session request handles, correlation, waiting, and streaming.
+  AI request handles, correlation, waiting, and streaming.
 
   ## Pattern
 
@@ -225,7 +225,7 @@ defmodule Jido.AI.Request do
           do: %{signal | data: Map.put(signal.data, :run_id, opts[:run_id])},
           else: signal
 
-      Jido.AI.Session.submit(server, signal, stream_to, opts)
+      Jido.AI.Orchestration.submit(server, signal, stream_to, opts)
     end
   end
 
@@ -289,7 +289,7 @@ defmodule Jido.AI.Request do
   def await(%Handle{id: request_id, server: server}, opts \\ []) do
     timeout = Keyword.get(opts, :timeout, @default_timeout)
 
-    Jido.AI.Session.await(server, request_id, timeout)
+    Jido.AI.Orchestration.await(server, request_id, timeout)
     |> normalize_await_result()
   end
 

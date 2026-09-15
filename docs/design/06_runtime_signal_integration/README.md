@@ -1,46 +1,53 @@
-> Seam review entry point. This document is pending approval.
+> Seam review entry point. Pending approval.
 
 # 06 — Core runtime and Signal integration
 
 ## Briefing
 
-Jido AI now uses core Agent, Plugin, Directive, Flow, Exec, and Signal contracts in its main V3 path. The target is a thin integration layer that never uses private runtime state or duplicates Signal transport. The main change is to define exact AI route, Plugin state, candidate, Directive, runtime binding, and typed Signal contracts.
+Runtime and Orchestration Plugins use separate core Agent and AgentServer facets. Orchestration owns AI request coordination above core commit. Canonical Session/Thread values are local to jido_ai. Signal types and existing internal wire names were preserved during the module rename.
+
+This seam retains the complete target, not only current functionality. Detailed
+current evidence and gaps are in [alignment](alignment.md); proposed contracts
+and stable requirement IDs are in [design](design.md).
 
 ## Why this seam exists
 
-- Owner: Jido AI integration modules, with core Jido and Signal contract review.
-- Owns: AI route targets, Plugin state, admission data, candidate data, AI Directives, runtime bindings, and typed AI Signal data.
-- Does not own: AgentServer internals, commit, PID identity, Signal envelopes, routing, dispatch, or the bus.
+- Owner: Runtime.Plugin and Orchestration.Plugin Agent/AgentServer facets, route/directive adapters, and typed Signal data.
+- Owns: core runtime and signal integration within [the package architecture](../ARCHITECTURE.md).
+- Does not own: contracts assigned to other seams or private lower-package internals.
 
 ## Current and target state
 
 | Area | Current | Target |
 | --- | --- | --- |
-| Agent integration | Authoring lowers to core Agents and Flows | All paths use the same public Turn and Plugin rules |
-| Runtime resources | Runtime binding exists | No resource handle enters portable state |
-| Signals | Typed AI Signal modules exist | AI owns data; `jido_signal` owns transport |
+| Architecture | The module and state ownership above is the code baseline | Use only public core Plugin, Agent, Flow, and Signal contracts. Preserve route validation, trusted runtime binding, post-commit work, event transport, and topology integration. |
+| Evidence | Linked example and boundary tests cover specific cases | Direct requirement-level acceptance, including advanced paths |
+| Compatibility | Current APIs remain authoritative | Explicit migration for approved contract changes |
 
 ## Major gaps and work remaining
 
-| Gap | Why it matters | Required outcome | Owner seam |
+| Gap | Why it matters | Required outcome | Owner |
 | --- | --- | --- | --- |
-| Event and command roles are not final | Signals can become a second control protocol | Clear route and event contracts | 06 and 12 |
-| Post-commit path choices are not final | Effects can run at the wrong time | Directive and Plugin callback rules | 06 |
+| [INT-GAP-001](alignment.md#gap-register) | Core route validation and boundary tests are present; complete route reachability/collision proof is not inferred. | Review INT-REQ-006 and facet ownership. | 06; dependencies below |
+| [INT-GAP-002](alignment.md#gap-register) | Static authoring and runtime binding are separated. Every optional Plugin callback still needs a purity audit for the full target. | Keep runtime services out of static preparation. | 06; dependencies below |
+| [INT-GAP-004](alignment.md#gap-register) | Typed Signal modules exist; complete field-by-field correlation across all events remains a separate matrix. | Align with seam 12. | 06; dependencies below |
+| [INT-GAP-005](alignment.md#gap-register) | Current delivery behavior must be compared with the no-hidden-self-routing proposal, not changed by documentation. | Review explicit dispatcher and loop-prevention cases. | 06; dependencies below |
 
 ## Decisions requested
 
-1. **Signal roles:** Approve typed AI Signals as event data and explicit routed request input only.
-   Effect: Event transport cannot bypass request admission.
-2. **Runtime handles:** Approve a strict no-portable-handle invariant.
-   Effect: Agents and checkpoints remain serializable.
+Review delivery defaults and callback purity against current core contracts. AI delegation must not introduce a second topology owner.
+
+The [target design decisions](design.md#open-design-decisions) remain pending.
+No advanced capability is removed by this reconciliation.
 
 ## Dependencies
 
-- Prerequisites: 00, 01, and 04; public contracts from `jido` and `jido_signal`.
-- Dependents: 07, 08, 09, 10, 11, and 12.
-- Blockers: AI event role and post-commit effect decisions.
+- Prerequisites: [00 Package boundary and invariants](../00_boundary_invariants/alignment.md), [01 Canonical interaction and AI values](../01_ai_values/alignment.md), [04 Shared AI execution](../04_ai_execution/alignment.md).
+- Dependents: 07, 09.
+- Blockers: unresolved target and prerequisite decisions. Current implementation can be inspected without treating proposed contracts as approved.
 
 ## Documents
 
 - [Target design](design.md).
-- [Alignment plan](alignment.md).
+- [Current evidence and alignment](alignment.md).
+- [Overall architecture](../ARCHITECTURE.md).

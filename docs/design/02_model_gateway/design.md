@@ -1,6 +1,40 @@
 > Target seam design. This document is pending approval.
 
-# Model gateway and request preparation design
+# Model integration and request preparation design
+
+## Architecture and contract status
+
+- Architecture category: [Model integration and request preparation](../ARCHITECTURE.md).
+- Owning subsystem: Models and Model.Transport, Model.Options, Model.Messages, Model.Generate; routing policy is in seam 08.
+- Complete target: Keep trusted provider binding, deterministic option precedence, bounded streaming and repair, and advanced named request-transform stages. Do not assume a new ModelRef wrapper is needed to achieve these capabilities.
+- Decision boundary: Separate native direct-call APIs from portable stored data. Resolve transform stages and callback views without introducing a second provider facade.
+- Current implementation, module links, example proof, and exact differences:
+  [alignment](alignment.md). This design is a target, not an API reference.
+
+The requirements and proposed signatures below remain pending approval.
+Illustrative types are not evidence that a module or function exists. A
+requirement is not removed merely because the current implementation differs.
+Use the alignment matrix to distinguish current behavior from the full target.
+
+## Selected transformer direction
+
+Under [EXE-DEC-005](../04_ai_execution/design.md#selected-direction-complete-the-runtime-split),
+request transformers receive a prepared request, a small common execution view,
+and the Profile instead of shared ReAct Config/State views. Native ReqLLM
+contracts remain unchanged. Exact callback compatibility and common-view
+fields remain open. Named stages and illustrative signatures below remain
+proposals, not a selected replacement API. Document approval remains pending.
+
+## Selected explicit binding direction
+
+Production execution uses explicit resource bindings from the Agent runtime,
+not process dictionaries or $callers lookup. Short MockLLM helpers supply
+explicit request call options before process boundaries, through the same
+execution path. Preserve native ReqLLM contracts and standalone ReAct.
+
+See [runtime ownership](../06_runtime_signal_integration/design.md#selected-ai-runtime-resource-ownership).
+This selects the binding direction, not a new provider facade or test-only
+execution engine.
 
 ## Scope and owner
 

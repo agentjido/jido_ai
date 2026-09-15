@@ -14,7 +14,7 @@ defmodule Jido.AI do
   - `Jido.AI.Request` provides handles for individual requests.
   - `Jido.Session` owns one `Jido.Thread` of `Jido.Thread.Entry` values.
     These values belong to this package. They do not own processes.
-  - `Jido.AI.Session` is the live request-control API, not a second Session value.
+  - `Jido.AI.Orchestration` is the live request-control API, not a second Session value.
   - `Jido.AI.Tools.Executor` executes tools. `Jido.AI.Turn` only represents
     responses and projects messages.
 
@@ -22,14 +22,14 @@ defmodule Jido.AI do
 
   ```text
   agent/ + dsl/       authoring and lowering through Profile
-  session/           admission, worker lifetime, commit, delivery
+  orchestration/     admission, worker lifetime, commit, delivery
   runtime/           temporary execution state and shared reasoning Flow
   thread/            AI entry projection and conversation controls
   model/             provider transport, options, and message adaptation
   tools/             shared tool execution through core Exec
   ```
 
-  Runtime and Session Plugins install core integration. A Plugin is an
+  Runtime and Orchestration Plugins install core integration. A Plugin is an
   implementation mechanism; it does not necessarily mean an optional feature.
 
   ## Optional capabilities
@@ -147,7 +147,7 @@ defmodule Jido.AI do
           {:ok, Jido.Agent.t()} | {:error, term()}
   def steer(server, content, opts \\ []) when is_binary(content),
     do:
-      Jido.AI.Session.control_agent(
+      Jido.AI.Orchestration.control_agent(
         server,
         content,
         :steer,
@@ -159,7 +159,7 @@ defmodule Jido.AI do
           {:ok, Jido.Agent.t()} | {:error, term()}
   def inject(server, content, opts \\ []) when is_binary(content),
     do:
-      Jido.AI.Session.control_agent(
+      Jido.AI.Orchestration.control_agent(
         server,
         content,
         :inject,

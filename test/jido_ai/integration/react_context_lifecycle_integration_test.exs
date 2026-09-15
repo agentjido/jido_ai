@@ -2,7 +2,7 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
   use ExUnit.Case, async: false
   use Mimic
 
-  alias Jido.AI.{Configuration, Profile, Session}
+  alias Jido.AI.{Configuration, Profile, Orchestration}
   alias Jido.Thread
   alias Jido.AI.TestSupport.StreamResponseFactory
 
@@ -115,7 +115,7 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
         [ReqLLM.Context.user("Reset seed")]
       )
 
-    # Reset context through the Session context command.
+    # Reset context through the Orchestration context command.
     reset_signal =
       Jido.Signal.new!(
         "jido.ai.context.modify",
@@ -137,7 +137,10 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
     state_after_reset = conversation(pid)
     assert hd(state_after_reset) == %{role: :system, content: "Reset prompt"}
     assert {:ok, %Profile{instructions: "Reset prompt"} = profile} = Configuration.profile(fetch_agent(pid))
-    assert {:ok, [%{role: :user, content: seed}]} = Jido.AI.Session.Transcript.read(fetch_agent(pid).state, profile)
+
+    assert {:ok, [%{role: :user, content: seed}]} =
+             Jido.AI.Orchestration.Transcript.read(fetch_agent(pid).state, profile)
+
     assert Jido.AI.Query.summarize(seed) == "Reset seed"
     assert non_system_messages(state_after_reset) == [%{role: :user, content: "Reset seed"}]
 
@@ -180,7 +183,7 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
   end
 
   defp conversation(pid) do
-    assert {:ok, view} = Session.snapshot(pid)
+    assert {:ok, view} = Orchestration.snapshot(pid)
     view.details.conversation
   end
 

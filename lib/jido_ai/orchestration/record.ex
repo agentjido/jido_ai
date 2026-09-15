@@ -1,4 +1,4 @@
-defmodule Jido.AI.Session.Record do
+defmodule Jido.AI.Orchestration.Record do
   @moduledoc false
   @schema Zoi.object(
             %{

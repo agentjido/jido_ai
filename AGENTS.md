@@ -32,15 +32,15 @@ for verified results and the remaining repairs.
 - `Authoring` lowers validated Profiles into core Agents and Flows. Profile
   owns defaults, policy validation, schemas, and validation errors. Its internal
   `Profile.References` module resolves explicit registry references without execution.
-- Request, Session, and runtime Plugins manage execution. Session inspection
-  reads the selected Profile and committed History. The root strategy inspection
+- Request, Orchestration, and runtime Plugins manage execution. Orchestration inspection
+  reads the selected Profile and committed Thread entries. The root strategy inspection
   helpers and execution CLI are removed.
 - Keep all eight reasoning methods and the standalone ReAct API.
 - `Jido.AI.Actions.*`: reusable runtime actions for chat/tool/structured flows
 - ReqLLM integration for provider abstraction and model routing
 - Policy/observability modules for retries, quotas, telemetry, and traceability
 - `jido_ai` owns `Jido.Session`, `Jido.Thread`, and `Jido.Thread.Entry`, despite
-  their `Jido.*` module names. Keep them in this package. Keep Session.Runtime's
+  their `Jido.*` module names. Keep them in this package. Keep Orchestration.Coordinator's
   process and commit responsibilities together.
 
 ## Standards

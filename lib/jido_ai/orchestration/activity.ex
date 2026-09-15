@@ -1,4 +1,4 @@
-defmodule Jido.AI.Session.Activity do
+defmodule Jido.AI.Orchestration.Activity do
   @moduledoc false
   # The session event owner owns these timers. References never enter Agent state.
 

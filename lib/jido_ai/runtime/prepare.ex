@@ -15,7 +15,7 @@ defmodule Jido.AI.Runtime.Prepare do
          {:ok, profile} <- Jido.AI.ModelRouter.select(profile, %{query: query}, context),
          {:ok, profile, adaptive} <- Jido.AI.Reasoning.select(profile, query),
          {:ok, output} <- Profile.output_contract(profile.result),
-         {:ok, history} <- Jido.AI.Session.Transcript.read(context.agent_state, profile),
+         {:ok, history} <- Jido.AI.Orchestration.Transcript.read(context.agent_state, profile),
          {:ok, history_messages} <- Jido.AI.Model.Messages.messages(history) do
       entry = profile.models[profile.reasoning.model]
       model = Models.resolve(entry.model)
@@ -40,14 +40,14 @@ defmodule Jido.AI.Runtime.Prepare do
           [
             Jido.AI.Model.Messages.put_refs(
               ReqLLM.Context.user(Jido.AI.Reasoning.query(profile, query)),
-              Jido.AI.Session.Transcript.request_refs(context)
+              Jido.AI.Orchestration.Transcript.request_refs(context)
             )
           ]
 
       refs =
         case context[:jido_ai_request_record] do
           nil -> %{}
-          record -> Jido.AI.Session.Transcript.refs(record, context.jido_ai_input_source)
+          record -> Jido.AI.Orchestration.Transcript.refs(record, context.jido_ai_input_source)
         end
 
       state = %{
@@ -58,7 +58,7 @@ defmodule Jido.AI.Runtime.Prepare do
         messages: ReqLLM.Context.new(messages),
         output: output,
         deadline: deadline,
-        history_delta: Jido.AI.Session.Transcript.query(query, refs)
+        history_delta: Jido.AI.Orchestration.Transcript.query(query, refs)
       }
 
       state = if adaptive, do: Map.put(state, :adaptive, adaptive), else: state
@@ -67,7 +67,7 @@ defmodule Jido.AI.Runtime.Prepare do
            {:ok, state} <- Jido.AI.Runtime.Checkpoint.restore(state, context),
            {:ok, state} <- Jido.AI.Reasoning.prepare(state, query),
            {:ok, state} <- Jido.AI.Runtime.State.validate(state),
-           :ok <- Jido.AI.Session.publish_selection(context, adaptive, deadline),
+           :ok <- Jido.AI.Orchestration.publish_selection(context, adaptive, deadline),
            do: {:ok, state}
     else
       {:error, _} = error -> error

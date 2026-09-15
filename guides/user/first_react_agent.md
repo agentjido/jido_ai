@@ -182,7 +182,7 @@ If you persist the conversation history (e.g. from `snapshot.details.conversatio
 you can restore it on restart so the agent resumes where it left off.
 
 ```elixir
-{:ok, snapshot} = Jido.AI.Session.snapshot(server)
+{:ok, snapshot} = Jido.AI.Orchestration.snapshot(server)
 saved_messages = snapshot.details.conversation
 
 # Split out one leading system message (if present) so it does not become

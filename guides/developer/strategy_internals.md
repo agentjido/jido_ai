@@ -8,7 +8,7 @@ Jido.AI.Agent DSL
   -> Jido.AI.Profile
   -> Jido.AI.Authoring.lower/2
   -> core Jido.Agent routes and plugins
-  -> Jido.AI.Session request runtime
+  -> Jido.AI.Orchestration request runtime
   -> Jido.AI.Runtime.Flow
   -> Jido.AI.Reasoning method functions
 ```
@@ -47,7 +47,7 @@ runtime is separate from Agent authoring.
 
 - Add public configuration to `Jido.AI.Profile` and the Spark DSL.
 - Keep profile construction free of model and tool calls.
-- Put shared request execution in `Jido.AI.Session` and `Jido.AI.Runtime`.
+- Put shared request execution in `Jido.AI.Orchestration` and `Jido.AI.Runtime`.
 - Put method-specific preparation, parsing, and advancement in
   `Jido.AI.Reasoning`.
 - Do not add a method-specific Agent macro or Strategy wrapper.

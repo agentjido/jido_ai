@@ -47,7 +47,7 @@ defmodule Jido.AI.Agent.Interface do
 
   def cancel(server, opts) do
     data = %{request_id: opts[:request_id], reason: Keyword.get(opts, :reason, :user_cancelled)}
-    signal = Jido.Signal.new!(Jido.AI.Session.cancel_type(), data, source: "/jido/ai/agent")
+    signal = Jido.Signal.new!(Jido.AI.Orchestration.cancel_type(), data, source: "/jido/ai/agent")
     Jido.AgentServer.cast(server, signal)
   end
 
@@ -67,7 +67,7 @@ defmodule Jido.AI.Agent.Interface do
         Enum.find(module.routes(), fn route ->
           {target, defaults} = Jido.Agent.Authoring.split_target(route.target)
 
-          target in [Jido.AI.Runtime.Run, Jido.AI.Session.Start] and
+          target in [Jido.AI.Runtime.Run, Jido.AI.Orchestration.Start] and
             is_map(defaults) and defaults[:profile_id] == profile.id
         end)
       end

@@ -97,7 +97,7 @@ defmodule Jido.AI.Reasoning.ReAct.Checkpoint do
     with :ok <- verify(state, config),
          {:ok, data} <- continuation(state, config, context, timeout) do
       entries =
-        Jido.AI.Session.Transcript.query(query, %{
+        Jido.AI.Orchestration.Transcript.query(query, %{
           request_id: state.request_id,
           run_id: state.run_id,
           source: "/ai/react/standalone"

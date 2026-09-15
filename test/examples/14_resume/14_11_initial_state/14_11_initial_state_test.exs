@@ -51,7 +51,7 @@ defmodule JidoAI.Examples.InitialStateTest do
 
       assert {:ok, agent} = Agent.from_initial_state(unquote(module), state, id: "imported")
       assert {:ok, profile} = Configuration.profile(agent, :assistant)
-      assert {:ok, messages} = Jido.AI.Session.Transcript.read(agent.state, profile)
+      assert {:ok, messages} = Jido.AI.Orchestration.Transcript.read(agent.state, profile)
       assert Enum.map(messages, & &1.role) == [:user, :assistant, :tool, :assistant]
       imported = agent.state.messages.thread.entries
       assert agent.state.messages.id == old.id
@@ -121,7 +121,7 @@ defmodule JidoAI.Examples.InitialStateTest do
 
       assert agent.state.primary_messages == primary
       assert {:ok, review_profile} = Configuration.profile(agent, :review)
-      assert {:ok, messages} = Jido.AI.Session.Transcript.read(agent.state, review_profile)
+      assert {:ok, messages} = Jido.AI.Orchestration.Transcript.read(agent.state, review_profile)
       assert [%{role: :user, content: content}] = messages
       assert Jido.AI.Query.summarize(content) == "Old review"
       assert {:ok, %{instructions: "Primary prompt"}} = Configuration.profile(agent, :primary)

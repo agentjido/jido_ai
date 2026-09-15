@@ -1,6 +1,6 @@
 defmodule Jido.AI.Runtime.OutputState do
   @moduledoc false
-  alias Jido.AI.{Output, Session}
+  alias Jido.AI.{Output, Orchestration}
 
   def start(%{output: nil} = state, _value, _context), do: state
   def start(%{output_meta: _} = state, _value, _context), do: state
@@ -24,7 +24,7 @@ defmodule Jido.AI.Runtime.OutputState do
     status = if state.repairs > 0, do: :repaired, else: :validated
     meta = Output.meta(state.output, status, state.output_raw, opts)
     data = event_data(state.output, :validated, answer, attempt: state.repairs)
-    :ok = Session.output(event_context(state, context), :output_validated, meta, data)
+    :ok = Orchestration.output(event_context(state, context), :output_validated, meta, data)
     Map.put(state, :output_meta, meta)
   end
 
@@ -41,7 +41,7 @@ defmodule Jido.AI.Runtime.OutputState do
     if Map.has_key?(state, :output_meta) do
       meta = Output.mark_failed(state.output_meta, reason)
       data = Map.put(meta, :schema_summary, schema_summary(state.output))
-      :ok = Session.output(event_context(state, context), :output_failed, meta, data)
+      :ok = Orchestration.output(event_context(state, context), :output_failed, meta, data)
     end
 
     {:error, Jido.AI.Reasoning.failure(state, reason)}
@@ -51,7 +51,7 @@ defmodule Jido.AI.Runtime.OutputState do
     meta = Output.meta(state.output, status, value, opts)
 
     :ok =
-      Session.output(
+      Orchestration.output(
         event_context(state, context),
         kind,
         meta,

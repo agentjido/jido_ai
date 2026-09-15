@@ -1,4 +1,4 @@
-defmodule Jido.AI.Session.Cancel do
+defmodule Jido.AI.Orchestration.Cancel do
   @moduledoc false
   use Jido.Action,
     name: "ai_session_cancel",
@@ -8,10 +8,10 @@ defmodule Jido.AI.Session.Cancel do
         reason: Zoi.any() |> Zoi.default(nil)
       })
 
-  alias Jido.AI.Session.Change
+  alias Jido.AI.Orchestration.Change
 
   def run(params, context) do
-    with {:ok, context} <- Jido.AI.Session.Plugin.context(context),
+    with {:ok, context} <- Jido.AI.Orchestration.Plugin.context(context),
          do: execute(params, context)
   end
 
@@ -30,7 +30,7 @@ defmodule Jido.AI.Session.Cancel do
             completion_reserve: nil,
             error: if(is_nil(reason), do: :cancelled, else: {:cancelled, reason}),
             meta:
-              Jido.AI.Session.failed_metadata(
+              Jido.AI.Orchestration.failed_metadata(
                 Map.get(context, :jido_ai_request_metadata, %{}),
                 if(is_nil(reason), do: :cancelled, else: {:cancelled, reason})
               ),
@@ -38,7 +38,7 @@ defmodule Jido.AI.Session.Cancel do
         }
 
         record =
-          Jido.AI.Session.Inspection.complete(
+          Jido.AI.Orchestration.Inspection.complete(
             record,
             context[:jido_ai_request_inspection],
             context.agent_state,

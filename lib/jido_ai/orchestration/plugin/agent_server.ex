@@ -1,10 +1,10 @@
-defmodule Jido.AI.Session.Plugin.AgentServer do
+defmodule Jido.AI.Orchestration.Plugin.AgentServer do
   @moduledoc false
   use Jido.AgentServer.Plugin
 
-  alias Jido.AI.Session.{Plugin, Runtime}
+  alias Jido.AI.Orchestration.{Plugin, Coordinator}
 
-  def child_spec(init), do: Supervisor.child_spec({Runtime, init}, id: Plugin)
+  def child_spec(init), do: Supervisor.child_spec({Coordinator, init}, id: Plugin)
 
   @impl Jido.AgentServer.Plugin
   def await_ready(runtime, _opts), do: GenServer.call(runtime, :ready)

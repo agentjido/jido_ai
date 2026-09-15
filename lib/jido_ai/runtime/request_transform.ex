@@ -13,7 +13,7 @@ defmodule Jido.AI.Runtime.RequestTransform do
       module ->
         case transform(module, state, request, catalog, context) do
           {:error, _} = error ->
-            :ok = Jido.AI.Session.failure_type(context, :request_transform)
+            :ok = Jido.AI.Orchestration.failure_type(context, :request_transform)
             error
 
           result ->
@@ -161,7 +161,7 @@ defmodule Jido.AI.Runtime.RequestTransform do
     conversation = Map.get(state, :repair_data, %{})[:conversation] || state.messages
     original = Map.get(state, :repair_data, %{})[:original] || state
     response = original[:response]
-    events = Jido.AI.Session.event_state(context)
+    events = Jido.AI.Orchestration.event_state(context)
     run_id = if record, do: record.run_id, else: state.run_id
 
     %State{

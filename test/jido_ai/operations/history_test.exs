@@ -58,7 +58,7 @@ defmodule Jido.AI.HistoryTest do
       jido_ai_input_source: "/test"
     }
 
-    bound = Jido.AI.Model.Messages.bind_response(response, Jido.AI.Session.Transcript.request_refs(owner))
+    bound = Jido.AI.Model.Messages.bind_response(response, Jido.AI.Orchestration.Transcript.request_refs(owner))
     assert bound.context.messages == [previous, bound.message]
     assert bound.message.metadata.provider_field == "keep"
 
@@ -92,7 +92,7 @@ defmodule Jido.AI.HistoryTest do
       jido_ai_input_source: "/test"
     }
 
-    bound = Jido.AI.Model.Messages.bind_response(response, Jido.AI.Session.Transcript.request_refs(owner))
+    bound = Jido.AI.Model.Messages.bind_response(response, Jido.AI.Orchestration.Transcript.request_refs(owner))
     assert bound.context == response.context
 
     assert {:error, %{tag: :tool_context_continuation, context: [kind: :pending_tool_calls]}} =

@@ -6,7 +6,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
   # Each removed Strategy case has a native replacement in linear-test-transfer.md.
   test "initializes an idle Agent with no request worker", %{jido: jido} do
     server = start_reasoning(jido, :chain_of_thought)
-    assert {:ok, view} = Session.snapshot(server)
+    assert {:ok, view} = Orchestration.snapshot(server)
     assert view.request == nil and view.live == nil
     assert view.details.phase == :idle
     assert ChainOfThought.get_steps(view.agent) == []
@@ -61,13 +61,13 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
   end
 
   test "the start Action validates a query and request ID before admission" do
-    assert Jido.AI.Session.Start.name() == "ai_session_start"
+    assert Jido.AI.Orchestration.Start.name() == "ai_session_start"
 
     assert {:ok, %{query: "Add", request_id: "one"}} =
-             Zoi.parse(Jido.AI.Session.Start.schema(), %{query: "Add", request_id: "one"})
+             Zoi.parse(Jido.AI.Orchestration.Start.schema(), %{query: "Add", request_id: "one"})
 
-    assert {:error, _} = Zoi.parse(Jido.AI.Session.Start.schema(), %{query: "Add"})
-    assert {:error, _} = Zoi.parse(Jido.AI.Session.Start.schema(), %{query: 123, request_id: "one"})
+    assert {:error, _} = Zoi.parse(Jido.AI.Orchestration.Start.schema(), %{query: "Add"})
+    assert {:error, _} = Zoi.parse(Jido.AI.Orchestration.Start.schema(), %{query: 123, request_id: "one"})
   end
 
   test "legacy model observations do not start work or change domain state", %{jido: jido} do
@@ -80,7 +80,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
       assert agent.state == before
     end
 
-    assert {:ok, %{request: nil, live: nil}} = Session.snapshot(server)
+    assert {:ok, %{request: nil, live: nil}} = Orchestration.snapshot(server)
   end
 
   test "query routes bind the CoT profile to the shared session", %{jido: jido} do
@@ -89,7 +89,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
     assert %{id: :assistant, mode: :session} = Jido.AI.Authoring.request_binding(Server.agent(server), signal)
     assert Jido.AI.Authoring.request_method(Server.agent(server), signal) == :chain_of_thought
     assert {:ok, router} = Jido.Signal.Router.new(Server.agent(server).routes)
-    assert {:ok, _} = Jido.Signal.Router.route(router, %{signal | type: Session.cancel_type()})
+    assert {:ok, _} = Jido.Signal.Router.route(router, %{signal | type: Orchestration.cancel_type()})
   end
 
   test "start commits the prompt and request before a worker runs", %{jido: jido} do
@@ -98,7 +98,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
     assert {:ok, handle} = request(server, mock, :chain_of_thought)
     assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
     assert %{status: :pending, query: "What is 2 + 2?"} = record(server, handle)
-    assert {:ok, view} = Session.snapshot(server)
+    assert {:ok, view} = Orchestration.snapshot(server)
     assert view.details.active_request_id == handle.id
     assert view.details.phase == :awaiting_llm
     assert Process.alive?(view.live.worker_pid)
@@ -131,7 +131,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
     assert rec.meta.reasoning.steps == [%{number: 1, content: "Add."}]
     assert rec.meta.reasoning.conclusion == "4"
     assert %{input_tokens: 10, output_tokens: 5} = rec.meta.usage
-    assert {:ok, %{live: nil, details: %{active_request_id: nil}}} = Session.snapshot(server)
+    assert {:ok, %{live: nil, details: %{active_request_id: nil}}} = Orchestration.snapshot(server)
     assert_script_done(mock)
   end
 
@@ -213,7 +213,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
                    1_000
 
     assert_receive {:signal, %{type: "ai.llm.delta", data: %{chunk_type: :content_part, delta: ^image}}}, 1_000
-    assert {:ok, active} = Session.snapshot(server)
+    assert {:ok, active} = Orchestration.snapshot(server)
     assert active.details.streaming_text == ""
     assert :ok = MockLLM.release(mock, :held)
     assert {:ok, [^image]} = Request.await(handle)
@@ -231,7 +231,10 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
     assert {:error, error} = Request.await(handle)
     assert error.details.status == 429 and error.message =~ "Rate limited"
     assert record(server, handle).status == :failed and record(server, handle).error == error
-    assert {:ok, %{live: nil, details: %{active_request_id: nil, phase: :request_failed}}} = Session.snapshot(server)
+
+    assert {:ok, %{live: nil, details: %{active_request_id: nil, phase: :request_failed}}} =
+             Orchestration.snapshot(server)
+
     assert_script_done(mock)
   end
 
@@ -241,13 +244,13 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
     assert {:ok, handle} = request(server, mock, :chain_of_thought)
     assert_receive {:mock_llm_waiting, ^mock, :held, provider}, 2_000
     monitor = Process.monitor(provider)
-    assert :ok = Session.cancel(handle, reason: :user_cancelled)
+    assert :ok = Orchestration.cancel(handle, reason: :user_cancelled)
     assert {:error, {:cancelled, :user_cancelled}} = Request.await(handle)
     assert record(server, handle).error == {:cancelled, :user_cancelled}
     assert_receive {:DOWN, ^monitor, :process, ^provider, _}, 2_000
 
     assert {:ok, %{live: nil, details: %{active_request_id: nil, cancel_reason: :user_cancelled}}} =
-             Session.snapshot(server)
+             Orchestration.snapshot(server)
 
     eventually(fn -> MockLLM.report(mock).waiting == [] end)
     assert_script_done(mock)
@@ -276,12 +279,12 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
     assert {:ok, first} = request(server, mock, :chain_of_thought)
     assert_receive {:mock_llm_waiting, ^mock, :held, provider}, 2_000
     monitor = Process.monitor(provider)
-    assert {:ok, view} = Session.snapshot(server)
+    assert {:ok, view} = Orchestration.snapshot(server)
     Process.exit(view.live.worker_pid, :kill)
     assert {:error, :worker_crash} = Request.await(first)
     assert record(server, first).error == :worker_crash
     assert_receive {:DOWN, ^monitor, :process, ^provider, _}, 2_000
-    assert {:ok, %{live: nil, details: %{active_request_id: nil}}} = Session.snapshot(server)
+    assert {:ok, %{live: nil, details: %{active_request_id: nil}}} = Orchestration.snapshot(server)
     assert {:ok, next} = request(server, mock, :chain_of_thought, "Next")
     assert {:ok, "Next"} = Request.await(next)
     eventually(fn -> MockLLM.report(mock).waiting == [] end)
@@ -306,7 +309,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
     server = start_reasoning(jido, :chain_of_thought)
     assert {:ok, handle} = request(server, mock, :chain_of_thought)
     assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
-    assert {:ok, view} = Session.snapshot(server)
+    assert {:ok, view} = Orchestration.snapshot(server)
 
     for n <- 1..2_010 do
       assert :ok =
@@ -316,13 +319,13 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
                )
     end
 
-    assert {:ok, active} = Session.snapshot(server)
+    assert {:ok, active} = Orchestration.snapshot(server)
     assert active.details.trace.truncated?
     assert Enum.map(active.details.trace.events, & &1.seq) == Enum.to_list(1..2_000)
     assert active.details.trace.seq == 2_012
     assert :ok = MockLLM.release(mock, :held)
     assert {:ok, "Done"} = Request.await(handle)
-    assert {:ok, done} = Session.snapshot(server)
+    assert {:ok, done} = Orchestration.snapshot(server)
     assert done.details.trace.events == active.details.trace.events
     assert done.details.trace.truncated? and done.details.trace.seq > active.details.trace.seq
     assert done.request.status == :completed

@@ -412,7 +412,7 @@ checks, the minimum runtime, migration and rollback gates remain open.
 ## Native parent request inspection: 2026-09-07
 
 [02_22](../../examples/02_requests/02_22_request_inspection/README.md) adds 14 integration
-cases and `Jido.AI.Session.snapshot/2`. The API combines the committed Agent,
+cases and `Jido.AI.Orchestration.snapshot/2`. The API combines the committed Agent,
 revision and selected request with a separate live sample from the matching
 Session run. It exposes phase, model label/counts, reasoning position, IDs,
 usage, output, stream text/thinking, tool progress/results and raw terminal
@@ -1375,7 +1375,7 @@ depends on it; this result does not establish a fully passing core release.
 
 ## Request/session slice
 
-The second production slice adds `lib/jido_ai/session`. Profiles now accept
+The second production slice adds `lib/jido_ai/orchestration`. Profiles now accept
 `requests` with `mode: :turn | :session`, `on_busy: :reject`, `max_requests`,
 and `streaming`. One-Turn remains the default. Source profiles, the DSL and
 source JSON still use the same lowerer. Core Builder consumes its output.
@@ -2346,7 +2346,7 @@ remain required. No commit, push or publication was made.
 ## Automatic session Signal delivery slice
 
 The [02_17 example](../../examples/02_requests/02_17_signal_delivery/README.md) adds
-26 integration cases. `Session.Runtime` remains the only canonical event and
+26 integration cases. `Orchestration.Coordinator` remains the only canonical event and
 sequence owner. A linked and monitored `Session.Delivery` process holds a
 bounded transient queue and one active submission. It projects existing typed
 Signals, then submits a batch through the owning Agent with a one-use ticket.

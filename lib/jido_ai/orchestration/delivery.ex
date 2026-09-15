@@ -1,8 +1,8 @@
-defmodule Jido.AI.Session.Delivery do
+defmodule Jido.AI.Orchestration.Delivery do
   @moduledoc false
   use GenServer
   require Logger
-  alias Jido.AI.Session
+  alias Jido.AI.Orchestration
 
   @defaults [queue_limit: 256, byte_limit: 8_388_608, batch_size: 16, timeout: 15_000]
 
@@ -276,7 +276,7 @@ defmodule Jido.AI.Session.Delivery do
 
     if remaining > 0 do
       signal =
-        Jido.Signal.new!(Session.publish_type(), %{batch_id: id}, source: "/jido/ai/session")
+        Jido.Signal.new!(Orchestration.publish_type(), %{batch_id: id}, source: "/jido/ai/session")
 
       case Jido.AgentServer.call(server, signal,
              timeout: remaining,

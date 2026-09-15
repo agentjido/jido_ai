@@ -5,7 +5,7 @@ defmodule Jido.AI.Thread.Control.Apply do
   @impl Jido.Action
   def run(params, context) do
     Jido.AI.Error.capture(fn ->
-      with {:ok, context} <- Jido.AI.Session.Plugin.context(context),
+      with {:ok, context} <- Jido.AI.Orchestration.Plugin.context(context),
            do: Jido.AI.Thread.Control.modify(params, context)
     end)
   end

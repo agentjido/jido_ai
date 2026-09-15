@@ -15,7 +15,7 @@ defmodule JidoAI.Examples.Completion.Ledger do
   def validate_directive(%Apply{} = directive, _), do: {:ok, directive}
 
   def prepare(command, opts) do
-    if opts[:deny_settle] == true and command.signal.type == Jido.AI.Session.settle_type(),
+    if opts[:deny_settle] == true and command.signal.type == Jido.AI.Orchestration.settle_type(),
       do: {:error, :fixture_settlement_denied},
       else: {:ok, command}
   end

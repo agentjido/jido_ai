@@ -28,7 +28,7 @@ defmodule JidoAITest.Authoring.Agents.RecoveryTest do
 
       if ctx.variant == :session do
         assert {:ok, _} = first
-        assert {:ok, %{status: :failed, error: error}} = Jido.AI.Session.await(server, "failed", 5_000)
+        assert {:ok, %{status: :failed, error: error}} = Jido.AI.Orchestration.await(server, "failed", 5_000)
         assert is_exception(error)
         assert Jido.AgentServer.agent(server).state.requests["failed"].status == :failed
       else
@@ -42,7 +42,8 @@ defmodule JidoAITest.Authoring.Agents.RecoveryTest do
       assert {:ok, _} = call(server, "next", context)
 
       if ctx.variant == :session,
-        do: assert({:ok, %{status: :completed, result: "Recovered"}} = Jido.AI.Session.await(server, "next", 5_000))
+        do:
+          assert({:ok, %{status: :completed, result: "Recovered"}} = Jido.AI.Orchestration.await(server, "next", 5_000))
 
       assert Jido.AgentServer.agent(server).state.reply == "Recovered"
       assert %{remaining: [], unexpected: [], requests: [_, _]} = MockLLM.report(mock)

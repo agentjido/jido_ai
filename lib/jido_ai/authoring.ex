@@ -80,7 +80,7 @@ defmodule Jido.AI.Authoring do
     Code.ensure_compiled!(Jido.AI.Configuration.Apply)
     Code.ensure_compiled!(Jido.AI.Thread.Control.Apply)
     ensure_plugin_compiled!(Jido.AI.Thread.Control.Plugin)
-    ensure_plugin_compiled!(Jido.AI.Session.Plugin)
+    ensure_plugin_compiled!(Jido.AI.Orchestration.Plugin)
 
     with {:ok, config} <- configured_state_size(config),
          {:ok, pairs} <- Profile.traverse(values, &Profile.source/1),
@@ -92,7 +92,7 @@ defmodule Jido.AI.Authoring do
              config.plugins,
              &(plugin_module(&1) in [
                  Runtime.Plugin,
-                 Jido.AI.Session.Plugin,
+                 Jido.AI.Orchestration.Plugin,
                  Jido.AI.Thread.Control.Plugin
                ])
            ),
@@ -109,7 +109,7 @@ defmodule Jido.AI.Authoring do
              Enum.filter(profiles, &(&1.memory.history != nil)),
              &{&1.id, &1.memory.history}
            ),
-         {:ok, internal_routes} <- Jido.AI.Session.routes(sessions),
+         {:ok, internal_routes} <- Jido.AI.Orchestration.routes(sessions),
          internal_routes = prefer_explicit_observation_routes(internal_routes, routes),
          {:ok, config_routes} <-
            Jido.Agent.Authoring.routes(
@@ -143,7 +143,7 @@ defmodule Jido.AI.Authoring do
           else:
             plugins ++
               [
-                {Jido.AI.Session.Plugin, session_opts}
+                {Jido.AI.Orchestration.Plugin, session_opts}
               ]
 
       plugins =
@@ -274,7 +274,7 @@ defmodule Jido.AI.Authoring do
     {:ok, router} = Jido.Signal.Router.new(explicit)
 
     Enum.reject(internal, fn route ->
-      Jido.AI.Session.observation_type?(route.path) and
+      Jido.AI.Orchestration.observation_type?(route.path) and
         explicitly_routed?(router, route.path)
     end)
   end
@@ -285,7 +285,7 @@ defmodule Jido.AI.Authoring do
   end
 
   defp flow(%{requests: %{mode: :session}} = profile),
-    do: Jido.AI.Session.admission_target(profile)
+    do: Jido.AI.Orchestration.admission_target(profile)
 
   defp flow(profile), do: {:ok, {Jido.AI.Runtime.Run, %{profile_id: profile.id}}}
 

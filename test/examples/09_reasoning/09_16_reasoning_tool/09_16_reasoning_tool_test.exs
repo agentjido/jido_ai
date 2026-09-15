@@ -99,7 +99,7 @@ defmodule JidoAI.Examples.ReasoningToolTest do
     assert_receive {:mock_llm_waiting, ^mock, :nested, provider}, 2_000
     assert [runner] = runner_pids(jido)
     refs = for pid <- [provider, runner], do: {Process.monitor(pid), pid}
-    assert :ok = Jido.AI.Session.cancel(request)
+    assert :ok = Jido.AI.Orchestration.cancel(request)
     assert {:error, :cancelled} = Request.await(request)
     for {ref, pid} <- refs, do: assert_receive({:DOWN, ^ref, :process, ^pid, _}, 2_000)
     assert {:ok, next} = submit(server, context)

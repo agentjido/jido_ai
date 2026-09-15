@@ -1299,7 +1299,7 @@ The first implementation pass should use these current source areas:
 | `lib/jido_ai/operations/run.ex` | Keep final state commit atomic and write the selected result value |
 | `lib/jido_ai/operations/tool_interception.ex` | Become the internal execution layer for staged operation controls |
 | `lib/jido_ai/skill/source.ex` and skill runtime modules | Normalize skill modules, paths, resources, and contributed tools |
-| `lib/jido_ai/session/` | Enforce request mode, retention, streaming, steering, idle timeout, and resume behavior |
+| `lib/jido_ai/orchestration/` | Enforce request mode, retention, streaming, steering, idle timeout, and resume behavior |
 | New codec and registry modules | Add safe versioned JSON and YAML import and export |
 | `.formatter.exs` | Export the complete DSL `locals_without_parens` list |
 

@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.StandaloneInputTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{PendingInputServer, Session}
+  alias Jido.AI.{PendingInputServer, Orchestration}
   alias Jido.AI.Reasoning.ReAct
   alias ReAct.{Config, Token}
   alias JidoAI.Examples.CheckpointResume
@@ -81,7 +81,7 @@ defmodule JidoAI.Examples.StandaloneInputTest do
     config = config(mock, queue, tools: [Hold])
     task = run_task("Use tool", config, jido)
     assert_receive {:standalone_tool_waiting, tool, server}, 2_000
-    owner = Server.children(server)[{:plugin, Session.Plugin}].pid
+    owner = Server.children(server)[{:plugin, Orchestration.Plugin}].pid
     [job] = :sys.get_state(owner).jobs |> Map.values()
     assert job.queue == queue
     assert :ok = PendingInputServer.enqueue(queue, %{id: "caller", content: "Caller input"})

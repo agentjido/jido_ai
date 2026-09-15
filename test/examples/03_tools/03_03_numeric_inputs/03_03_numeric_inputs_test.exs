@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.NumericInputsTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Request, Session}
+  alias Jido.AI.{Request, Orchestration}
   alias JidoAI.Examples.NumericInputs.Agent
 
   defp request(server, context) do
@@ -48,7 +48,7 @@ defmodule JidoAI.Examples.NumericInputsTest do
       assert factor === 3.0
 
       assert record.meta.model_calls == 2
-      assert {:ok, %{live: nil, details: %{phase: :request_completed}}} = Session.snapshot(server)
+      assert {:ok, %{live: nil, details: %{phase: :request_completed}}} = Orchestration.snapshot(server)
       assert_script_done(mock)
     end
 
@@ -74,7 +74,7 @@ defmodule JidoAI.Examples.NumericInputsTest do
       assert length(MockLLM.report(mock).requests) == 1
       assert Server.agent(server).state.requests[handle.id].status == :failed
       assert Server.agent(server).state.reply == ""
-      assert {:ok, %{live: nil, details: %{phase: :request_failed}}} = Session.snapshot(server)
+      assert {:ok, %{live: nil, details: %{phase: :request_failed}}} = Orchestration.snapshot(server)
       assert_script_done(mock)
     end
   end

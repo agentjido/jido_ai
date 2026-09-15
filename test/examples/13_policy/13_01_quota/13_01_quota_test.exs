@@ -293,7 +293,7 @@ defmodule JidoAI.Examples.QuotaTest do
     assert_receive {:mock_llm_waiting, ^mock, :partial_usage, provider}, 2_000
     assert_eventually(fn -> Store.get("team").total_tokens == 5 end)
     monitor = Process.monitor(provider)
-    assert :ok = Jido.AI.Session.cancel(Jido.AI.Request.Handle.new("cancel", server, "Review"))
+    assert :ok = Jido.AI.Orchestration.cancel(Jido.AI.Request.Handle.new("cancel", server, "Review"))
     assert_receive {:DOWN, ^monitor, :process, ^provider, _}, 2_000
     assert_eventually(fn -> match?([%{status: :unknown}], Store.ledger("team")) end)
     assert %{requests: 1, total_tokens: 5} = Store.get("team")
@@ -662,7 +662,7 @@ defmodule JidoAI.Examples.QuotaTest do
   defp await(:turn, _, _), do: :ok
 
   defp await(:session, server, id) do
-    assert {:ok, _} = Jido.AI.Session.await(server, id, 5_000)
+    assert {:ok, _} = Jido.AI.Orchestration.await(server, id, 5_000)
     :ok
   end
 end

@@ -1,10 +1,10 @@
-defmodule Jido.AI.Session.Settle do
+defmodule Jido.AI.Orchestration.Settle do
   @moduledoc false
   use Jido.Action, name: "ai_session_settle", schema: Zoi.object(%{request_id: Zoi.string()})
-  alias Jido.AI.Session.Change
+  alias Jido.AI.Orchestration.Change
 
   def run(params, context) do
-    with {:ok, context} <- Jido.AI.Session.Plugin.context(context),
+    with {:ok, context} <- Jido.AI.Orchestration.Plugin.context(context),
          do: execute(params, context)
   end
 
@@ -40,7 +40,7 @@ defmodule Jido.AI.Session.Settle do
               {:error, reason} ->
                 meta =
                   meta
-                  |> Jido.AI.Session.failed_metadata(reason)
+                  |> Jido.AI.Orchestration.failed_metadata(reason)
                   |> compact_failure_metadata(reason)
 
                 {context.agent_state, %{status: :failed, error: Jido.AI.Error.for_storage(reason), meta: meta}, []}
@@ -57,7 +57,7 @@ defmodule Jido.AI.Session.Settle do
         |> Map.put(:completed_at, System.system_time(:millisecond))
 
       record =
-        Jido.AI.Session.Inspection.complete(record, completion[:inspection], candidate, context)
+        Jido.AI.Orchestration.Inspection.complete(record, completion[:inspection], candidate, context)
 
       with {:ok, candidate, changes} <-
              Jido.AI.Thread.Control.finish(candidate, record, context),

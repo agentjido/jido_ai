@@ -1,10 +1,68 @@
 > Target seam design. This document is pending approval.
 
-# AI values and result contracts design
+# Canonical interaction and AI values design
+
+## Architecture and contract status
+
+- Architecture category: [Canonical interaction and AI values](../ARCHITECTURE.md).
+- Owning subsystem: Jido.Session, Jido.Thread, Jido.Thread.Entry, Query, Turn, Output, Usage, Error, and Thread.Projection.
+- Complete target: Use canonical Session/Thread values for conversation data. Preserve multimodal content, correlation, output validation, safe errors, and explicit portable encodings. Broader constructor uniformity and strict provider-neutral content remain decisions.
+- Decision boundary: Resolve tagged constructor uniformity, provider-native content acceptance, and the proposed error taxonomy without reintroducing Context or History stores.
+- Current implementation, module links, example proof, and exact differences:
+  [alignment](alignment.md). This design is a target, not an API reference.
+
+The requirements and proposed signatures below remain pending approval.
+Illustrative types are not evidence that a module or function exists. A
+requirement is not removed merely because the current implementation differs.
+Use the alignment matrix to distinguish current behavior from the full target.
+
+## Selected conversation projection policy
+
+The [selected commit policy](../07_request_sessions/design.md#selected-conversation-commit-policy)
+distinguishes the canonical evidence log from its completed-conversation view.
+It does not create another conversation store.
+
+`VAL-REQ-023`: The default Thread model projection shall include request work only after successful settlement promotes it into the completed conversation.
+
+`VAL-REQ-024`: The default Thread model projection shall exclude unresolved tool exchanges without inventing tool results.
+
+Failed or cancelled work remains available as log evidence. Promotion metadata
+and explicit context-lane interactions remain open. Document approval is pending.
+
+## Proposed entry batch and receipt values
+
+These are proposed private data contracts, not implemented public modules.
+They support the [data-focused direction](../00_boundary_invariants/design.md#selected-direction-data-focused-foundation).
+
+- EntryBatch: stable batch ID, request/run IDs, target Thread/context, expected
+  Thread revision, and canonical entries with IDs assigned once.
+- CommitReceipt: batch ID, explicit commit status, resulting Thread revision,
+  and assigned entry sequence range where commit is confirmed.
+
+Thread sequence means committed order. Request/run references group execution;
+native tool-call IDs link calls and results. Model rounds can be derived views,
+not another conversation store. ReqLLM.Context remains temporary model input;
+Session/Thread remains the canonical conversation record. Preserve native
+message payloads and open-tool-call validation.
+
+Exact schemas, duplicate-entry rules, batch conflicts, and receipt validation
+remain open. Stable IDs alone do not establish durable deduplication.
+Shared reference trust sanitization belongs conceptually in the AI Thread
+reference layer; skills consume it through a separate trusted activation path.
+
+## Content permission constraint
+
+Apply the [selected content permissions](../12_observation_diagnostics/design.md#selected-content-permissions).
+Retained evidence does not authorize rich-content or reasoning storage.
+Storage needs its own permission; stream permission is insufficient. Preserve
+permitted identity, ordering, outcomes, and bounded metadata without forbidden
+payloads. Redacted data does not imply sufficient recovery input; resolve that
+case explicitly rather than reconstructing missing content. Native ReqLLM
+execution data remains unchanged.
 
 ## Scope and owner
 
-- Owner: `Jido.AI.Query`, `Jido.AI.Context`, `Jido.AI.Turn`, `Jido.AI.Output`, `Jido.AI.Usage`, and `Jido.AI.Error`.
+- Owner: `Jido.AI.Query`, `Jido.Session` with `Jido.Thread` and `Jido.Thread.Entry`, `Jido.AI.Turn`, `Jido.AI.Output`, `Jido.AI.Usage`, and `Jido.AI.Error`.
 - In scope: Portable query content, conversation entries, model turns, output contracts, usage, result metadata, errors, validation, redaction, and codec rules.
 - Out of scope: Provider calls, tool execution, request lifecycle, Agent commit, storage, process ownership, and transport.
 
@@ -15,7 +73,7 @@ V2 supplied text and multimodal queries, conversation context, normalized model 
 | V2 capability | V3 target |
 | --- | --- |
 | String or provider content-part query | `Jido.AI.Query` with Jido AI content parts and explicit provider conversion |
-| Conversation context | Portable `Jido.AI.Context` entries in chronological semantic order |
+| Conversation context | Portable `Jido.Session` with `Jido.Thread` and `Jido.Thread.Entry` entries in chronological semantic order |
 | Model response maps | Validated `Jido.AI.Turn` with ordered content and tool calls |
 | Structured output options | Validated `Jido.AI.Output` contract with Zoi or JSON Schema input |
 | Provider usage maps | Canonical token and cost fields plus bounded provider metadata |
@@ -23,10 +81,10 @@ V2 supplied text and multimodal queries, conversation context, normalized model 
 
 ## Model
 
-The value layer has six primary values:
+The value layer has six groups:
 
 1. `Jido.AI.Query` is validated text or a nonempty ordered list of Jido AI content parts.
-2. `Jido.AI.Context` is an identified ordered conversation with `user`, `assistant`, `tool`, and `system` entries.
+2. `Jido.Session` owns one `Jido.Thread` of `Jido.Thread.Entry` values. AI roles and provider messages are projections, not a second conversation store.
 3. `Jido.AI.Turn` is one normalized model response. It is either a final answer or an ordered tool-call request.
 4. `Jido.AI.Output` is a structured-output contract. It contains a schema, validation mode, and bounded repair policy.
 5. `Jido.AI.Usage` is canonical usage data with optional bounded provider extensions.
@@ -65,7 +123,7 @@ The final list and fields require approval. Unknown types are validation errors.
 
 `VAL-REQ-007`: When Jido AI summarizes multimodal content for logs or events, it shall not expose binary content, file bytes, credentials, or hidden thinking text.
 
-### Context and turn
+### Canonical conversation and turn
 
 `VAL-REQ-008`: A context shall preserve semantic message order, roles, tool-call correlation, reasoning details when allowed, and caller references.
 
@@ -111,9 +169,9 @@ Recommended constructors and adapters:
 Jido.AI.Query.new(input) :: {:ok, Query.t()} | {:error, Jido.AI.Error.t()}
 Jido.AI.Query.to_provider(query, adapter_opts) :: {:ok, term()} | {:error, Jido.AI.Error.t()}
 
-Jido.AI.Context.new(opts) :: {:ok, Context.t()} | {:error, Jido.AI.Error.t()}
-Jido.AI.Context.append(context, entry) :: {:ok, Context.t()} | {:error, Jido.AI.Error.t()}
-Jido.AI.Context.project(context, adapter, opts) :: {:ok, [term()]} | {:error, Jido.AI.Error.t()}
+Jido.Session.new(opts) :: Jido.Session.t()
+Jido.Session.append(session, entries) :: Jido.Session.t()
+# AI projection belongs to Jido.AI.Thread.Projection, not a second Context value.
 
 Jido.AI.Turn.from_provider(response, adapter_opts) :: {:ok, Turn.t()} | {:error, Jido.AI.Error.t()}
 Jido.AI.Output.new(attrs) :: {:ok, Output.t() | nil} | {:error, Jido.AI.Error.t()}
@@ -122,7 +180,10 @@ Jido.AI.Usage.normalize(provider_usage) :: Jido.AI.Usage.t()
 Jido.AI.Error.normalize(term, context) :: Jido.AI.Error.t()
 ```
 
-Bang constructors are allowed for trusted module and compile-time authoring. Runtime and encoded input use tagged tuples.
+The Session signatures above retain the existing value-constructor contract.
+VAL-REQ-001 proposes broader tagged-constructor uniformity and remains a decision,
+not an instruction to change Session silently. Other signatures in this section
+are target proposals. Bang and tagged constructor policy needs explicit review.
 
 Compatibility applies to encoded semantic fields, not to debug fields, internal struct layout, or provider metadata. An adapter can accept a ReqLLM struct, but the stable returned value is owned by Jido AI.
 

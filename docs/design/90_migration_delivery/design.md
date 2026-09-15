@@ -1,6 +1,20 @@
 > Target seam design. This document is pending approval.
 
-# Migration, delivery, and consumer support design
+# Migration and delivery design
+
+## Architecture and contract status
+
+- Architecture category: [Migration and delivery](../ARCHITECTURE.md).
+- Owning subsystem: Package metadata, guides, examples, public test helpers, Mix tasks, and release evidence.
+- Complete target: Preserve the complete capability/disposition inventory, migrations, compatibility decisions, deterministic consumer support, and release/security/performance/operational gates.
+- Decision boundary: Reconcile old CLI and reduced-method release recommendations explicitly. Separate current tested functionality from an approved stable release surface.
+- Current implementation, module links, example proof, and exact differences:
+  [alignment](alignment.md). This design is a target, not an API reference.
+
+The requirements and proposed signatures below remain pending approval.
+Illustrative types are not evidence that a module or function exists. A
+requirement is not removed merely because the current implementation differs.
+Use the alignment matrix to distinguish current behavior from the full target.
 
 ## Scope and owner
 
@@ -150,7 +164,7 @@ CHANGELOG and release notes
 package archive and checksum
 ```
 
-Recommended first-release compatibility table:
+Proposed release disposition table; this is not a current stability claim:
 
 | Surface | V3 status |
 | --- | --- |
@@ -158,9 +172,8 @@ Recommended first-release compatibility table:
 | Core Agent DSL plus `Jido.AI.DSL` | Stable |
 | `Jido.AI.Profile` and portable authoring | Stable |
 | `use Jido.AI.Agent` | Stable V3 authoring |
-| Query, Context, Turn, Output, Usage, Error | Stable after seam 01 approval |
-| ReAct, Chain-of-Thought, Chain-of-Draft, Adaptive | Stable after seam 05 approval |
-| Other reasoning methods | Experimental unless promoted |
+| Session, Thread, Entry, Query, Turn, Output, Usage, Error | Stability requires seam 01 approval and evidence |
+| ReAct, CoT, CoD, AoT, ToT, GoT, TRM, Adaptive | All eight retained; stability labels require method-specific evidence and approval |
 | Request, stream, cancel, and steering APIs | Stable after seam 07 approval |
 | Retrieval and quota in-memory stores | Supported nondurable adapters |
 | Skills | Stable after seam 09 approval |
@@ -196,7 +209,7 @@ The exact table is pending seam approval and alignment evidence.
 | ID | Question | Recommended option | Effect |
 | --- | --- | --- | --- |
 | `DEL-DEC-001` | What V2 source compatibility is required? | None | Gives V3 one authoring and data contract |
-| `DEL-DEC-002` | Which reasoning methods are stable? | Use the seam 05 recommended first-release set | Bounds testing and compatibility |
-| `DEL-DEC-003` | Does the first V3 release include CLI support? | Yes, for authoring inspection, request execution, streaming, and cancellation | Preserves practical V2 workflows |
+| `DEL-DEC-002` | Which reasoning methods are stable? | Use all eight methods as the review baseline; approve stability labels from seam 05 evidence | Bounds testing and compatibility |
+| `DEL-DEC-003` | Does the first V3 release include CLI support? | Decision required: execution CLI was removed; retain this proposal for explicit disposition, not automatic restoration | Preserves practical V2 workflows |
 | `DEL-DEC-004` | What is the stable release test gate? | All package tests, acceptance examples, docs, package build, and V3 sibling matrix pass | Makes release readiness measurable |
 | `DEL-DEC-005` | Is the V2 checkpoint importer required? | No | Keeps checkpoint restore limited to V3 data |

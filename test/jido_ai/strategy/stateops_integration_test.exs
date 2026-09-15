@@ -25,7 +25,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
 
   test "new ReAct state has a profile and an idle session with no live handles", %{jido: jido} do
     server = start(jido)
-    assert {:ok, view} = Session.snapshot(server)
+    assert {:ok, view} = Orchestration.snapshot(server)
     assert view.details.phase == :idle
     assert view.request == nil and view.live == nil
     assert view.details.tool_calls == []
@@ -40,7 +40,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     server = start(jido)
     assert {:ok, handle} = ask(server, mock, "test query")
     assert_receive {:mock_llm_waiting, ^mock, :model, _}, 2_000
-    assert {:ok, view} = Session.snapshot(server)
+    assert {:ok, view} = Orchestration.snapshot(server)
     assert view.request.query == "test query" and view.request.status == :pending
     assert view.details.phase == :awaiting_llm and view.details.iteration == 1
     assert view.details.model_calls == 1 and view.details.active_request_id == handle.id
@@ -64,19 +64,19 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     assert {:ok, handle} = ask(server, mock)
     assert_receive {:state_tool, first, "hold", 1, _}, 2_000
     assert_receive {:state_tool, second, "hold", 2, _}, 2_000
-    assert {:ok, view} = Session.snapshot(server)
+    assert {:ok, view} = Orchestration.snapshot(server)
     assert view.details.phase == :executing_tool
     assert Enum.sort(Enum.map(view.details.tool_calls, & &1.id)) == ["one", "two"]
     send(first, :release)
 
     eventually(fn ->
-      {:ok, live} = Session.snapshot(server)
+      {:ok, live} = Orchestration.snapshot(server)
       Enum.map(live.details.tool_calls, & &1.id) == ["two"]
     end)
 
     send(second, :release)
     assert_receive {:mock_llm_waiting, ^mock, :answer, _}, 2_000
-    assert {:ok, ready} = Session.snapshot(server)
+    assert {:ok, ready} = Orchestration.snapshot(server)
     assert ready.details.tool_calls == []
     assert Enum.sort(Enum.map(ready.details.tool_results, & &1.id)) == ["one", "two"]
     assert ready.details.model_calls == 2 and ready.details.iteration == 2
@@ -94,7 +94,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     assert_receive {:mock_llm_waiting, ^mock, :text, _}, 2_000
 
     eventually(fn ->
-      {:ok, view} = Session.snapshot(server)
+      {:ok, view} = Orchestration.snapshot(server)
       view.details.streaming_text == "Hello world"
     end)
 
@@ -162,10 +162,10 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     server = start(jido)
     assert {:ok, handle} = ask(server, mock)
     assert_receive {:mock_llm_waiting, ^mock, :answer, _}, 2_000
-    assert :ok = Session.cancel(handle, reason: :stop)
+    assert :ok = Orchestration.cancel(handle, reason: :stop)
     assert {:error, {:cancelled, :stop}} = Request.await(handle)
     assert Server.agent(server).state.count == 0 and Server.agent(server).state.data == %{}
-    assert {:ok, view} = Session.snapshot(server)
+    assert {:ok, view} = Orchestration.snapshot(server)
     assert view.details.active_request_id == nil and view.details.tool_calls == [] and view.live == nil
     assert view.details.cancel_reason == :stop
     eventually(fn -> MockLLM.report(mock).waiting == [] end)
@@ -186,7 +186,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     assert record(server, first).meta.usage.total_tokens == 30
     assert {:ok, next} = ask(server, mock, "Again")
     assert_receive {:mock_llm_waiting, ^mock, :next, _}, 2_000
-    assert {:ok, view} = Session.snapshot(server)
+    assert {:ok, view} = Orchestration.snapshot(server)
     assert view.details.iteration == 1 and view.details.model_calls == 1
     assert view.details.usage == %{} and view.details.streaming_text == ""
     assert view.details.tool_calls == [] and view.details.tool_results == []
@@ -196,7 +196,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     assert {:ok, "Next"} = Request.await(next)
     assert record(server, next).meta.usage.total_tokens == 15
     assert record(server, first).result == "First"
-    assert {:ok, done} = Session.snapshot(server)
+    assert {:ok, done} = Orchestration.snapshot(server)
     assert done.details.active_request_id == nil and done.live == nil
     assert done.details.termination_reason == :final_answer
     assert_script_done(mock)
@@ -206,7 +206,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     server = start(jido)
     assert {:ok, _} = Jido.AI.register_tool(server, Double)
     assert {:ok, _} = Jido.AI.register_tool(server, Double)
-    assert {:ok, view} = Session.snapshot(server)
+    assert {:ok, view} = Orchestration.snapshot(server)
     config = view.details.config
     assert config.tools == [Double, Update]
     assert config.actions_by_name == %{"state_update" => Update, "state_double" => Double}
@@ -227,7 +227,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     assert Jason.decode!(tool["content"])["result"] == %{"result" => 10}
     assert {:ok, _} = Jido.AI.unregister_tool(server, "state_update")
     assert {:ok, _} = Jido.AI.unregister_tool(server, "state_double")
-    assert {:ok, view} = Session.snapshot(server)
+    assert {:ok, view} = Orchestration.snapshot(server)
     empty = view.details.config
     assert empty.tools == [] and empty.actions_by_name == %{} and empty.reqllm_tools == []
     assert {:ok, next} = ask(server, mock, "No tools")
@@ -239,7 +239,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
   test "model generation and tool options come from the normalized profile", %{jido: jido} do
     mock = mock([%{reply: {:text, "Done"}}])
     server = start_reasoning(jido, :react, tools: [], max_tokens: 40, temperature: 0.2)
-    assert {:ok, view} = Session.snapshot(server)
+    assert {:ok, view} = Orchestration.snapshot(server)
     config = view.details.config
     assert {:ok, profile} = Configuration.profile(view.agent)
     generation = profile.models[profile.reasoning.model].generation
@@ -264,12 +264,12 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
         [ReqLLM.Context.user("Hello"), ReqLLM.Context.assistant("Hi")]
       )
 
-    assert {:ok, _} = Session.modify_context(server, %{type: :replace, result_context: context})
+    assert {:ok, _} = Orchestration.modify_context(server, %{type: :replace, result_context: context})
     assert {:ok, first} = ask(server, mock, "Continue")
     assert {:ok, "Answer"} = Request.await(first)
     assert [wire] = MockLLM.report(mock).requests
     assert Enum.map(wire.body["messages"], & &1["content"]) == ["History prompt", "Hello", "Hi", "Continue"]
-    assert {:ok, _} = Session.modify_context(server, %{type: :replace, result_context: Jido.Thread.new()})
+    assert {:ok, _} = Orchestration.modify_context(server, %{type: :replace, result_context: Jido.Thread.new()})
     assert {:ok, next} = ask(server, mock, "Fresh")
     assert {:ok, "Fresh answer"} = Request.await(next)
     last = List.last(MockLLM.report(mock).requests)

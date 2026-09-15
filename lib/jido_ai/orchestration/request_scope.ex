@@ -1,4 +1,4 @@
-defmodule Jido.AI.Session.RequestScope do
+defmodule Jido.AI.Orchestration.RequestScope do
   @moduledoc false
   alias Jido.AI.{Output, Profile, ToolCatalog}
   alias Jido.AI.Reasoning.ReAct.ToolSelection

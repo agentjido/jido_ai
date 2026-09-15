@@ -140,7 +140,8 @@ Keep explicit Flow orchestration only when that composition is the lesson.
 
 Use public Jido AI request, stream, and session APIs to observe and control AI
 work. Prefer generated request helpers, `Jido.AI.Request.await/2`,
-`Jido.AI.Request.Stream.events/2`, and public Session cancellation and inspection.
+`Jido.AI.Request.Stream.events/2`, and public `Jido.AI.Orchestration`
+cancellation and inspection. `Jido.Session` is a portable value, not the live API.
 Use public core AgentServer APIs for the core Turn itself. Do not confuse an AI
 request's lifetime with the admission Turn that starts it. Keep streams and
 runtime handles outside portable Agent state.

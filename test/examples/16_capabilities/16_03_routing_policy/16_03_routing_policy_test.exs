@@ -519,7 +519,7 @@ defmodule JidoAI.Examples.RoutingPolicyTest do
   defp await_mode(:turn, _, _), do: :ok
 
   defp await_mode(:session, server, id) do
-    assert {:ok, _} = Jido.AI.Session.await(server, id, 5_000)
+    assert {:ok, _} = Jido.AI.Orchestration.await(server, id, 5_000)
     :ok
   end
 end

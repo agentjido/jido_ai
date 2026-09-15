@@ -6,7 +6,7 @@ defmodule Jido.AI.Runtime.Preflight do
       :ok
     else
       {:error, _} = error ->
-        Jido.AI.Session.failure_type(context, :tool_guardrail)
+        Jido.AI.Orchestration.failure_type(context, :tool_guardrail)
         error
     end
   end

@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.FailurePositionTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Request, Session}
+  alias Jido.AI.{Request, Orchestration}
   alias Jido.AI.Reasoning.ReAct
   alias ReAct.{Config, Token}
   alias JidoAI.Examples.FailurePosition.Fault, as: Example
@@ -108,13 +108,13 @@ defmodule JidoAI.Examples.FailurePositionTest do
       assert_receive {:reasoning_position, 1, :completed, ^server}, 2_000
       assert_receive {:mock_llm_waiting, ^mock, :repair, provider}, 2_000
       monitor = Process.monitor(provider)
-      owner = Server.children(server)[{:plugin, Jido.AI.Session.Plugin}].pid
+      owner = Server.children(server)[{:plugin, Jido.AI.Orchestration.Plugin}].pid
       [{id, job}] = Map.to_list(:sys.get_state(owner).jobs)
 
       case unquote(stop) do
         :cancel ->
           assert :ok =
-                   Session.cancel(%Request.Handle{id: id, server: server, query: "Hold repair"})
+                   Orchestration.cancel(%Request.Handle{id: id, server: server, query: "Hold repair"})
 
         :worker ->
           Process.exit(job.task.pid, :kill)

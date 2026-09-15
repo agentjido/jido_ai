@@ -1,7 +1,7 @@
 defmodule JidoAI.Examples.StreamingTest do
   use JidoAI.Examples.Case
   alias JidoAI.Examples.Streaming.Agent
-  alias Jido.AI.{Request, Session}
+  alias Jido.AI.{Request, Orchestration}
 
   test "public stream events precede the complete answer commit", %{jido: jido} do
     {mock, context} = native_mock([%{reply: {:stream, [%{content: "First "}, {:wait, :middle}, %{content: "last"}]}}])
@@ -40,7 +40,7 @@ defmodule JidoAI.Examples.StreamingTest do
 
     assert_receive {:mock_llm_waiting, ^mock, :cancel, worker}, 5_000
     monitor = Process.monitor(worker)
-    assert :ok = Session.cancel(request)
+    assert :ok = Orchestration.cancel(request)
     assert {:error, :cancelled} = Request.await(request)
     assert List.last(Enum.to_list(events)).kind == :request_cancelled
     assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 5_000

@@ -76,7 +76,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
     server = native_start(jido, [tools: []], %{controls: %{output: [RawFailure]}})
     assert {:ok, handle} = request(server, mock, :react, "Fail", context: %{observer: self(), failure: raw})
     assert {:error, ^raw} = Request.await(handle)
-    assert {:ok, view} = Session.snapshot(server)
+    assert {:ok, view} = Orchestration.snapshot(server)
     assert view.request.status == :failed and view.request.error == raw
     assert view.live == nil and view.details.active_request_id == nil
     streamed = events(handle)
@@ -91,7 +91,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
     server = start_reasoning(jido, :react, tools: [])
     assert {:ok, handle} = request(server, mock, :react, "Checkpoint")
     assert {:ok, "Done"} = Request.await(handle)
-    assert {:ok, view} = Session.snapshot(server)
+    assert {:ok, view} = Orchestration.snapshot(server)
     assert view.live == nil and view.details.active_request_id == nil
     assert {:ok, saved} = Jido.Agent.checkpoint(view.agent)
     assert saved.state.requests[handle.id] == view.request
@@ -199,7 +199,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
   defp current_history(server) do
     agent = Server.agent(server)
     assert {:ok, profile} = Configuration.profile(agent)
-    assert {:ok, entries} = Jido.AI.Session.Transcript.read(agent.state, profile)
+    assert {:ok, entries} = Jido.AI.Orchestration.Transcript.read(agent.state, profile)
     Enum.map(entries, &message_data/1)
   end
 
@@ -239,7 +239,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
     do: Thread.filter_by_kind(Server.agent(server).state.messages.thread, :ai_context_operation)
 
   defp replace_context(server, value, opts),
-    do: Session.modify_context(server, %{type: :replace, result_context: value}, opts)
+    do: Orchestration.modify_context(server, %{type: :replace, result_context: value}, opts)
 
   defp deferred_context(jido, terminal) do
     first =
@@ -278,7 +278,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     case terminal do
       :task_loss ->
-        assert {:ok, view} = Session.snapshot(server)
+        assert {:ok, view} = Orchestration.snapshot(server)
         assert view.details.phase == :executing_tool
         Process.exit(view.live.worker_pid, :kill)
         assert {:error, :worker_crash} = Request.await(handle)
@@ -373,7 +373,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert {:ok, router} = Jido.Signal.Router.new(Server.agent(server).routes)
 
       for type <- [
-            Session.cancel_type(),
+            Orchestration.cancel_type(),
             "jido.ai.session.control",
             "jido.ai.configure",
             "jido.ai.context.modify"
@@ -390,7 +390,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
         assert after_signal.state == before
       end
 
-      assert {:ok, %{request: nil, live: nil}} = Session.snapshot(server)
+      assert {:ok, %{request: nil, live: nil}} = Orchestration.snapshot(server)
     end
   end
 
@@ -398,11 +398,11 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
     test "start commits one request before its owned model worker runs", %{jido: jido} do
       mock = mock([%{reply: {:wait, :held, {:text, "4"}}}])
       server = native_start(jido, streaming: true)
-      assert {:ok, %{request: nil, live: nil}} = Session.snapshot(server)
+      assert {:ok, %{request: nil, live: nil}} = Orchestration.snapshot(server)
       assert {:ok, handle} = request(server, mock, :react, "What is 2 + 2?", context: %{observer: self()})
       assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
       assert %{status: :pending, query: "What is 2 + 2?"} = record(server, handle)
-      assert {:ok, view} = Session.snapshot(server)
+      assert {:ok, view} = Orchestration.snapshot(server)
       assert view.details.active_request_id == handle.id
       assert view.details.phase == :awaiting_llm
       assert Process.alive?(view.live.worker_pid)
@@ -560,7 +560,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert {:error, {:unknown_allowed_tools, ["search"]}} =
                request(server, mock, :react, "Bad tool", allowed_tools: ["search"], context: %{observer: self()})
 
-      assert {:ok, %{request: nil, live: nil}} = Session.snapshot(server)
+      assert {:ok, %{request: nil, live: nil}} = Orchestration.snapshot(server)
       assert Server.agent(server).state.requests == %{}
       refute_receive {:prepared_request, _, _}, 0
       assert MockLLM.report(mock).requests == []
@@ -643,7 +643,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       server = start_reasoning(jido, :react, tools: [])
       assert {:ok, handle} = request(server, mock, :react, "Hello")
       assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
-      assert {:ok, active} = Session.snapshot(server)
+      assert {:ok, active} = Orchestration.snapshot(server)
       assert active.details.phase == :awaiting_llm
       assert active.details.active_request_id == handle.id
       assert Enum.map(active.details.trace.events, & &1.kind) == [:request_started, :llm_started]
@@ -656,7 +656,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert Enum.count(all, &(&1.kind == :request_started)) == 1
       assert Enum.count(all, &(&1.kind == :request_completed)) == 1
       assert Enum.all?(all, &(&1.request_id == handle.id and &1.run_id == active.request.run_id))
-      assert {:ok, done} = Session.snapshot(server)
+      assert {:ok, done} = Orchestration.snapshot(server)
       assert done.details.phase == :request_completed and done.live == nil
       assert done.details.trace.events == Enum.take(all, done.details.trace.seq)
       assert_script_done(mock)
@@ -670,7 +670,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       id = handle.id
 
       assert {:ok, %{status: :queued, request_id: ^id, input_id: input_id}} =
-               Session.steer(handle, "Actually answer Q2", source: "/test/steer", extra_refs: %{origin: "suite"})
+               Orchestration.steer(handle, "Actually answer Q2", source: "/test/steer", extra_refs: %{origin: "suite"})
 
       assert user_texts(server) == ["Q1"]
       assert :ok = MockLLM.release(mock, :held)
@@ -688,12 +688,12 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       server = start_reasoning(jido, :react, tools: [])
       assert {:ok, first} = request(server, mock, :react, "Q1")
       assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
-      assert {:ok, %{status: :queued}} = Session.steer(first, "Discard this input")
+      assert {:ok, %{status: :queued}} = Orchestration.steer(first, "Discard this input")
       assert :ok = MockLLM.release(mock, :held)
       assert {:error, error} = Request.await(first)
       assert error.details.status == 429
       assert record(server, first).status == :failed
-      assert {:ok, %{live: nil, details: %{active_request_id: nil}}} = Session.snapshot(server)
+      assert {:ok, %{live: nil, details: %{active_request_id: nil}}} = Orchestration.snapshot(server)
       refute Enum.any?(events(first), &(&1.kind == :input_injected))
       assert user_texts(server) == ["Q1"]
       assert {:ok, next} = request(server, mock, :react, "Q2")
@@ -708,9 +708,12 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       mock = mock([])
       server = start_reasoning(jido, :react, tools: [])
       before = Server.agent(server).state
-      assert {:error, %{status: :rejected, reason: :idle, kind: :inject}} = Session.inject(server, "Programmatic input")
+
+      assert {:error, %{status: :rejected, reason: :idle, kind: :inject}} =
+               Orchestration.inject(server, "Programmatic input")
+
       assert Server.agent(server).state == before
-      assert {:ok, %{request: nil, live: nil}} = Session.snapshot(server)
+      assert {:ok, %{request: nil, live: nil}} = Orchestration.snapshot(server)
       assert MockLLM.report(mock).requests == []
       assert_script_done(mock)
     end
@@ -723,7 +726,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       before = Server.agent(server).state.messages
 
       assert {:error, %{status: :rejected, reason: :request_mismatch}} =
-               Session.steer(server, "Wrong request", expected_request_id: "stale")
+               Orchestration.steer(server, "Wrong request", expected_request_id: "stale")
 
       assert Server.agent(server).state.messages == before
       assert :ok = MockLLM.release(mock, :held)
@@ -740,7 +743,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert {:ok, handle} = request(server, mock, :react, "Q1")
       assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
       before = Server.agent(server).state.messages
-      assert {:error, %{status: :rejected, reason: :empty_content}} = Session.steer(handle, "   ")
+      assert {:error, %{status: :rejected, reason: :empty_content}} = Orchestration.steer(handle, "   ")
       assert Server.agent(server).state.messages == before
       assert :ok = MockLLM.release(mock, :held)
       assert {:ok, "Done"} = Request.await(handle)
@@ -757,7 +760,10 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
 
       assert {:ok, %{input_id: input_id}} =
-               Session.inject(handle, "Actually answer Q2", source: "/test/runtime", extra_refs: %{origin: "suite"})
+               Orchestration.inject(handle, "Actually answer Q2",
+                 source: "/test/runtime",
+                 extra_refs: %{origin: "suite"}
+               )
 
       assert user_texts(server) == ["Q1"]
       assert :ok = MockLLM.release(mock, :held)
@@ -792,7 +798,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       server = start_reasoning(jido, :react, tools: [])
       assert {:ok, handle} = request(server, mock, :react, "Draft")
       assert_receive {:mock_llm_waiting, ^mock, :draft, _}, 2_000
-      assert {:ok, _} = Session.inject(handle, "Revise")
+      assert {:ok, _} = Orchestration.inject(handle, "Revise")
       assert :ok = MockLLM.release(mock, :draft)
       assert {:ok, "Draft two"} = Request.await(handle)
 
@@ -933,7 +939,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       server = start_reasoning(jido, :react, tools: [])
       assert {:ok, handle} = request(server, mock, :react, "Track this")
       assert {:ok, "Tracked"} = Request.await(handle)
-      assert {:ok, view} = Session.snapshot(server)
+      assert {:ok, view} = Orchestration.snapshot(server)
       conversation = Enum.reject(view.details.conversation, &(&1.role == :system))
 
       assert Enum.map(conversation, &%{role: &1.role, content: Jido.AI.Query.summarize(&1.content)}) ==
@@ -969,7 +975,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       server = start_reasoning(jido, :react, tools: [TestCalculator])
       assert {:ok, handle} = request(server, mock, :react, "Add", context: %{observer: self(), hold_tool: true})
       assert_receive {:calculator_held, tool}, 2_000
-      assert {:ok, view} = Session.snapshot(server)
+      assert {:ok, view} = Orchestration.snapshot(server)
 
       assert view.details.tool_calls == [
                %{
@@ -983,7 +989,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
       send(tool, :release)
       assert {:ok, "5"} = Request.await(handle)
-      assert {:ok, done} = Session.snapshot(server)
+      assert {:ok, done} = Orchestration.snapshot(server)
       assert done.details.tool_calls == []
       assert [%{id: "call_string", result: {:ok, %{result: 5}, []}}] = done.details.tool_results
       assert_script_done(mock)
@@ -1005,19 +1011,19 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       server = start_reasoning(jido, :react, tools: [TestCalculator, TestSearch])
       assert {:ok, handle} = request(server, mock, :react, "Use tools")
       assert_receive {:mock_llm_waiting, ^mock, :final, _}, 2_000
-      assert {:ok, before} = Session.snapshot(server)
+      assert {:ok, before} = Orchestration.snapshot(server)
       replay = Enum.find(before.details.trace.events, &(&1.kind == :tool_completed and &1.tool_call_id == "call_calc"))
       assert replay != nil
 
       assert :ok =
                GenServer.call(owner(server), {:event, handle.id, before.request.run_id, :tool_completed, replay.data})
 
-      assert {:ok, replayed} = Session.snapshot(server)
+      assert {:ok, replayed} = Orchestration.snapshot(server)
       assert replayed.details.phase == :awaiting_llm
       assert replayed.details.tool_results == before.details.tool_results
       assert :ok = MockLLM.release(mock, :final)
       assert {:ok, "The tools finished."} = Request.await(handle)
-      assert {:ok, done} = Session.snapshot(server)
+      assert {:ok, done} = Orchestration.snapshot(server)
       assert done.request.result == "The tools finished."
       assert done.details.tool_calls == []
 
@@ -1049,13 +1055,13 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert :ok =
                GenServer.call(owner(server), {:event, handle.id, before.request.run_id, :tool_completed, replay.data})
 
-      assert {:ok, retained} = Session.snapshot(server, request_id: handle.id)
+      assert {:ok, retained} = Orchestration.snapshot(server, request_id: handle.id)
       assert retained.request == done.request
       assert {:ok, next} = request(server, mock, :react, "Next run")
       assert_receive {:mock_llm_waiting, ^mock, :next, _}, 2_000
-      assert {:ok, fresh} = Session.snapshot(server)
+      assert {:ok, fresh} = Orchestration.snapshot(server)
       assert fresh.details.tool_results == [] and fresh.details.tool_calls == []
-      assert {:ok, retained} = Session.snapshot(server, request_id: handle.id)
+      assert {:ok, retained} = Orchestration.snapshot(server, request_id: handle.id)
       assert retained.details.tool_results == done.details.tool_results
       assert :ok = MockLLM.release(mock, :next)
       assert {:ok, "Next"} = Request.await(next)
@@ -1074,7 +1080,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
                )
 
       assert {:ok, "First"} = Request.await(first)
-      assert {:ok, %{live: nil}} = Session.snapshot(server)
+      assert {:ok, %{live: nil}} = Orchestration.snapshot(server)
       assert {:ok, next} = request(server, mock, :react, "Q2")
       assert {:ok, "Next"} = Request.await(next)
       [first_wire, next_wire] = MockLLM.report(mock).requests
@@ -1093,7 +1099,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       copy = saved |> :erlang.term_to_binary() |> :erlang.binary_to_term([:safe])
       assert {:ok, restored} = Jido.Agent.restore(Jido.Agent, copy)
       server = start_agent(jido, restored)
-      assert {:ok, view} = Session.snapshot(server, request_id: handle.id)
+      assert {:ok, view} = Orchestration.snapshot(server, request_id: handle.id)
       assert view.request.status == :completed and view.request.result == "Done"
       assert view.live == nil and view.details.active_request_id == nil
       assert view.details.phase == :request_completed
@@ -1114,13 +1120,13 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert {:ok, handle} = request(server, mock, :react)
       assert_receive {:mock_llm_waiting, ^mock, :held, provider}, 2_000
       monitor = Process.monitor(provider)
-      assert :ok = Session.cancel(handle, reason: :user_cancelled)
+      assert :ok = Orchestration.cancel(handle, reason: :user_cancelled)
       assert {:error, {:cancelled, :user_cancelled}} = Request.await(handle)
       assert record(server, handle).error == {:cancelled, :user_cancelled}
       assert_receive {:DOWN, ^monitor, :process, ^provider, _}, 2_000
 
       assert {:ok, %{live: nil, details: %{active_request_id: nil, cancel_reason: :user_cancelled}}} =
-               Session.snapshot(server)
+               Orchestration.snapshot(server)
 
       eventually(fn -> MockLLM.report(mock).waiting == [] end)
       assert_script_done(mock)
@@ -1132,12 +1138,12 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert {:ok, first} = request(server, mock, :react)
       assert_receive {:mock_llm_waiting, ^mock, :held, provider}, 2_000
       monitor = Process.monitor(provider)
-      assert {:ok, view} = Session.snapshot(server)
+      assert {:ok, view} = Orchestration.snapshot(server)
       Process.exit(view.live.worker_pid, :kill)
       assert {:error, :worker_crash} = Request.await(first)
       assert record(server, first).error == :worker_crash
       assert_receive {:DOWN, ^monitor, :process, ^provider, _}, 2_000
-      assert {:ok, %{live: nil, details: %{active_request_id: nil}}} = Session.snapshot(server)
+      assert {:ok, %{live: nil, details: %{active_request_id: nil}}} = Orchestration.snapshot(server)
       assert {:ok, next} = request(server, mock, :react, "Next")
       assert {:ok, "Next"} = Request.await(next)
       eventually(fn -> MockLLM.report(mock).waiting == [] end)
@@ -1179,12 +1185,12 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
                      1_000
 
       assert_receive {:signal, %{type: "ai.llm.delta", data: %{chunk_type: :content_part, delta: ^image}}}, 1_000
-      assert {:ok, active} = Session.snapshot(server)
+      assert {:ok, active} = Orchestration.snapshot(server)
       assert active.details.streaming_text == ""
       assert :ok = MockLLM.release(mock, :held)
       assert {:ok, [^image]} = Request.await(handle)
       assert record(server, handle).result == [image]
-      assert {:ok, %{details: %{streaming_text: ""}}} = Session.snapshot(server)
+      assert {:ok, %{details: %{streaming_text: ""}}} = Orchestration.snapshot(server)
       assert :ok = Jido.Action.validate_static_data(Server.agent(server).state)
       assert_script_done(mock)
     end
@@ -1212,7 +1218,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert_receive {:delta_metadata, metadata}, 1_000
       assert metadata.model == "openai:gpt-4o-mini"
       assert [%{body: %{"model" => "gpt-4o-mini"}}] = MockLLM.report(mock).requests
-      assert {:ok, view} = Session.snapshot(server)
+      assert {:ok, view} = Orchestration.snapshot(server)
       assert view.details.model == metadata.model
       assert_script_done(mock)
     end
@@ -1222,7 +1228,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       server = start_reasoning(jido, :react, tools: [])
       assert {:ok, handle} = request(server, mock, :react)
       assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
-      assert {:ok, view} = Session.snapshot(server)
+      assert {:ok, view} = Orchestration.snapshot(server)
 
       for n <- 1..2_010 do
         assert :ok =
@@ -1232,13 +1238,13 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
                  )
       end
 
-      assert {:ok, active} = Session.snapshot(server)
+      assert {:ok, active} = Orchestration.snapshot(server)
       assert active.details.trace.truncated?
       assert Enum.map(active.details.trace.events, & &1.seq) == Enum.to_list(1..2_000)
       assert active.details.trace.seq == 2_012
       assert :ok = MockLLM.release(mock, :held)
       assert {:ok, "Done"} = Request.await(handle)
-      assert {:ok, done} = Session.snapshot(server)
+      assert {:ok, done} = Orchestration.snapshot(server)
       assert done.details.trace.events == active.details.trace.events
       assert done.details.trace.truncated? and done.details.trace.seq > active.details.trace.seq
       assert done.request.status == :completed
@@ -1251,7 +1257,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert {:ok, handle} = request(server, mock, :react)
       # The Chat SDK maps the wire value to :error. Do not claim :incomplete decoding.
       assert {:error, {:incomplete_response, :error}} = Request.await(handle)
-      assert {:ok, view} = Session.snapshot(server)
+      assert {:ok, view} = Orchestration.snapshot(server)
       assert view.request.error == {:incomplete_response, :error}
       assert view.request.meta.error_type == :llm_response
       assert_script_done(mock)
@@ -1405,7 +1411,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       replacement = conversation("Compacted prompt", [%{role: :user, content: "summary"}])
 
       assert {:ok, _} =
-               Session.modify_context(
+               Orchestration.modify_context(
                  server,
                  %{
                    type: :replace,
@@ -1511,14 +1517,14 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
         ])
 
       assert {:ok, _} =
-               Session.modify_context(
+               Orchestration.modify_context(
                  server,
                  %{type: :replace, reason: :compaction, result_context: replacement},
                  op_id: "op_durable"
                )
 
       compacted = current_history(server)
-      assert {:ok, view} = Session.snapshot(server)
+      assert {:ok, view} = Orchestration.snapshot(server)
       messages = view.details.conversation
 
       assistant = Enum.find(messages, &(&1[:role] == :assistant))
@@ -1561,20 +1567,26 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       beta = conversation("Beta", [%{role: :user, content: "beta"}])
       assert {:ok, _} = replace_context(server, alpha, context_ref: "alpha", op_id: "alpha")
       assert {:ok, _} = replace_context(server, beta, context_ref: "beta", op_id: "beta")
-      assert {:ok, _} = Session.modify_context(server, %{type: :switch}, context_ref: "alpha", op_id: "switch-alpha")
+
+      assert {:ok, _} =
+               Orchestration.modify_context(server, %{type: :switch}, context_ref: "alpha", op_id: "switch-alpha")
+
       assert context_lane(server).active_context_ref == "alpha"
       assert current_history(server) == history_entries(alpha)
       assert length(context_operations(server)) == 3
       assert {:ok, first} = request(server, mock, :react, "Alpha query")
       assert {:ok, "Alpha answer"} = Request.await(first)
-      assert {:ok, _} = Session.modify_context(server, %{type: :switch}, context_ref: "beta", op_id: "switch-beta")
+
+      assert {:ok, _} =
+               Orchestration.modify_context(server, %{type: :switch}, context_ref: "beta", op_id: "switch-beta")
+
       assert current_history(server) == history_entries(beta)
       assert {:ok, next} = request(server, mock, :react, "Beta query")
       assert {:ok, "Beta answer"} = Request.await(next)
       [a, b] = MockLLM.report(mock).requests
       assert Enum.map(a.body["messages"], & &1["content"]) == ["Alpha", "alpha", "Alpha query"]
       assert Enum.map(b.body["messages"], & &1["content"]) == ["Beta", "beta", "Beta query"]
-      assert {:ok, _} = Session.modify_context(server, %{type: :switch}, context_ref: "alpha", op_id: "back")
+      assert {:ok, _} = Orchestration.modify_context(server, %{type: :switch}, context_ref: "alpha", op_id: "back")
       assert Enum.map(current_history(server), & &1.content) == ["alpha", "Alpha query", "Alpha answer"]
       assert_script_done(mock)
     end
@@ -1584,14 +1596,14 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       server = start_reasoning(jido, :react, tools: [], system_prompt: "Original prompt")
       assert {:ok, first} = request(server, mock, :react, "Q1")
       assert {:ok, "A1"} = Request.await(first)
-      assert {:ok, _} = Session.modify_context(server, %{type: :switch}, context_ref: "fresh", op_id: "fresh")
+      assert {:ok, _} = Orchestration.modify_context(server, %{type: :switch}, context_ref: "fresh", op_id: "fresh")
       assert current_history(server) == []
       assert {:ok, %Profile{instructions: "Original prompt"}} = Configuration.profile(Server.agent(server))
       assert {:ok, next} = request(server, mock, :react, "Q2")
       assert {:ok, "A2"} = Request.await(next)
       [_, wire] = MockLLM.report(mock).requests
       assert Enum.map(wire.body["messages"], & &1["content"]) == ["Original prompt", "Q2"]
-      assert {:ok, _} = Session.modify_context(server, %{type: :switch}, context_ref: "default", op_id: "back")
+      assert {:ok, _} = Orchestration.modify_context(server, %{type: :switch}, context_ref: "default", op_id: "back")
       assert Enum.map(current_history(server), & &1.content) == ["Q1", "A1"]
       assert_script_done(mock)
     end
@@ -1740,7 +1752,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       source = definition(:react, tools: [TestCalculator], model: MockLLM.model(), system_prompt: "Configured")
       assert {:ok, agent} = Jido.AI.Agent.from_initial_state(source, %{messages: session}, id: "restored-agent")
       assert {:ok, %Profile{id: :assistant, instructions: "Restored"} = profile} = Configuration.profile(agent)
-      assert {:ok, history} = Jido.AI.Session.Transcript.read(agent.state, profile)
+      assert {:ok, history} = Jido.AI.Orchestration.Transcript.read(agent.state, profile)
       assert Enum.map(history, &Jido.AI.Query.summarize(&1.content)) == ["Previous question", "Previous answer"]
       assert agent.id == "restored-agent"
       refute Map.has_key?(agent.state, :context)
@@ -1770,7 +1782,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       source = definition(:react, tools: [TestCalculator], model: MockLLM.model(), system_prompt: "Config prompt")
       assert {:ok, agent} = Jido.AI.Agent.from_initial_state(source, %{messages: session})
       assert {:ok, %Profile{instructions: "Config prompt"} = profile} = Configuration.profile(agent)
-      assert {:ok, history} = Jido.AI.Session.Transcript.read(agent.state, profile)
+      assert {:ok, history} = Jido.AI.Orchestration.Transcript.read(agent.state, profile)
       assert Enum.map(history, &Jido.AI.Query.summarize(&1.content)) == ["Previous question", "Previous answer"]
       mock = mock([%{reply: {:text, "Continued"}}])
       server = start_agent(jido, agent)
@@ -1804,7 +1816,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert agent.state.thread == thread
       assert {:ok, profile} = Configuration.profile(agent)
       assert profile.memory.history == :messages
-      assert {:ok, []} = Jido.AI.Session.Transcript.read(agent.state, profile)
+      assert {:ok, []} = Jido.AI.Orchestration.Transcript.read(agent.state, profile)
       mock = mock([%{reply: {:text, "Done"}}])
       server = start_agent(jido, agent)
       assert {:ok, handle} = request(server, mock, :react, "Hello")
@@ -1824,7 +1836,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       server = start_reasoning(jido, :react, tools: [], runtime_adapter: false)
       assert {:ok, handle} = request(server, mock, :react, "Work")
       assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
-      assert {:ok, view} = Session.snapshot(server)
+      assert {:ok, view} = Orchestration.snapshot(server)
       assert Process.alive?(view.live.worker_pid) and Process.alive?(owner(server))
       assert view.request.status == :pending
       assert view.details.phase == :awaiting_llm

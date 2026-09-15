@@ -1,5 +1,9 @@
 # Current public API map
 
+The live request API is `Jido.AI.Orchestration`. `Jido.Session` remains the
+portable value. See [ownership and migration](orchestration-layout.md) for the
+file layout, Coordinator boundary, and future delegation constraints.
+
 Conversation consolidation is complete. `Jido.AI.Thread.Projection` provides
 canonical Session/Thread message projection. Runtime history now stores Session
 values, with no second Session in Plugin lane state. Standalone ReAct and
@@ -20,7 +24,7 @@ The [old migration map](public-api-map-history.md) is historical evidence only.
 `Jido.AI.Thread.Projection` interprets AI entries; it does not own state.
 Thread controls and operation encoding live under `Jido.AI.Thread`.
 The top-level `Conversation` and `History` modules are removed. Internal
-`Session.Transcript` owns Agent field access and commits. Internal
+`Orchestration.Transcript` owns Agent field access and commits. Internal
 `Model.Messages` owns provider-message normalization and private metadata.
 No forwarding compatibility modules remain.
 
@@ -52,11 +56,11 @@ This separation does not add resume support to other reasoning methods.
 | Surface | Current contract | Source and acceptance tests |
 | --- | --- | --- |
 | Generated `ask/2,3`, `ask_sync/2,3`, `ask_stream/2,3` | `ask` returns an answer for turn mode or a request handle for session mode. `ask_sync` waits for an answer; `ask_stream` starts a streaming session request. These are not aliases for core route helpers, which return the committed Agent. | [generated definitions](../../lib/jido_ai/agent/definition.ex), [interface](../../lib/jido_ai/agent/interface.ex), [interface tests](../../test/authoring/agents/interfaces_test.exs) |
-| Generated `await/1,2`, `cancel/1,2`, `steer/2,3` | Retained convenience helpers. Generated cancellation targets the Agent server; `Session.cancel` targets a handle. `inject` is not generated. | [definitions](../../lib/jido_ai/agent/definition.ex), [request tests](../../test/authoring/agents/execution_test.exs) |
-| `Jido.AI.Request.await/1,2`, `await_many/1,2` | Wait for admitted requests. `await_many` belongs to Request, not the generated Agent interface. | [Request](../../lib/jido_ai/request.ex), [Session tests](../../test/jido_ai/session/session_test.exs) |
-| `Jido.AI.Session.snapshot/1,2`, `modify_context/2,3`, `cancel/1,2`, `steer/2,3`, `inject/2,3`, `skill_catalog/1,2` | Inspect or control AI sessions. Inspection reads selected Profile and committed Session entries, not private strategy state. | [Session](../../lib/jido_ai/session.ex), [inspection tests](../../test/jido_ai/session/inspection_test.exs), [recovery tests](../../test/authoring/agents/recovery_test.exs) |
+| Generated `await/1,2`, `cancel/1,2`, `steer/2,3` | Retained convenience helpers. Generated cancellation targets the Agent server; `Orchestration.cancel` targets a handle. `inject` is not generated. | [definitions](../../lib/jido_ai/agent/definition.ex), [request tests](../../test/authoring/agents/execution_test.exs) |
+| `Jido.AI.Request.await/1,2`, `await_many/1,2` | Wait for admitted requests. `await_many` belongs to Request, not the generated Agent interface. | [Request](../../lib/jido_ai/request.ex), [Session tests](../../test/jido_ai/orchestration/orchestration_test.exs) |
+| `Jido.AI.Orchestration.snapshot/1,2`, `modify_context/2,3`, `cancel/1,2`, `steer/2,3`, `inject/2,3`, `skill_catalog/1,2` | Inspect or control AI requests. Inspection reads selected Profile and committed Session entries, not private strategy state. | [Orchestration](../../lib/jido_ai/orchestration.ex), [inspection tests](../../test/jido_ai/orchestration/inspection_test.exs), [recovery tests](../../test/authoring/agents/recovery_test.exs) |
 | `Jido.AI.Configuration.profile/1,2`, `Jido.AI.Thread.Projection.messages/1` | Read effective configuration and the declared committed history. A request already in progress keeps its admitted input. | [Configuration](../../lib/jido_ai/configuration.ex), [Thread projection](../../lib/jido_ai/thread/projection.ex), [history tests](../../test/jido_ai/operations/history_test.exs) |
-| `Jido.Session`, `Jido.Thread`, `Jido.Thread.Entry` | Value contracts owned by **jido_ai**, despite the module prefix. They remain in this package. `Jido.Session` is distinct from the AI runtime service `Jido.AI.Session`. | [Session value](../../lib/jido/session.ex), [Thread](../../lib/jido/thread.ex), [Entry](../../lib/jido/thread/entry.ex), [value tests](../../test/jido_ai/thread_value_test.exs) |
+| `Jido.Session`, `Jido.Thread`, `Jido.Thread.Entry` | Value contracts owned by **jido_ai**, despite the module prefix. They remain in this package. `Jido.Session` is distinct from the AI runtime service `Jido.AI.Orchestration`. | [Session value](../../lib/jido_session.ex), [Thread](../../lib/jido_thread.ex), [Entry](../../lib/jido_thread/entry.ex), [value tests](../../test/jido_ai/thread_value_test.exs) |
 
 ## Models, tools, and capabilities
 
@@ -97,7 +101,7 @@ not forwarded. Use `ToolAdapter.to_action_map/1` for module lookup maps and
   These do not restore private V2 strategy state. See [import](../../lib/jido_ai/agent/initial_state.ex)
   and [boundary tests](../../test/authoring/agents/boundaries_test.exs).
 - Internal implementation: `Agent.Definition`, `Agent.Interface`, DSL compiler,
-  `Profile.References`, Runtime steps, and Session process/commit helpers support
+  `Profile.References`, Runtime steps, and Orchestration process/commit helpers support
   the public entry points. Do not infer a stable user API from their exports.
 - Public testing support remains: [Test](../../lib/jido_ai/test.ex),
   [TestCase](../../lib/jido_ai/test_case.ex), and

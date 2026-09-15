@@ -1,5 +1,12 @@
 # Jido AI V3 Architecture Seams
 
+> Retained research snapshot from the early V3 migration. Its current-fact
+> sections, source paths, and test blockers are not current evidence.
+> Use [ARCHITECTURE.md](ARCHITECTURE.md) for the current overview and
+> [README.md](README.md) for document review status. The proposals, requirement
+> rationale, and capability inventory below remain available for review.
+> Historical approval statements below do not approve changed documents.
+
 Status: Seam map approved on 2026-09-08; seam contracts pending approval
 
 This document separates current facts from recommendations. The seam organization is approved. The target contracts and open decisions in each seam are not approved yet.
@@ -186,11 +193,11 @@ The current implementation already uses core Flow for important execution shapes
 - `lib/jido_ai/operations/runtime.ex:917-955` defines the next-batch continuation.
 - `lib/jido_ai/operations/runtime.ex:957-987` builds tool and reasoning Flows from core Flow components.
 - `lib/jido_ai/operations/tool_calling/flow.ex:1-134` exposes tool-call Flows and continuations.
-- `lib/jido_ai/session/session.ex:2` defines request admission and completion through the core Agent and Plugin model.
-- `lib/jido_ai/session/actions.ex:64-193` implements request admission and pending records.
-- `lib/jido_ai/session/actions.ex:195-275` settles an AI result into a candidate Agent and Directives.
-- `lib/jido_ai/session/actions.ex:277-331` defines AI cancellation semantics.
-- `lib/jido_ai/session/plugin.ex:2` owns portable request records and starts work only after admission commit.
+- `lib/jido_ai/orchestration/session.ex:2` defines request admission and completion through the core Agent and Plugin model.
+- `lib/jido_ai/orchestration/actions.ex:64-193` implements request admission and pending records.
+- `lib/jido_ai/orchestration/actions.ex:195-275` settles an AI result into a candidate Agent and Directives.
+- `lib/jido_ai/orchestration/actions.ex:277-331` defines AI cancellation semantics.
+- `lib/jido_ai/orchestration/plugin.ex:2` owns portable request records and starts work only after admission commit.
 - `lib/jido_ai/request.ex:1-154` defines request handles and public send and await calls.
 - `lib/jido_ai/operations/react_runner.ex:2-8` implements the standalone request stream with a private V3 Agent and the shared Flow.
 
@@ -448,7 +455,7 @@ Suggested requirements: `RSN-REQ-001` and later.
 | Owner | AI integration maintainers, with core Jido and Signal contract review |
 | Scope | Lower AI requests to core Turns, use Plugin admission and state ownership, form candidate Agents and Directives, bind trusted runtime resources, and define typed AI Signal data. |
 | Non-goals | No private AgentServer message, core state mutation, custom commit, PID identity, Signal router, dispatcher, bus, or envelope implementation. |
-| Current implementation | `lib/jido_ai/operations/runtime.ex:1-158`, `lib/jido_ai/session/plugin.ex`, `lib/jido_ai/session/actions.ex`, AI Signal modules, and authoring extension routes. Core contracts are in `../jido/lib/jido/plugin.ex:2-102` and `../jido/lib/jido/agent/extension.ex:2-28`. |
+| Current implementation | `lib/jido_ai/operations/runtime.ex:1-158`, `lib/jido_ai/orchestration/plugin.ex`, `lib/jido_ai/orchestration/actions.ex`, AI Signal modules, and authoring extension routes. Core contracts are in `../jido/lib/jido/plugin.ex:2-102` and `../jido/lib/jido/agent/extension.ex:2-28`. |
 | Planned target | A thin integration layer that uses only public Jido, Exec, and Signal contracts. Plugin state is portable. Runtime handles remain outside Agent checkpoints. |
 | Public contracts | AI route targets, Plugin keys, admission input, candidate data, AI Directives, runtime binding, typed Signal type and data, and post-commit effect rules. |
 | Dependencies | Seams 00, 01, and 04. It consumes core Jido and `jido_signal` public contracts. |
@@ -463,7 +470,7 @@ Suggested requirements: `INT-REQ-001` and later.
 | Owner | Session, Request, PendingInput, and public request API maintainers |
 | Scope | Define request identity, admission policy, portable request records, status, await, stream, sync, cancellation, steering, settlement, and active-input correlation. |
 | Non-goals | No general job queue, private AgentServer protocol, durable workflow, provider transport, or custom process registry. |
-| Current implementation | `lib/jido_ai/session/session.ex`, `lib/jido_ai/session/actions.ex:64-331`, `lib/jido_ai/session/plugin.ex`, and `lib/jido_ai/request.ex:1-154`. Tests include `test/jido_ai/request_test.exs:72-548` and `examples/v3/test/examples/02_requests/02_01_session_test.exs:38-569`. |
+| Current implementation | `lib/jido_ai/orchestration/session.ex`, `lib/jido_ai/orchestration/actions.ex:64-331`, `lib/jido_ai/orchestration/plugin.ex`, and `lib/jido_ai/request.ex:1-154`. Tests include `test/jido_ai/request_test.exs:72-548` and `examples/v3/test/examples/02_requests/02_01_session_test.exs:38-569`. |
 | Planned target | One request lifecycle for authored Agents and standalone use. Core Jido owns process and commit mechanics. Seam 04 owns bounded execution. This seam owns AI request policy and user controls. |
 | Public contracts | Request handle, request ID, status, result, timeout, cancel result, steering input, pending-input contract, busy and duplicate errors, and settlement events. |
 | Dependencies | Seams 00, 01, 04, and 06. |

@@ -295,7 +295,7 @@ defmodule JidoAI.Examples.TypedSignalsTest do
       if unquote(failure) == :cancel do
         assert_receive {:mock_llm_waiting, ^mock, :cancel_provider, worker}, 2_000
         ref = Process.monitor(worker)
-        assert :ok = Jido.AI.Session.cancel(request)
+        assert :ok = Jido.AI.Orchestration.cancel(request)
         assert_receive {:DOWN, ^ref, :process, ^worker, _}, 2_000
       end
 

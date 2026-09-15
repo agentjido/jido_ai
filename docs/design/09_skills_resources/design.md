@@ -1,6 +1,59 @@
 > Target seam design. This document is pending approval.
 
-# Skills and resource augmentation design
+# Skills and resources design
+
+## Architecture and contract status
+
+- Architecture category: [Skills and resources](../ARCHITECTURE.md).
+- Owning subsystem: Skill discovery, source, specification, activation, registry, runtime, resources, providers, and Actions.Skill.
+- Complete target: Keep rich skill and resource functionality, deterministic dependencies/collisions, trust boundaries, bounded loading, and versioned restoration. Do not remove advanced resource work because the current implementation is narrower.
+- Decision boundary: Resolve explicit versus lazy registry ownership and atomic re-resolution. Define skill compatibility policy with checkpoint and authoring seams.
+- Current implementation, module links, example proof, and exact differences:
+  [alignment](alignment.md). This design is a target, not an API reference.
+
+The requirements and proposed signatures below remain pending approval.
+Illustrative types are not evidence that a module or function exists. A
+requirement is not removed merely because the current implementation differs.
+Use the alignment matrix to distinguish current behavior from the full target.
+
+## Proposed reference trust boundary
+
+The shared sanitizer for untrusted Thread references belongs conceptually in
+the AI Thread reference layer, with Skill.Runtime as a consumer. Keep a
+separate trusted skill-activation path. This recommendation preserves removal
+of forged durable, skill_name, and skill_activation-kind fields; it does not
+weaken activation authority.
+
+See [value ownership](../01_ai_values/design.md#proposed-entry-batch-and-receipt-values).
+Exact helper placement and compatibility remain open. No code move or named
+document approval is implied.
+
+## Selected resource and activation ownership
+
+User-selected on 2026-09-15: one supervised AI resource owner per AgentServer,
+through the existing core Plugin runtime child contract. Catalogs and resource
+providers belong to that Agent runtime. Bind selected resources once before
+execution through core Plugin runtime context; pass bindings explicitly to
+workers. Lazy global Skill.Registry startup is not the default ownership model.
+
+`SKL-REQ-027`: The AgentServer AI resource owner shall index skill activations by canonical Jido.Session.id.
+
+`SKL-REQ-028`: The AgentServer AI resource owner shall share activations between requests in the same Session and isolate activations between different Sessions.
+
+`SKL-REQ-029`: When a request completes, is cancelled, or loses its worker, the AI resource owner shall retain that Session's activations.
+
+`SKL-REQ-030`: When a Session is explicitly closed, the AI resource owner shall clear that Session's activations.
+
+`SKL-REQ-031`: When delegated work crosses unrelated processes, the target shall resolve permitted resource IDs through its own bindings and target Session activation scope without treating transfer as activation authority.
+
+Session and Thread remain values without process references. Delegation
+transfers permitted resource IDs and input, not the originating process or
+activation authority. Core retains topology and child lifecycle ownership.
+
+Open: activation survival across AgentServer/resource-owner restart. Rebuilding
+catalogs/providers, clearing activations, and failing affected requests is only
+a preliminary proposal, not an agreed restart policy. Cross-Agent shared
+resources are outside this decision. No named document is approved.
 
 ## Scope and owner
 

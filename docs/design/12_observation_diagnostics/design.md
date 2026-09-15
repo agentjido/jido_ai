@@ -2,6 +2,59 @@
 
 # Observation and diagnostics design
 
+## Architecture and contract status
+
+- Architecture category: [Observation and diagnostics](../ARCHITECTURE.md).
+- Owning subsystem: Observe, sanitization, Runtime.Event/Telemetry, typed Signal projections, Request metadata, and Orchestration.Inspection.
+- Complete target: Preserve a complete versioned event contract, request/model/tool/delegation lineage, safe default projections, explicit rich-content policy, bounded diagnostics, and compatibility testing.
+- Decision boundary: Decide the common event representation and default rich/thinking-content policy. Observation must not become an execution or durable-event owner.
+- Current implementation, module links, example proof, and exact differences:
+  [alignment](alignment.md). This design is a target, not an API reference.
+
+The requirements and proposed signatures below remain pending approval.
+Illustrative types are not evidence that a module or function exists. A
+requirement is not removed merely because the current implementation differs.
+Use the alignment matrix to distinguish current behavior from the full target.
+
+## Selected request and attempt meanings
+
+Apply the [request/attempt policy](../07_request_sessions/design.md#selected-request-and-attempt-meanings)
+to observations: one logical request can have multiple attempts and preserved
+attempt outcomes. ReAct run_id is not sufficient as a unique attempt ID.
+Distinguish execution, commit, and delivery failures from uncertainty,
+cancellation, and supersession. Delivery failure does not rewrite a committed
+outcome. Exact event fields and compatibility remain open; no new struct is
+selected. Document approval remains pending.
+
+## Selected content permissions
+
+User-selected on 2026-09-15. Each permission applies only to its destination
+and content class. Stream permission cannot authorize storage. Rich content
+includes tool arguments, tool results, and media. Reasoning content includes
+hidden thinking and provider reasoning details. All permissions default off.
+
+`OBS-REQ-032`: Stream projection shall exclude rich content unless stream-specific permission permits it.
+
+`OBS-REQ-033`: Storage projection shall exclude rich content unless separate storage-specific permission permits it.
+
+`OBS-REQ-034`: Stream projection shall exclude reasoning content unless separate trusted stream-reasoning permission permits it.
+
+`OBS-REQ-035`: Storage projection shall exclude reasoning content unless separate trusted storage-reasoning permission permits it.
+
+`OBS-REQ-036`: Diagnostics projection shall exclude content unless both trusted access and explicit diagnostics content permission permit it.
+
+`OBS-REQ-037`: Telemetry projection shall exclude content regardless of rich-content or reasoning permissions.
+
+`OBS-REQ-038`: Every permitted content projection shall remove credentials and apply size limits.
+
+These rules do not change native ReqLLM data needed during execution. They
+govern exposure and storage, including canonical log payloads and snapshots.
+Retention of execution evidence is not permission to retain rich or reasoning
+content: preserve permitted identity, order, status, and bounded metadata.
+Exact permission field names and migration remain open. Preserve canonical
+Session/Thread, Agent + DSL + Profile, all methods, advanced capabilities,
+and core topology ownership. Named-document approval remains pending.
+
 ## Scope and owner
 
 - Owner: `Jido.AI.Observe`, sanitization, AI lifecycle event definitions, typed AI Signal data, public stream event views, inspection data, and diagnostic helpers.

@@ -1,6 +1,67 @@
 > Target seam design. This document is pending approval.
 
-# Bounded AI execution and streaming design
+# Shared AI execution design
+
+## Architecture and contract status
+
+- Architecture category: [Shared AI execution](../ARCHITECTURE.md).
+- Owning subsystem: Runtime.State, Flow, ReasonFlow, Prepare, CallModel, Decide, ToolsFlow, ToolAttempt, and OutputState.
+- Complete target: Keep one bounded execution path for all authoring forms and methods. Preserve advanced streaming, cancellation, retry, and effect contracts without making temporary execution state a portable conversation value.
+- Decision boundary: Resolve portable public Execution types, explicit Map concurrency, and the exact public cancellation contract against current core APIs.
+- Current implementation, module links, example proof, and exact differences:
+  [alignment](alignment.md). This design is a target, not an API reference.
+
+The requirements and proposed signatures below remain pending approval.
+Illustrative types are not evidence that a module or function exists. A
+requirement is not removed merely because the current implementation differs.
+Use the alignment matrix to distinguish current behavior from the full target.
+
+## Selected direction: complete the runtime split
+
+`EXE-DEC-005` — User-selected direction, 2026-09-15. This decision does not
+approve this document or authorize implementation.
+
+Keep the existing execution structure. Runtime owns model and tool execution,
+limits, usage, output validation, and output repair. Reasoning remains one
+internal dispatcher, with explicit method selection from the Profile. Each
+method owns its transitions, diagnostics, and validated `method_state`.
+
+Use the existing Reasoning functions as the starting contract. Do not add a
+method registry or a new execution framework for this change. The standalone
+ReAct adapter owns ReAct Config/State conversion and its existing token format.
+Shared execution does not use that adapter state as its common state model.
+
+Request transformers receive the prepared request, a small common execution
+view, and the Profile. Output repair reads the query directly, without a ReAct
+State conversion. The exact common-view fields and transformer callback
+compatibility remain open migration questions in seams 02 and 90.
+
+Preserve all eight methods and advanced capabilities, canonical `Jido.Session`
+and `Jido.Thread`, Agent + DSL + Profile authoring, native ReqLLM contracts,
+and core Jido topology ownership. This is an ownership decision, not approval
+of the illustrative public Execution types below.
+
+## Proposed execution-to-orchestration boundary
+
+The [private request adapter proposal](../07_request_sessions/design.md#proposed-data-boundary)
+carries execution facts out and returns control decisions. Runtime owns
+temporary native execution state, algorithm execution through the existing
+Reasoning dispatcher, and safe boundary positions. Method semantics remain
+owned by seam 05 under EXE-DEC-005.
+
+Orchestration owns pending-input order and queue access. A shared control point
+for pending input and checkpoints is a proposal, not a settled contract.
+Preserve wait-for-entry-commit behavior unless explicitly changed. This
+boundary does not require a public execution model or a second conversation
+store.
+
+## Conversation evidence and completion
+
+The [selected commit policy](../07_request_sessions/design.md#selected-conversation-commit-policy)
+keeps committed intermediate work as evidence without promoting failed or
+cancelled work into the next default model conversation. Runtime reports
+completed tool results and unresolved calls accurately; it does not invent
+results to make a tool exchange complete. Orchestration owns promotion.
 
 ## Scope and owner
 
@@ -32,7 +93,7 @@ One AI execution starts with portable input:
   request_id: String.t(),
   run_id: String.t(),
   query: Jido.AI.Query.t(),
-  context: Jido.AI.Context.t(),
+  context: Jido.Session.t(),
   controls: map(),
   limits: Jido.AI.Execution.Limits.t(),
   metadata: map()

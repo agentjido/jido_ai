@@ -12,7 +12,7 @@ Thread holds ordered `Jido.Thread.Entry` values, including AI messages,
 conversation operations, and application entries.
 
 The context-control Plugin holds lane and pending-operation state. It does not
-hold a second Session or copy of the messages. `Jido.AI.Session` is the separate
+hold a second Session or copy of the messages. `Jido.AI.Orchestration` is the separate
 live API for request control and inspection; it is not the portable value.
 
 ## Build and project a conversation
@@ -70,13 +70,13 @@ special `:context` import input is removed.
   %{role: :user, content: "Summary of the earlier conversation"}
 ])
 
-{:ok, _} = Jido.AI.Session.modify_context(server, %{
+{:ok, _} = Jido.AI.Orchestration.modify_context(server, %{
   type: :replace,
   reason: :compaction,
   result_context: summary
 }, op_id: "compact-1")
 
-{:ok, _} = Jido.AI.Session.modify_context(server, %{type: :switch},
+{:ok, _} = Jido.AI.Orchestration.modify_context(server, %{type: :switch},
   context_ref: "review", op_id: "switch-1")
 ```
 
@@ -92,7 +92,7 @@ references do not grant durability.
 
 ## Inspect and verify
 
-Use `Jido.AI.Session.snapshot(server)` for live request inspection. Use the
+Use `Jido.AI.Orchestration.snapshot(server)` for live request inspection. Use the
 canonical Thread to inspect entry identity and references. Use
 `snapshot.details[:tool_results]` for completed structured tool outputs rather
 than parsing provider-facing tool messages.

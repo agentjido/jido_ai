@@ -1,11 +1,11 @@
-defmodule Jido.AI.Session.Runtime do
+defmodule Jido.AI.Orchestration.Coordinator do
   @moduledoc false
   use GenServer
-  alias Jido.AI.{Authoring, Session}
+  alias Jido.AI.{Authoring, Orchestration}
   alias Jido.AI.PendingInputServer, as: InputQueue
   alias Jido.AI.Request.Stream
-  alias Jido.AI.Session.Change
-  alias Jido.AI.Session.{Activity, Inspection}
+  alias Jido.AI.Orchestration.Change
+  alias Jido.AI.Orchestration.{Activity, Inspection}
 
   def start_link(init), do: GenServer.start_link(__MODULE__, init)
 
@@ -15,7 +15,7 @@ defmodule Jido.AI.Session.Runtime do
 
     with {:ok, skills} <-
            Jido.AI.Skill.Source.prepare_all(Keyword.get(init.options, :skills, %{})),
-         {:ok, delivery} <- Jido.AI.Session.Delivery.start_link(self(), init.agent_server) do
+         {:ok, delivery} <- Jido.AI.Orchestration.Delivery.start_link(self(), init.agent_server) do
       {:ok, %{init: init, jobs: %{}, settlements: %{}, delivery: delivery, skills: skills}, {:continue, :recover}}
     else
       {:error, reason} ->
@@ -60,13 +60,13 @@ defmodule Jido.AI.Session.Runtime do
   def handle_call(:skill_catalogs, _, state), do: {:reply, state.skills, state}
 
   def handle_call({:delivery_status, id}, _, state),
-    do: {:reply, Jido.AI.Session.Delivery.status(state.delivery, id), state}
+    do: {:reply, Jido.AI.Orchestration.Delivery.status(state.delivery, id), state}
 
   def handle_call({:claim_delivery, id, ticket}, _, state),
-    do: {:reply, Jido.AI.Session.Delivery.claim(state.delivery, id, ticket), state}
+    do: {:reply, Jido.AI.Orchestration.Delivery.claim(state.delivery, id, ticket), state}
 
   def handle_call({:delivery_receipt, id, ticket}, _, state),
-    do: {:reply, Jido.AI.Session.Delivery.receipt(state.delivery, id, ticket), state}
+    do: {:reply, Jido.AI.Orchestration.Delivery.receipt(state.delivery, id, ticket), state}
 
   def handle_call({:completion_status, id, run_id}, _, state) do
     failure =
@@ -181,7 +181,7 @@ defmodule Jido.AI.Session.Runtime do
 
     runtime = self()
     enabled = Map.get(profile.observability, :emit_signals?, true)
-    :ok = Jido.AI.Session.Delivery.register(state.delivery, record, enabled)
+    :ok = Jido.AI.Orchestration.Delivery.register(state.delivery, record, enabled)
     saved = if checkpoint, do: checkpoint.state
     resumed? = Jido.AI.Runtime.Checkpoint.resumed?(context)
 
@@ -584,7 +584,7 @@ defmodule Jido.AI.Session.Runtime do
   # the model work or its original Directive batch again.
   defp settle(state, id, attempt) do
     server = state.init.agent_server
-    task = Task.async(fn -> commit(server, Session.settle_signal(id)) end)
+    task = Task.async(fn -> commit(server, Orchestration.settle_signal(id)) end)
     entry = %{id: id, run_id: state.jobs[id].record.run_id, attempt: attempt, task: task}
     put_in(state.settlements[task.ref], entry)
   end
@@ -602,7 +602,7 @@ defmodule Jido.AI.Session.Runtime do
              :reentrant_turn,
              :reentrant_admission,
              :reentrant_directive,
-             {:plugin_runtime_unavailable, Jido.AI.Session.Plugin, :restarting}
+             {:plugin_runtime_unavailable, Jido.AI.Orchestration.Plugin, :restarting}
            ] ->
         # Recovery can start before core publishes the replacement owner.
         # This exact refusal occurs before admission; no work was committed.
@@ -881,7 +881,7 @@ defmodule Jido.AI.Session.Runtime do
     Stream.send_event(job.sink, event)
     # Delivery is observational. Its bounded failure report is separate from
     # the committed request result and the caller's canonical event stream.
-    Jido.AI.Session.Delivery.enqueue(Map.get(job, :delivery), event)
+    Jido.AI.Orchestration.Delivery.enqueue(Map.get(job, :delivery), event)
 
     job =
       if kind == :llm_completed do

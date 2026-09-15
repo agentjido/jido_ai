@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.CallCountsTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Request, Session}
+  alias Jido.AI.{Request, Orchestration}
   alias JidoAI.Examples.CallCounts.Agent
 
   setup do
@@ -113,7 +113,7 @@ defmodule JidoAI.Examples.CallCountsTest do
     assert {:ok, request} = submit(server, context)
     assert_receive {:mock_llm_waiting, ^mock, :held, provider}, 2_000
     monitor = Process.monitor(provider)
-    assert :ok = Session.cancel(request)
+    assert :ok = Orchestration.cancel(request)
     assert {:error, :cancelled} = Request.await(request)
     saved = assert_counts(server, request, 1)
     assert_receive {:DOWN, ^monitor, :process, ^provider, _}, 2_000
@@ -160,7 +160,7 @@ defmodule JidoAI.Examples.CallCountsTest do
     server = start_agent(jido, Agent.new!())
     assert {:ok, request} = submit(server, context)
     assert_receive {:mock_llm_waiting, ^mock, :owner_loss, worker}, 2_000
-    owner = Server.children(server)[{:plugin, Session.Plugin}].pid
+    owner = Server.children(server)[{:plugin, Orchestration.Plugin}].pid
     monitor = Process.monitor(worker)
     Process.exit(owner, :kill)
     assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 2_000
@@ -191,7 +191,7 @@ defmodule JidoAI.Examples.CallCountsTest do
     assert {:ok, request} = submit(server, Map.put(context, :hold_input, true))
     assert_receive {:input_held, worker}, 2_000
     monitor = Process.monitor(worker)
-    assert :ok = Session.cancel(request)
+    assert :ok = Orchestration.cancel(request)
     assert {:error, :cancelled} = Request.await(request)
     assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 2_000
     assert_counts(server, request, 0)

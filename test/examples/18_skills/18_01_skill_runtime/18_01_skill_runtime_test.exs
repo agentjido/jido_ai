@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.SkillRuntimeTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Request, Session}
+  alias Jido.AI.{Request, Orchestration}
   alias Jido.AI.Thread.Projection
   alias Jido.AI.Actions.Skill.{LoadSkill, RuntimeContext}
   alias Jido.Thread
@@ -35,7 +35,7 @@ defmodule JidoAI.Examples.SkillRuntimeTest do
   defp entries(server) do
     agent = Server.agent(server)
     {:ok, profile} = Jido.AI.Configuration.profile(agent, :assistant)
-    {:ok, messages} = Jido.AI.Session.Transcript.read(agent.state, profile)
+    {:ok, messages} = Jido.AI.Orchestration.Transcript.read(agent.state, profile)
     # These assertions inspect the most recent tool result first.
     Enum.reverse(messages)
   end
@@ -49,7 +49,7 @@ defmodule JidoAI.Examples.SkillRuntimeTest do
         [ReqLLM.Context.user("Summary")]
       )
 
-    Session.modify_context(server, %{
+    Orchestration.modify_context(server, %{
       type: :replace,
       reason: :compaction,
       result_context: snapshot
@@ -62,7 +62,7 @@ defmodule JidoAI.Examples.SkillRuntimeTest do
     do: parts |> Enum.find(&(&1.type == :text)) |> Map.fetch!(:text) |> Jason.decode!()
 
   defp wire_text(wire), do: Jason.encode!(wire.body)
-  defp owner(server), do: Server.children(server)[{:plugin, Session.Plugin}].pid
+  defp owner(server), do: Server.children(server)[{:plugin, Orchestration.Plugin}].pid
 
   test "a real activation survives compaction and reaches the next HTTP request", %{jido: jido} do
     {mock, context} = mock(script([skill()]) ++ [%{reply: {:text, "Next"}}])
@@ -76,7 +76,7 @@ defmodule JidoAI.Examples.SkillRuntimeTest do
     assert entry.refs.kind == :skill_activation
     assert entry.refs.skill_name == "review"
     assert payload(entry)["result"]["instructions"] == "Original instructions"
-    assert {:ok, %{request: %{id: request}}} = Session.snapshot(server)
+    assert {:ok, %{request: %{id: request}}} = Orchestration.snapshot(server)
     assert entry.refs.request_id == request
     assert {:ok, _} = compact(server)
     assert [^entry] = tool_entries(server)

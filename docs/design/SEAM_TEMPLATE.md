@@ -4,7 +4,12 @@
 
 Use this template for each numbered folder under `docs/design`.
 
-The top-level `docs/design/README.md` owns the approved seam dependency tree,
+Follow [AGENTS.md](AGENTS.md). The review table in [README.md](README.md) is
+the source of truth for approval. Use [ARCHITECTURE.md](ARCHITECTURE.md) for
+the current module and ownership map. Preserve advanced target work and stable
+requirement IDs; unimplemented does not mean rejected.
+
+The top-level `docs/design/README.md` owns the seam dependency tree,
 build order, and document index. An individual seam README owns only its direct
 prerequisites, dependents, and blockers.
 
@@ -155,11 +160,15 @@ here.
 ## Status
 
 - Design reviewed: <commit or date>
-- Code reviewed: <commit>
+- Code reviewed: <branch, commit, and relevant uncommitted changes>
 - Prerequisite alignments: <links or `None`>
 - Alignment state: `Draft`, `Blocked`, `Ready`, or `Complete`
 
 The alignment state is execution status. It is not document approval.
+Record whether tests were rerun or are referenced prior evidence. Use the
+evidence states from the main README, including `Not revalidated` for old
+assessments. Do not carry an old compile blocker or `Proven` label forward
+without checking its evidence.
 
 ## Inputs and evidence
 
@@ -210,7 +219,7 @@ Create the implementation plan only after the design is approved.
 
 | Requirement | Evidence now | Required evidence | Evidence state |
 | --- | --- | --- | --- |
-| `<SEAM>-REQ-001` | `<path:line>` or `None` | `<test or check>` | `Proven`, `Partial`, `Missing`, or `Conflict` |
+| `<SEAM>-REQ-001` | `<path:line>` or `None` | `<test or check>` | <evidence state from the main README> |
 
 ## Migration and compatibility
 
@@ -225,8 +234,8 @@ rules. State `None` when no migration is required.>
 
 ## Completion criteria
 
-- [ ] All approved requirements have `Proven` evidence.
-- [ ] No unresolved `Conflict` remains.
+- [ ] All approved requirements are `Implemented and evidenced`.
+- [ ] No unresolved `Decision required` remains for approved scope.
 - [ ] Compatibility work is complete.
 - [ ] Dependent seam documents use the approved contract.
 ```
@@ -245,6 +254,8 @@ rules. State `None` when no migration is required.>
 10. Keep every changed document at `Pending approval` until the user approves it.
 11. Do not put implementation tasks in the seam documents. Create an implementation plan after the seam design is approved.
 12. Keep Jido AI behavior above the public Jido, Flow, Exec, and Signal boundaries.
+13. Keep proposed advanced work visible. Separate evidence gaps, implementation
+    gaps, and decisions; do not turn an old proposal into an automatic code task.
 
 ## Migration from current documents
 

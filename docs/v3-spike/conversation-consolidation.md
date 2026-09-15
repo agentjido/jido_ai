@@ -14,7 +14,7 @@ and commit behavior. Keep these modules in jido_ai.
 Jido.Session already owns exactly one Jido.Thread. Thread owns ordered entries
 and its append revision. Session revision also covers session metadata and
 closure. Keep these separate revision meanings. Do not add a second entry list
-to Session. Jido.AI.Session remains the live request API, not the portable value.
+to Session. Jido.AI.Orchestration remains the live request API, not the portable value.
 
 Thread.Entry already has kind, payload, refs, identity, sequence, and time.
 Define an AI message payload contract above this provider-independent value;

@@ -379,7 +379,7 @@ defmodule JidoAI.Examples.RetrievalTest do
                  context: context
                )
 
-      assert {:ok, %{result: "Take a coat"}} = Jido.AI.Session.await(server, id, 5_000)
+      assert {:ok, %{result: "Take a coat"}} = Jido.AI.Orchestration.await(server, id, 5_000)
     end
 
     assert Enum.all?(

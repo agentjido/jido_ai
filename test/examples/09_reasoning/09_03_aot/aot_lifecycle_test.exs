@@ -4,7 +4,7 @@ defmodule JidoAI.Examples.StableAoTLifecycleTest do
   @moduletag :example
   import JidoAI.Examples.Case
   alias JidoAI.Examples.AoT
-  alias Jido.AI.{Observe, Request, Session}
+  alias Jido.AI.{Observe, Request, Orchestration}
 
   test "AoT emits request started/completed signals and request telemetry" do
     jido = :"aot_stable_#{System.unique_integer([:positive])}"
@@ -66,7 +66,7 @@ defmodule JidoAI.Examples.StableAoTLifecycleTest do
     assert metadata.request_id == request_id and metadata.strategy == :aot
     assert metadata.origin == :worker_runtime
     assert measurements.total_tokens == 15 and measurements.duration_ms >= 25
-    assert {:ok, _} = Session.delivery_status(server, request_id)
+    assert {:ok, _} = Orchestration.delivery_status(server, request_id)
     assert_script_done(mock)
   end
 end

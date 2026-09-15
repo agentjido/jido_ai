@@ -1,46 +1,55 @@
-> Seam review entry point. This document is pending approval.
+> Seam review entry point. Pending approval.
 
 # 12 — Observation and diagnostics
 
 ## Briefing
 
-Jido AI emits telemetry, typed Signals, stream items, usage data, and diagnostic metadata. The target is one safe observation vocabulary for authored Agents and standalone requests. The main change is to separate user output, telemetry, and Signal transport while keeping one correlation and redaction model.
+Telemetry and transport sanitizers redact and bound values differently. Typed Signal and stream projections exist. Inspection separates committed records from live samples and bounds retained traces. Current observation tests deliberately preserve some nested tool_result content; the strict content-free telemetry target is therefore not fully met.
+
+This seam retains the complete target, not only current functionality. Detailed
+current evidence and gaps are in [alignment](alignment.md); proposed contracts
+and stable requirement IDs are in [design](design.md).
 
 ## Why this seam exists
 
-- Owner: AI observation, telemetry, usage-event, and diagnostic modules.
-- Owns: AI event names, measurements, metadata, correlation, redaction, safe inspection, and failure reporting.
-- Does not own: A telemetry backend, log storage, Signal bus, provider dashboard, request control channel, or secret capture.
+- Owner: Observe, sanitization, Runtime.Event/Telemetry, typed Signal projections, Request metadata, and Orchestration.Inspection.
+- Owns: observation and diagnostics within [the package architecture](../ARCHITECTURE.md).
+- Does not own: contracts assigned to other seams or private lower-package internals.
 
 ## Current and target state
 
 | Area | Current | Target |
 | --- | --- | --- |
-| Telemetry | Observation and sanitization modules exist | One stable AI event vocabulary |
-| Signals | Typed AI events exist | AI event data uses `jido_signal` transport |
-| Streams | Token and progress items are emitted | Clear user-output and telemetry roles |
+| Architecture | The module and state ownership above is the code baseline | Preserve a complete versioned event contract, request/model/tool/delegation lineage, safe default projections, explicit rich-content policy, bounded diagnostics, and compatibility testing. |
+| Evidence | Linked example and boundary tests cover specific cases | Direct requirement-level acceptance, including advanced paths |
+| Compatibility | Current APIs remain authoritative | Explicit migration for approved contract changes |
 
 ## Major gaps and work remaining
 
-| Gap | Why it matters | Required outcome | Owner seam |
+| Gap | Why it matters | Required outcome | Owner |
 | --- | --- | --- | --- |
-| Stable event set is not approved | Consumers can depend on incidental events | Versioned public event list | 12 |
-| Default metadata policy is not final | Secrets or content can leak | Safe default allowlist and redaction rules | 12 |
+| [OBS-GAP-001](alignment.md#gap-register) | Runtime.Event and typed projections exist; there is no single public Event value matching all proposed fields. | Keep event semantics and versioning work. | 12; dependencies below |
+| [OBS-GAP-002](alignment.md#gap-register) | Lifecycle IDs and measurements exist. A complete finite vocabulary and correlation matrix remains. | Retain per-event schema and measurement proof. | 12; dependencies below |
+| [OBS-GAP-003](alignment.md#gap-register) | ReAct run identity is retained across resume rather than replaced with linked identity. | Resolve with 11 before asserting OBS-REQ-006. | 12; dependencies below |
+| [OBS-GAP-004](alignment.md#gap-register) | observe_test explicitly preserves nested tool_result payload fields after sanitization. | Review the strict no-content default against current consumers. | 12; dependencies below |
+| [OBS-GAP-005](alignment.md#gap-register) | Reasoning details can remain in results/projections. A universal private-thinking exclusion is a stronger target. | Specify trusted opt-in policy with 01/05. | 12; dependencies below |
+| [OBS-GAP-006](alignment.md#gap-register) | Bounds and sanitizers exist; full cross-projection/version compatibility evidence remains. | Retain golden projection, cardinality, and arbitrary-input safety tests. | 12; dependencies below |
 
 ## Decisions requested
 
-1. **Public events:** Approve only request, model, tool, usage, and terminal lifecycle events as compatibility contracts.
-   Effect: Internal diagnostic events can change safely.
-2. **Metadata:** Approve an allowlist and redact content by default.
-   Effect: Observation stays safe without host configuration.
+Decide the common event representation and default rich/thinking-content policy. Observation must not become an execution or durable-event owner.
+
+The [target design decisions](design.md#open-design-decisions) remain pending.
+No advanced capability is removed by this reconciliation.
 
 ## Dependencies
 
-- Prerequisites: 00 through 11 for their event contracts; public core observe and `jido_signal` contracts.
+- Prerequisites: [10 Authoring and portable definitions](../10_authoring_definitions/alignment.md), [11 Checkpoints and resume](../11_checkpoints_resume/alignment.md).
 - Dependents: 90.
-- Blockers: Public event list and metadata policy.
+- Blockers: unresolved target and prerequisite decisions. Current implementation can be inspected without treating proposed contracts as approved.
 
 ## Documents
 
 - [Target design](design.md).
-- [Alignment plan](alignment.md).
+- [Current evidence and alignment](alignment.md).
+- [Overall architecture](../ARCHITECTURE.md).

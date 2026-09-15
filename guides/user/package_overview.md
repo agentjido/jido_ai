@@ -22,7 +22,7 @@ After this guide, you should be able to explain the package in a prioritized way
 Thread and adds a portable lifecycle and metadata value. These modules do not
 own a process, runtime server, storage adapter, or live model request.
 
-`Jido.Session` is separate from `Jido.AI.Session`. The first is portable data.
+`Jido.Session` is separate from `Jido.AI.Orchestration`. The first is portable data.
 The second is the live request API for an AI agent process.
 
 ## Priority 1: `Jido.AI.Agent`
@@ -189,7 +189,7 @@ These helpers replace only the model decision boundary. The application still ex
 ```text
 User/App Query
   -> Jido.AI.Agent route and Profile
-  -> Jido.AI.Session admission
+  -> Jido.AI.Orchestration admission
   -> Reasoning Flow and Actions
   -> ReqLLM and Jido.Exec
   -> Session events and public Signals

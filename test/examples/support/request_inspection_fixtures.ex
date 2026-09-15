@@ -14,7 +14,7 @@ defmodule JidoAI.Examples.RequestInspection.CancelGate do
   use Jido.Plugin
 
   def admit(nil, command, opts) do
-    if command.signal.type == Jido.AI.Session.cancel_type() do
+    if command.signal.type == Jido.AI.Orchestration.cancel_type() do
       send(opts[:observer], {:cancel_admission, self()})
 
       receive do

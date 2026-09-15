@@ -1,6 +1,6 @@
 defmodule Jido.AI.Actions.Reasoning.RunStrategy do
   @moduledoc """
-  Runs a prompt in one linked private Agent and Session.
+  Runs a prompt in one linked private Agent and Orchestration.
 
   Bind a resolved `Jido.AI.Profile` in host context at
   `:jido_ai_callable_profile`. Input accepts only a nonempty string `prompt`.
@@ -13,7 +13,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
     description: "Run a prompt with host-bound reasoning policy",
     schema: Zoi.object(%{prompt: Zoi.string() |> Zoi.min(1)}, coerce: true, unrecognized_keys: :error)
 
-  alias Jido.AI.{Authoring, Profile, Request, Session}
+  alias Jido.AI.{Authoring, Profile, Request, Orchestration}
   alias Jido.AgentServer, as: Server
 
   @methods %{
@@ -91,10 +91,10 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
              source: "/ai/reasoning/action",
              admission_deadline: deadline,
              admission_timeout: remaining(deadline),
-             context: Map.merge(Session.caller_context(context), Map.take(context, [:jido_ai_quota]))
+             context: Map.merge(Orchestration.caller_context(context), Map.take(context, [:jido_ai_quota]))
            ) do
       result = Request.await(handle, timeout: remaining(deadline))
-      if result == {:error, :timeout}, do: Session.cancel(handle, reason: :timeout, timeout: 1_000)
+      if result == {:error, :timeout}, do: Orchestration.cancel(handle, reason: :timeout, timeout: 1_000)
       snapshot = fetch_snapshot(server, handle.id)
       normalize_runner_result(result, @methods[profile.reasoning.method], profile.controls.timeout, snapshot)
     end
@@ -146,7 +146,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
   end
 
   defp fetch_snapshot(server, id) do
-    with {:ok, records} <- Server.plugin_state(server, Jido.AI.Session.Plugin, 1_000),
+    with {:ok, records} <- Server.plugin_state(server, Jido.AI.Orchestration.Plugin, 1_000),
          record when is_map(record) <- records[id] do
       status =
         case record.status do

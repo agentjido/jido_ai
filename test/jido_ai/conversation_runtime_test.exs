@@ -26,7 +26,10 @@ defmodule Jido.AI.ConversationRuntimeTest do
     assert {:ok, "First"} = Request.await(first)
     original = Server.agent(server).state.messages
     {:ok, replacement} = Jido.AI.Thread.Projection.append(Jido.Thread.new(), [ReqLLM.Context.user("Saved question")])
-    assert {:ok, _} = Session.modify_context(server, %{type: :replace, result_context: replacement}, op_id: "replace-1")
+
+    assert {:ok, _} =
+             Orchestration.modify_context(server, %{type: :replace, result_context: replacement}, op_id: "replace-1")
+
     state = Server.agent(server).state
     assert state.messages.id == original.id
     operation = List.last(state.messages.thread.entries)
@@ -36,7 +39,7 @@ defmodule Jido.AI.ConversationRuntimeTest do
              state.messages |> Jido.Session.encode() |> Jason.encode!() |> Jason.decode!() |> Jido.Session.decode()
 
     {:ok, profile} = Configuration.profile(Server.agent(server))
-    assert {:ok, [%{content: saved}]} = Jido.AI.Session.Transcript.read(%{messages: decoded}, profile)
+    assert {:ok, [%{content: saved}]} = Jido.AI.Orchestration.Transcript.read(%{messages: decoded}, profile)
     assert Jido.AI.Query.summarize(saved) == "Saved question"
     refute Map.has_key?(state[Jido.AI.Thread.Control.key()].assistant, :session)
     assert {:ok, second} = request(server, mock, :react, "Continue")

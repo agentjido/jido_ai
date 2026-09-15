@@ -68,7 +68,7 @@ defmodule Jido.AI.Runtime.ToolInterception do
         |> Map.put(:effects, Map.take(stats, [:received_count, :allowed_count, :dropped_count]))
 
       :ok =
-        Jido.AI.Session.emit(context, :tool_completed, %{
+        Jido.AI.Orchestration.emit(context, :tool_completed, %{
           tool_call_id: call.id,
           tool_name: call.name,
           result: result,

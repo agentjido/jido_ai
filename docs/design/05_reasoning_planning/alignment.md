@@ -1,102 +1,153 @@
-# 05 — Reasoning And Planning Alignment
+> Seam alignment review. Pending approval.
 
-> Seam alignment plan. This document and its design are pending approval.
+# Reasoning and planning methods alignment
 
 ## Status
 
-- Design reviewed: 2026-09-09 for alignment only.
-- Code reviewed: 17c97ca04d97b26a1c7017250c90053ad674f33f.
-- Prerequisites: seams 00 through 04.
-- Alignment state: Blocked.
-- Blockers: design approval, package compile failure, and missing public method and plan contracts.
+- Reviewed: 2026-09-15.
+- Code: `v3-spike`, HEAD `c4e57c8d34d09ffc922c37fb41cccc2e1491123e`, plus the uncommitted Orchestration and canonical-value file reorganization.
+- Prerequisite alignments used: [04 Shared AI execution](../04_ai_execution/alignment.md).
+- Alignment state: Draft. Current ownership is mapped; target decisions and full acceptance proof remain.
+- Verification: source and test inspection in this documentation task. The preceding code-change run reported 2,809 passing tests and one existing exclusion, including authoring and MockLLM examples. That run is not proof of every target requirement; no Elixir tests were rerun here.
 
-Proven means that current source and a direct executable test assertion exist. It does not mean that the current package test suite passes.
+## Current architecture
 
-## Inputs And Evidence
+ReAct, ChainOfThought, ChainOfDraft, AlgorithmOfThoughts, TreeOfThoughts, GraphOfThoughts, TRM, and Adaptive remain. Linear, tree, graph, and recursive engines integrate with shared execution. Callable reasoning uses a prompt and host-bound Profile. Planning Actions exist; they are not a general executable Plan system.
 
-- Target design: design.md.
-- Method selection and options: lib/jido_ai/reasoning.ex and lib/jido_ai/reasoning/adaptive/selection.ex.
-- Shared Flow lowering: lib/jido_ai/authoring/authoring.ex:231-243.
-- Current method implementations: lib/jido_ai/reasoning.
-- Planning Actions: lib/jido_ai/planning.
-- Method examples: examples/v3/test/examples/09_reasoning.
-- Tree-of-thought evidence: examples/v3/test/examples/09_reasoning/09_04_tot_test.exs:28-430.
-- Historical input only: docs/v3-spike.
+- Current owner: Reasoning methods, shared method engines, method state/results, and planning Actions.
+- Cross-package ownership: core Jido owns Agent commit and topology; Flow/Exec and Signal internals remain in their respective packages.
+- Overall placement: [architecture overview](../ARCHITECTURE.md).
+- Full target: [design](design.md). Preserve all eight methods, advanced search and recursive behavior, custom-method extension, and portable plans. Keep algorithms above Flow and provider/tool boundaries.
 
-## Retained Baseline
+## Inputs and evidence
 
-- Keep the current built-in reasoning method names and bounded options.
-- Keep method work inside shared Flow and Jido.Exec execution.
-- Keep stable candidate IDs, deterministic ranking order, and usage aggregation.
-- Keep bounded parser repair and tool call order.
-- Keep planning operations as Jido Actions.
+### Canonical code
 
-## Gap Register
+| Source | Evidence scope |
+| --- | --- |
+| [lib/jido_ai/reasoning.ex](../../../lib/jido_ai/reasoning.ex) | Method dispatch and limits |
+| [lib/jido_ai/reasoning/tree_search.ex](../../../lib/jido_ai/reasoning/tree_search.ex) | Tree search integration |
+| [lib/jido_ai/reasoning/graph_search.ex](../../../lib/jido_ai/reasoning/graph_search.ex) | Graph search integration |
+| [lib/jido_ai/reasoning/recursive.ex](../../../lib/jido_ai/reasoning/recursive.ex) | TRM integration |
+| [lib/jido_ai/actions/reasoning/run_strategy.ex](../../../lib/jido_ai/actions/reasoning/run_strategy.ex) | Callable Profile contract |
+| [lib/jido_ai/actions/planning/plan.ex](../../../lib/jido_ai/actions/planning/plan.ex) | Planning Action |
 
-| Gap | Requirement | Current evidence | Difference | Disposition |
+### Examples and tests
+
+- [Example briefing](../../../examples/09_reasoning/09_14_callable_reasoning/README.md): public behavior and documented limits.
+- [Matching example tests](../../../test/examples/09_reasoning/09_14_callable_reasoning): deterministic example evidence.
+- [test/authoring/agents/callable_profiles_test.exs](../../../test/authoring/agents/callable_profiles_test.exs): detailed boundary evidence.
+- [test/examples/09_reasoning/09_10_adaptive/09_10_adaptive_test.exs](../../../test/examples/09_reasoning/09_10_adaptive/09_10_adaptive_test.exs): detailed boundary evidence.
+
+These are evidence entry points, not blanket acceptance claims. The requirement
+matrix below separates target decisions from implemented behavior whose full
+proof is still incomplete. Inert declaration support is not runtime support.
+
+## Retained baseline
+
+Preserve all eight methods, advanced search and recursive behavior, custom-method extension, and portable plans. Keep algorithms above Flow and provider/tool boundaries.
+
+Preserve current public behavior unless an approved decision includes a
+migration. No runtime or example changes are authorized by this review.
+Advanced requirements remain in the target even when they are not implemented.
+
+## Gap register
+
+Existing gap IDs remain stable. Superseded rows identify resolved historical
+findings, not removed target requirements. Old acceptance labels and erroneous
+requirement associations are not carried forward as proof.
+
+| Gap | Requirement or proposal | Current evidence or difference | State | Required outcome and owner |
 | --- | --- | --- | --- | --- |
-| RSN-GAP-001 | RSN-REQ-001, RSN-REQ-002 | shared/reasoning.ex | There is no formal public method behavior, descriptor, or trusted registration contract. | Define the method contract and a trusted static registry. |
-| RSN-GAP-002 | RSN-REQ-004, RSN-REQ-013 | method modules and options | Methods work, but not every method is proved as the same bounded Flow shape with approved hard maxima. | Add shared lowering and limit conformance tests. |
-| RSN-GAP-003 | RSN-REQ-009, RSN-REQ-010 | tree-of-thought ranking tests | Ranking is stable in examples, but tie behavior and pruning rules are not one public contract. | Define deterministic tie and prune rules. |
-| RSN-GAP-004 | RSN-REQ-015, RSN-REQ-016 | method-specific result maps | There is no common method result. Thinking data can remain in public results and metadata. | Add a common result and a safe thinking projection policy. |
-| RSN-GAP-005 | RSN-REQ-017, RSN-REQ-022 | current reasoning modules | Extension and method lookup are not based on one trusted registry contract. | Add trusted registration, collision checks, and lookup tests. |
-| RSN-GAP-006 | RSN-REQ-018, RSN-REQ-019, RSN-REQ-020, RSN-REQ-021 | planning Actions | No stable Plan value, validation contract, or deterministic lowering to executable work exists. | Define Plan and separate planning data from execution. |
+| `RSN-GAP-001` | `RSN-REQ-001`, `RSN-REQ-002` | Built-in method IDs, options, state, and limits exist. A uniform public descriptor/Flow factory is not the current API. | Partially implemented | Preserve descriptor and custom-method work as a target. |
+| `RSN-GAP-002` | `RSN-REQ-003`, `RSN-REQ-004`, `RSN-REQ-005`, `RSN-REQ-012`, `RSN-REQ-013`, `RSN-REQ-014` | All eight methods use shared execution and method limits. Complete limit conformance is not proved by one method example. | Implemented; evidence incomplete | Review method-specific construction and execution matrices. |
+| `RSN-GAP-003` | `RSN-REQ-008`, `RSN-REQ-009`, `RSN-REQ-010` | Search engines implement ordering and pruning; target-wide deterministic tie/prune diagnostics need direct proof. | Implemented; evidence incomplete | Retain deterministic search contracts. |
+| `RSN-GAP-004` | `RSN-REQ-015`, `RSN-REQ-016`, `RSN-REQ-017` | Results retain method-specific shapes and some reasoning metadata. The uniform result/private-thinking target needs review. | Decision required | Coordinate visibility with 01/12. |
+| `RSN-GAP-005` | `RSN-REQ-022` | There is no general trusted custom-method registry matching RSN-REQ-022. | Proposed; not implemented | Retain registration, validation, and collision requirements. |
+| `RSN-GAP-006` | `RSN-REQ-018`, `RSN-REQ-019`, `RSN-REQ-020`, `RSN-REQ-021` | Planning Actions do not establish a portable Plan type and deterministic executable lowering contract. | Proposed; not implemented | Retain Plan design; executable work remains Flow or host-owned. |
 
-## High-Level Work Sequence
+## Selected-direction gap
 
-This sequence defines outcomes and gates. Detailed implementation planning comes after design approval.
+`RSN-GAP-007` — [EXE-DEC-005](../04_ai_execution/design.md#selected-direction-complete-the-runtime-split)
+selects an explicit Profile-based dispatcher and method-owned validated
+`method_state`. Current [Reasoning](../../../lib/jido_ai/reasoning.ex) dispatches
+some transitions and diagnostics from `tree_search`, `graph_search`, or
+`recursive` keys. This boundary is incomplete, not a new framework requirement.
 
-1. Approve the method behavior, descriptor, registry, common result, and Plan value.
-2. Adapt built-in methods to the shared method contract.
-3. Define deterministic ranking, tie, prune, and termination rules.
-4. Apply finite maxima to every method and planning operation.
-5. Add safe thinking projections.
-6. Add Plan validation and deterministic lowering tests without making Plan an execution owner.
+Use the existing functions as the starting contract. Future evidence covers
+all eight methods, Adaptive selection, invalid method state, transitions,
+diagnostics, and common limits. `RSN-GAP-005` and `RSN-REQ-022` remain retained
+extension proposals, excluded from this cleanup. The prerequisite is the
+[execution boundary](../04_ai_execution/alignment.md#selected-direction-gap).
+This direction does not approve this document or its other proposals.
 
-## Acceptance Matrix
+## Decisions and dependency gates
 
-| Requirement | Current evidence | Required evidence | State |
+Do not infer a reduced stable method set from the old first-release recommendation. Decide extension registration, common results, thinking visibility, and executable Plan semantics explicitly.
+
+- Prerequisites: [04 Shared AI execution](../04_ai_execution/alignment.md).
+- Dependents: 07, 08, 10.
+- Blocker: approval of the affected target decisions, not a historical package compile failure.
+- Assumption: the current public lower-package contracts remain the integration boundary. A proposed API in this design is not evidence of an upstream API.
+- Re-review dependents when an owning contract changes. Do not infer approval from a passing test or a category rename.
+
+## High-level work sequence
+
+1. Resolve prerequisite ownership and the decisions above. Exit: each changed contract has an explicit decision and compatibility scope.
+2. Align current public contracts and retained target requirements. Exit: current behavior and intended changes are distinct, with no fictional API presented as implemented.
+3. Specify acceptance cases for each approved change, including examples, failure paths, and cleanup. Exit: each requirement has direct evidence or a named missing test outcome.
+4. Review dependent seams, migrations, and release implications. Exit: no dependent document assumes an unapproved guarantee.
+
+This is a dependency and outcome plan, not a formal implementation task list.
+Implementation planning follows approval of the seam intent and requirements.
+
+## Acceptance matrix
+
+This table is rebuilt from the actual requirement IDs in `design.md`; earlier
+tables sometimes mapped evidence to the wrong requirement. “Implemented;
+evidence incomplete” means the subsystem has relevant code, not that every
+clause is met. No row below grants approval or claims a fresh test run.
+
+| Requirement | Evidence state | Current evidence | Required acceptance outcome |
 | --- | --- | --- | --- |
-| RSN-REQ-001 | no formal public behavior | Approved method callback contract | Missing |
-| RSN-REQ-002 | built-in selection map exists | Trusted descriptors and registration tests | Partial |
-| RSN-REQ-003 | adaptive selection exists | Passing deterministic selection tests | Proven |
-| RSN-REQ-004 | methods use shared runtime | Uniform public Flow lowering proof | Partial |
-| RSN-REQ-005 | no private method worker found | Direct ownership and scheduler tests | Proven |
-| RSN-REQ-006 | ReAct examples exist | Passing termination and tool tests | Proven |
-| RSN-REQ-007 | chain methods have ordered steps | Passing ordered-step tests | Proven |
-| RSN-REQ-008 | candidate IDs are stable | Passing candidate identity tests | Proven |
-| RSN-REQ-009 | ranked candidates are tested | Explicit deterministic tie rule | Partial |
-| RSN-REQ-010 | pruning is implemented | Approved stable pruning contract | Partial |
-| RSN-REQ-011 | parser repair is bounded | Passing parse failure tests | Proven |
-| RSN-REQ-012 | usage aggregation exists | Passing multi-step usage tests | Proven |
-| RSN-REQ-013 | max values are finite | Approved hard maxima for every method | Partial |
-| RSN-REQ-014 | tool order is retained | Complete multi-method tool tests | Partial |
-| RSN-REQ-015 | method result shapes differ | One common result value | Partial |
-| RSN-REQ-016 | thinking can be public | Default-safe thinking projection | Conflict |
-| RSN-REQ-017 | extension points are informal | Trusted extension contract | Missing |
-| RSN-REQ-018 | no stable Plan value | Versioned Plan struct and codec | Missing |
-| RSN-REQ-019 | planning Actions return data | Plan validation and dependency tests | Partial |
-| RSN-REQ-020 | no canonical lowering | Deterministic Plan-to-work lowering | Missing |
-| RSN-REQ-021 | planning and execution are partly separate | Explicit no-execution-owner tests | Partial |
-| RSN-REQ-022 | no trusted registry | Collision-safe trusted method registry | Missing |
-| RSN-REQ-023 | stable IDs and profile codec exist | Complete portability fixtures | Partial |
+| `RSN-REQ-001` | Decision required | See current contract and gap register | Verify the target behavior: Each public reasoning method shall have a stable identifier, option schema, state schema, capability declaration, Flow factory, and result contract. |
+| `RSN-REQ-002` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Method options and state shall be portable data and shall reject unknown fields at untrusted boundaries. |
+| `RSN-REQ-003` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: A method shall use seam 02 for every model call and seam 03 for every local tool call. |
+| `RSN-REQ-004` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: A method shall use public Flow components for branching, fan-out, reduction, iteration, subflows, and continuation. |
+| `RSN-REQ-005` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: A method shall not create a worker pool, private task supervisor, graph scheduler, or direct Runic workflow. |
+| `RSN-REQ-006` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: ReAct shall alternate model decisions and approved tool batches until final answer, failure, cancellation, or a limit. |
+| `RSN-REQ-007` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Linear methods shall preserve prompt-step order and shall return one final answer or structured result. |
+| `RSN-REQ-008` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Search methods shall assign stable candidate identifiers before concurrent evaluation. |
+| `RSN-REQ-009` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Search methods shall define deterministic score ordering and a deterministic tie-break rule. |
+| `RSN-REQ-010` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When a method prunes candidates, it shall retain the reason and score data required for safe diagnostics. |
+| `RSN-REQ-011` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: An Adaptive method shall select only a declared method whose capabilities satisfy the request. |
+| `RSN-REQ-012` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When a method does not support a requested feature, profile validation shall fail before model execution. |
+| `RSN-REQ-013` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Each method shall declare finite defaults and hard maxima for its iterations, candidates, depth, breadth, and model calls as applicable. |
+| `RSN-REQ-014` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: The execution seam shall apply the most restrictive method, profile, request, and Exec bounds. |
+| `RSN-REQ-015` | Decision required | See current contract and gap register | Verify the target behavior: Every terminal method result shall include method ID, status, value, termination reason, usage, and safe method metadata. |
+| `RSN-REQ-016` | Decision required | See current contract and gap register | Verify the target behavior: A method result shall not expose private chain-of-thought by default. |
+| `RSN-REQ-017` | Decision required | See current contract and gap register | Verify the target behavior: When a method retains reasoning details, policy shall identify whether the data is private, provider-required, or safe for user output. |
+| `RSN-REQ-018` | Proposed; not implemented | No complete implementation claimed | Verify the target behavior: Planning shall produce a validated portable plan value with stable step identifiers and declared dependencies. |
+| `RSN-REQ-019` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Planning shall not execute a plan unless the plan is explicitly lowered to a `Jido.Flow` or submitted to a host-owned orchestrator. |
+| `RSN-REQ-020` | Proposed; not implemented | No complete implementation claimed | Verify the target behavior: When a plan is lowered to Flow, every executable plan step shall resolve to an approved Action or Subflow through a trusted registry. |
+| `RSN-REQ-021` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: An encoded plan shall not contain anonymous functions, PIDs, provider clients, or unregistered executable targets. |
+| `RSN-REQ-022` | Proposed; not implemented | No complete implementation claimed | Verify the target behavior: A custom method shall register through a trusted method registry and shall pass the same option, state, capability, and Flow validation as built-in methods. |
+| `RSN-REQ-023` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: The Agent DSL and profile codec shall refer to methods by stable identifiers and portable options. |
 
-## Migration And Compatibility
+## Migration and compatibility
 
-- Keep current method names and option keys through descriptor aliases.
-- Convert method-specific result maps to the common result at the public boundary.
-- Keep old Plan-like maps as legacy inputs only after validation.
-- Do not store functions, processes, tasks, provider structs, or Jido.Exec state in method or plan values.
+Do not infer a reduced stable method set from the old first-release recommendation. Decide extension registration, common results, thinking visibility, and executable Plan semantics explicitly.
 
-## Assumptions And Blockers
+Keep existing request, data, Signal, and provider contracts until a change is
+approved. A documentation rename does not authorize a wire-format change.
+Retained advanced proposals need their own migration and operational review.
+Source paths above replace old `operations/`, `shared/`, live Session, and
+`examples/v3/` references as evidence; historical paths are not current owners.
 
-- The design must decide whether third-party method registration is compile-time or host-owned.
-- Planning remains data production. Execution remains in Flow and Jido.Exec.
-- Package compile failure blocks final conformance tests.
+## Completion criteria
 
-## Completion Criteria
-
-- Every method implements one trusted, bounded, deterministic contract.
-- All method results use one portable public value with safe thinking projections.
-- Plan is versioned, validated, deterministic, and separate from execution.
-- Built-in method and planning acceptance tests pass.
+- [ ] All approved requirements have direct implementation and acceptance evidence.
+- [ ] All material decisions have an explicit owner and resolution.
+- [ ] Examples state what they prove and do not claim unsupported target features.
+- [ ] Migrations and dependent seam reviews are complete.
+- [ ] No previous test result is used as proof of an untested target requirement.

@@ -103,7 +103,7 @@ defmodule JidoAI.Examples.AIRuntimeTest do
         "schemas/domain" => {:schema, definition.schema},
         "plugins/audit" => {:plugin, JidoAI.Examples.Support.CommitCounter},
         "plugins/ai" => {:plugin, Jido.AI.Runtime.Plugin},
-        "plugins/session" => {:plugin, Jido.AI.Session.Plugin},
+        "plugins/session" => {:plugin, Jido.AI.Orchestration.Plugin},
         "actions/assistant-v1" => {:action, target},
         "actions/close" => {:action, JidoAI.Examples.Support.CloseCase},
         "actions/configure" => {:action, Jido.AI.Configuration.Apply},

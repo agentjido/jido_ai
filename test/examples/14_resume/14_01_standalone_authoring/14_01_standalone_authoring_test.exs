@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.StandaloneAuthoringTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Configuration, Request, Session}
+  alias Jido.AI.{Configuration, Request, Orchestration}
   alias Jido.AI.Reasoning.ReAct.{Config, State, Token}
   alias JidoAI.Examples.StandaloneAuthoring.{Agent, Add, Change, Transform, Repair}
 
@@ -191,7 +191,7 @@ defmodule JidoAI.Examples.StandaloneAuthoringTest do
     assert {:ok, request} = submit(server, context, "Stream", stream_to: self())
     assert_receive {:mock_llm_waiting, ^mock, :standalone_stream, provider}, 2_000
     ref = Process.monitor(provider)
-    assert :ok = Session.cancel(request)
+    assert :ok = Orchestration.cancel(request)
     events = request |> Request.Stream.events() |> Enum.to_list()
     assert Enum.any?(events, &(&1.kind == :llm_delta and &1.data.delta == "Part"))
     assert List.last(events).kind == :request_cancelled

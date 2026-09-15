@@ -334,7 +334,7 @@ defmodule Jido.AI.Portable do
   end
 
   defp portable_route(%{path: path, target: {target, %{profile_id: id}}})
-       when target in [Jido.AI.Runtime.Run, Jido.AI.Session.Start],
+       when target in [Jido.AI.Runtime.Run, Jido.AI.Orchestration.Start],
        do: [%{"type" => path, "target" => %{"ai" => Atom.to_string(id)}}]
 
   defp portable_route(_route), do: []

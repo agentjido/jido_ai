@@ -1,14 +1,14 @@
-defmodule Jido.AI.Session.Start do
+defmodule Jido.AI.Orchestration.Start do
   @moduledoc false
   use Jido.Action,
     name: "ai_session_start",
     schema: Zoi.object(%{query: Jido.AI.Query.schema(), request_id: Zoi.string() |> Zoi.min(1)})
 
   alias Jido.AI.{Profile, Request}
-  alias Jido.AI.Session.Change
+  alias Jido.AI.Orchestration.Change
 
   def run(params, context) do
-    with {:ok, context} <- Jido.AI.Session.Plugin.context(context),
+    with {:ok, context} <- Jido.AI.Orchestration.Plugin.context(context),
          do: execute(Jido.AI.Plugins.Retrieval.apply_input(params, context), context)
   end
 
@@ -83,7 +83,7 @@ defmodule Jido.AI.Session.Start do
             error: nil,
             inserted_at: System.system_time(:millisecond),
             completed_at: nil,
-            completion_reserve: Jido.AI.Session.Record.completion_reserve(),
+            completion_reserve: Jido.AI.Orchestration.Record.completion_reserve(),
             streamed: sink != nil,
             max_requests: profile.requests.max_requests,
             extra_refs: Map.get(context.signal.data, :extra_refs, %{}),
@@ -101,7 +101,7 @@ defmodule Jido.AI.Session.Start do
   defp start_history(context, profile, record) do
     if Jido.AI.Runtime.Checkpoint.resumed?(context),
       do: {:ok, context.agent_state},
-      else: Jido.AI.Session.Transcript.start(context.agent_state, profile, record, context.signal.source)
+      else: Jido.AI.Orchestration.Transcript.start(context.agent_state, profile, record, context.signal.source)
   end
 
   defp checkpoint_metadata(context) do

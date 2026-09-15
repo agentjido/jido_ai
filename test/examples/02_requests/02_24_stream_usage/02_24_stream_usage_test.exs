@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.StreamUsageTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Request, Session, Usage}
+  alias Jido.AI.{Request, Orchestration, Usage}
   alias Jido.AI.Reasoning.ReAct
   alias Jido.AI.Reasoning.ReAct.{Config, Token}
   alias JidoAI.Examples.StreamUsage.{Agent, QuietAgent, Echo}
@@ -88,7 +88,7 @@ defmodule JidoAI.Examples.StreamUsageTest do
     events = request |> Request.Stream.events(stream_event_timeout_ms: 2_000) |> Enum.to_list()
     record = Server.agent(server).state.requests[request.id]
     assert record.status == :completed
-    assert {:ok, %{live: nil}} = Session.snapshot(server)
+    assert {:ok, %{live: nil}} = Orchestration.snapshot(server)
     assert List.last(events).data.usage == record.meta.usage
     {events, record.meta.usage}
   end

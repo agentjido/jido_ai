@@ -62,7 +62,7 @@ defmodule JidoAITest.Authoring.Agents.ExecutionTest do
                  )
 
         if variant == :session do
-          assert {:ok, _} = Jido.AI.Session.await(server, id, 10_000)
+          assert {:ok, _} = Jido.AI.Orchestration.await(server, id, 10_000)
         end
 
         state = Server.agent(server).state

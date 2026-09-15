@@ -1,4 +1,4 @@
-defmodule Jido.AI.Session.DeliveryReceipt do
+defmodule Jido.AI.Orchestration.DeliveryReceipt do
   @moduledoc false
   use Jido.Agent.Directive
 

@@ -8,7 +8,7 @@ separate plugin stack or Strategy contract.
 - A `Jido.Action` is one executable operation.
 - A `Jido.Plugin` adds reusable state and command handling to an Agent.
 - A `Jido.AI.Profile` defines inert AI policy.
-- `Jido.AI.Session` and `Jido.AI.Runtime` own live AI request execution.
+- `Jido.AI.Orchestration` and `Jido.AI.Runtime` own live AI request execution.
 
 Declare ordinary plugins in the Agent block:
 

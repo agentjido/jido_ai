@@ -9,7 +9,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.StrategyTest do
     assert %{profile: :standard, search_style: :dfs, require_explicit_answer: true} = profile.reasoning.options
     mock = mock([%{reply: {:text, "answer: 24"}}])
     server = start_reasoning(jido, Method.method())
-    assert {:ok, %{details: %{phase: :idle}, request: nil}} = Session.snapshot(server)
+    assert {:ok, %{details: %{phase: :idle}, request: nil}} = Orchestration.snapshot(server)
     assert {:ok, handle} = request(server, mock, Method.method())
     assert {:ok, %{answer: "24"}} = Request.await(handle)
     assert [wire] = MockLLM.report(mock).requests
@@ -36,11 +36,11 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.StrategyTest do
   end
 
   test "native Actions validate admission and cancellation inputs" do
-    assert Jido.AI.Session.Start.name() == "ai_session_start"
-    assert Jido.AI.Session.Cancel.name() == "ai_session_cancel"
-    assert {:ok, _} = Zoi.parse(Jido.AI.Session.Start.schema(), %{query: "Solve", request_id: "one"})
-    assert {:error, _} = Zoi.parse(Jido.AI.Session.Start.schema(), %{query: "Solve"})
-    assert {:ok, _} = Zoi.parse(Jido.AI.Session.Cancel.schema(), %{request_id: "one", reason: :changed_plan})
+    assert Jido.AI.Orchestration.Start.name() == "ai_session_start"
+    assert Jido.AI.Orchestration.Cancel.name() == "ai_session_cancel"
+    assert {:ok, _} = Zoi.parse(Jido.AI.Orchestration.Start.schema(), %{query: "Solve", request_id: "one"})
+    assert {:error, _} = Zoi.parse(Jido.AI.Orchestration.Start.schema(), %{query: "Solve"})
+    assert {:ok, _} = Zoi.parse(Jido.AI.Orchestration.Cancel.schema(), %{request_id: "one", reason: :changed_plan})
   end
 
   test "AoT query routes select the method and model observations stay read only", %{jido: jido} do
@@ -55,7 +55,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.StrategyTest do
       assert after_agent.state == before.state
     end
 
-    assert {:ok, %{request: nil}} = Session.snapshot(server)
+    assert {:ok, %{request: nil}} = Orchestration.snapshot(server)
   end
 
   test "start owns a streaming call with a correlated request and prompt", %{jido: jido} do
@@ -63,7 +63,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.StrategyTest do
     server = start_reasoning(jido, Method.method(), streaming: true)
     assert {:ok, handle} = request(server, mock, Method.method(), "Solve this")
     assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
-    assert {:ok, view} = Session.snapshot(server)
+    assert {:ok, view} = Orchestration.snapshot(server)
     assert view.request.query == "Solve this" and view.request.status == :pending
     assert is_binary(view.details.current_llm_call_id)
     assert Process.alive?(view.live.worker_pid)
@@ -133,7 +133,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.StrategyTest do
 
   test "snapshot of a new AoT Agent has no result or live request", %{jido: jido} do
     server = start_reasoning(jido, Method.method())
-    assert {:ok, view} = Session.snapshot(server)
+    assert {:ok, view} = Orchestration.snapshot(server)
     assert view.details.phase == :idle and view.request == nil and view.live == nil
     assert Method.get_result(view.agent) == nil
     refute view.agent.state.completed
@@ -144,7 +144,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.StrategyTest do
     server = start_reasoning(jido, Method.method(), reasoning_options: %{profile: :long})
     assert {:ok, handle} = request(server, mock, Method.method(), "Test")
     assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
-    assert {:ok, view} = Session.snapshot(server)
+    assert {:ok, view} = Orchestration.snapshot(server)
     assert view.details.phase == :awaiting_llm and view.request.status == :pending
     assert {:ok, profile} = Configuration.profile(view.agent)
     assert profile.reasoning.options.profile == :long
@@ -163,7 +163,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.StrategyTest do
     agent = definition(Method.method())
     assert {:ok, router} = Jido.Signal.Router.new(agent.routes)
 
-    for type <- ["ai.aot.query", Session.cancel_type()] do
+    for type <- ["ai.aot.query", Orchestration.cancel_type()] do
       assert {:ok, _} = Jido.Signal.Router.route(router, Jido.Signal.new!(type, %{}, source: "/test"))
     end
 

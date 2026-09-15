@@ -2,6 +2,20 @@
 
 # Reasoning and planning methods design
 
+## Architecture and contract status
+
+- Architecture category: [Reasoning and planning methods](../ARCHITECTURE.md).
+- Owning subsystem: Reasoning methods, shared method engines, method state/results, and planning Actions.
+- Complete target: Preserve all eight methods, advanced search and recursive behavior, custom-method extension, and portable plans. Keep algorithms above Flow and provider/tool boundaries.
+- Decision boundary: Do not infer a reduced stable method set from the old first-release recommendation. Decide extension registration, common results, thinking visibility, and executable Plan semantics explicitly.
+- Current implementation, module links, example proof, and exact differences:
+  [alignment](alignment.md). This design is a target, not an API reference.
+
+The requirements and proposed signatures below remain pending approval.
+Illustrative types are not evidence that a module or function exists. A
+requirement is not removed merely because the current implementation differs.
+Use the alignment matrix to distinguish current behavior from the full target.
+
 ## Scope and owner
 
 - Owner: Jido AI reasoning and planning method modules.
@@ -22,9 +36,22 @@ V2 included ReAct, Chain-of-Thought, Chain-of-Draft, Algorithm-of-Thoughts, Tree
 | Dynamic method choice | Adaptive policy plus `Jido.Flow.Dispatch` |
 | Plan execution | Plan value only; Flow or host executes approved work |
 
+## Selected runtime boundary
+
+The user selected [EXE-DEC-005](../04_ai_execution/design.md#selected-direction-complete-the-runtime-split).
+Reasoning stays one internal dispatcher. The Profile selects the method;
+each method owns its transitions, diagnostics, and validated `method_state`.
+Runtime owns common execution and output validation/repair. Existing Reasoning
+functions are the starting contract, not a new method framework.
+
+The callback model below and `RSN-REQ-022` remain retained extension proposals.
+They do not authorize a method registry in this cleanup. Review their fit with
+the selected direction before any separate extension work. No requirement ID
+is removed, and no named document is approved by this decision.
+
 ## Model
 
-Every public method implements one semantic behavior:
+Earlier extension proposal, not the selected implementation contract:
 
 ```elixir
 @callback id() :: atom()
@@ -39,7 +66,7 @@ Every public method implements one semantic behavior:
 
 `capabilities/0` declares whether the method supports tools, streaming, structured output, steering, and parallel candidates. Profile validation rejects unsupported combinations before a request starts.
 
-The proposed first-release method set is:
+The complete retained method set is:
 
 - `:react`
 - `:chain_of_thought`
@@ -50,7 +77,8 @@ The proposed first-release method set is:
 - `:trm`
 - `:adaptive`
 
-This list is pending approval. A method can be retained as experimental without becoming a stable public contract.
+The selected direction retains all eight methods. Their individual stability
+claims still need evidence; this does not approve the full document.
 
 A plan is portable output:
 
@@ -173,7 +201,7 @@ Built-in methods can supply DSL helpers, but those helpers must expand to standa
 
 | ID | Question | Recommended option | Effect |
 | --- | --- | --- | --- |
-| `RSN-DEC-001` | Which methods are stable in the first V3 release? | ReAct, Chain-of-Thought, Chain-of-Draft, and Adaptive; mark the other search methods experimental until aligned | Reduces the first stable compatibility surface |
+| `RSN-DEC-001` | Which methods are stable in the first V3 release? | Retain all eight implemented methods; decide stability from method-specific evidence, not an automatic reduced release set | Preserves the full method scope while making stability evidence explicit |
 | `RSN-DEC-002` | Can a plan execute directly? | No; lower to Flow or send to a host orchestrator | Keeps plan semantics separate from workflow execution |
 | `RSN-DEC-003` | How are score ties resolved? | Stable candidate insertion order after normalized score | Makes concurrent search reproducible |
 | `RSN-DEC-004` | Can methods retain hidden reasoning? | Only through explicit policy and never in public output by default | Protects sensitive reasoning data |

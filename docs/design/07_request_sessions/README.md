@@ -1,46 +1,54 @@
-> Seam review entry point. This document is pending approval.
+> Seam review entry point. Pending approval.
 
-# 07 — Request sessions and active input
+# 07 — Request orchestration and active input
 
 ## Briefing
 
-The V3 branch has request handles, portable request records, streams, cancellation, and steering. The target is one AI request lifecycle for authored Agents and standalone use. The main change is to leave process, admission, and commit mechanics in core Jido while this seam owns request policy and user controls.
+Orchestration owns the live API; Jido.Session is a separate portable value. Record is a validated internal map with pending/completed/failed statuses. Cancellation and interruption are failure outcomes rather than distinct record status atoms. Coordinator owns active workers, completion, recovery, and ordered commit coordination. Request streams are best-effort views, not durable logs.
+
+This seam retains the complete target, not only current functionality. Detailed
+current evidence and gaps are in [alignment](alignment.md); proposed contracts
+and stable requirement IDs are in [design](design.md).
 
 ## Why this seam exists
 
-- Owner: Session, Request, PendingInput, and public request API modules.
-- Owns: Request identity, records, status, await, stream, sync, cancellation, steering, settlement, and active-input correlation.
-- Does not own: A general job queue, private AgentServer protocol, durable workflow, provider transport, or process registry.
+- Owner: Request, Orchestration and Coordinator, PendingInputServer, Thread.Control, and core Plugin integration.
+- Owns: request orchestration and active input within [the package architecture](../ARCHITECTURE.md).
+- Does not own: contracts assigned to other seams or private lower-package internals.
 
 ## Current and target state
 
 | Area | Current | Target |
 | --- | --- | --- |
-| Lifecycle | Session Actions and Plugin implement admission and settlement | One documented request state model |
-| Entry points | Agent and standalone paths exist | Both paths use the same execution and result rules |
-| Active input | Steering and pending input exist | Stable and bounded steering points |
+| Architecture | The module and state ownership above is the code baseline | Define one request contract across authored and standalone paths, plus advanced linked delegation, handoff, bounded active input, and explicit delivery/cancellation guarantees. |
+| Evidence | Linked example and boundary tests cover specific cases | Direct requirement-level acceptance, including advanced paths |
+| Compatibility | Current APIs remain authoritative | Explicit migration for approved contract changes |
 
 ## Major gaps and work remaining
 
-| Gap | Why it matters | Required outcome | Owner seam |
+| Gap | Why it matters | Required outcome | Owner |
 | --- | --- | --- | --- |
-| Concurrency policy is not final | Busy and duplicate behavior can vary | One active-request policy | 07 |
-| Late cancellation is not final | Callers can see inconsistent results | One terminal cancel contract | 07 |
+| [SES-GAP-001](alignment.md#gap-register) | Request.await_many exists; the prior row incorrectly linked it to the stream-sink requirement. | Keep ordering/timeout/cleanup proof as an API evidence item, separate from SES-REQ-022. | 07; dependencies below |
+| [SES-GAP-002](alignment.md#gap-register) | Start/settle/cancel transitions and failure retention exist. Proposed statuses and replies differ from Record and current APIs. | Resolve record vocabulary, reply compatibility, and rollback limits. | 07; dependencies below |
+| [SES-GAP-003](alignment.md#gap-register) | Steering, injection, source references, and bounded input exist. Queued input is not proof of model consumption. | Complete malformed/stale/queued/applied acceptance cases. | 07; dependencies below |
+| [SES-GAP-004](alignment.md#gap-register) | Coordinator and streams have lifecycle policies. A full sink/caller/owner loss matrix is still required. | Do not conflate caller exit with cancellation of shared work. | 07; dependencies below |
+| [SES-GAP-006](alignment.md#gap-register) | Subagent/handoff declarations do not implement linked requests, context transfer, fan-out, or peer cancellation. | Retain delegation requirements with 03/06/11/12; core owns topology. | 07; dependencies below |
 
 ## Decisions requested
 
-1. **Active request count:** Approve one active AI request per Agent for the first V3 release.
-   Effect: Admission and steering remain simple and deterministic.
-2. **Late cancel:** Approve completion as authoritative after settlement starts.
-   Effect: Cancellation cannot replace an already committed terminal result.
+Resolve record/error semantics and cancellation replies before changing current API shapes. Define child/peer delegation as linked work above core topology, not a new Agent model.
+
+The [target design decisions](design.md#open-design-decisions) remain pending.
+No advanced capability is removed by this reconciliation.
 
 ## Dependencies
 
-- Prerequisites: 00, 01, 04, 05, and 06.
-- Dependents: 08, 09, 10, 11, and 12.
-- Blockers: Request concurrency and late-cancel decisions.
+- Prerequisites: [05 Reasoning and planning methods](../05_reasoning_planning/alignment.md), [06 Core runtime and Signal integration](../06_runtime_signal_integration/alignment.md).
+- Dependents: 08, 09, 11.
+- Blockers: unresolved target and prerequisite decisions. Current implementation can be inspected without treating proposed contracts as approved.
 
 ## Documents
 
 - [Target design](design.md).
-- [Alignment plan](alignment.md).
+- [Current evidence and alignment](alignment.md).
+- [Overall architecture](../ARCHITECTURE.md).

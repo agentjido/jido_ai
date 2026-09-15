@@ -1,4 +1,4 @@
-defmodule Jido.AI.Session.Change do
+defmodule Jido.AI.Orchestration.Change do
   @moduledoc false
   use Jido.Agent.Directive
 
@@ -6,7 +6,7 @@ defmodule Jido.AI.Session.Change do
             __MODULE__,
             %{
               operation: Zoi.enum([:start, :finish, :control, :history, :progress]),
-              record: Jido.AI.Session.Record.schema(),
+              record: Jido.AI.Orchestration.Record.schema(),
               batch_id: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil)
             },
             coerce: true
