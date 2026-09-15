@@ -1,6 +1,6 @@
 defmodule Jido.AI.Runtime.RequestTransform do
   @moduledoc false
-  alias Jido.AI.{Context, Models, Output, Profile, ToolCatalog}
+  alias Jido.AI.{Models, Output, Profile, ToolCatalog}
   alias Jido.AI.Reasoning.ReAct.{Config, State}
 
   def prepare(state, request, context) do
@@ -203,5 +203,5 @@ defmodule Jido.AI.Runtime.RequestTransform do
   end
 
   defp messages(context),
-    do: Context.new() |> Context.append_messages(Jido.AI.History.entries(context.messages)) |> Context.to_messages()
+    do: Jido.AI.History.entries(context.messages)
 end

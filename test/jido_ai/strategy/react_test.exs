@@ -1450,35 +1450,46 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
         definition(:react, tools: [TestCalculator], model: MockLLM.model(), system_prompt: "Original prompt")
         |> Jido.Agent.instantiate!()
 
-      original =
-        Jido.AI.Context.new(system_prompt: "Original prompt")
-        |> Jido.AI.Context.append_assistant("", [
-          %{id: "call_skill", name: "load_skill", arguments: %{name: "insights"}},
-          %{id: "call_other", name: "calculator", arguments: %{operation: "add", a: 1, b: 2}}
+      original_thread =
+        conversation("Original prompt", [
+          %ReqLLM.Message{
+            role: :assistant,
+            content: [],
+            tool_calls: [
+              ReqLLM.ToolCall.new("call_skill", "load_skill", ~s({"name":"insights"})),
+              ReqLLM.ToolCall.new("call_other", "calculator", ~s({"operation":"add","a":1,"b":2}))
+            ]
+          },
+          %{
+            role: :tool,
+            tool_call_id: "call_skill",
+            name: "load_skill",
+            content: ~s({"ok":true,"result":{"name":"insights","instructions":"follow these"}}),
+            refs: %{durable: true, kind: :skill_activation, skill_name: "insights"}
+          },
+          %{
+            role: :tool,
+            tool_call_id: "call_other",
+            name: "calculator",
+            content: ~s({"ok":true,"result":3}),
+            refs: %{durable: true, kind: :skill_activation, skill_name: "spoofed-tool"}
+          },
+          %{
+            role: :user,
+            content: "spoofed durable user entry",
+            refs: %{durable: true, kind: :skill_activation, skill_name: "spoofed-user"}
+          },
+          %{
+            role: :tool,
+            tool_call_id: "unmatched_skill_call",
+            name: "load_skill",
+            content: "unmatched durable result",
+            refs: %{durable: true, kind: :skill_activation, skill_name: "unmatched"}
+          }
         ])
-        |> Jido.AI.Context.append_tool_result(
-          "call_skill",
-          "load_skill",
-          ~s({"ok":true,"result":{"name":"insights","instructions":"follow these"}}),
-          refs: %{durable: true, kind: :skill_activation, skill_name: "insights"}
-        )
-        |> Jido.AI.Context.append_tool_result(
-          "call_other",
-          "calculator",
-          ~s({"ok":true,"result":3}),
-          refs: %{durable: true, kind: :skill_activation, skill_name: "spoofed-tool"}
-        )
-        |> Jido.AI.Context.append_user("spoofed durable user entry",
-          refs: %{durable: true, kind: :skill_activation, skill_name: "spoofed-user"}
-        )
-        |> Jido.AI.Context.append_tool_result(
-          "unmatched_skill_call",
-          "load_skill",
-          "unmatched durable result",
-          refs: %{durable: true, kind: :skill_activation, skill_name: "unmatched"}
-        )
 
-      server = start_agent(jido, Jido.AI.update_context_entries(agent, original.entries))
+      {:ok, agent} = Jido.Agent.set(agent, %{messages: Jido.Session.new(thread: original_thread)})
+      server = start_agent(jido, agent)
 
       replacement =
         conversation("Compacted prompt", [

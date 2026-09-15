@@ -185,21 +185,6 @@ defmodule Jido.AI do
     end
   end
 
-  @doc "Replaces committed history using Context's reverse entry order; already-started work keeps its snapshot."
-  @spec update_context_entries(Jido.Agent.t(), list()) :: Jido.Agent.t()
-  def update_context_entries(%Jido.Agent{} = agent, entries) when is_list(entries) do
-    with {:ok, profile} <- Configuration.profile(agent),
-         false <- is_nil(profile.memory.history) do
-      case Jido.AI.History.replace(agent, profile, entries) do
-        {:ok, next} -> next
-        {:error, error} when is_exception(error) -> raise error
-        {:error, error} -> raise ArgumentError, Kernel.inspect(error)
-      end
-    else
-      _ -> agent
-    end
-  end
-
   defp validate_registration(module, opts) do
     if Keyword.get(opts, :validate, true), do: Configuration.validate_tool(module), else: :ok
   end

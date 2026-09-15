@@ -82,6 +82,26 @@ Remaining work:
 
 ## Work log (historical steps, not current status)
 
+- History, request-transform views, and Session inspection now normalize
+  messages directly through ReqLLM; they no longer construct Context values.
+  Removed update_context_entries/2 and the reverse-order History replacement
+  path. Direct Agent setup uses the declared Session field. The 173-test
+  normalization run passed. A subsequent 102-test inspection/state run found
+  one old plain-string assertion; it now checks typed text content. Full run:
+  `/tmp/jido-ai-normalized-messages-full.log`. The unused Context module and its
+  legacy tests were then removed. Conversation content tests now cover ordered
+  text/thinking/image/video/file parts, multimodal tools, per-entry references,
+  identity/time preservation, and explicit system messages. Existing canonical
+  tests cover validation, selection, operation encoding, and runtime behavior.
+  Removed tests target the removed reverse-list, coercion, debug/pretty-print,
+  and permissive malformed-input APIs; they are not skipped tests. All 99
+  focused content/resource/ReAct tests pass in `/tmp/jido-ai-context-removal.log`.
+  The current-source gate after removal passed format, forced compilation,
+  inventory, and all 2,796 tests with one existing exclusion:
+  `/tmp/jido-ai-context-removal-full.log`. The lower count reflects removed
+  Context-only API tests and added canonical contract tests, not new skips.
+  User and developer projection guides and the public API map are updated.
+
 - Active control migration: replacement validation, lane projection, and
   compaction now operate on canonical Threads. Context.Operations no longer
   converts through the Context struct or calls History. History reads the

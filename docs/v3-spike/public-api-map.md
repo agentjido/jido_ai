@@ -2,9 +2,10 @@
 
 Conversation consolidation is in progress. `Jido.AI.Conversation` introduces
 canonical Session/Thread message projection. Runtime history now stores Session
-values, with no second Session in Plugin lane state. Projection and standalone
-ReAct consolidation remain. See [the migration plan](conversation-consolidation.md). Do not treat
-the temporary coexistence of History and Conversation as the final API.
+values, with no second Session in Plugin lane state. Standalone ReAct and
+conversation controls use canonical Threads. The old Context value and
+reverse-order history replacement API are removed. Final verification and
+remaining cleanup are tracked in [the migration plan](conversation-consolidation.md).
 
 Checked against the source on 2026-09-15, after `a59eb23c`.
 This map describes the current V3 branch, not a released V3 package.
@@ -52,7 +53,7 @@ contract; they are not separate authoring models.
 
 - `Agent.from_initial_state/2,3` accepts canonical Session values or encoded
   Session maps in declared conversation fields. The special `:context` input
-  is removed. Root `update_context_entries/2` remains pending consolidation.
+  is removed, as is root `update_context_entries/2`.
   These do not restore private V2 strategy state. See [import](../../lib/jido_ai/agent/initial_state.ex)
   and [boundary tests](../../test/authoring/agents/boundaries_test.exs).
 - Internal implementation: `Agent.Definition`, `Agent.Interface`, DSL compiler,

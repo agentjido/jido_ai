@@ -1,105 +1,65 @@
-# Context History And Projection Model
+# Conversation storage and projection
 
-This guide defines the V3 context history, portable session thread, and materialized projection.
+## Ownership
 
-## Ownership Boundaries
+The Profile's `memory.history` field holds a `Jido.Session`. That Session owns
+one append-only `Jido.Thread`. The context-control Plugin stores only the active
+lane, one pending operation, and a bounded list of applied operation IDs. It
+does not store messages or a second Session.
 
-- Canonical message history: the Profile `memory.history` field in Agent state.
-- Portable interaction value: `agent.state.jido_ai_contexts[profile_id].session` (`Jido.Session`).
-- Append-only lane thread: `session.thread` (`Jido.Thread`).
-- Materialized LLM view: `Jido.AI.Context`, returned by `Jido.AI.get_strategy_context/2`.
-- In-flight turn state: live request execution state outside portable Agent state.
+`Jido.AI.Conversation` encodes AI entries and selects provider input. It has no
+state. History reads and commits the declared Session field. In-flight provider
+messages are request snapshots, not another committed store. Core Agent state
+updates remain the commit boundary.
 
-The declared history field is the source of truth for model messages. The
-Agent-owned session thread records lane operations and the message batches that
-support deterministic lane projection.
+## Entry contracts
 
-## Thread Entry Kinds
+`:ai_message` payloads have string keys and a version. They contain role,
+content, tool calls, tool-call correlation, message metadata, and reasoning
+details. Binary parts use explicit base64 encoding. References such as
+`request_id`, `run_id`, source, and lane remain in `Thread.Entry.refs`, outside
+provider metadata. Entry identity, sequence, and time belong to Thread.Entry.
 
-### `:ai_message`
+`:ai_context_operation` payloads also have a version. They contain operation ID,
+lane, type, reason, optional base sequence, metadata, and an encoded canonical
+Thread snapshot for replacement. A switch has no replacement snapshot.
+`Conversation.Operation` validates and encodes this internal contract.
 
-Payload fields:
-- `context_ref`
-- `role` (`:user | :assistant | :tool`)
-- `content`
-- optional `tool_calls`, `tool_call_id`, `name`, `thinking`
-- `request_id`, `run_id`
+Application entry kinds are retained by Thread but excluded from model input.
+Malformed AI payloads return errors rather than becoming provider messages.
 
-### `:ai_context_operation`
+## Selection and lifecycle
 
-Payload fields:
-- `op_id`
-- `context_ref`
-- `operation`
+`Conversation.select/2` chooses a named lane, or the last selected lane. A
+replacement resets the selected message view to its saved Thread entries.
+Subsequent AI entries extend that view. Selection does not mutate the audit log.
 
-Operation map fields:
-- `type` (`:replace` implemented now, `:switch` implemented now)
-- `reason` (`:manual | :restore | :compaction | :system`)
-- `result_context` for `:replace` (full context snapshot)
-- optional `base_seq`, `meta`
+An admitted request retains its input snapshot. User, assistant, and tool
+messages append through the existing runtime commit path. Session-mode history
+can be published during execution; turn-mode history commits with its result.
+These modes do not have identical publication timing.
 
-## Materialized ReAct State
+An idle context operation applies immediately. During a request, the latest
+pending operation applies after termination. Repeated applied IDs do not append
+another operation. Compaction retains trusted, matched skill activation pairs;
+caller-supplied references alone do not grant durability.
 
-- `context`
-- `run_context`
-- `active_context_ref`
-- `pending_context_op` (deferred while run active, latest wins)
-- `applied_context_ops` (bounded op-id dedupe list)
-- `projection_cursor_seq`
+## Import and checkpoints
 
-## Lifecycle
+`Agent.from_initial_state/2,3` accepts canonical Session values or encoded Session
+maps in declared fields. It preserves their entries and rejects incomplete tool
+exchanges. It does not import live request or Plugin state. The legacy special
+`:context` input and reverse-order history replacement API are removed.
 
-1. Run start:
-- use materialized `context` for `active_context_ref`
-- append the user `:ai_message` to the session thread
-- initialize `run_context`
+Standalone `ReAct.State.context` is a canonical Thread. Its state checkpoint
+format is version 4 and encodes that Thread. Execution checkpoint data retains
+the pending runtime position and resumes through the shared Agent/Flow runtime.
+Do not use a conversation import to resume tool execution.
 
-2. Run progression:
-- append assistant/tool `:ai_message` entries when history commits
-- append drained steering/injection input as user `:ai_message` when runtime emits `:input_injected`
-- update `run_context` in lockstep
+## Contract evidence
 
-3. Context modify during active run:
-- store only `pending_context_op`
-- do not mutate `run_context` mid-flight
-
-4. Terminal transition:
-- finalize request state first
-- apply deferred op second (append `:ai_context_operation`, then update materialized context)
-
-## Projection Rule
-
-For a lane (`context_ref`):
-- find latest `:replace` anchor
-- fold subsequent `:ai_message` events by sequence
-- produce deterministic `Jido.AI.Context` at any seq boundary
-
-## Steering Scope
-
-- ReAct steering is user-style only in this version
-- drained `steer` / `inject` input projects as `role: :user`
-- hidden/system-role steering is not projected or persisted
-
-## Idempotency
-
-`op_id` is required for deterministic operation semantics. If already applied:
-- no duplicate thread append
-- no duplicate materialized mutation
-
-## Compaction
-
-Compaction is represented as a normal context operation:
-- `type: :replace`
-- `reason: :compaction`
-- `result_context`: compacted snapshot
-- provenance in `meta`
-
-The session thread remains append-only.
-
-## Checkpoint boundary
-
-ReAct runtime and checkpoint data uses the current V3 context format and the
-`rt2.` token envelope. Other formats are not accepted.
-
-This rule does not reject the new portable `Jido.Thread` value in declared
-Agent state. Native Agent checkpoints can retain `Jido.Session` and its thread.
+- [Conversation codec and selection tests](../../test/jido_ai/conversation_test.exs)
+- [Content and reference tests](../../test/jido_ai/conversation_content_test.exs)
+- [Runtime ownership and replacement tests](../../test/jido_ai/conversation_runtime_test.exs)
+- [Import tests](../../test/jido_ai/operations/initial_state_test.exs)
+- [Standalone examples](../../examples/14_resume/README.md)

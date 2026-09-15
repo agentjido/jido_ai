@@ -1,14 +1,20 @@
 defmodule Jido.AI.History do
-  @moduledoc "Projects portable domain message maps through the existing AI context."
-  alias Jido.AI.{Context, Conversation, Profile}
+  @moduledoc "Reads and commits the Profile's canonical Session conversation."
+  alias Jido.AI.{Conversation, Profile}
   @refs_key :jido_ai_refs
 
   def entries(messages) do
-    Context.new()
-    |> Context.append_messages(Enum.map(messages, &restore_refs/1))
-    |> Map.fetch!(:entries)
-    |> Enum.reverse()
-    |> Enum.map(&Map.from_struct/1)
+    Enum.map(messages, fn input ->
+      {:ok, context} = normalize_messages([input])
+      [message] = context.messages
+      refs = message.metadata[@refs_key] || message.metadata[Atom.to_string(@refs_key)] || %{}
+
+      message
+      |> clear_refs()
+      |> Map.from_struct()
+      |> Map.put(:refs, if(refs == %{}, do: nil, else: refs))
+      |> Map.put(:timestamp, Map.get(input, :timestamp) || DateTime.utc_now())
+    end)
   end
 
   def query(query, refs),
@@ -46,50 +52,13 @@ defmodule Jido.AI.History do
 
   def read(_, _), do: Profile.error("memory.history", "Expected initialized Agent state")
 
-  @doc false
-  def replace(agent, profile, entries) do
-    with {:ok, values} <- prepare_entries(entries) do
-      state = append(Map.put(agent.state, profile.memory.history, nil), profile, values)
-      Jido.Agent.set(agent, %{profile.memory.history => state[profile.memory.history]})
-    end
-  end
-
-  @doc false
-  def prepare_entries(entries) do
-    Jido.AI.Error.capture(fn ->
-      with true <- is_list(entries) and Enum.all?(entries, &is_map/1),
-           values = Enum.map(Enum.reverse(entries), &entry_map/1),
-           :ok <- Jido.Action.validate_static_data(values),
-           {:ok, messages} <- messages(values),
-           :ok <- validate_messages(messages) do
-        {:ok, values}
-      else
-        false -> Profile.error("memory.history", "Expected Context entries or message maps")
-        {:error, _} = error -> error
-      end
-    end)
-  end
-
-  defp entry_map(%Context.Entry{} = entry), do: Map.from_struct(entry)
-  defp entry_map(entry), do: entry
-
-  defp validate_messages(messages) do
-    Enum.reduce_while(messages, :ok, fn message, :ok ->
-      case Zoi.parse(ReqLLM.Message.schema(), message) do
-        {:ok, _} -> {:cont, :ok}
-        {:error, _} -> {:halt, Profile.error("memory.history", "Invalid model message")}
-      end
-    end)
-  end
-
   # A complete exchange has one result for every announced call. A pending
   # after-model pause is the only supported position with an open exchange.
   @doc false
   defdelegate open_tool_calls(messages), to: Jido.AI.Conversation
 
   def messages(entries) do
-    values = Context.new() |> Context.append_messages(entries) |> Context.to_messages()
-    with {:ok, context} <- normalize_messages(values), do: {:ok, context.messages}
+    with {:ok, context} <- normalize_messages(entries), do: {:ok, context.messages}
   end
 
   # ReqLLM message metadata carries refs locally. Provider requests remove this
@@ -162,11 +131,6 @@ defmodule Jido.AI.History do
 
   defp clear_refs(%ReqLLM.Message{metadata: metadata} = message),
     do: %{message | metadata: Map.drop(metadata, [@refs_key, Atom.to_string(@refs_key)])}
-
-  defp restore_refs(%ReqLLM.Message{metadata: %{@refs_key => refs}} = message),
-    do: message |> Map.from_struct() |> Map.put(:refs, refs)
-
-  defp restore_refs(message), do: message
 
   def start(state, profile, record, source) do
     with {:ok, _} <- read(state, profile),

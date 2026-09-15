@@ -243,9 +243,11 @@ defmodule Jido.AI.Session.Inspection do
   defp conversation(state, profile) do
     case History.read(state, profile) do
       {:ok, entries} ->
-        Context.new(system_prompt: profile.instructions)
-        |> Context.append_messages(entries)
-        |> Context.to_messages()
+        messages = Enum.map(entries, &Map.drop(&1, [:timestamp]))
+
+        if is_binary(profile.instructions),
+          do: [%{role: :system, content: profile.instructions} | messages],
+          else: messages
 
       {:error, _} ->
         nil

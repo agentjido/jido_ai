@@ -708,7 +708,7 @@
       "modules": [
         "Jido.AI"
       ],
-      "sha256": "78afc50d060632324a14c1d70eb0dacc6b5a5ea739579495e095490889d02b2f",
+      "sha256": "e0d4138ce55064d8594ae5d329fab71ababdf3e379fd5bb76f003fc4647e705c",
       "declarations": [
         {
           "line": 1,
@@ -1117,27 +1117,6 @@
           ],
           "clause_lines": [
             180
-          ]
-        },
-        {
-          "line": 188,
-          "module": "Jido.AI",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 190,
-          "module": "Jido.AI",
-          "name": "update_context_entries",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            190
           ]
         }
       ]
@@ -5437,406 +5416,6 @@
       ]
     },
     {
-      "path": "lib/jido_ai/context.ex",
-      "modules": [
-        "Jido.AI.Context",
-        "Jido.AI.Context.Entry"
-      ],
-      "sha256": "9fc65a34a086c38db8fd939c23e3934e47a75e3b4d4e6753040c8a4e49ddc2ff",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.AI.Context",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.AI.Context",
-          "name": "moduledoc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 43,
-          "module": "Jido.AI.Context",
-          "source": "[[:id, entries: [], system_prompt: nil]]",
-          "kind": "defstruct",
-          "quoted": false
-        },
-        {
-          "line": 45,
-          "module": "Jido.AI.Context",
-          "name": "Jido.AI.Context.Entry",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 46,
-          "module": "Jido.AI.Context.Entry",
-          "name": "moduledoc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 62,
-          "module": "Jido.AI.Context.Entry",
-          "source": "[\n  [\n    :role,\n    :content,\n    :thinking,\n    :reasoning_details,\n    :tool_calls,\n    :tool_call_id,\n    :name,\n    :timestamp,\n    :refs\n  ]\n]",
-          "kind": "defstruct",
-          "quoted": false
-        },
-        {
-          "line": 75,
-          "module": "Jido.AI.Context",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 84,
-          "module": "Jido.AI.Context",
-          "name": "new",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            0,
-            1
-          ],
-          "clause_lines": [
-            84
-          ]
-        },
-        {
-          "line": 91,
-          "module": "Jido.AI.Context",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 101,
-          "module": "Jido.AI.Context",
-          "name": "append",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            101
-          ]
-        },
-        {
-          "line": 106,
-          "module": "Jido.AI.Context",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 110,
-          "module": "Jido.AI.Context",
-          "name": "append_user",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2,
-            3
-          ],
-          "clause_lines": [
-            110
-          ]
-        },
-        {
-          "line": 115,
-          "module": "Jido.AI.Context",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 120,
-          "module": "Jido.AI.Context",
-          "name": "append_assistant",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2,
-            3,
-            4
-          ],
-          "clause_lines": [
-            120
-          ]
-        },
-        {
-          "line": 135,
-          "module": "Jido.AI.Context",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 140,
-          "module": "Jido.AI.Context",
-          "name": "append_tool_result",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            4,
-            5
-          ],
-          "clause_lines": [
-            140
-          ]
-        },
-        {
-          "line": 152,
-          "module": "Jido.AI.Context",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 162,
-          "module": "Jido.AI.Context",
-          "name": "to_messages",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1,
-            2
-          ],
-          "clause_lines": [
-            162
-          ]
-        },
-        {
-          "line": 184,
-          "module": "Jido.AI.Context",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 190,
-          "module": "Jido.AI.Context",
-          "name": "append_messages",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            190
-          ]
-        },
-        {
-          "line": 197,
-          "module": "Jido.AI.Context",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 201,
-          "module": "Jido.AI.Context",
-          "name": "length",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            201
-          ]
-        },
-        {
-          "line": 203,
-          "module": "Jido.AI.Context",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 207,
-          "module": "Jido.AI.Context",
-          "name": "empty?",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            207,
-            208
-          ]
-        },
-        {
-          "line": 210,
-          "module": "Jido.AI.Context",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 214,
-          "module": "Jido.AI.Context",
-          "name": "clear",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            214
-          ]
-        },
-        {
-          "line": 218,
-          "module": "Jido.AI.Context",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 222,
-          "module": "Jido.AI.Context",
-          "name": "last_entry",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            222,
-            223
-          ]
-        },
-        {
-          "line": 225,
-          "module": "Jido.AI.Context",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 229,
-          "module": "Jido.AI.Context",
-          "name": "last_assistant_content",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            229
-          ]
-        },
-        {
-          "line": 239,
-          "module": "Jido.AI.Context",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 258,
-          "module": "Jido.AI.Context",
-          "name": "debug_view",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1,
-            2
-          ],
-          "clause_lines": [
-            258
-          ]
-        },
-        {
-          "line": 280,
-          "module": "Jido.AI.Context",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 295,
-          "module": "Jido.AI.Context",
-          "name": "pp",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            295
-          ]
-        },
-        {
-          "line": 310,
-          "module": "Jido.AI.Context",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 312,
-          "module": "Jido.AI.Context",
-          "name": "coerce",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            312,
-            314,
-            336
-          ]
-        },
-        {
-          "line": 727,
-          "module": null,
-          "source": "defimpl(Inspect, for: Jido.AI.Context)",
-          "kind": "defimpl",
-          "quoted": false
-        },
-        {
-          "line": 728,
-          "module": "defimpl(Inspect, for: Jido.AI.Context)",
-          "name": "inspect",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            728
-          ]
-        }
-      ]
-    },
-    {
       "path": "lib/jido_ai/context/operations.ex",
       "modules": [
         "Jido.AI.Context.Operations"
@@ -8302,7 +7881,7 @@
       "modules": [
         "Jido.AI.History"
       ],
-      "sha256": "a635b6f882261addbae6783fad8fa1717431341e8f7c51973e2c020d263eac91",
+      "sha256": "9717844d3c574663130c5c6b807086ec75df27ead21d68d34ff122a6e7c42371",
       "declarations": [
         {
           "line": 1,
@@ -8333,7 +7912,7 @@
           ]
         },
         {
-          "line": 14,
+          "line": 20,
           "module": "Jido.AI.History",
           "name": "query",
           "kind": "def",
@@ -8342,11 +7921,11 @@
             2
           ],
           "clause_lines": [
-            14
+            20
           ]
         },
         {
-          "line": 17,
+          "line": 23,
           "module": "Jido.AI.History",
           "name": "refs",
           "kind": "def",
@@ -8355,11 +7934,11 @@
             2
           ],
           "clause_lines": [
-            17
+            23
           ]
         },
         {
-          "line": 25,
+          "line": 31,
           "module": "Jido.AI.History",
           "name": "read",
           "kind": "def",
@@ -8368,30 +7947,9 @@
             2
           ],
           "clause_lines": [
-            25,
-            27,
-            47
-          ]
-        },
-        {
-          "line": 49,
-          "module": "Jido.AI.History",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 50,
-          "module": "Jido.AI.History",
-          "name": "replace",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3
-          ],
-          "clause_lines": [
-            50
+            31,
+            33,
+            53
           ]
         },
         {
@@ -8405,8 +7963,8 @@
         {
           "line": 58,
           "module": "Jido.AI.History",
-          "name": "prepare_entries",
-          "kind": "def",
+          "name": "open_tool_calls",
+          "kind": "defdelegate",
           "quoted": false,
           "arities": [
             1
@@ -8416,28 +7974,7 @@
           ]
         },
         {
-          "line": 87,
-          "module": "Jido.AI.History",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 88,
-          "module": "Jido.AI.History",
-          "name": "open_tool_calls",
-          "kind": "defdelegate",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            88
-          ]
-        },
-        {
-          "line": 90,
+          "line": 60,
           "module": "Jido.AI.History",
           "name": "messages",
           "kind": "def",
@@ -8446,11 +7983,11 @@
             1
           ],
           "clause_lines": [
-            90
+            60
           ]
         },
         {
-          "line": 97,
+          "line": 66,
           "module": "Jido.AI.History",
           "name": "normalize_messages",
           "kind": "def",
@@ -8459,11 +7996,11 @@
             1
           ],
           "clause_lines": [
-            97
+            66
           ]
         },
         {
-          "line": 100,
+          "line": 69,
           "module": "Jido.AI.History",
           "name": "provider_context",
           "kind": "def",
@@ -8472,12 +8009,12 @@
             1
           ],
           "clause_lines": [
-            100,
-            103
+            69,
+            72
           ]
         },
         {
-          "line": 105,
+          "line": 74,
           "module": "Jido.AI.History",
           "name": "restore_response_context",
           "kind": "def",
@@ -8486,12 +8023,12 @@
             3
           ],
           "clause_lines": [
-            105,
-            117
+            74,
+            86
           ]
         },
         {
-          "line": 119,
+          "line": 88,
           "module": "Jido.AI.History",
           "name": "bind_message",
           "kind": "def",
@@ -8501,11 +8038,11 @@
             3
           ],
           "clause_lines": [
-            119
+            88
           ]
         },
         {
-          "line": 129,
+          "line": 98,
           "module": "Jido.AI.History",
           "name": "bind_response",
           "kind": "def",
@@ -8514,12 +8051,12 @@
             2
           ],
           "clause_lines": [
-            129,
-            147
+            98,
+            116
           ]
         },
         {
-          "line": 171,
+          "line": 135,
           "module": "Jido.AI.History",
           "name": "start",
           "kind": "def",
@@ -8528,11 +8065,11 @@
             4
           ],
           "clause_lines": [
-            171
+            135
           ]
         },
         {
-          "line": 176,
+          "line": 140,
           "module": "Jido.AI.History",
           "name": "append",
           "kind": "def",
@@ -8541,12 +8078,12 @@
             3
           ],
           "clause_lines": [
-            176,
-            178
+            140,
+            142
           ]
         },
         {
-          "line": 200,
+          "line": 164,
           "module": "Jido.AI.History",
           "name": "record",
           "kind": "def",
@@ -8555,7 +8092,7 @@
             3
           ],
           "clause_lines": [
-            200
+            164
           ]
         }
       ]
@@ -21755,7 +21292,7 @@
       "modules": [
         "Jido.AI.Runtime.RequestTransform"
       ],
-      "sha256": "b87583ea3e92bc860778d66c4c06c6f9539645e13d8a97da7087b6fe7b568a69",
+      "sha256": "dd0b7b5b4d2752ac2bab4e274bbd379472b3603108bcd0bd3bc54729f2d1c50c",
       "declarations": [
         {
           "line": 1,
@@ -23711,7 +23248,7 @@
       "modules": [
         "Jido.AI.Session.Inspection"
       ],
-      "sha256": "8b6fe935a79bf14d8b5f3253479d28f19e16d0f7cdc782e804fc92eaf2b8bd9f",
+      "sha256": "380c0dffba3b61cf2a4b0e306ab6e8196bb489bc21af8bca7b857fd7fe9514e4",
       "declarations": [
         {
           "line": 1,
@@ -31869,6 +31406,7 @@
     }
   ],
   "generator": "scripts/api_inventory.exs",
+  "schema_version": 2,
   "limits": [
     "No compilation or macro evaluation is used to index source declarations.",
     "Public def/defmacro declarations include implementation helpers; consult the contract map for supported use.",
@@ -31877,11 +31415,10 @@
     "Doc attributes are retained as declarations, not interpreted as per-function public API approval.",
     "Source presence and checksums do not establish passing behavior, compatibility, or release readiness."
   ],
-  "schema_version": 2,
   "historical_inventory": "api-inventory-v2.json",
   "contract_map": "public-api-map.md",
-  "source_digest": "dbacad1ff46eb3c4e1522c5b6734fd94fa7b7043333e235837a55dc290867038",
-  "file_count": 252,
+  "source_digest": "9065962b84a6c42ed5329cdf2838106ad0fd1ab8d011b4d7b39d5b0e9085a327",
+  "file_count": 251,
   "ownership": {
     "Jido.Session": "jido_ai",
     "Jido.Thread": "jido_ai",

@@ -215,7 +215,7 @@ defmodule Jido.AI.Session.InspectionTest do
     assert hd(next_wire.body["messages"])["content"] == "Changed prompt"
     assert {:ok, retained} = Session.snapshot(server, request_id: first.id)
     assert retained.details.config.system_prompt == "Changed prompt"
-    assert List.last(retained.details.conversation).content == "Next answer"
+    assert Jido.AI.Query.summarize(List.last(retained.details.conversation).content) == "Next answer"
     assert_script_done(mock)
   end
 

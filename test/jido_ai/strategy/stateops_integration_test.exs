@@ -1,6 +1,6 @@
 defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
   use Jido.AI.Test.ReasoningCase, async: false
-  alias Jido.AI.{Authoring, Context}
+  alias Jido.AI.Authoring
   alias Jido.AI.Test.StateMigration.{Agent, Change, Double, Update}
 
   # See docs/v3-spike/state-test-transfer.md for all old case mappings.
@@ -280,8 +280,14 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
   test "history prepend and append use committed context entries without losing a sibling", %{jido: jido} do
     mock = mock([%{reply: {:text, "Done"}}])
     initial = Agent.new!(state: %{label: "keep"})
-    context = Context.new() |> Context.append_user("first") |> Context.append_assistant("second")
-    changed = Jido.AI.update_context_entries(initial, context.entries)
+
+    {:ok, session} =
+      Jido.AI.Conversation.append(Jido.Session.new(), [
+        ReqLLM.Context.user("first"),
+        ReqLLM.Context.assistant("second")
+      ])
+
+    {:ok, changed} = Jido.Agent.set(initial, %{messages: session})
     assert is_nil(initial.state.messages) and changed.state.label == "keep"
     server = start_agent(jido, changed)
     assert {:ok, handle} = ask(server, mock, "third")
