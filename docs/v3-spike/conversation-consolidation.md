@@ -82,6 +82,19 @@ Remaining work:
 
 ## Work log (historical steps, not current status)
 
+- Active control migration: replacement validation, lane projection, and
+  compaction now operate on canonical Threads. Context.Operations no longer
+  converts through the Context struct or calls History. History reads the
+  shared selector directly. All 28 skill-runtime examples pass with canonical
+  replacement input (`/tmp/jido-ai-canonical-skill-compaction.log`), including
+  durable activation and provenance cases. Nine ReAct control tests still use
+  old replacement inputs in that first run. They now use canonical Threads;
+  all 78 ReAct tests pass. Lifecycle and state-operation fixtures are migrated
+  too. The old replacement `context` alias is removed; use `result_context`.
+  Full gate: `/tmp/jido-ai-canonical-controls-full.log`. Format, forced
+  compilation, inventory, and all 2,875 tests pass with one existing exclusion.
+  The conversation guide now describes the canonical store and controls.
+
 - Initial-state import now uses the declared Session field, including encoded
   Session maps. It no longer accepts the special legacy Context input or copies
   message entries into a new Session. Eight import unit tests and five live-

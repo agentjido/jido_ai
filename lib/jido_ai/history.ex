@@ -30,7 +30,14 @@ defmodule Jido.AI.History do
         {:ok, []}
 
       %Jido.Session{} = session ->
-        {:ok, Jido.AI.Context.Operations.project_entries(session, profile)}
+        with {:ok, selected} <- Conversation.select(session) do
+          {:ok,
+           Enum.map(selected.entries, fn entry ->
+             {:ok, message} = Conversation.message(entry)
+             [value] = entries([message])
+             %{value | refs: entry.refs, timestamp: DateTime.from_unix!(entry.at, :millisecond)}
+           end)}
+        end
 
       _ ->
         Profile.error("memory.history", "Expected a Jido.Session value")

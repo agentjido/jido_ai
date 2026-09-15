@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.SkillRuntimeTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Context, Request, Session}
+  alias Jido.AI.{Conversation, Request, Session}
   alias Jido.AI.Actions.Skill.{LoadSkill, RuntimeContext}
   alias Jido.Thread
   alias Jido.AI.Skill.{Activation, AgentIntegration, Registry, Spec}
@@ -41,13 +41,19 @@ defmodule JidoAI.Examples.SkillRuntimeTest do
 
   defp tool_entries(server), do: Enum.filter(entries(server), &(&1.role == :tool))
 
-  defp compact(server),
-    do:
-      Session.modify_context(server, %{
-        type: :replace,
-        reason: :compaction,
-        result_context: Context.new(system_prompt: "After compaction") |> Context.append_user("Summary")
-      })
+  defp compact(server) do
+    {:ok, snapshot} =
+      Conversation.append(
+        Jido.Thread.new(metadata: %{system_prompt: "After compaction"}),
+        [ReqLLM.Context.user("Summary")]
+      )
+
+    Session.modify_context(server, %{
+      type: :replace,
+      reason: :compaction,
+      result_context: snapshot
+    })
+  end
 
   defp payload(%{content: content}) when is_binary(content), do: Jason.decode!(content)
 

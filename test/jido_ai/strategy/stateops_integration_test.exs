@@ -258,15 +258,18 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     mock = mock([%{reply: {:text, "Answer"}}, %{reply: {:text, "Fresh answer"}}])
     server = start(jido)
 
-    context =
-      Context.new(system_prompt: "History prompt") |> Context.append_user("Hello") |> Context.append_assistant("Hi")
+    {:ok, context} =
+      Jido.AI.Conversation.append(
+        Jido.Thread.new(metadata: %{system_prompt: "History prompt"}),
+        [ReqLLM.Context.user("Hello"), ReqLLM.Context.assistant("Hi")]
+      )
 
     assert {:ok, _} = Session.modify_context(server, %{type: :replace, result_context: context})
     assert {:ok, first} = ask(server, mock, "Continue")
     assert {:ok, "Answer"} = Request.await(first)
     assert [wire] = MockLLM.report(mock).requests
     assert Enum.map(wire.body["messages"], & &1["content"]) == ["History prompt", "Hello", "Hi", "Continue"]
-    assert {:ok, _} = Session.modify_context(server, %{type: :replace, result_context: Context.new()})
+    assert {:ok, _} = Session.modify_context(server, %{type: :replace, result_context: Jido.Thread.new()})
     assert {:ok, next} = ask(server, mock, "Fresh")
     assert {:ok, "Fresh answer"} = Request.await(next)
     last = List.last(MockLLM.report(mock).requests)

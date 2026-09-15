@@ -5841,7 +5841,7 @@
       "modules": [
         "Jido.AI.Context.Operations"
       ],
-      "sha256": "b4342acfb3da63343fd1c777b1513463a6eda53b2fb9b699ee01632dfd84a483",
+      "sha256": "89b56bac1a7728a568e961026b57ad74e20503e23ddfa2f2dde9e43cf6659754",
       "declarations": [
         {
           "line": 1,
@@ -5972,28 +5972,7 @@
           ]
         },
         {
-          "line": 215,
-          "module": "Jido.AI.Context.Operations",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 216,
-          "module": "Jido.AI.Context.Operations",
-          "name": "project_entries",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            216
-          ]
-        },
-        {
-          "line": 326,
+          "line": 308,
           "module": "Jido.AI.Context.Operations",
           "name": "validate_state",
           "kind": "def",
@@ -6002,8 +5981,8 @@
             3
           ],
           "clause_lines": [
-            326,
-            339
+            308,
+            321
           ]
         }
       ]
@@ -8323,7 +8302,7 @@
       "modules": [
         "Jido.AI.History"
       ],
-      "sha256": "16512cc94db22937c4ee9fa5781d675f3c9792ad41980cb7bc92ef5008594c95",
+      "sha256": "a635b6f882261addbae6783fad8fa1717431341e8f7c51973e2c020d263eac91",
       "declarations": [
         {
           "line": 1,
@@ -8391,11 +8370,11 @@
           "clause_lines": [
             25,
             27,
-            40
+            47
           ]
         },
         {
-          "line": 42,
+          "line": 49,
           "module": "Jido.AI.History",
           "name": "doc",
           "status": "hidden",
@@ -8403,7 +8382,7 @@
           "quoted": false
         },
         {
-          "line": 43,
+          "line": 50,
           "module": "Jido.AI.History",
           "name": "replace",
           "kind": "def",
@@ -8412,11 +8391,11 @@
             3
           ],
           "clause_lines": [
-            43
+            50
           ]
         },
         {
-          "line": 50,
+          "line": 57,
           "module": "Jido.AI.History",
           "name": "doc",
           "status": "hidden",
@@ -8424,7 +8403,7 @@
           "quoted": false
         },
         {
-          "line": 51,
+          "line": 58,
           "module": "Jido.AI.History",
           "name": "prepare_entries",
           "kind": "def",
@@ -8433,11 +8412,11 @@
             1
           ],
           "clause_lines": [
-            51
+            58
           ]
         },
         {
-          "line": 80,
+          "line": 87,
           "module": "Jido.AI.History",
           "name": "doc",
           "status": "hidden",
@@ -8445,7 +8424,7 @@
           "quoted": false
         },
         {
-          "line": 81,
+          "line": 88,
           "module": "Jido.AI.History",
           "name": "open_tool_calls",
           "kind": "defdelegate",
@@ -8454,26 +8433,13 @@
             1
           ],
           "clause_lines": [
-            81
-          ]
-        },
-        {
-          "line": 83,
-          "module": "Jido.AI.History",
-          "name": "messages",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            83
+            88
           ]
         },
         {
           "line": 90,
           "module": "Jido.AI.History",
-          "name": "normalize_messages",
+          "name": "messages",
           "kind": "def",
           "quoted": false,
           "arities": [
@@ -8484,7 +8450,20 @@
           ]
         },
         {
-          "line": 93,
+          "line": 97,
+          "module": "Jido.AI.History",
+          "name": "normalize_messages",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            97
+          ]
+        },
+        {
+          "line": 100,
           "module": "Jido.AI.History",
           "name": "provider_context",
           "kind": "def",
@@ -8493,12 +8472,12 @@
             1
           ],
           "clause_lines": [
-            93,
-            96
+            100,
+            103
           ]
         },
         {
-          "line": 98,
+          "line": 105,
           "module": "Jido.AI.History",
           "name": "restore_response_context",
           "kind": "def",
@@ -8507,12 +8486,12 @@
             3
           ],
           "clause_lines": [
-            98,
-            110
+            105,
+            117
           ]
         },
         {
-          "line": 112,
+          "line": 119,
           "module": "Jido.AI.History",
           "name": "bind_message",
           "kind": "def",
@@ -8522,11 +8501,11 @@
             3
           ],
           "clause_lines": [
-            112
+            119
           ]
         },
         {
-          "line": 122,
+          "line": 129,
           "module": "Jido.AI.History",
           "name": "bind_response",
           "kind": "def",
@@ -8535,12 +8514,12 @@
             2
           ],
           "clause_lines": [
-            122,
-            140
+            129,
+            147
           ]
         },
         {
-          "line": 164,
+          "line": 171,
           "module": "Jido.AI.History",
           "name": "start",
           "kind": "def",
@@ -8549,11 +8528,11 @@
             4
           ],
           "clause_lines": [
-            164
+            171
           ]
         },
         {
-          "line": 169,
+          "line": 176,
           "module": "Jido.AI.History",
           "name": "append",
           "kind": "def",
@@ -8562,12 +8541,12 @@
             3
           ],
           "clause_lines": [
-            169,
-            171
+            176,
+            178
           ]
         },
         {
-          "line": 193,
+          "line": 200,
           "module": "Jido.AI.History",
           "name": "record",
           "kind": "def",
@@ -8576,7 +8555,7 @@
             3
           ],
           "clause_lines": [
-            193
+            200
           ]
         }
       ]
@@ -31901,7 +31880,7 @@
   "schema_version": 2,
   "historical_inventory": "api-inventory-v2.json",
   "contract_map": "public-api-map.md",
-  "source_digest": "91c60df6f0e7e43558773ce36b82eb7f0a387ac841805929e3dcde7ebde8ee0c",
+  "source_digest": "dbacad1ff46eb3c4e1522c5b6734fd94fa7b7043333e235837a55dc290867038",
   "file_count": 252,
   "ownership": {
     "Jido.Session": "jido_ai",

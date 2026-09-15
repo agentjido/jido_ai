@@ -4,7 +4,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
   alias Jido.AI.Reasoning.ReAct
   alias Jido.AI.Reasoning.ReAct.{Config, Token}
   alias Jido.AI.Usage
-  alias Jido.AI.{Context, History, Profile}
+  alias Jido.AI.{History, Profile}
   alias Jido.Thread
   alias Jido.AI.Context.Operations, as: ContextOps
   alias ReqLLM.Message.ContentPart
@@ -203,8 +203,20 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
     Enum.map(entries, &message_data/1)
   end
 
-  defp history_entries(context),
-    do: context.entries |> Enum.reverse() |> Enum.map(&(&1 |> Map.from_struct() |> message_data()))
+  defp history_entries(%Thread{} = thread) do
+    Enum.map(thread.entries, fn entry ->
+      {:ok, message} = Jido.AI.Conversation.message(entry)
+      [value] = History.entries([message])
+      message_data(%{value | refs: entry.refs})
+    end)
+  end
+
+  defp conversation(prompt, messages) do
+    Enum.reduce(messages, Thread.new(metadata: %{system_prompt: prompt}), fn message, thread ->
+      {:ok, thread} = Jido.AI.Conversation.append(thread, [message], Map.get(message, :refs, %{}))
+      thread
+    end)
+  end
 
   # Compare message data across input and projection forms. Canonical entry
   # timestamps and lane references are checked on Thread entries separately.
@@ -253,7 +265,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     monitor = Process.monitor(worker)
     before = current_history(server)
-    replacement = Context.new(system_prompt: "Recovered prompt") |> Context.append_user("Recovered history")
+    replacement = conversation("Recovered prompt", [%{role: :user, content: "Recovered history"}])
     assert {:ok, _} = replace_context(server, replacement, op_id: "deferred", context_ref: "recovered")
     assert current_history(server) == before
     pending = context_lane(server).pending_context_op
@@ -1327,8 +1339,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       server = start_reasoning(jido, :react, tools: [], system_prompt: "Original prompt")
 
       replacement =
-        Context.new(system_prompt: "Restored prompt")
-        |> Context.append_messages([%{role: :user, content: "Hello"}, %{role: :assistant, content: "Hi there"}])
+        conversation("Restored prompt", [%{role: :user, content: "Hello"}, %{role: :assistant, content: "Hi there"}])
 
       assert {:ok, _} = replace_context(server, replacement, op_id: "replace")
       assert current_history(server) == history_entries(replacement)
@@ -1343,7 +1354,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
     test "a promptless context replacement preserves the configured model prompt", %{jido: jido} do
       mock = mock([%{reply: {:text, "Done"}}])
       server = start_reasoning(jido, :react, tools: [], system_prompt: "Keep me")
-      replacement = Context.append_user(Context.new(), "test")
+      replacement = conversation(nil, [%{role: :user, content: "test"}])
       assert {:ok, _} = replace_context(server, replacement, op_id: "nil-prompt")
       assert current_history(server) == history_entries(replacement)
       assert {:ok, %Profile{instructions: "Keep me"}} = Configuration.profile(Server.agent(server))
@@ -1391,7 +1402,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
     test "idle compaction records its operation metadata in the core Thread", %{jido: jido} do
       mock = mock([%{reply: {:text, "Done"}}])
       server = start_reasoning(jido, :react, tools: [], system_prompt: "Original prompt")
-      replacement = Context.new(system_prompt: "Compacted prompt") |> Context.append_user("summary")
+      replacement = conversation("Compacted prompt", [%{role: :user, content: "summary"}])
 
       assert {:ok, _} =
                Session.modify_context(
@@ -1470,17 +1481,23 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       server = start_agent(jido, Jido.AI.update_context_entries(agent, original.entries))
 
       replacement =
-        Jido.AI.Context.new(system_prompt: "Compacted prompt")
-        |> Jido.AI.Context.append_user("summary")
-        |> Jido.AI.Context.append_assistant("", [
-          %{id: "call_skill", name: "load_skill", arguments: %{name: "insights"}}
+        conversation("Compacted prompt", [
+          %{role: :user, content: "summary"},
+          %ReqLLM.Message{
+            role: :assistant,
+            content: [],
+            tool_calls: [
+              ReqLLM.ToolCall.new("call_skill", "load_skill", ~s({"name":"insights"}))
+            ]
+          },
+          %{
+            role: :tool,
+            tool_call_id: "call_skill",
+            name: "load_skill",
+            content: "replacement spoof",
+            refs: %{durable: true, kind: :skill_activation, skill_name: "insights"}
+          }
         ])
-        |> Jido.AI.Context.append_tool_result(
-          "call_skill",
-          "load_skill",
-          "replacement spoof",
-          refs: %{durable: true, kind: :skill_activation, skill_name: "insights"}
-        )
 
       assert {:ok, _} =
                Session.modify_context(
@@ -1511,8 +1528,8 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
     test "duplicate context operation IDs preserve the first result and one Thread record", %{jido: jido} do
       mock = mock([%{reply: {:text, "Done"}}])
       server = start_reasoning(jido, :react, tools: [], system_prompt: "Original prompt")
-      first = Context.new(system_prompt: "A") |> Context.append_user("A")
-      second = Context.new(system_prompt: "B") |> Context.append_user("B")
+      first = conversation("A", [%{role: :user, content: "A"}])
+      second = conversation("B", [%{role: :user, content: "B"}])
       assert {:ok, _} = replace_context(server, first, op_id: "op_dup")
       before = Server.agent(server).state
       assert {:ok, _} = replace_context(server, second, op_id: "op_dup")
@@ -1529,8 +1546,8 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
     test "lane switches restore the selected history and prompt for real model requests", %{jido: jido} do
       mock = mock([%{reply: {:text, "Alpha answer"}}, %{reply: {:text, "Beta answer"}}])
       server = start_reasoning(jido, :react, tools: [], system_prompt: "Original prompt")
-      alpha = Context.new(system_prompt: "Alpha") |> Context.append_user("alpha")
-      beta = Context.new(system_prompt: "Beta") |> Context.append_user("beta")
+      alpha = conversation("Alpha", [%{role: :user, content: "alpha"}])
+      beta = conversation("Beta", [%{role: :user, content: "beta"}])
       assert {:ok, _} = replace_context(server, alpha, context_ref: "alpha", op_id: "alpha")
       assert {:ok, _} = replace_context(server, beta, context_ref: "beta", op_id: "beta")
       assert {:ok, _} = Session.modify_context(server, %{type: :switch}, context_ref: "alpha", op_id: "switch-alpha")
@@ -1762,7 +1779,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "initial state import rejects an AI Context under the Thread key" do
       source = definition(:react, tools: [])
-      context = Context.new(system_prompt: "Legacy key") |> Context.append_user("legacy")
+      context = conversation("Legacy key", [%{role: :user, content: "legacy"}])
       assert {:error, error} = Jido.AI.Agent.from_initial_state(source, %{thread: context})
       assert Exception.message(error) =~ "Unknown field :thread"
       assert source.state == nil

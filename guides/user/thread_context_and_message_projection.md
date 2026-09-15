@@ -1,155 +1,104 @@
-# Context And Message Projection
+# Conversations, Sessions, and Threads
 
-You need deterministic conversation state and explicit message projection to LLM input format.
+Use `Jido.Session` and `Jido.Thread` as portable conversation values. Both belong
+to the `jido_ai` package. They do not start processes or execute requests.
 
-After this guide, you can build and inspect history using `Jido.AI.Context`.
+## One conversation store
 
-## Agent History, Session, And Thread
+The Profile's `memory.history` setting names an Agent field. That field holds
+one `Jido.Session`, or `nil` before the first request. Declare it with
+`Jido.AI.Conversation.schema()`. A Session owns one append-only Thread. The
+Thread holds ordered `Jido.Thread.Entry` values, including AI messages,
+conversation operations, and application entries.
 
-Four values have separate jobs:
+The context-control Plugin holds lane and pending-operation state. It does not
+hold a second Session or copy of the messages. `Jido.AI.Session` is the separate
+live API for request control and inspection; it is not the portable value.
 
-- The Profile `memory.history` field stores the canonical portable message maps.
-- `agent.state.jido_ai_contexts[profile_id].session` stores a portable `Jido.Session`.
-- `session.thread` stores the append-only `Jido.Thread` entries for lane operations and audit data.
-- `Jido.AI.Context` is the materialized LLM projection returned by the public context getter.
-
-`Jido.Thread` and `Jido.Session` are ordinary portable values. They have no
-process, Plugin, storage adapter, AgentServer, or execution behavior.
-
-See the checked [Thread and Session example](../../examples/02_requests/02_27_thread_session_values/README.md)
-for direct construction, selection, lifecycle, and encoding.
-
-## Build Context
+## Build and project a conversation
 
 ```elixir
-alias Jido.AI.Context
+alias Jido.AI.Conversation
 
-context =
-  Context.new(system_prompt: "You are concise.")
-  |> Context.append_user("Hello")
-  |> Context.append_assistant("Hi")
-  |> Context.append_user("Summarize this chat")
+thread = Jido.Thread.new(metadata: %{system_prompt: "Be concise."})
+{:ok, session} = Conversation.append(Jido.Session.new(thread: thread), [
+  %{role: :user, content: "Hello"},
+  %{role: :assistant, content: "Hi"}
+], %{source: "/import"})
+
+{:ok, messages} = Conversation.messages(session)
 ```
 
-## Project To Messages
+`messages/1` returns ReqLLM messages in order for the selected conversation.
+It applies saved replacements and lane switches. It ignores application entry
+kinds. Invalid AI payloads return an error. Entry references stay outside the
+provider message metadata. Text, tool correlation, binary content, and required
+reasoning data have a versioned portable encoding.
+
+The projection does not prepend `system_prompt` metadata. Agent execution uses
+the selected Profile's instructions. Import and replacement can update those
+instructions from the saved Thread metadata. Do not add the same system prompt
+both as a message and as Profile instructions.
+
+Use `Conversation.select(thread, "lane-name")` to inspect a named lane. This
+returns a selected Thread view without changing the original audit log. Do not
+replace the full audit log with that view unless this is your explicit intent.
+
+## Save and import
 
 ```elixir
-messages = Context.to_messages(context)
-# [%{role: :system, ...}, %{role: :user, ...}, ...]
-
-recent_messages = Context.to_messages(context, limit: 2)
+encoded = session |> Jido.Session.encode() |> Jason.encode!()
+{:ok, restored} = encoded |> Jason.decode!() |> Jido.Session.decode()
+{:ok, agent} = Jido.AI.Agent.from_initial_state(MyAgent, %{messages: restored})
 ```
 
-## Import Existing Messages
+Use the declared field name in place of `messages` when it differs. Import also
+accepts an encoded Session map in that field. It preserves Session identity,
+Thread entry identities, timestamps, and references. A saved system prompt
+updates the selected Profile; `nil` retains its configured prompt, and `""` is
+an explicit empty prompt. Use `profile: :review` to select another Profile.
+
+Import accepts complete tool exchanges. It rejects pending, orphaned, duplicate,
+or interrupted exchanges. It does not restore active requests, workers, or
+Plugin state. Use an execution checkpoint to resume pending work. The old
+special `:context` import input is removed.
+
+## Replace, compact, or switch
 
 ```elixir
-raw = [
-  %{role: "user", content: "Question"},
-  %{role: "assistant", content: "Answer"}
-]
+{:ok, summary} = Conversation.append(Jido.Thread.new(), [
+  %{role: :user, content: "Summary of the earlier conversation"}
+])
 
-context = Context.new() |> Context.append_messages(raw)
+{:ok, _} = Jido.AI.Session.modify_context(server, %{
+  type: :replace,
+  reason: :compaction,
+  result_context: summary
+}, op_id: "compact-1")
+
+{:ok, _} = Jido.AI.Session.modify_context(server, %{type: :switch},
+  context_ref: "review", op_id: "switch-1")
 ```
 
-Use `Jido.AI.Turn.extract_text/1` when normalizing diverse provider response shapes.
+Replacement accepts a canonical Thread or Session, or an encoded Thread map.
+The `result_context` name identifies the replacement snapshot; it does not
+accept the old Context struct. The old `context` input alias is removed.
 
-## Restore Snapshot Conversation Safely
+An idle operation applies immediately. An operation received during a request
+is deferred until that request terminates. Repeated operation IDs do not apply
+twice. Operations append to the audit log; they do not erase earlier messages.
+Compaction preserves trusted, matched skill activation tool pairs. Untrusted
+references do not grant durability.
 
-When restoring from `snapshot.details.conversation`, split out one leading
-system message first. Otherwise, that system message becomes a normal context
-entry and may be duplicated during projection.
+## Inspect and verify
 
-```elixir
-saved_messages = snapshot.details.conversation
+Use `Jido.AI.Session.snapshot(server)` for live request inspection. Use the
+canonical Thread to inspect entry identity and references. Use
+`snapshot.details[:tool_results]` for completed structured tool outputs rather
+than parsing provider-facing tool messages.
 
-{system_prompt, conversation_messages} =
-  case saved_messages do
-    [%{role: role, content: content} | rest]
-    when role in [:system, "system"] and is_binary(content) ->
-      {content, rest}
-
-    _ ->
-      {nil, saved_messages}
-  end
-
-context =
-  Context.new(system_prompt: system_prompt)
-  |> Context.append_messages(conversation_messages)
-```
-
-Use `snapshot.details.conversation` for message restore/import workflows. Tool
-messages in that conversation are serialized for LLM projection, so do not parse
-them to recover structured tool payloads. For completed ReAct tool outputs, use
-`snapshot.details[:tool_results]`.
-
-## ReAct Context Operations
-
-Canonical strategy signal for context lifecycle:
-
-- `jido.ai.context.modify`
-
-Busy semantics in ReAct:
-
-- if idle, context operation applies immediately
-- if a request is active, operation is deferred and applied after terminal state
-
-## Compaction Is Replace
-
-Compaction is represented as a standard context replace operation with reason metadata:
-
-```elixir
-%{
-  op_id: "op_123",
-  context_ref: "default",
-  operation: %{
-    type: :replace,
-    reason: :compaction,
-    result_context: compacted_context,
-    meta: %{from_seq: 1, to_seq: 100}
-  }
-}
-```
-
-## Failure Mode: Unexpected Missing Context
-
-Symptom:
-- assistant ignores previous turns
-
-Fix:
-- verify you append both user and assistant/tool entries
-- avoid too-small `limit` values during projection
-- inspect with `Context.debug_view/2` or `Context.pp/1`
-
-## Defaults You Should Know
-
-- Entries are stored reversed internally for append speed
-- `Context.to_messages/2` reorders to chronological output
-- `limit: nil` includes the full context
-
-## When To Use / Not Use
-
-Use this when:
-- you need explicit control over message windows
-- you need an import/export-friendly context format
-
-Do not use this when:
-- strategy internals already manage conversation state for your use case
-
-## Breaking Change
-
-`Jido.AI.Thread` remains removed. Use canonical Session and Thread values for conversations.
-The `jido_ai` package now provides `Jido.Thread` as a portable interaction log
-and `Jido.Session` as a portable envelope that owns one thread. These values do
-not restore the old core Thread Plugin or `Jido.Thread.Agent` helper.
-
-`Jido.Session` can span many requests. `Jido.AI.Session` is the separate live
-request API for admission, steering, cancellation, completion, and inspection.
-If you previously restored state with `initial_state: %{thread: ...}`,
-use `Jido.AI.Agent.from_initial_state(MyAgent, %{messages: session})` before
-starting the Server. Declare any unrelated application `:thread` field in the
-v3 Agent schema. Use the Profile's declared conversation field in place of
-`messages` when it has another name. The special `:context` import is removed.
-See the [import example](../../examples/14_resume/14_11_initial_state/README.md).
+See the [Thread and Session example](../../examples/02_requests/02_27_thread_session_values/README.md)
+and [initial-state import example](../../examples/14_resume/14_11_initial_state/README.md).
 
 ## Next
 

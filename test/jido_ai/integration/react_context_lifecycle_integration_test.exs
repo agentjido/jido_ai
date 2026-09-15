@@ -2,7 +2,7 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
   use ExUnit.Case, async: false
   use Mimic
 
-  alias Jido.AI.{Configuration, Context, History, Profile, Session}
+  alias Jido.AI.{Configuration, History, Profile, Session}
   alias Jido.Thread
   alias Jido.AI.TestSupport.StreamResponseFactory
 
@@ -109,9 +109,11 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
              %{role: :assistant, content: "A2"}
            ]
 
-    replacement_context =
-      Context.new(system_prompt: "Reset prompt")
-      |> Context.append_user("Reset seed")
+    {:ok, replacement_context} =
+      Jido.AI.Conversation.append(
+        Jido.Thread.new(metadata: %{system_prompt: "Reset prompt"}),
+        [ReqLLM.Context.user("Reset seed")]
+      )
 
     # Reset context through the Session context command.
     reset_signal =
