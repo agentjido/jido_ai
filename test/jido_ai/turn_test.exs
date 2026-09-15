@@ -508,7 +508,7 @@ defmodule Jido.AI.TurnTest do
 
       context = %{tools: %{Calculator.name() => Calculator}}
 
-      assert {:ok, updated_turn} = Turn.run_tools(turn, context, timeout: 1000)
+      assert {:ok, updated_turn} = Jido.AI.Tools.Executor.run_tools(turn, context, timeout: 1000)
       assert length(updated_turn.tool_results) == 1
 
       [tool_result] = updated_turn.tool_results
@@ -525,13 +525,13 @@ defmodule Jido.AI.TurnTest do
 
     test "returns original turn when no tool calls are requested" do
       turn = %Turn{type: :final_answer, text: "done", tool_calls: []}
-      assert {:ok, ^turn} = Turn.run_tools(turn, %{})
+      assert {:ok, ^turn} = Jido.AI.Tools.Executor.run_tools(turn, %{})
     end
 
     test "returns a validation result for malformed tool-call items" do
       turn = %Turn{type: :tool_calls, text: "", tool_calls: [:malformed]}
 
-      assert {:ok, updated_turn} = Turn.run_tools(turn, %{})
+      assert {:ok, updated_turn} = Jido.AI.Tools.Executor.run_tools(turn, %{})
 
       assert [%{id: "", name: "", raw_result: {:error, error, []}}] =
                updated_turn.tool_results
@@ -572,7 +572,7 @@ defmodule Jido.AI.TurnTest do
         origin: :test
       }
 
-      assert {:ok, updated_turn} = Turn.run_tools(turn, context)
+      assert {:ok, updated_turn} = Jido.AI.Tools.Executor.run_tools(turn, context)
 
       assert [
                %{
@@ -607,7 +607,7 @@ defmodule Jido.AI.TurnTest do
       on_exit(fn -> :telemetry.detach(handler_id) end)
 
       assert {:ok, _result, _effects} =
-               Turn.execute_module(
+               Jido.AI.Tools.Executor.execute_module(
                  Calculator,
                  %{operation: "add", a: 1, b: 2},
                  %{observability: %{emit_telemetry?: true}, call_id: "tc_duration_1"}
@@ -640,7 +640,7 @@ defmodule Jido.AI.TurnTest do
       context = %{observability: %{emit_telemetry?: true}, origin: :test}
 
       assert {:ok, %{origin: :test, has_call_id: false, has_tool_call_id: false}, _effects} =
-               Turn.execute_module(
+               Jido.AI.Tools.Executor.execute_module(
                  ContextEcho,
                  %{},
                  context,
@@ -687,7 +687,7 @@ defmodule Jido.AI.TurnTest do
       end)
 
       assert {:ok, _result, _effects} =
-               Turn.execute_module(
+               Jido.AI.Tools.Executor.execute_module(
                  Calculator,
                  %{operation: "add", a: 1, b: 2},
                  %{observability: %{emit_telemetry?: true}, tool_call_id: "tc_ctx_1"}
@@ -718,7 +718,7 @@ defmodule Jido.AI.TurnTest do
       on_exit(fn -> :telemetry.detach(stop_handler_id) end)
 
       assert {:ok, _result, _effects} =
-               Turn.execute_module(
+               Jido.AI.Tools.Executor.execute_module(
                  Calculator,
                  %{operation: "add", a: 1, b: 2},
                  %{observability: %{emit_telemetry?: true}, call_id: "tc_legacy_1"}
@@ -747,7 +747,7 @@ defmodule Jido.AI.TurnTest do
       on_exit(fn -> :telemetry.detach(stop_handler_id) end)
 
       assert {:ok, _result, _effects} =
-               Turn.execute_module(
+               Jido.AI.Tools.Executor.execute_module(
                  Calculator,
                  %{operation: "add", a: 1, b: 2},
                  %{observability: %{emit_telemetry?: true}, tool_call_id: "tc_payload_1"}
@@ -762,7 +762,7 @@ defmodule Jido.AI.TurnTest do
 
   test "rejects unsupported tool execution options" do
     assert_raise ArgumentError, fn ->
-      Turn.execute_module(Calculator, %{operation: "add", a: 1, b: 2}, %{}, log_level: :warning)
+      Jido.AI.Tools.Executor.execute_module(Calculator, %{operation: "add", a: 1, b: 2}, %{}, log_level: :warning)
     end
   end
 

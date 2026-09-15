@@ -126,7 +126,9 @@ defmodule Jido.AI.Skill.BinaryResourcesTest do
       File.write!(Path.join(root, name), bytes)
 
       assert {:ok, output, []} =
-               Turn.execute_module(LoadResource, %{name: spec.name, relative_path: name}, %{agent_id: "binary-session"})
+               Jido.AI.Tools.Executor.execute_module(LoadResource, %{name: spec.name, relative_path: name}, %{
+                 agent_id: "binary-session"
+               })
 
       refute Map.has_key?(output, :content)
       assert [%ContentPart{type: ^kind, data: ^bytes}] = output.__content_parts__

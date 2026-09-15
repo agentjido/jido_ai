@@ -119,7 +119,7 @@ defmodule Jido.AI.TurnExecutionTest do
 
   setup do
     tools =
-      Turn.build_tools_map([
+      Jido.AI.ToolAdapter.to_action_map([
         TestActions.Calculator,
         TestActions.SlowAction,
         TestActions.ErrorAction,
@@ -136,26 +136,31 @@ defmodule Jido.AI.TurnExecutionTest do
   describe "execute/3 with Actions" do
     test "executes action via Jido.Exec", %{tools: tools} do
       # Use string keys like LLM would provide
-      result = Turn.execute("calculator", %{"operation" => "add", "a" => "1", "b" => "2"}, %{}, tools: tools)
+      result =
+        Jido.AI.Tools.Executor.execute("calculator", %{"operation" => "add", "a" => "1", "b" => "2"}, %{}, tools: tools)
 
       assert {:ok, %{result: 3}, []} = result
     end
 
     test "normalizes string keys to atom keys", %{tools: tools} do
-      result = Turn.execute("calculator", %{"operation" => "add", "a" => 1, "b" => 2}, %{}, tools: tools)
+      result =
+        Jido.AI.Tools.Executor.execute("calculator", %{"operation" => "add", "a" => 1, "b" => 2}, %{}, tools: tools)
 
       assert {:ok, %{result: 3}, []} = result
     end
 
     test "parses string numbers based on schema", %{tools: tools} do
-      result = Turn.execute("calculator", %{"operation" => "multiply", "a" => "3", "b" => "4"}, %{}, tools: tools)
+      result =
+        Jido.AI.Tools.Executor.execute("calculator", %{"operation" => "multiply", "a" => "3", "b" => "4"}, %{},
+          tools: tools
+        )
 
       assert {:ok, %{result: 12}, []} = result
     end
 
     test "returns error from action", %{tools: tools} do
       result =
-        Turn.execute("calculator", %{"operation" => "divide", "a" => "10", "b" => "0"}, %{},
+        Jido.AI.Tools.Executor.execute("calculator", %{"operation" => "divide", "a" => "10", "b" => "0"}, %{},
           tools: tools,
           timeout: 50
         )
@@ -169,13 +174,13 @@ defmodule Jido.AI.TurnExecutionTest do
 
   describe "execute/3 with Echo Action" do
     test "executes echo action", %{tools: tools} do
-      result = Turn.execute("echo", %{"message" => "hello"}, %{}, tools: tools)
+      result = Jido.AI.Tools.Executor.execute("echo", %{"message" => "hello"}, %{}, tools: tools)
 
       assert {:ok, %{echoed: "hello"}, []} = result
     end
 
     test "normalizes string keys for echo action", %{tools: tools} do
-      result = Turn.execute("echo", %{"message" => "world"}, %{}, tools: tools)
+      result = Jido.AI.Tools.Executor.execute("echo", %{"message" => "world"}, %{}, tools: tools)
 
       assert {:ok, %{echoed: "world"}, []} = result
     end
@@ -183,7 +188,7 @@ defmodule Jido.AI.TurnExecutionTest do
 
   describe "execute/3 registry lookup" do
     test "returns error for unknown tool" do
-      result = Turn.execute("unknown_tool", %{}, %{}, tools: %{})
+      result = Jido.AI.Tools.Executor.execute("unknown_tool", %{}, %{}, tools: %{})
 
       assert {:error, error, []} = result
       assert error.message == "Tool not found: unknown_tool"
@@ -194,13 +199,13 @@ defmodule Jido.AI.TurnExecutionTest do
 
   describe "execute/4 with timeout" do
     test "completes within timeout", %{tools: tools} do
-      result = Turn.execute("slow_action", %{"delay_ms" => "20"}, %{}, tools: tools, timeout: 200)
+      result = Jido.AI.Tools.Executor.execute("slow_action", %{"delay_ms" => "20"}, %{}, tools: tools, timeout: 200)
 
       assert {:ok, %{completed: true, delay: 20}, []} = result
     end
 
     test "times out for slow operations", %{tools: tools} do
-      result = Turn.execute("slow_action", %{"delay_ms" => "120"}, %{}, tools: tools, timeout: 30)
+      result = Jido.AI.Tools.Executor.execute("slow_action", %{"delay_ms" => "120"}, %{}, tools: tools, timeout: 30)
 
       assert {:error, error, []} = result
       assert error.type == :timeout
@@ -211,7 +216,8 @@ defmodule Jido.AI.TurnExecutionTest do
 
   describe "error handling" do
     test "returns structured error from action", %{tools: tools} do
-      result = Turn.execute("error_action", %{"message" => "test error"}, %{}, tools: tools, timeout: 50)
+      result =
+        Jido.AI.Tools.Executor.execute("error_action", %{"message" => "test error"}, %{}, tools: tools, timeout: 50)
 
       assert {:error, error, []} = result
       assert error.type == :execution_error
@@ -220,7 +226,7 @@ defmodule Jido.AI.TurnExecutionTest do
     end
 
     test "handles missing required parameters", %{tools: tools} do
-      result = Turn.execute("calculator", %{}, %{}, tools: tools)
+      result = Jido.AI.Tools.Executor.execute("calculator", %{}, %{}, tools: tools)
 
       assert {:error, error, []} = result
       assert error.type == :validation_error
@@ -233,7 +239,7 @@ defmodule Jido.AI.TurnExecutionTest do
   describe "normalize_params/2" do
     test "converts string keys to atom keys" do
       schema = [a: [type: :integer], b: [type: :string]]
-      result = Turn.normalize_params(%{"a" => 1, "b" => "hello"}, schema)
+      result = Jido.AI.SchemaInput.normalize_tool(schema, %{"a" => 1, "b" => "hello"})
 
       assert result.a == 1
       assert result.b == "hello"
@@ -241,14 +247,14 @@ defmodule Jido.AI.TurnExecutionTest do
 
     test "parses string integers" do
       schema = [count: [type: :integer]]
-      result = Turn.normalize_params(%{"count" => "42"}, schema)
+      result = Jido.AI.SchemaInput.normalize_tool(schema, %{"count" => "42"})
 
       assert result.count == 42
     end
 
     test "parses string floats" do
       schema = [value: [type: :float]]
-      result = Turn.normalize_params(%{"value" => "3.14"}, schema)
+      result = Jido.AI.SchemaInput.normalize_tool(schema, %{"value" => "3.14"})
 
       assert_in_delta result.value, 3.14, 0.001
     end
@@ -256,7 +262,7 @@ defmodule Jido.AI.TurnExecutionTest do
     test "handles mixed string and atom keys" do
       # jido_action v2.0.0-rc.2+ supports both string and atom keys
       schema = [a: [type: :integer], b: [type: :string]]
-      result = Turn.normalize_params(%{"a" => 1, :b => "test"}, schema)
+      result = Jido.AI.SchemaInput.normalize_tool(schema, %{"a" => 1, :b => "test"})
 
       assert result.a == 1
       assert result.b == "test"
@@ -264,14 +270,14 @@ defmodule Jido.AI.TurnExecutionTest do
 
     test "returns empty map when params is empty" do
       schema = [name: [type: :string]]
-      result = Turn.normalize_params(%{}, schema)
+      result = Jido.AI.SchemaInput.normalize_tool(schema, %{})
 
       assert result == %{}
     end
 
     test "coerces integer to float when schema expects float" do
       schema = [value: [type: :float], amount: [type: :float]]
-      result = Turn.normalize_params(%{"value" => 20, "amount" => 3}, schema)
+      result = Jido.AI.SchemaInput.normalize_tool(schema, %{"value" => 20, "amount" => 3})
 
       assert result.value == 20.0
       assert result.amount == 3.0
@@ -281,7 +287,7 @@ defmodule Jido.AI.TurnExecutionTest do
 
     test "preserves float values when schema expects float" do
       schema = [value: [type: :float]]
-      result = Turn.normalize_params(%{"value" => 20.5}, schema)
+      result = Jido.AI.SchemaInput.normalize_tool(schema, %{"value" => 20.5})
 
       assert result.value == 20.5
       assert is_float(result.value)
@@ -289,7 +295,7 @@ defmodule Jido.AI.TurnExecutionTest do
 
     test "parses string to float and does not double-coerce" do
       schema = [value: [type: :float]]
-      result = Turn.normalize_params(%{"value" => "20"}, schema)
+      result = Jido.AI.SchemaInput.normalize_tool(schema, %{"value" => "20"})
 
       assert result.value == 20.0
       assert is_float(result.value)
@@ -305,15 +311,19 @@ defmodule Jido.AI.TurnExecutionTest do
 
       input = %{"count" => "0", "groups" => [%{"ratio" => "1.5", "count" => "-2"}], "label" => "123"}
       expected = %{count: 0, groups: [%{ratio: 1.5, count: -2}], label: "123"}
-      assert Turn.normalize_params(input, schema) == expected
+      assert Jido.AI.SchemaInput.normalize_tool(schema, input) == expected
       assert {:ok, ^expected} = Zoi.parse(schema, expected)
-      assert Turn.normalize_params(%{"groups" => [], "label" => "ok"}, schema) == %{groups: [], label: "ok"}
+
+      assert Jido.AI.SchemaInput.normalize_tool(schema, %{"groups" => [], "label" => "ok"}) == %{
+               groups: [],
+               label: "ok"
+             }
     end
 
     for value <- ["4x", "1.5", "", nil, 2.5] do
       test "invalid integer #{inspect(value)} remains invalid" do
         schema = Zoi.object(%{count: Zoi.integer()})
-        normalized = Turn.normalize_params(%{"count" => unquote(value)}, schema)
+        normalized = Jido.AI.SchemaInput.normalize_tool(schema, %{"count" => unquote(value)})
         assert normalized == %{count: unquote(value)}
         assert {:error, _} = Zoi.parse(schema, normalized)
       end
@@ -322,7 +332,7 @@ defmodule Jido.AI.TurnExecutionTest do
     test "unknown keys and explicit atom keys retain their values" do
       schema = Zoi.object(%{count: Zoi.integer()})
       input = %{"count" => "3", :count => 7, "unknown_numeric_key_92841" => "5"}
-      assert Turn.normalize_params(input, schema) == %{"unknown_numeric_key_92841" => "5", count: 7}
+      assert Jido.AI.SchemaInput.normalize_tool(schema, input) == %{"unknown_numeric_key_92841" => "5", count: 7}
       assert_raise ArgumentError, fn -> String.to_existing_atom("unknown_numeric_key_92841") end
     end
 
@@ -418,7 +428,7 @@ defmodule Jido.AI.TurnExecutionTest do
   describe "execute_module/4" do
     test "executes action module directly" do
       result =
-        Turn.execute_module(
+        Jido.AI.Tools.Executor.execute_module(
           TestActions.Calculator,
           %{"operation" => "add", "a" => "5", "b" => "3"},
           %{}
@@ -429,7 +439,7 @@ defmodule Jido.AI.TurnExecutionTest do
 
     test "executes echo action module directly" do
       result =
-        Turn.execute_module(
+        Jido.AI.Tools.Executor.execute_module(
           TestActions.Echo,
           %{"message" => "direct call"},
           %{}
@@ -440,7 +450,7 @@ defmodule Jido.AI.TurnExecutionTest do
 
     test "respects timeout for direct execution" do
       result =
-        Turn.execute_module(
+        Jido.AI.Tools.Executor.execute_module(
           TestActions.SlowAction,
           %{"delay_ms" => "120"},
           %{},
@@ -468,7 +478,7 @@ defmodule Jido.AI.TurnExecutionTest do
         nil
       )
 
-      Turn.execute("calculator", %{operation: "add", a: 1, b: 1}, %{}, tools: tools)
+      Jido.AI.Tools.Executor.execute("calculator", %{operation: "add", a: 1, b: 1}, %{}, tools: tools)
 
       assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :start], %{system_time: _}, %{tool_name: "calculator"}}
       assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :stop], %{duration: _}, %{tool_name: "calculator"}}
@@ -488,7 +498,7 @@ defmodule Jido.AI.TurnExecutionTest do
         nil
       )
 
-      Turn.execute("slow_action", %{"delay_ms" => "120"}, %{}, tools: tools, timeout: 20)
+      Jido.AI.Tools.Executor.execute("slow_action", %{"delay_ms" => "120"}, %{}, tools: tools, timeout: 20)
 
       assert_receive {:telemetry, [:jido, :ai, :tool, :execute, :exception], %{duration: _},
                       %{tool_name: "slow_action", reason: :timeout}},
@@ -513,7 +523,7 @@ defmodule Jido.AI.TurnExecutionTest do
         nil
       )
 
-      Turn.execute(
+      Jido.AI.Tools.Executor.execute(
         "calculator",
         %{"operation" => "add", "a" => "2", "b" => "3"},
         %{request_id: request_id},
@@ -550,7 +560,7 @@ defmodule Jido.AI.TurnExecutionTest do
         "secret_value" => "shhh"
       }
 
-      Turn.execute("calculator", sensitive_params, %{}, tools: tools)
+      Jido.AI.Tools.Executor.execute("calculator", sensitive_params, %{}, tools: tools)
 
       assert_receive {:telemetry_params, sanitized_params}
 
@@ -590,7 +600,7 @@ defmodule Jido.AI.TurnExecutionTest do
         }
       }
 
-      Turn.execute("calculator", nested_params, %{}, tools: tools)
+      Jido.AI.Tools.Executor.execute("calculator", nested_params, %{}, tools: tools)
 
       assert_receive {:telemetry_params, sanitized_params}
 
@@ -609,7 +619,10 @@ defmodule Jido.AI.TurnExecutionTest do
 
       capture_log(fn ->
         result =
-          Turn.execute("exception_action2", %{"message" => "test exception"}, %{}, tools: tools, timeout: 50)
+          Jido.AI.Tools.Executor.execute("exception_action2", %{"message" => "test exception"}, %{},
+            tools: tools,
+            timeout: 50
+          )
 
         assert {:error, error, []} = result
         assert error.type == :execution_error
@@ -624,7 +637,10 @@ defmodule Jido.AI.TurnExecutionTest do
 
       log =
         capture_log([level: :error], fn ->
-          Turn.execute("exception_action2", %{"message" => "logged exception"}, %{}, tools: tools, timeout: 50)
+          Jido.AI.Tools.Executor.execute("exception_action2", %{"message" => "logged exception"}, %{},
+            tools: tools,
+            timeout: 50
+          )
         end)
 
       assert log =~ "logged exception" or log =~ "ArgumentError"

@@ -2,6 +2,12 @@
 
 You want to normalize raw LLM responses, classify them, execute tool calls, and project messages for follow-up LLM turns.
 
+`Jido.AI.Turn` is a response value and message projection. It does not execute
+tools. `Jido.AI.Tools.Executor` owns direct tool execution. Native Profile
+requests use the same target execution boundary with their own limits,
+interception, and effect policy. Use Agent + DSL + Profile for ordinary agents;
+the direct APIs below are for explicit lower-level composition.
+
 After this guide, you can:
 - Build a `Jido.AI.Turn` from any provider response
 - Check whether a turn requests tool execution
@@ -84,11 +90,11 @@ end
 `run_tools/3` executes every tool call in the turn and returns an updated turn with `tool_results` attached.
 
 ```elixir
-tools = Turn.build_tools_map([MyApp.Actions.Multiply])
+tools = Jido.AI.ToolAdapter.to_action_map([MyApp.Actions.Multiply])
 
 context = %{tools: tools}
 
-{:ok, updated_turn} = Turn.run_tools(turn, context)
+{:ok, updated_turn} = Jido.AI.Tools.Executor.run_tools(turn, context)
 
 # Each tool result has this shape:
 # %{
@@ -102,7 +108,7 @@ context = %{tools: tools}
 You can also pass tools via opts:
 
 ```elixir
-{:ok, updated_turn} = Turn.run_tools(turn, %{}, tools: tools, timeout: 10_000)
+{:ok, updated_turn} = Jido.AI.Tools.Executor.run_tools(turn, %{}, tools: tools, timeout: 10_000)
 ```
 
 ## Project Messages For Follow-Up LLM Calls
@@ -152,7 +158,7 @@ defmodule MyApp.ToolLoop do
     # 3. Check if the LLM wants tools
     if Turn.needs_tools?(turn) do
       # 4. Execute all requested tools
-      {:ok, executed_turn} = Turn.run_tools(turn, %{tools: tools_map})
+      {:ok, executed_turn} = Jido.AI.Tools.Executor.run_tools(turn, %{tools: tools_map})
 
       # 5. Project assistant + tool messages
       assistant_msg = Turn.assistant_message(executed_turn)
@@ -169,7 +175,7 @@ defmodule MyApp.ToolLoop do
 end
 
 # Usage:
-tools_map = Turn.build_tools_map([MyApp.Actions.Multiply])
+tools_map = Jido.AI.ToolAdapter.to_action_map([MyApp.Actions.Multiply])
 
 messages = [
   %{role: :system, content: "You are a calculator. Use the multiply tool."},
@@ -185,9 +191,9 @@ IO.puts(final_turn.text)
 Use `execute/4` when you know the tool name and want to call it outside an LLM loop:
 
 ```elixir
-tools = Turn.build_tools_map([MyApp.Actions.Multiply])
+tools = Jido.AI.ToolAdapter.to_action_map([MyApp.Actions.Multiply])
 
-{:ok, result, effects} = Turn.execute("multiply", %{"a" => 6, "b" => 7}, %{}, tools: tools)
+{:ok, result, effects} = Jido.AI.Tools.Executor.execute("multiply", %{"a" => 6, "b" => 7}, %{}, tools: tools)
 # result == %{product: 42}
 # effects == []
 ```
@@ -195,7 +201,7 @@ tools = Turn.build_tools_map([MyApp.Actions.Multiply])
 Use `execute_module/4` when you have the module reference directly:
 
 ```elixir
-{:ok, result, effects} = Turn.execute_module(MyApp.Actions.Multiply, %{a: 6, b: 7}, %{})
+{:ok, result, effects} = Jido.AI.Tools.Executor.execute_module(MyApp.Actions.Multiply, %{a: 6, b: 7}, %{})
 # result == %{product: 42}
 # effects == []
 ```
@@ -241,7 +247,7 @@ recovering structured tool payloads.
 
 ## Effect Policy And Ordering
 
-- `Turn.execute/4` and `Turn.execute_module/4` filter tool-emitted effects through `context[:effect_policy]` when provided.
+- `Jido.AI.Tools.Executor.execute/4` and `Jido.AI.Tools.Executor.execute_module/4` filter tool-emitted effects through `context[:effect_policy]` when provided.
 - Disallowed effects are dropped; allowed effects remain in the returned `effects` list.
 - Tool call execution order in `run_tools/3` follows the order of `turn.tool_calls`.
 - Tool actions may read runtime state snapshots from `context[:state]` (canonical, core-aligned).
@@ -305,7 +311,7 @@ Symptom:
 Fix:
 - verify `module.name/0` matches the tool name the LLM requested
 - pass the tools map via `context[:tools]`, `opts[:tools]`, or `context[:tool_calling][:tools]`
-- inspect with `Turn.build_tools_map([YourModule])` to see registered names
+- inspect with `Jido.AI.ToolAdapter.to_action_map([YourModule])` to see registered names
 
 ## Failure Mode: Tool Execution Timeout
 
@@ -313,7 +319,7 @@ Symptom:
 - tool result contains `type: :timeout` error
 
 Fix:
-- increase timeout: `Turn.run_tools(turn, context, timeout: 60_000)`
+- increase timeout: `Jido.AI.Tools.Executor.run_tools(turn, context, timeout: 60_000)`
 - check that the action's `run/2` completes within the configured timeout
 
 ## Defaults You Should Know

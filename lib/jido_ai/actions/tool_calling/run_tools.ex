@@ -4,7 +4,7 @@ defmodule Jido.AI.Actions.ToolCalling.RunTools do
 
   def run(state, context) do
     with {:ok, turn} <-
-           Jido.AI.Turn.run_tools(state.turn, context, tools: state.tools, timeout: state.timeout) do
+           Jido.AI.Tools.Executor.run_tools(state.turn, context, tools: state.tools, timeout: state.timeout) do
       {:ok,
        %{
          state

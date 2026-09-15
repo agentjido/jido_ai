@@ -81,7 +81,7 @@ defmodule Jido.AI.TurnEdgeCoverageTest do
   end
 
   test "builds a map from one Action module" do
-    assert Turn.build_tools_map(Echo) == %{Echo.name() => Echo}
+    assert Jido.AI.ToolAdapter.to_action_map(Echo) == %{Echo.name() => Echo}
   end
 
   test "runs calls even when the response type was not classified as tool calls" do
@@ -90,7 +90,7 @@ defmodule Jido.AI.TurnEdgeCoverageTest do
       tool_calls: [%{id: "call", name: Echo.name(), arguments: %{}}]
     }
 
-    assert {:ok, updated} = Turn.run_tools(turn, :invalid_context, tools: Echo, timeout: :invalid)
+    assert {:ok, updated} = Jido.AI.Tools.Executor.run_tools(turn, :invalid_context, tools: Echo, timeout: :invalid)
     assert [%{raw_result: {:ok, %{status: :done}, []}}] = updated.tool_results
   end
 
@@ -149,15 +149,15 @@ defmodule Jido.AI.TurnEdgeCoverageTest do
   end
 
   test "executes a valid module without an explicit timeout" do
-    assert {:ok, %{status: :done}, []} = Turn.execute_module(Echo, %{}, %{}, timeout: nil)
+    assert {:ok, %{status: :done}, []} = Jido.AI.Tools.Executor.execute_module(Echo, %{}, %{}, timeout: nil)
   end
 
   test "returns normalized errors when tool setup raises or throws" do
-    assert {:error, raised, []} = Turn.execute_module(BrokenSchema, %{}, %{}, timeout: nil)
+    assert {:error, raised, []} = Jido.AI.Tools.Executor.execute_module(BrokenSchema, %{}, %{}, timeout: nil)
     assert raised.type == :exception
     assert raised.message == "broken schema"
 
-    assert {:error, thrown, []} = Turn.execute_module(ThrowingSchema, %{}, nil)
+    assert {:error, thrown, []} = Jido.AI.Tools.Executor.execute_module(ThrowingSchema, %{}, nil)
     assert thrown.type == :caught
     assert thrown.message == "Caught throw: :broken_schema"
   end

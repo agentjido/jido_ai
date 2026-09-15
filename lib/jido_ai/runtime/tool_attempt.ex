@@ -18,8 +18,13 @@ defmodule Jido.AI.Runtime.ToolAttempt do
       tool_context = Map.merge(tool_context, Map.take(context, [:jido_ai_quota]))
 
       result =
-        Jido.Exec.run(call.tool.target, call.arguments, tool_context, timeout: min(remaining, call.tool.timeout))
-        |> Jido.AI.ToolResult.normalize(call)
+        Jido.AI.Tools.Executor.execute_target(
+          call.tool.target,
+          call.arguments,
+          tool_context,
+          [timeout: min(remaining, call.tool.timeout)],
+          call
+        )
 
       with :ok <-
              Jido.AI.Control.check(

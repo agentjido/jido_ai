@@ -3,7 +3,7 @@ defmodule Jido.AI.Actions.ToolCalling.ExecuteTool do
   A Jido.Action for direct tool execution without LLM involvement.
 
   This action executes a registered Action by name with the given parameters.
-  It uses `Jido.AI.Turn` tool execution to keep result formatting consistent.
+  It uses `Jido.AI.Tools.Executor` to keep execution and result formatting consistent.
 
   ## Parameters
 
@@ -50,8 +50,6 @@ defmodule Jido.AI.Actions.ToolCalling.ExecuteTool do
   @impl Jido.Action
   def on_before_validate_params(params), do: Jido.AI.ActionInput.before_validate(schema(), params)
 
-  alias Jido.AI.Turn
-
   @doc """
   Executes the tool by name.
   """
@@ -89,7 +87,7 @@ defmodule Jido.AI.Actions.ToolCalling.ExecuteTool do
     tool_call = %{id: "direct_tool_exec", name: tool_name, arguments: params}
     tools = resolve_tools_input(context)
 
-    case Turn.run_tool_calls([tool_call], context, timeout: timeout, tools: tools) do
+    case Jido.AI.Tools.Executor.run_tool_calls([tool_call], context, timeout: timeout, tools: tools) do
       {:ok, [%{raw_result: {:ok, result, _effects}}]} ->
         {:ok, format_result(result)}
 

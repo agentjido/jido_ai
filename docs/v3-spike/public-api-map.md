@@ -49,6 +49,13 @@ contract; they are not separate authoring models.
 
 ## Models, tools, and capabilities
 
+`Jido.AI.Tools.Executor` owns direct tool execution (`execute`, `execute_module`,
+`run_tools`, and `run_tool_calls`). Profile tool attempts use its internal
+target boundary before applying Profile policy. `Jido.AI.Turn` only normalizes
+response values and projects messages. Its old execution functions are removed,
+not forwarded. Use `ToolAdapter.to_action_map/1` for module lookup maps and
+`SchemaInput.normalize_tool/2` (schema first) for argument normalization.
+
 | Surface | Current contract | Source and acceptance tests |
 | --- | --- | --- |
 | `Jido.AI.Models.aliases/0`, `resolve/1` | Resolve aliases and native ReqLLM model inputs. Use ReqLLM directly for provider calls; there is no second root generation facade. | [Models](../../lib/jido_ai/models.ex), [model example tests](../../test/examples/01_authoring/01_08_model_helpers/01_08_model_helpers_test.exs) |

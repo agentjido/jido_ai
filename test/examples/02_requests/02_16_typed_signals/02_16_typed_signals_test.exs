@@ -526,27 +526,27 @@ defmodule JidoAI.Examples.TypedSignalsTest do
 
   test "direct Turn tools use core validation timeout cleanup and canonical effect results" do
     assert {:ok, %{echo: "direct"}, []} =
-             Turn.execute("echo", %{"value" => "direct"}, %{observer: self()}, tools: [Echo])
+             Jido.AI.Tools.Executor.execute("echo", %{"value" => "direct"}, %{observer: self()}, tools: [Echo])
 
-    assert {:error, _, []} = Turn.execute_module(Echo, %{}, %{observer: self()})
+    assert {:error, _, []} = Jido.AI.Tools.Executor.execute_module(Echo, %{}, %{observer: self()})
     parent = self()
-    task = Task.async(fn -> Turn.execute_module(Hold, %{}, %{observer: parent}, timeout: 80) end)
+    task = Task.async(fn -> Jido.AI.Tools.Executor.execute_module(Hold, %{}, %{observer: parent}, timeout: 80) end)
     assert_receive {:held_action, worker}
     ref = Process.monitor(worker)
     assert {:error, %{type: :timeout, retryable?: false}, []} = Task.await(task)
     assert_receive {:DOWN, ^ref, :process, ^worker, _}
-    assert {:error, %{type: :not_found}, []} = Turn.execute("unknown", %{}, %{}, tools: [Echo])
+    assert {:error, %{type: :not_found}, []} = Jido.AI.Tools.Executor.execute("unknown", %{}, %{}, tools: [Echo])
   end
 
   test "direct Turn parameter labels use only declared keyword and Zoi keys and enums" do
     schema = [mode: [type: {:in, [:fast, :slow]}]]
 
-    assert Turn.normalize_params(%{"mode" => "fast", "unlisted" => "keep"}, schema) == %{
+    assert Jido.AI.SchemaInput.normalize_tool(schema, %{"mode" => "fast", "unlisted" => "keep"}) == %{
              "unlisted" => "keep",
              mode: :fast
            }
 
     zoi = Zoi.object(%{mode: Zoi.enum([:fast, :slow])})
-    assert Turn.normalize_params(%{"mode" => "slow"}, zoi) == %{mode: :slow}
+    assert Jido.AI.SchemaInput.normalize_tool(zoi, %{"mode" => "slow"}) == %{mode: :slow}
   end
 end

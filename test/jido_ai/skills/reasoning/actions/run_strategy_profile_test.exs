@@ -180,7 +180,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyProfileTest do
     profile = profile(%{controls: %{timeout: 5_000}})
 
     assert {:ok, payload, []} =
-             Jido.AI.Turn.execute(
+             Jido.AI.Tools.Executor.execute(
                "reason",
                %{"prompt" => "Explain tool execution"},
                %{jido_ai_callable_profile: profile, ai: %{review: %{options: react_llm_opts(script)}}},
