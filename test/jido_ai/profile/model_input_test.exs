@@ -23,8 +23,13 @@ defmodule Jido.AI.Profile.ModelInputTest do
   end
 
   test "callable reasoning returns the same tagged model error" do
+    profile =
+      Profile.new!(%{id: :review, reasoning: :chain_of_thought, requests: %{mode: :session}, result: %{into: :answer}})
+
+    profile = put_in(profile.models.default.model, false)
+
     assert {:error, %Invalid{field: "models"}} =
-             Jido.AI.Actions.Reasoning.RunStrategy.run(%{strategy: :cot, prompt: "Explain", model: false}, %{})
+             Jido.AI.Actions.Reasoning.RunStrategy.run(%{prompt: "Explain"}, %{jido_ai_callable_profile: profile})
   end
 
   test "native model specifications remain unchanged in a validated Profile" do

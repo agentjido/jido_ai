@@ -8,8 +8,41 @@ defmodule JidoAI.Examples.ReasoningCapabilities.Agent do
              case_id: Zoi.string() |> Zoi.default("case-17")
            })
 
-    plugin Jido.AI.Plugins.Reasoning.ChainOfThought, config: [into: :result, timeout: 5_000]
-    plugin Jido.AI.Plugins.Reasoning.ChainOfDraft, config: [into: :review, timeout: 5_000]
+    plugin Jido.AI.Plugins.Reasoning.ChainOfThought,
+      config: [
+        profile:
+          Jido.AI.Profile.new!(%{
+            id: :assistant,
+            model: :reasoning,
+            reasoning: :chain_of_thought,
+            controls: %{
+              timeout: 5_000,
+              max_iterations: :method_default,
+              max_model_calls: :method_default,
+              max_tool_calls: :method_default
+            },
+            requests: %{mode: :session, streaming: true},
+            result: %{into: :result}
+          })
+      ]
+
+    plugin Jido.AI.Plugins.Reasoning.ChainOfDraft,
+      config: [
+        profile:
+          Jido.AI.Profile.new!(%{
+            id: :assistant,
+            model: :reasoning,
+            reasoning: :chain_of_draft,
+            controls: %{
+              timeout: 5_000,
+              max_iterations: :method_default,
+              max_model_calls: :method_default,
+              max_tool_calls: :method_default
+            },
+            requests: %{mode: :session, streaming: true},
+            result: %{into: :review}
+          })
+      ]
   end
 
   routes do

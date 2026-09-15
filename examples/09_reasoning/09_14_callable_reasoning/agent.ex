@@ -19,7 +19,7 @@ defmodule JidoAI.Examples.CallableReasoning.Agent do
         end
       end
 
-      define :reason, args: [:strategy, :prompt]
+      define :reason, args: [:prompt]
     end
   end
 end

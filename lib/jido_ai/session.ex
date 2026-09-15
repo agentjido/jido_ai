@@ -284,7 +284,8 @@ defmodule Jido.AI.Session do
   def submit(server, signal, sink, opts) do
     id = signal.data.request_id
     timeout = Keyword.get(opts, :admission_timeout, 5_000)
-    agent = Jido.AgentServer.agent(server, timeout)
+    deadline = Keyword.get(opts, :admission_deadline)
+    agent = Jido.AgentServer.agent(server, admission_remaining(deadline, timeout))
     method = Jido.AI.Runtime.Binding.method(agent, signal)
     # These values can contain runtime resources. They do not enter Signal data.
     {portable, resources} = Map.split(signal.data, [:request_id, :query, :prompt, :extra_refs])
@@ -292,10 +293,11 @@ defmodule Jido.AI.Session do
     with {:ok, context} <- Jido.Agent.Command.normalize_context(Keyword.get(opts, :context, %{})),
          context = Map.put(context, :jido_ai_request, resources),
          :ok <- session_declared(agent),
+         :ok <- admission_open(deadline),
          {:ok, agent} <-
            Jido.AgentServer.call(server, %{signal | data: portable},
              context: context,
-             timeout: timeout
+             timeout: admission_remaining(deadline, timeout)
            ),
          %{id: ^id} <- get_in(agent.state, [:requests, id]) do
       {:ok, Handle.new(id, server, signal.data.query)}
@@ -313,6 +315,16 @@ defmodule Jido.AI.Session do
         {:error, :request_not_admitted}
     end
   end
+
+  defp admission_open(nil), do: :ok
+
+  defp admission_open(deadline),
+    do: if(deadline > System.monotonic_time(:millisecond), do: :ok, else: {:error, :timeout})
+
+  defp admission_remaining(nil, timeout), do: timeout
+
+  defp admission_remaining(deadline, _timeout),
+    do: max(deadline - System.monotonic_time(:millisecond), 0)
 
   defp session_declared(agent) do
     if Enum.any?(agent.plugins, &(elem(&1, 0) == Plugin)),

@@ -22,12 +22,15 @@ defmodule Jido.AI.Test.CallableReasoningCase do
 
   # The HTTP barrier holds the first call while public APIs identify its owners.
   # No runtime function is stubbed. Both owners must stop before the Action returns.
-  def call(jido, params, [first | rest], expected_budget, context \\ %{}) do
+  def call(jido, profile, prompt, [first | rest], expected_budget, context \\ %{}) do
     first = %{first | reply: {:wait, :started, first.reply}}
     mock = start_supervised!({MockLLM, script: [first | rest], observer: self()})
     options = MockLLM.options(mock)
-    context = Map.merge(context, %{jido: jido, ai: %{assistant: %{options: options}}})
-    params = Map.merge(%{model: MockLLM.model(), timeout: 10_000}, params)
+
+    context =
+      Map.merge(context, %{jido: jido, jido_ai_callable_profile: profile, ai: %{profile.id => %{options: options}}})
+
+    params = %{prompt: prompt}
 
     task = Task.async(fn -> Jido.Exec.run(RunStrategy, params, context, timeout: 15_000) end)
     assert_receive {:mock_llm_waiting, ^mock, :started, provider}, 5_000
@@ -35,7 +38,7 @@ defmodule Jido.AI.Test.CallableReasoningCase do
     session = AgentServer.children(server)[{:plugin, Session.Plugin}].pid
     monitors = for pid <- [server, session, provider], do: {Process.monitor(pid), pid}
 
-    {:ok, profile} = Configuration.profile(AgentServer.agent(server), :assistant)
+    {:ok, profile} = Configuration.profile(AgentServer.agent(server), profile.id)
     {:ok, selected, selection} = Reasoning.select(profile, params.prompt)
     assert selected.controls.max_model_calls == expected_budget
     assert selected.controls.max_iterations == expected_budget
@@ -60,6 +63,25 @@ defmodule Jido.AI.Test.CallableReasoningCase do
 
     assert length(report.requests) <= expected_budget
     {outcome, report.requests, selection}
+  end
+
+  # Canonical policy for finite HTTP fixtures. Callers supply Profile fields only.
+  def callable_profile(method, attrs \\ %{}) do
+    defaults = %{
+      id: :review,
+      model: MockLLM.model(),
+      reasoning: %{method: method, options: %{}},
+      controls: %{
+        timeout: 10_000,
+        max_iterations: :method_default,
+        max_model_calls: :method_default,
+        max_tool_calls: :method_default
+      },
+      requests: %{mode: :session, streaming: true},
+      result: %{into: :answer}
+    }
+
+    Jido.AI.Profile.new!(Map.merge(defaults, attrs))
   end
 
   def text_reply(text), do: %{reply: {:text, text}}

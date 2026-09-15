@@ -1,9 +1,10 @@
-# V3 callable reasoning contract proposal
+# V3 callable reasoning contract
 
-Status: proposal only, based on `c4def59d`; breaking-change approval is pending. No runtime change.
+Status: approved and implemented on `v3-spike`, after `cc37525e`.
+The user approved the breaking callable input and Plugin configuration changes.
 Read with `docs/v3-spike/simplification.md`. Paths are repository-relative.
 
-## Recommended public contract
+## Public contract
 
 Use `Jido.AI.Agent` + DSL + `Jido.AI.Profile` for authoring and native AI routes for application
 requests. Keep `Actions.Reasoning.RunStrategy` for isolated, finite Action/tool/Flow calls. Bind one
@@ -16,7 +17,7 @@ Zoi.object(%{prompt: Zoi.string() |> Zoi.min(1)},
 
 Accept one nonempty string under `:prompt` or JSON key `"prompt"`. Before work, reject duplicate key
 forms, unknown fields, and missing/invalid input, including direct `run/2` calls. Do not trim or
-convert the prompt. Bind `%Profile{}` at the proposed host-context key `:jido_ai_callable_profile`:
+convert the prompt. Bind `%Profile{}` at the host-context key `:jido_ai_callable_profile`:
 
 ```elixir
 profile = Jido.AI.Agent.profile(MyAgent, :review)
@@ -40,7 +41,7 @@ options, limits, tools, or policy through parameters. Hosts can expose several n
 Adaptive uses its bound policy.
 
 Keep the seven `Plugins.Reasoning.*` modules as small, fixed-method bindings for core Agent
-composition. Their proposed configuration is `[profile: profile]` only. Validate the Profile/method
+composition. Their configuration is `[profile: profile]` only. Validate the Profile/method
 at Agent construction. Keep explicit routes and core ownership. `RunCapability` requires the
 selected prepared Plugin input; arbitrary caller context cannot forge that input. Use
 `profile.result.into` as the host destination; remove the Plugin `into` copy. On success, replace
@@ -132,11 +133,11 @@ after checking callers and overrides. Generated cancel casts, whereas `Session.c
 confirms via a call. Keep both lifecycle semantics. Wait timeout does not cancel native work. Do not
 remove Request/Session APIs.
 
-1. Approve the breaking migration above; retain existing code until then.
+1. Approval is complete. The implementation removes the old callable configuration API.
 2. Implement binding/validation. Test strict input, inert refs, unknown IDs, fixed methods, legacy field paths, nil/false, and compile/runtime errors.
 3. Migrate Plugins/tools. Test forged input, domain ownership, two capabilities, retrieval/routing, quota, provider options, and nested cancellation.
 4. Require seven successful methods, Adaptive fallback, TRM 15 calls, ToT/AoT failure data, explicit limits, timeout cleanup, and concurrent calls.
-5. Keep helper return/stream/cancel tests. Run bounded package gates and migrate callable consumers before removal. The current unit method matrix permits failure.
+5. Keep helper return/stream/cancel tests. Run bounded package gates and migrate callable consumers before removal. The selected unit matrix requires success for all seven callable methods.
 
 Source evidence: `actions/reasoning/{run_strategy,run_capability}.ex`, `reasoning_capability.ex`,
 `capability.ex`, `plugins/reasoning/*.ex`, `profile.ex`, `authoring.ex`,
@@ -147,3 +148,27 @@ Tests: `test/jido_ai/skills/reasoning/actions/run_strategy_{action,profile}_test
 fixtures: `test/examples/09_reasoning/` (09_14, 09_16),
 `test/examples/16_capabilities/16_01_reasoning/`, and `test/authoring/agents/interfaces_test.exs`;
 those suites are currently deferred.
+
+## Implementation notes
+
+- `RunStrategy` validates its input before binding or startup. It keeps the Profile
+  ID and creates fresh result and optional history fields. Authoring rejects a
+  history/result collision. It still checks the Profile when it lowers the Agent.
+- Reasoning Plugins keep an empty core-owned state namespace. Their Profile stays
+  in configuration and selected prepared input. They no longer store policy
+  defaults or a second result destination in Plugin state.
+- Core rejects caller `plugin_inputs` before preparation. `RunCapability` reads
+  the selected `%Jido.Plugin.Input{}` and verifies that the package and owner
+  match. This uses the core trust boundary; it is not an unforgeable token for
+  arbitrary direct Elixir calls with fabricated runtime structures.
+- `Session.submit/4` accepts an internal admission deadline. Callable readiness,
+  both admission calls, and await use the time left on one deadline. Outer Exec
+  limits remain enforced by Exec's process owner; core does not expose that
+  deadline as Action context. Cleanup has a separate short allowance: cancel,
+  snapshot, and graceful stop each have a 1,000 ms limit. A failed graceful stop
+  unlinks and kills the private server, then waits up to 1,000 ms for its monitor.
+- Named model roles, host provider options, Profile routers, tool context,
+  controls, result schemas, quota, and method limits use the existing runtime.
+  The selected unit tests cover nested callable tools and parent cancellation.
+- Authoring/example suites and broad documentation repairs remain deferred.
+  See `simplification.md` for compile-only example changes and test results.

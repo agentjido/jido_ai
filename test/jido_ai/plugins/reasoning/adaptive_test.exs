@@ -6,41 +6,55 @@ defmodule Jido.AI.Plugins.Reasoning.AdaptiveTest do
     use Jido.Action, name: "overwrite_adaptive_defaults"
 
     def run(_, context) do
-      next = put_in(context.agent_state.reasoning_adaptive.timeout, 1)
+      next = put_in(context.agent_state.reasoning_adaptive, %{forged: true})
       {:ok, next}
     end
   end
 
-  test "core creates owned defaults for the fixed method" do
-    definition = definition([])
-    agent = Jido.Agent.instantiate!(definition)
-
-    assert agent.state.reasoning_adaptive == %{
-             strategy: :adaptive,
-             default_model: :reasoning,
-             timeout: 30_000,
-             options: %{}
-           }
-
+  test "core owns an empty state namespace; policy stays in configuration" do
+    profile = profile()
+    agent = definition(profile: profile) |> Jido.Agent.instantiate!()
+    assert agent.state.reasoning_adaptive == %{}
     assert agent.state.result == nil
   end
 
-  test "configured defaults survive an empty restored state and reject another method" do
-    config = [default_model: :fast, timeout: 800, options: %{system_prompt: "Use facts"}]
-    {:reasoning_adaptive, schema} = Capability.Agent.state_spec(config)
-    assert {:ok, state} = Zoi.parse(schema, %{})
-    assert state.default_model == :fast and state.timeout == 800
-    assert state.options == %{system_prompt: "Use facts"}
-    assert {:error, _} = Zoi.parse(schema, %{state | strategy: :invalid})
-    assert {:error, _} = Zoi.parse(schema, %{state | timeout: 0})
+  test "construction validates the Profile and fixed method" do
+    profile = profile()
+    {:reasoning_adaptive, schema} = Capability.Agent.state_spec(profile: profile)
+    assert {:ok, %{}} = Zoi.parse(schema, %{})
+    assert {:error, _} = Zoi.parse(schema, %{timeout: 0})
+    wrong = put_in(profile.reasoning.method, :react)
+    assert_raise Jido.Error.ExecutionError, fn -> definition(profile: wrong) end
+    invalid = put_in(profile.controls.timeout, 0)
+    assert_raise Jido.Error.ExecutionError, fn -> definition(profile: invalid) end
+    other = put_in(profile.reasoning, %{method: :chain_of_thought, model: :default})
+    assert_raise Jido.Error.ExecutionError, fn -> definition(profile: other) end
   end
 
-  test "an ordinary Action cannot replace the owned defaults" do
-    agent = definition([]) |> Jido.Agent.instantiate!()
+  test "an ordinary Action cannot replace Plugin state" do
+    agent = definition(profile: profile()) |> Jido.Agent.instantiate!()
     signal = Jido.Signal.new!("defaults.replace", %{}, source: "/test")
     assert {:error, error} = Jido.Agent.cmd(agent, signal)
     assert inspect(error) =~ "Plugin"
-    assert agent.state.reasoning_adaptive.timeout == 30_000
+    assert agent.state.reasoning_adaptive == %{}
+  end
+
+  test "legacy, missing, and duplicate configuration fail during construction" do
+    for opts <- [
+          [],
+          [timeout: 800],
+          [default_model: :fast],
+          [into: :result],
+          [options: %{}],
+          [profile: profile(), profile: profile()]
+        ] do
+      error = Jido.Error.ExecutionError
+      assert_raise error, fn -> definition(opts) end
+    end
+  end
+
+  defp profile do
+    Jido.AI.Profile.new!(%{id: :review, reasoning: :adaptive, requests: %{mode: :session}, result: %{into: :result}})
   end
 
   defp definition(config) do

@@ -21,7 +21,7 @@ defmodule Jido.AI.ReasoningCapability do
       def signal_routes(_config),
         do: [{hd(signal_patterns()), Jido.AI.Actions.Reasoning.RunCapability}]
 
-      def schema, do: Jido.AI.ReasoningCapability.schema(@strategy, [])
+      def schema, do: Jido.AI.ReasoningCapability.schema()
 
       defmodule unquote(facet) do
         @moduledoc false
@@ -45,48 +45,32 @@ defmodule Jido.AI.ReasoningCapability do
     end
   end
 
+  def schema, do: Zoi.object(%{}, unrecognized_keys: :error) |> Zoi.default(%{})
+
   def schema(strategy, opts) do
-    Jido.AI.PluginConfig.validate!(
-      opts,
-      [:default_model, :timeout, :options, :into],
-      "Reasoning capability"
-    )
-
-    into = Keyword.get(opts, :into, :result)
-
-    unless is_atom(into) and not is_nil(into),
-      do: raise(ArgumentError, "into must be a field atom")
-
-    schema = state_schema(strategy, %{default_model: :reasoning, timeout: 30_000, options: %{}})
-
-    case Zoi.parse(schema, opts |> Keyword.delete(:into) |> Map.new()) do
-      {:ok, defaults} ->
-        state_schema(strategy, defaults) |> Zoi.default(defaults)
-
-      {:error, errors} ->
-        raise ArgumentError, "Invalid reasoning capability defaults: #{inspect(errors)}"
-    end
+    profile!(strategy, opts)
+    schema()
   end
 
-  defp state_schema(strategy, defaults) do
-    Zoi.object(%{
-      strategy: Zoi.enum([strategy]) |> Zoi.default(strategy),
-      default_model: Zoi.any() |> Zoi.default(defaults.default_model),
-      timeout: Zoi.integer() |> Zoi.min(1) |> Zoi.default(defaults.timeout),
-      options: Zoi.map() |> Zoi.default(defaults.options)
-    })
+  defp profile!(strategy, opts) do
+    Jido.AI.PluginConfig.validate!(opts, [:profile], "Reasoning capability")
+
+    profile =
+      case Jido.AI.Actions.Reasoning.RunStrategy.validate_profile(Keyword.get(opts, :profile)) do
+        {:ok, profile} -> profile
+        {:error, error} -> raise error
+      end
+
+    unless Jido.AI.Reasoning.label(profile.reasoning.method) == strategy,
+      do: raise(ArgumentError, "Reasoning capability requires method #{strategy}")
+
+    profile
   end
 
   def prepare_input(preparation, package, strategy, state_key, opts) do
     selected =
       if preparation.signal.type == "reasoning.#{strategy}.run" do
-        %{
-          owner: package,
-          strategy: strategy,
-          into: Keyword.get(opts, :into, :result),
-          key: state_key,
-          defaults: preparation.plugin_state
-        }
+        %{owner: package, profile: profile!(strategy, opts), key: state_key}
       end
 
     {:ok, selected}

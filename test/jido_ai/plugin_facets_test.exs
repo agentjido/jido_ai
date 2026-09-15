@@ -22,7 +22,32 @@ defmodule Jido.AI.PluginFacetsTest do
 
   test "AI Plugin packages use owner-specific facets" do
     for package <- @packages do
-      assert {:ok, [%Jido.Plugin.Spec{} = spec]} = Jido.Plugin.normalize_all([package])
+      methods = %{
+        Jido.AI.Plugins.Reasoning.ChainOfThought => :chain_of_thought,
+        Jido.AI.Plugins.Reasoning.ChainOfDraft => :chain_of_draft,
+        Jido.AI.Plugins.Reasoning.AlgorithmOfThoughts => :algorithm_of_thoughts,
+        Jido.AI.Plugins.Reasoning.TreeOfThoughts => :tree_of_thoughts,
+        Jido.AI.Plugins.Reasoning.GraphOfThoughts => :graph_of_thoughts,
+        Jido.AI.Plugins.Reasoning.TRM => :trm,
+        Jido.AI.Plugins.Reasoning.Adaptive => :adaptive
+      }
+
+      opts =
+        if method = methods[package] do
+          [
+            profile:
+              Jido.AI.Profile.new!(%{
+                id: :review,
+                reasoning: method,
+                requests: %{mode: :session},
+                result: %{into: :answer}
+              })
+          ]
+        else
+          []
+        end
+
+      assert {:ok, [%Jido.Plugin.Spec{} = spec]} = Jido.Plugin.normalize_all([{package, opts}])
       assert spec.module == package
       refute spec.legacy?
       assert %Jido.Plugin.Manifest{module: ^package} = spec.manifest

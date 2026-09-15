@@ -25,9 +25,12 @@ This record covers `jido_ai` on `v3-spike` only.
 7. `bf5c9785` rejects invalid scalar model inputs in Profile before
    ReqLLM model validation. Valid aliases and native model specifications keep
    their existing behavior. The ReqLLM pin is unchanged.
-8. This checkpoint removes the extra Profile validation in `RunStrategy` and
+8. The earlier callable validation checkpoint removed the extra Profile validation in `RunStrategy` and
    two repeated context normalizations. Authoring performs canonical Profile
-   validation before server startup. Public option and default rules remain.
+   validation before server startup. That checkpoint retained the old option rules.
+9. `cc37525e` requires successful completion for all seven callable methods.
+10. The approved breaking migration binds one resolved Profile to each callable
+    request. See the implementation section below for the new API and results.
 
 ## Inventory and caller evidence
 
@@ -44,7 +47,7 @@ Source paths below are relative to `lib/jido_ai/` unless they start with
 | Keep | Eight reasoning methods and their data APIs | `reasoning.ex` dispatches Profile methods. `reasoning/*` parsers, machines, results, and inspection helpers serve the native runtime and method tests. Removing a CLI adapter does not remove its method. |
 | Keep | Standalone ReAct Config, State, Token, Runner and Actions | `reasoning/react.ex` provides run, stream, resume, collect, and cancel. `reasoning/react/authoring.ex` lowers Config to a native Agent. `examples/14_resume` and ReAct unit tests call these APIs. |
 | Keep | Capability Plugins, planning, retrieval, quota, skills | `plugins/*` supplies core Agent composition. Examples in groups 07, 08, 13, 16, and 18 use it. `RunStrategy` is also a callable tool in 09_14 and 09_16. |
-| Simplify; complete | Callable Profile validation | `RunStrategy.runner_definition/2` was the only caller of its explicit `Profile.new/1` step. `Authoring.lower/2` immediately validated the same Profile again through `Profile.source/1`. The Action now passes source attributes to the lowerer. The seven reasoning Plugins reach this same path through `RunCapability` and `Capability.run/4`. |
+| Replace; complete | Callable configuration | `RunStrategy` takes only prompt input and a host-bound resolved Profile. Seven fixed-method Plugins use `[profile: profile]`. The Action validates the binding; Authoring also validates it when it lowers the private Agent. |
 | Keep; ownership unresolved | Session/Thread values and AI Context | This `jido_ai` repository defines `Jido.Session`, `Jido.Thread`, and `Jido.Thread.Entry`. They were in `lib/jido_session.ex` and `lib/jido_thread.ex`; they now use `lib/jido/session.ex`, `lib/jido/thread.ex`, and `lib/jido/thread/entry.ex`. The prior claim that core Jido owns the current code was incorrect. Intended package ownership remains unresolved. AI history, initial-state conversion, and unit tests use these values. No module moves to another repository and no value API is removed here. |
 | Keep | Install, skill, and quality Mix tasks | These configure applications, manage skills, or run quality checks. They have separate unit tests and no dependency on `Mix.Tasks.JidoAi` or its adapters. |
 | Remove; complete | `mix jido_ai` and `Mix.Tasks.JidoAi` | The execution task was the CLI entry point. Its option parsing, stdin batches, output formatting, and telemetry display have no other runtime caller. |
@@ -202,7 +205,7 @@ recovery, deferred context replacement, checkpoints, and trace truncation.
   state, bounded checks, and deferred suites. Broader documentation remains
   deferred. This step adds no public authoring API or execution framework.
 
-## Callable reasoning review
+## Callable reasoning review before approval
 
 - Before: `RunStrategy` called `Profile.new/1`, then `Authoring.lower/2`
   called `Profile.source/1`, which called `Profile.new/1` again. After: the
@@ -233,7 +236,7 @@ recovery, deferred context replacement, checkpoints, and trace truncation.
 The review found real contract differences that prevent a larger compatible
 merge:
 
-| Surface | Existing contract to preserve |
+| Surface | Prior callable contract |
 | --- | --- |
 | `RunStrategy` | Seven short strategy IDs; direct default model `:fast`; request timeout 30 seconds; method-derived count limits. It is itself callable as a tool. |
 | `ReasoningCapability` and seven `Plugins.Reasoning` modules | Core-owned defaults use model `:reasoning`. The Plugin fixes the method and result field. Routing and retrieval can supply input before the Action runs. Schema validation checks the defaults container; method policy is validated during execution. |
@@ -242,12 +245,10 @@ merge:
 | Method wrappers | They expose method identity, prompts, parsers, and stored result inspection. They no longer build another runtime configuration. Retained unit tests and examples call them. |
 | ReAct | Standalone Config/Runner and native Profile execution remain. `RunStrategy` still rejects `strategy: :react`; this checkpoint does not add an eighth callable strategy. All eight reasoning methods remain supported through their current APIs. |
 
-No caller migration is required for this reduction. A larger change needs a
-product decision about replacing flat callable options and Plugin default
-containers with Profile configuration. It must define model defaults, ignored
-keys, generation validation, explicit limit precedence, and when Plugin
-configuration errors occur. Generated Agent helpers and Session/Thread values
-are unchanged.
+That earlier reduction required no caller migration. The user has now approved
+the replacement of flat options and Plugin default containers with Profile
+configuration. The implemented changes and required migrations are below.
+Generated Agent helpers and Session/Thread values are unchanged.
 
 ## Callable completion coverage
 
@@ -288,24 +289,121 @@ No provider or runtime function is stubbed. No live provider is used.
   private Agents. Every script must have no unused responses, unexpected
   requests, or held requests. The tests use no sleeps or runtime observer hooks.
 
-This checkpoint changes tests and documentation only. No current method
-defect was found. The Profile-bound callable contract in
-`callable-v3-contract.md` remains a proposal awaiting approval. Its original
-statement that the unit matrix permits failure describes the earlier
-checkpoint. The tests here close that success-coverage gap; they do not
-authorize the configuration migration. Flat callable inputs, Plugin defaults,
-and current validation behavior remain. Callable timeout, caller-death, outer
-cancellation, concurrent-call, and wider Plugin-composition coverage from the
-deferred example suites still need a selected unit or example verification
-step. Authoring and example suites remain deferred.
+The `cc37525e` checkpoint changed tests and documentation only. It found no
+method defect. The user then approved the Profile-bound migration. The current
+implementation and added lifecycle/composition checks are recorded below.
+Authoring and example suites remain deferred.
+
+## Approved callable Profile implementation
+
+The breaking contract in `callable-v3-contract.md` is implemented. The old flat
+configuration API is removed. Profile is the only policy/default authority.
+
+- `RunStrategy` accepts exactly one nonempty string under `:prompt` or `"prompt"`.
+  It rejects duplicate key forms, unknown fields, missing input, and invalid
+  values before startup, including direct `run/2`. It does not trim the string.
+  Host context binds a resolved `%Profile{}` at `:jido_ai_callable_profile`.
+  Missing bindings return `:reasoning_profile_not_bound`; invalid bindings return
+  Profile validation errors. The ID stays unchanged. Session mode and one of the
+  seven callable methods are required. Direct callable ReAct stays unsupported.
+- Removed Action interfaces: `strategy`, `model`, `timeout`, `options`, all flat
+  method/generation fields, the method-specific option allowlist, context/default
+  lookup, `provided_params` precedence, and Plugin/state/Agent default lookup.
+  No runtime or test helper translates the old API. Method-specific configuration
+  remains available in canonical Profile fields. The count and timeout defaults
+  now follow Profile; tests that need method-derived budgets select
+  `:method_default` explicitly.
+- All seven reasoning Plugins accept only `[profile: profile]`. Construction
+  validates policy and the fixed method. Plugin state is an empty core-owned
+  namespace. The old `strategy/default_model/timeout/options` state and the
+  Plugin `into` copy are removed. The destination comes from `profile.result.into`.
+  Core keeps the state boundary; two Plugins retain independent domain results.
+  Failure preserves the previous state, and the domain schema checks the envelope.
+- `RunCapability` reads core-prepared selected input. It applies retrieval to the
+  validated prompt and trusted ModelRouting output to the selected Profile model
+  role. It forwards quota explicitly before the private Session removes parent
+  runtime context. Provider options stay under `context.ai[profile.id].options`.
+  Named wrapper tools can bind Profiles in code. Raw callable tools use an explicit
+  context field list. Model arguments cannot choose policy.
+- The private Agent declares fresh result and optional history fields. Authoring
+  rejects collisions. One deadline covers readiness, both admission waits, and
+  await. Expired work is not admitted. Outer Exec enforces its own shorter limit.
+  Cancel, snapshot, and graceful stop each use a separate 1,000 ms cleanup limit.
+  A failed graceful stop unlinks and kills the server, then checks its monitor.
+  This closes the suspended-server leak. Committed-success recovery is retained.
+- Public success/error envelopes, method diagnostics, partial usage, ToT/AoT
+  outputs, Adaptive selection/fallback, and the TRM 15-call budget are retained.
+  All eight native reasoning methods and standalone ReAct APIs are unchanged.
+  No generic framework, dependency change, or generated helper removal is included.
+
+### Contract details from the core implementation
+
+Core rejects caller-supplied `plugin_inputs` at the Agent command boundary.
+`RunCapability` requires a prepared `Jido.Plugin.Input` with matching package and
+owner. It does not add a token protocol to protect against arbitrary trusted
+Elixir code that fabricates the complete runtime context. Plugin callback errors
+at Agent construction use core's `Jido.Error.ExecutionError` wrapper; the cause
+retains the Profile or configuration error. Direct binding errors retain their
+Profile field paths.
+
+Profile is validated before binding/startup and again by the existing Authoring
+lowerer. Routing validates its changed model. This repeated validation is kept
+for correctness; no validation bypass or second authoring entry point was added.
+The internal `admission_deadline` option is used only by callable requests; native
+requests without it keep their current admission timeout behavior.
+
+### Selected callable coverage
+
+The seven successful method tests and all selected unit consumers now use
+canonical Profiles. Old precedence/default-container assertions are replaced by
+strict rejection coverage. The shared callable fixture accepts Profile fields;
+it has no general old-to-new translation helper.
+
+New checks cover binding type and ID, atom/string input, duplicates, legacy keys,
+missing values, nil/false, field error order, method restrictions, inert refs,
+static context protection, fixed-method construction, forged Plugin input,
+owned state, two results, retrieval, routing, quota, and provider options.
+They also cover numeric model/iteration/tool/node limits, input controls, fresh
+history, explicit context projection, nested callable execution, nested cancel,
+timeout, caller death, concurrent calls, lost-await committed-success recovery,
+one admission deadline, exhausted readiness, and suspended-server cleanup.
+HTTP scripts remain finite and deterministic. No skips or ignored failures were
+added. The success matrix still requires exact answers, usage, metadata, and
+call counts. Native and standalone tests remain in the selected package run.
+
+### Compile-only example changes and deferred work
+
+The request explicitly defers example runtime repairs. `examples/AGENTS.md` was
+read before edits. Four example source files needed minimal compile changes:
+
+| File | Compile change | Deferred runtime repair |
+| --- | --- | --- |
+| `examples/08_planning/08_01_planning/agent.ex` | Bind a session CoT Profile in Plugin configuration. | Remove model/policy fields from reasoning Signals and update state/default assertions. |
+| `examples/09_reasoning/09_14_callable_reasoning/agent.ex` | Generated `reason` arguments now contain only `prompt`. | Hosts must bind a Profile; migrate old strategy/options tests and helper calls. |
+| `examples/16_capabilities/16_01_reasoning/agent.ex` | Bind CoT and CoD Profiles with separate result fields. | Migrate flat Signals and Plugin-default/state assertions. |
+| `examples/16_capabilities/16_01_reasoning/mixed_agent.ex` | Bind the callable CoT Profile. Native configuration is unchanged. | Migrate callable Signals and provider options under the bound ID. |
+
+`examples/13_policy/13_01_quota/reasoning_flow.ex` still compiles with its old
+flat parameters. A compile probe confirmed this, so the source is unchanged. Its
+runtime repair must remove `strategy` and bind a Profile from host context.
+`examples/09_reasoning/09_16_reasoning_tool/agent.ex` still compiles unchanged,
+but its context list must include `:jido_ai_callable_profile` and its callers must
+bind that Profile. Its tool-call fixtures must send only prompt. The deferred
+`test/examples/support/16_03_routing_policy_fixtures.ex` still builds the old
+Plugin options at runtime; it needs a Profile binding. The selected unit support
+has been migrated. No example test file or deferred support file was repaired.
+The existing two strategy-inspection example repairs below also remain open.
+Broader guides, API inventories, authoring tests, and example tests still need
+migration and fresh verification before release.
 
 ## Profile model input validation
 
 - `Profile.model_input/1` now rejects explicit `nil`, booleans, integers, and
   floats with `{:error, %Jido.AI.Error.Validation.Invalid{field: "models"}}`.
   The message remains `models: Invalid ReqLLM model input`. An omitted model
-  still uses the normal default. Callable reasoning still treats `nil` as an
-  omitted option, but rejects `false` and numbers through Profile.
+  still uses the normal default. The earlier callable API treated `nil` as an
+  omitted option. The current callable API rejects flat model fields and
+  validates its bound Profile, including explicit nil/false model values.
 - Defect ownership: Profile owns the tagged policy validation boundary. Its
   fallback passed these unsupported values to the pinned ReqLLM's
   `model/1` fallback (`deps/req_llm/lib/req_llm.ex:367`). That fallback calls
@@ -424,6 +522,19 @@ After verification, `rmdir` removed the two empty test fixture directories
 listed above and 75 empty directories under `tmp/`. No empty source directory
 remained. Build, dependency, and Git directories were not touched.
 
+Callable Profile migration result: 148 selected files; 1,886 passed, 1 excluded;
+no failures or skips. This is 33 more selected tests than `cc37525e`. The final
+run took 23.5 seconds with seed 0 and warnings as errors. The same selected run
+also passed before the compile-only scope check. `mix format --check-formatted`
+and `mix compile --force --warnings-as-errors` passed; the forced dev compile
+compiled 337 files. The focused command
+`mix test test/jido_ai/skills/reasoning/actions --warnings-as-errors --seed 0`
+passed all 81 tests in 5.3 seconds. The existing flaky exclusion is unchanged.
+Authoring and example suites were not run. After verification, `rmdir` removed
+`test/jido_ai/fixtures`, `test/fixtures/skills`, and 75 empty directories under
+`tmp/`. No empty source directory remained. Build, dependency, and Git
+directories were not touched.
+
 The 15 tests added at the model-call checkpoint cover default ReqLLM calls,
 callback data and delegation,
 explicit option precedence, quota admission and accounting, cancellation,
@@ -485,10 +596,9 @@ remain undecided; this checkpoint does not authorize more feature removal.
 1. Review generated Agent request helpers against route `define` helpers.
    Choose one normal calling form. Keep request admission, stream, and cancel
    behavior covered before removing any helper.
-2. The callable/default review above is complete. Decide whether a later
-   breaking change should replace flat callable options and Plugin default
-   containers with Profile configuration. Define the differences listed above
-   before implementation. Keep Plugin composition and all reasoning methods.
+2. The callable Profile migration is approved and implemented. Repair the
+   deferred callable examples and authoring consumers listed above before release.
+   Keep Plugin composition and all reasoning methods.
 3. Session.Runtime was also reviewed. It coordinates jobs, recovery,
    completion commits, input queues, and observed events. Keep those process
    and commit boundaries together for now; no Runtime extraction is included

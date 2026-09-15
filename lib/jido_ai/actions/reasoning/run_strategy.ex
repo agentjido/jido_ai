@@ -1,275 +1,152 @@
 defmodule Jido.AI.Actions.Reasoning.RunStrategy do
   @moduledoc """
-  Runs one reasoning method in an isolated v3 Agent and Session.
+  Runs a prompt in one linked private Agent and Session.
 
-  The caller owns the linked Agent. The same validated profile and core Flow
-  serve direct Actions and declared AI Agents. Completion stops the private
-  Agent. It does not use a separate Strategy or Directive executor.
+  Bind a resolved `Jido.AI.Profile` in host context at
+  `:jido_ai_callable_profile`. Input accepts only a nonempty string `prompt`.
+  The Profile must select session mode and a supported callable method.
+  Completion, failure, and cancellation stop the private runtime.
   """
 
   use Jido.Action,
     name: "reasoning_run_strategy",
-    description: "Run an isolated reasoning strategy by id",
-    schema:
-      Zoi.object(%{
-        strategy:
-          Zoi.enum([:cod, :cot, :tot, :got, :trm, :aot, :adaptive],
-            description: "Reasoning strategy identifier"
-          ),
-        prompt: Zoi.string(description: "Prompt to reason on"),
-        model:
-          Zoi.any(description: "Optional model alias (atom) or model spec (string)")
-          |> Zoi.optional(),
-        timeout:
-          Zoi.integer(description: "Request timeout in milliseconds")
-          |> Zoi.default(30_000)
-          |> Zoi.optional(),
-        options:
-          Zoi.map(description: "Strategy-specific runtime options")
-          |> Zoi.default(%{})
-          |> Zoi.optional(),
-        # CoT options
-        system_prompt: Zoi.string(description: "Custom CoT system prompt") |> Zoi.optional(),
-        llm_timeout_ms: Zoi.integer(description: "LLM timeout in milliseconds") |> Zoi.optional(),
-        request_policy: Zoi.atom(description: "Request policy") |> Zoi.optional(),
-        # ToT options
-        branching_factor: Zoi.integer(description: "ToT branching factor") |> Zoi.optional(),
-        max_depth: Zoi.integer(description: "ToT/GoT max depth") |> Zoi.optional(),
-        traversal_strategy:
-          Zoi.enum([:bfs, :dfs, :best_first], description: "ToT traversal strategy")
-          |> Zoi.optional(),
-        generation_prompt: Zoi.string(description: "Custom generation prompt") |> Zoi.optional(),
-        evaluation_prompt: Zoi.string(description: "Custom ToT evaluation prompt") |> Zoi.optional(),
-        # GoT options
-        max_nodes: Zoi.integer(description: "GoT max nodes") |> Zoi.optional(),
-        aggregation_strategy:
-          Zoi.enum([:voting, :weighted, :synthesis], description: "GoT aggregation strategy")
-          |> Zoi.optional(),
-        connection_prompt: Zoi.string(description: "Custom GoT connection prompt") |> Zoi.optional(),
-        aggregation_prompt: Zoi.string(description: "Custom GoT aggregation prompt") |> Zoi.optional(),
-        # TRM options
-        max_supervision_steps: Zoi.integer(description: "TRM max supervision steps") |> Zoi.optional(),
-        act_threshold: Zoi.float(description: "TRM ACT threshold") |> Zoi.optional(),
-        # AoT options
-        profile:
-          Zoi.enum([:short, :standard, :long], description: "AoT in-context profile")
-          |> Zoi.optional(),
-        search_style:
-          Zoi.enum([:dfs, :bfs], description: "AoT search style preference")
-          |> Zoi.optional(),
-        temperature: Zoi.float(description: "AoT temperature override") |> Zoi.optional(),
-        max_tokens: Zoi.integer(description: "AoT max generation tokens") |> Zoi.optional(),
-        examples:
-          Zoi.list(Zoi.string(description: "AoT algorithmic in-context example"),
-            description: "AoT examples"
-          )
-          |> Zoi.optional(),
-        require_explicit_answer:
-          Zoi.boolean(description: "Require an explicit `answer:` line for AoT success")
-          |> Zoi.optional(),
-        # Adaptive options
-        available_strategies:
-          Zoi.list(
-            Zoi.enum([:cod, :cot, :react, :tot, :got, :trm, :aot],
-              description: "Adaptive strategy id"
-            ),
-            description: "Adaptive available strategies"
-          )
-          |> Zoi.optional(),
-        complexity_thresholds:
-          Zoi.map(description: "Adaptive complexity thresholds")
-          |> Zoi.optional()
-      })
+    description: "Run a prompt with host-bound reasoning policy",
+    schema: Zoi.object(%{prompt: Zoi.string() |> Zoi.min(1)}, coerce: true, unrecognized_keys: :error)
 
-  alias Jido.AI.{Authoring, Request, Session}
+  alias Jido.AI.{Authoring, Profile, Request, Session}
   alias Jido.AgentServer, as: Server
 
   @methods %{
-    cod: :chain_of_draft,
-    cot: :chain_of_thought,
-    tot: :tree_of_thoughts,
-    got: :graph_of_thoughts,
+    chain_of_draft: :cod,
+    chain_of_thought: :cot,
+    tree_of_thoughts: :tot,
+    graph_of_thoughts: :got,
     trm: :trm,
-    aot: :algorithm_of_thoughts,
+    algorithm_of_thoughts: :aot,
     adaptive: :adaptive
   }
 
-  @strategy_state_keys %{
-    cod: [:model, :system_prompt, :llm_timeout_ms, :request_policy],
-    cot: [:model, :system_prompt, :llm_timeout_ms, :request_policy],
-    tot: [
-      :model,
-      :branching_factor,
-      :max_depth,
-      :traversal_strategy,
-      :generation_prompt,
-      :evaluation_prompt
-    ],
-    got: [
-      :model,
-      :max_nodes,
-      :max_depth,
-      :aggregation_strategy,
-      :generation_prompt,
-      :connection_prompt,
-      :aggregation_prompt
-    ],
-    trm: [:model, :max_supervision_steps, :act_threshold],
-    aot: [
-      :model,
-      :profile,
-      :search_style,
-      :temperature,
-      :max_tokens,
-      :examples,
-      :require_explicit_answer,
-      :llm_timeout_ms
-    ],
-    adaptive: [:model, :available_strategies, :complexity_thresholds]
-  }
+  @impl Jido.Action
+  def on_before_validate_params(params) when is_map(params) and not is_struct(params) do
+    case Map.to_list(params) do
+      [{key, prompt}] when key in [:prompt, "prompt"] and is_binary(prompt) and byte_size(prompt) > 0 ->
+        {:ok, %{prompt: prompt}}
+
+      _ ->
+        {:error, :invalid_strategy_request}
+    end
+  end
+
+  def on_before_validate_params(_), do: {:error, :invalid_strategy_request}
+
+  @doc false
+  def validate_profile(%Profile{} = value) do
+    with {:ok, profile} <- Profile.validate(value),
+         :ok <- callable_mode(profile),
+         :ok <- callable_method(profile) do
+      {:ok, profile}
+    end
+  end
+
+  def validate_profile(_), do: Profile.error("profile", "Expected a resolved Profile binding")
+
+  defp callable_mode(%{requests: %{mode: :session}}), do: :ok
+  defp callable_mode(_), do: Profile.error("requests.mode", "Callable reasoning requires session mode")
+  defp callable_method(%{reasoning: %{method: method}}) when is_map_key(@methods, method), do: :ok
+  defp callable_method(_), do: Profile.error("reasoning.method", "Unsupported callable method")
+
   @impl Jido.Action
   def run(params, context) do
-    context = normalize_context(context)
-    params = apply_context_defaults(params, context)
-    strategy = params[:strategy]
+    context = if is_map(context), do: context, else: %{}
 
-    if is_binary(params[:prompt]) and params[:prompt] != "" and Map.has_key?(@methods, strategy) do
-      with {:ok, definition} <- runner_definition(strategy, params),
-           {:ok, server} <-
-             Server.start_link([agent: definition] ++ Map.to_list(Map.take(context, [:jido]))) do
-        try do
-          run_request(server, strategy, params, context)
-        after
-          stop_runner(server)
-        end
+    with {:ok, %{prompt: prompt}} <- on_before_validate_params(params),
+         {:ok, value} <- bound_profile(context),
+         {:ok, profile} <- validate_profile(value),
+         deadline = System.monotonic_time(:millisecond) + profile.controls.timeout,
+         {:ok, definition} <- runner_definition(profile),
+         :ok <- time_left(deadline),
+         {:ok, server} <- Server.start_link([agent: definition] ++ Map.to_list(Map.take(context, [:jido]))) do
+      try do
+        run_request(server, profile, prompt, context, deadline)
+      after
+        stop_runner(server)
       end
-    else
-      {:error, :invalid_strategy_request}
     end
   end
 
-  defp run_request(server, strategy, params, context) do
-    timeout = params[:timeout] || 30_000
+  defp bound_profile(context) do
+    case Map.fetch(context, :jido_ai_callable_profile) do
+      {:ok, value} -> {:ok, value}
+      :error -> {:error, :reasoning_profile_not_bound}
+    end
+  end
 
-    with :ok <- Server.await_ready(server, timeout),
+  defp run_request(server, profile, prompt, context, deadline) do
+    with :ok <- time_left(deadline),
+         :ok <- Server.await_ready(server, remaining(deadline)),
+         :ok <- time_left(deadline),
          {:ok, handle} <-
-           Request.create_and_send(server, params.prompt,
+           Request.create_and_send(server, prompt,
              signal_type: "reasoning.run",
              source: "/ai/reasoning/action",
+             admission_deadline: deadline,
+             admission_timeout: remaining(deadline),
              context: Map.merge(Session.caller_context(context), Map.take(context, [:jido_ai_quota]))
            ) do
-      result = Request.await(handle, timeout: timeout)
-      if result == {:error, :timeout}, do: Session.cancel(handle, reason: :timeout)
+      result = Request.await(handle, timeout: remaining(deadline))
+      if result == {:error, :timeout}, do: Session.cancel(handle, reason: :timeout, timeout: 1_000)
       snapshot = fetch_snapshot(server, handle.id)
-      normalize_runner_result(result, strategy, timeout, params, snapshot)
+      normalize_runner_result(result, @methods[profile.reasoning.method], profile.controls.timeout, snapshot)
+    end
+  catch
+    :exit, {:timeout, _} -> {:error, :timeout}
+  end
+
+  defp time_left(deadline), do: if(remaining(deadline) > 0, do: :ok, else: {:error, :timeout})
+
+  defp remaining(deadline), do: max(deadline - System.monotonic_time(:millisecond), 0)
+
+  defp stop_runner(server) do
+    if Process.alive?(server), do: Server.stop(server, :normal, 1_000)
+  catch
+    :exit, _reason -> force_stop_runner(server)
+  end
+
+  defp force_stop_runner(server) do
+    # A graceful stop can time out while the server is suspended or busy.
+    # Unlink before killing it so that cleanup does not kill the Action owner.
+    ref = Process.monitor(server)
+    Process.unlink(server)
+    Process.exit(server, :kill)
+
+    receive do
+      {:DOWN, ^ref, :process, ^server, _} -> :ok
+    after
+      1_000 -> exit(:reasoning_runner_cleanup_timeout)
     end
   end
 
-  defp stop_runner(server) do
-    if Process.alive?(server), do: Server.stop(server, :normal)
-  catch
-    :exit, _reason -> :ok
-  end
+  defp runner_definition(profile) do
+    fields = %{profile.result.into => Zoi.any() |> Zoi.default(nil)}
 
-  defp apply_context_defaults(params, context) when is_map(params) do
-    provided = provided_params(context)
-    strategy = params[:strategy]
-    strategy_defaults = strategy_plugin_defaults(context, strategy)
-
-    model_default =
-      first_present([
-        context[:default_model],
-        Map.get(strategy_defaults, :default_model)
-      ])
-
-    timeout_default =
-      first_present([
-        context[:timeout],
-        Map.get(strategy_defaults, :timeout)
-      ])
-
-    options_default =
-      first_present([
-        context[:options],
-        Map.get(strategy_defaults, :options)
-      ]) || %{}
-
-    params
-    |> put_default_param(:model, model_default, provided)
-    |> put_default_param(:timeout, timeout_default, provided)
-    |> merge_options_default(options_default, provided)
-  end
-
-  defp apply_context_defaults(params, _context), do: params
-
-  defp runner_definition(strategy, params) do
-    method = @methods[strategy]
-
-    options =
-      Map.new(@strategy_state_keys[strategy], fn key -> {key, strategy_option(params, key)} end)
-      |> Map.reject(fn {_key, value} -> is_nil(value) end)
-
-    timeout = params[:timeout] || 30_000
-
-    generation =
-      options
-      |> Map.take([:temperature, :max_tokens])
-      |> Enum.to_list()
-      |> then(fn generation ->
-        case options[:llm_timeout_ms] do
-          nil -> generation
-          value -> Keyword.put(generation, :receive_timeout, value)
-        end
-      end)
-
-    method_options =
-      Map.drop(options, [
-        :model,
-        :system_prompt,
-        :llm_timeout_ms,
-        :request_policy,
-        :temperature,
-        :max_tokens
-      ])
-
-    profile = %{
-      id: :assistant,
-      instructions: options[:system_prompt],
-      models: %{answer: %{model: Map.get(options, :model, :fast), generation: generation}},
-      reasoning: %{method: method, model: :answer, options: method_options},
-      controls: %{
-        timeout: timeout,
-        max_iterations: :method_default,
-        max_model_calls: :method_default,
-        max_tool_calls: :method_default
-      },
-      requests: %{
-        mode: :session,
-        streaming: true,
-        on_busy: Map.get(options, :request_policy, :reject)
-      },
-      result: %{schema: nil, into: :result}
-    }
+    fields =
+      case profile.memory.history do
+        nil -> fields
+        field -> Map.put(fields, field, Zoi.list(Zoi.map()) |> Zoi.default([]))
+      end
 
     base = %{
       name: "jido_ai_internal_reasoning_runner",
       plugins: [],
-      schema: Zoi.object(%{result: Zoi.any() |> Zoi.default(nil)}),
-      routes: [{"reasoning.run", Authoring.ai(:assistant)}]
+      schema: Zoi.object(fields),
+      routes: [{"reasoning.run", Authoring.ai(profile.id)}]
     }
 
     Authoring.lower(base, [profile])
   end
 
-  defp strategy_option(params, key) do
-    top_level = Map.get(params, key, Map.get(params, Atom.to_string(key)))
-    options = Map.get(params, :options, %{}) || %{}
-    options_level = Map.get(options, key, Map.get(options, Atom.to_string(key)))
-    first_present([top_level, options_level])
-  end
-
   defp fetch_snapshot(server, id) do
-    with {:ok, records} <- Server.plugin_state(server, Jido.AI.Session.Plugin),
+    with {:ok, records} <- Server.plugin_state(server, Jido.AI.Session.Plugin, 1_000),
          record when is_map(record) <- records[id] do
       status =
         case record.status do
@@ -304,18 +181,18 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
     :exit, _reason -> nil
   end
 
-  defp normalize_runner_result({:ok, output}, strategy, timeout, params, snapshot) do
+  defp normalize_runner_result({:ok, output}, strategy, timeout, snapshot) do
     {:ok,
      %{
        strategy: strategy,
        status: snapshot_status(snapshot, :success),
        output: output,
        usage: extract_usage(snapshot),
-       diagnostics: diagnostics(timeout, params, snapshot, nil)
+       diagnostics: diagnostics(timeout, snapshot, nil)
      }}
   end
 
-  defp normalize_runner_result({:error, reason}, strategy, timeout, params, snapshot) do
+  defp normalize_runner_result({:error, reason}, strategy, timeout, snapshot) do
     case maybe_recover_success(snapshot) do
       {:ok, output} ->
         {:ok,
@@ -325,7 +202,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
            output: output,
            usage: extract_usage(snapshot),
            diagnostics:
-             diagnostics(timeout, params, snapshot, nil)
+             diagnostics(timeout, snapshot, nil)
              |> Map.put(:recovered_error, Jido.AI.Error.Sanitize.sanitize_error_message(reason))
          }}
 
@@ -339,7 +216,6 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
            diagnostics:
              diagnostics(
                timeout,
-               params,
                snapshot,
                Jido.AI.Error.Sanitize.sanitize_error_message(reason)
              )
@@ -356,10 +232,9 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
 
   defp extract_usage(_), do: %{}
 
-  defp diagnostics(timeout, params, snapshot, error) do
+  defp diagnostics(timeout, snapshot, error) do
     %{
       timeout: timeout,
-      options: Map.get(params, :options, %{}),
       snapshot_status: snapshot_status(snapshot, :unknown),
       snapshot_done: snapshot_done?(snapshot),
       snapshot_details: snapshot_details(snapshot),
@@ -388,82 +263,4 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
 
   defp snapshot_output(%{result: result}), do: result
   defp snapshot_output(_), do: nil
-
-  defp put_default_param(params, _key, nil, _provided), do: params
-
-  defp put_default_param(params, key, default, :unknown) do
-    if Map.get(params, key) in [nil, ""] do
-      Map.put(params, key, default)
-    else
-      params
-    end
-  end
-
-  defp put_default_param(params, key, default, provided) do
-    if provided_param?(provided, key) do
-      params
-    else
-      Map.put(params, key, default)
-    end
-  end
-
-  defp merge_options_default(params, defaults, _provided) when defaults == %{}, do: params
-
-  defp merge_options_default(params, defaults, provided) do
-    current = Map.get(params, :options, %{})
-
-    merged =
-      cond do
-        provided == :unknown and (current == %{} or is_nil(current)) ->
-          defaults
-
-        provided == :unknown ->
-          Map.merge(defaults, current)
-
-        provided_param?(provided, :options) ->
-          Map.merge(defaults, current)
-
-        true ->
-          defaults
-      end
-
-    Map.put(params, :options, merged)
-  end
-
-  defp strategy_plugin_defaults(context, strategy) do
-    key = strategy_state_key(strategy)
-
-    first_present([
-      get_in(context, [:plugin_state, key]),
-      get_in(context, [:state, key]),
-      agent_state_default(context, key)
-    ]) || %{}
-  end
-
-  defp agent_state_default(%{agent: %{state: state}}, key) when is_map(state),
-    do: Map.get(state, key)
-
-  defp agent_state_default(_, _), do: nil
-
-  defp strategy_state_key(:cot), do: :reasoning_cot
-  defp strategy_state_key(:cod), do: :reasoning_cod
-  defp strategy_state_key(:tot), do: :reasoning_tot
-  defp strategy_state_key(:got), do: :reasoning_got
-  defp strategy_state_key(:trm), do: :reasoning_trm
-  defp strategy_state_key(:aot), do: :reasoning_aot
-  defp strategy_state_key(:adaptive), do: :reasoning_adaptive
-  defp strategy_state_key(_), do: nil
-
-  defp provided_params(%{provided_params: provided}) when is_list(provided), do: provided
-  defp provided_params(_), do: :unknown
-
-  defp provided_param?(provided, key) when is_list(provided) do
-    key_str = Atom.to_string(key)
-    Enum.any?(provided, fn k -> k == key or k == key_str end)
-  end
-
-  defp normalize_context(context) when is_map(context), do: context
-  defp normalize_context(_), do: %{}
-
-  defp first_present(values), do: Enum.find(values, &(not is_nil(&1)))
 end

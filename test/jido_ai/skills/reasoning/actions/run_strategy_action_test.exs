@@ -19,13 +19,17 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyTest do
         {:adaptive, :chain_of_draft, %{}, 1, 1, :success}
       ] do
     script_method = if strategy == :adaptive, do: :cod, else: strategy
+    bound_method = if strategy == :adaptive, do: :adaptive, else: method
 
     test "#{strategy} completes with the expected answer and finite call budget", %{jido: jido} do
       strategy = unquote(strategy)
       script_method = unquote(script_method)
-      params = %{strategy: strategy, prompt: "What is 2 + 2?", options: unquote(Macro.escape(options))}
+      method = unquote(bound_method)
+      profile = callable_profile(method, %{reasoning: %{method: method, options: unquote(Macro.escape(options))}})
 
-      assert {{:ok, payload}, requests, selection} = call(jido, params, script(script_method), unquote(budget))
+      assert {{:ok, payload}, requests, selection} =
+               call(jido, profile, "What is 2 + 2?", script(script_method), unquote(budget))
+
       details = assert_success(payload, strategy, unquote(method), unquote(calls), unquote(termination))
       assert length(requests) == unquote(calls)
       assert_answer(script_method, payload.output, details)
@@ -43,8 +47,8 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyTest do
   for strategy <- [:trm, :adaptive] do
     test "#{strategy} permits all five default TRM cycles and 15 model calls", %{jido: jido} do
       strategy = unquote(strategy)
-      params = %{strategy: strategy, prompt: "Improve this answer"}
-      assert {{:ok, payload}, requests, selection} = call(jido, params, five_trm_cycles(), 15)
+      profile = callable_profile(strategy)
+      assert {{:ok, payload}, requests, selection} = call(jido, profile, "Improve this answer", five_trm_cycles(), 15)
       details = assert_success(payload, strategy, :trm, 15, :max_steps)
       assert payload.output == "Improvement 5"
       assert length(requests) == 15
@@ -60,7 +64,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyTest do
 
   test "TRM can stop at its confidence threshold before the default limit", %{jido: jido} do
     assert {{:ok, payload}, requests, nil} =
-             call(jido, %{strategy: :trm, prompt: "Improve this answer"}, script(:trm), 15)
+             call(jido, callable_profile(:trm), "Improve this answer", script(:trm), 15)
 
     details = assert_success(payload, :trm, :trm, 3, :act_threshold)
     assert payload.output == "Improved answer"
@@ -71,7 +75,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyTest do
 
   test "Adaptive selects ReAct for a tool request and completes without tool calls", %{jido: jido} do
     assert {{:ok, payload}, requests, selection} =
-             call(jido, %{strategy: :adaptive, prompt: "Calculate two plus two"}, script(:react), 10)
+             call(jido, callable_profile(:adaptive), "Calculate two plus two", script(:react), 10)
 
     assert payload.output == "Four"
     assert payload.status == :success
@@ -91,8 +95,8 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyTest do
   end
 
   test "Adaptive falls back to available CoT when ReAct is unavailable", %{jido: jido} do
-    params = %{strategy: :adaptive, prompt: "Calculate two plus two", available_strategies: [:cot]}
-    assert {{:ok, payload}, requests, selection} = call(jido, params, script(:cot), 1)
+    profile = callable_profile(:adaptive, %{reasoning: %{method: :adaptive, options: %{available_strategies: [:cot]}}})
+    assert {{:ok, payload}, requests, selection} = call(jido, profile, "Calculate two plus two", script(:cot), 1)
     details = assert_success(payload, :adaptive, :chain_of_thought, 1, :success)
     assert payload.output == "Four"
     assert details.adaptive == selection
@@ -103,8 +107,8 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyTest do
   end
 
   test "Adaptive fallback resolves the selected TRM budget before execution", %{jido: jido} do
-    params = %{strategy: :adaptive, prompt: "What is 2 + 2?", available_strategies: [:trm]}
-    assert {{:ok, payload}, requests, selection} = call(jido, params, five_trm_cycles(), 15)
+    profile = callable_profile(:adaptive, %{reasoning: %{method: :adaptive, options: %{available_strategies: [:trm]}}})
+    assert {{:ok, payload}, requests, selection} = call(jido, profile, "What is 2 + 2?", five_trm_cycles(), 15)
     details = assert_success(payload, :adaptive, :trm, 15, :max_steps)
     assert payload.output == "Improvement 5"
     assert details.trm.supervision_step == 5
@@ -114,24 +118,28 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyTest do
     assert length(requests) == 15
   end
 
-  test "plugin-state defaults reach a successful call and its HTTP prompt", %{jido: jido} do
-    params = %{strategy: :cot, prompt: "Use defaults from plugin state"}
+  test "Profile instructions and timeout reach a successful call", %{jido: jido} do
+    profile =
+      callable_profile(:chain_of_thought, %{
+        instructions: "Use these facts",
+        controls: %{
+          timeout: 5_000,
+          max_iterations: :method_default,
+          max_model_calls: :method_default,
+          max_tool_calls: :method_default
+        }
+      })
 
-    context = %{
-      provided_params: [:strategy, :prompt, :model],
-      plugin_state: %{reasoning_cot: %{timeout: 5_000, options: %{system_prompt: "Use these facts"}}}
-    }
-
-    assert {{:ok, payload}, [request], nil} = call(jido, params, script(:cot), 1, context)
+    assert {{:ok, payload}, [request], nil} = call(jido, profile, "Use Profile instructions", script(:cot), 1)
     assert_success(payload, :cot, :chain_of_thought, 1, :success)
     assert payload.output == "Four"
     assert payload.diagnostics.timeout == 5_000
-    assert payload.diagnostics.options.system_prompt == "Use these facts"
+    refute Map.has_key?(payload.diagnostics, :options)
     assert hd(request.body["messages"])["content"] == "Use these facts"
   end
 
   test "returns error for invalid strategy request" do
-    assert {:error, :invalid_strategy_request} = RunStrategy.run(%{prompt: "Missing strategy"}, %{})
+    assert {:error, :reasoning_profile_not_bound} = RunStrategy.run(%{prompt: "Missing Profile"}, %{})
     assert {:error, :invalid_strategy_request} = RunStrategy.run(%{strategy: :cot}, %{})
   end
 
@@ -139,7 +147,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyTest do
     response = "No explicit answer is available."
 
     assert {{:error, %ExecutionFailureError{details: %{reason: payload}}}, [_request], nil} =
-             call(jido, %{strategy: :aot, prompt: "Solve this problem"}, [text_reply(response)], 1)
+             call(jido, callable_profile(:algorithm_of_thoughts), "Solve this problem", [text_reply(response)], 1)
 
     assert_failure(payload, :aot, 1)
     refute payload.output.found_solution?
@@ -150,10 +158,14 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyTest do
 
   test "ToT evaluation failure retains its tree and completed usage", %{jido: jido} do
     replies = [hd(script(:tot)), %{reply: {:error, 503, "Score unavailable"}}]
-    params = %{strategy: :tot, prompt: "Choose a path", branching_factor: 2, max_depth: 1}
+
+    profile =
+      callable_profile(:tree_of_thoughts, %{
+        reasoning: %{method: :tree_of_thoughts, options: %{branching_factor: 2, max_depth: 1}}
+      })
 
     assert {{:error, %ExecutionFailureError{details: %{reason: payload}}}, requests, nil} =
-             call(jido, params, replies, 802)
+             call(jido, profile, "Choose a path", replies, 802)
 
     assert_failure(payload, :tot, 1)
     assert length(requests) == 2
@@ -167,10 +179,10 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyTest do
 
   test "TRM supervision failure retains its phase and completed usage", %{jido: jido} do
     replies = [text_reply("First answer"), %{reply: {:error, 503, "Review unavailable"}}]
-    params = %{strategy: :trm, prompt: "Improve this answer", max_supervision_steps: 1}
+    profile = callable_profile(:trm, %{reasoning: %{method: :trm, options: %{max_supervision_steps: 1}}})
 
     assert {{:error, %ExecutionFailureError{details: %{reason: payload}}}, requests, nil} =
-             call(jido, params, replies, 3)
+             call(jido, profile, "Improve this answer", replies, 3)
 
     assert_failure(payload, :trm, 1)
     assert length(requests) == 2

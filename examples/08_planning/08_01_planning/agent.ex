@@ -11,7 +11,22 @@ defmodule JidoAI.Examples.Planning.Agent do
     plugin Jido.AI.Plugins.Planning, config: [into: :result, default_max_tokens: 512]
 
     plugin Jido.AI.Plugins.Reasoning.ChainOfThought,
-      config: [into: :review, default_model: JidoAI.Examples.MockLLM.model(), timeout: 5_000]
+      config: [
+        profile:
+          Jido.AI.Profile.new!(%{
+            id: :assistant,
+            model: JidoAI.Examples.MockLLM.model(),
+            reasoning: :chain_of_thought,
+            controls: %{
+              timeout: 5_000,
+              max_iterations: :method_default,
+              max_model_calls: :method_default,
+              max_tool_calls: :method_default
+            },
+            requests: %{mode: :session, streaming: true},
+            result: %{into: :review}
+          })
+      ]
   end
 
   routes do

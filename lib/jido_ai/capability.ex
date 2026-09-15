@@ -12,7 +12,7 @@ defmodule Jido.AI.Capability do
     context
     |> Map.get(:plugin_inputs, %{})
     |> Enum.find_value(fn
-      {_package, %Jido.Plugin.Input{prepared: %{owner: owner, strategy: _} = binding}}
+      {owner, %Jido.Plugin.Input{prepared: %{owner: owner, profile: %Jido.AI.Profile{}} = binding}}
       when is_atom(owner) ->
         binding
 
@@ -24,6 +24,25 @@ defmodule Jido.AI.Capability do
   def bind(command, key, binding) do
     with :ok <- result_field(command.agent.schema, binding) do
       {:ok, %{command | context: Map.put(command.context, key, binding)}}
+    end
+  end
+
+  def run(action, params, context, %{profile: profile} = binding) do
+    binding = Map.put(binding, :into, profile.result.into)
+
+    context =
+      case get_in(context, [:plugin_inputs, Jido.AI.Plugins.Quota]) do
+        %Jido.Plugin.Input{runtime: %{binding: quota}} -> Map.put(context, :jido_ai_quota, quota)
+        %Jido.Plugin.Input{prepared: %{binding: quota}} -> Map.put(context, :jido_ai_quota, quota)
+        _ -> context
+      end
+
+    with {:ok, params} <- Jido.AI.Actions.Reasoning.RunStrategy.on_before_validate_params(params),
+         :ok <- result_field_from_context(context, binding),
+         {:ok, profile} <- route_profile(profile, context),
+         params = Jido.AI.Plugins.Retrieval.apply_input(params, context),
+         {:ok, result} <- Jido.Exec.run(action, params, Map.put(context, :jido_ai_callable_profile, profile)) do
+      {:ok, Map.replace!(context.agent_state, profile.result.into, result)}
     end
   end
 
@@ -46,6 +65,18 @@ defmodule Jido.AI.Capability do
     with :ok <- result_field_from_context(context, binding),
          {:ok, result} <- Jido.Exec.run(action, params, scoped) do
       {:ok, Map.replace!(context.agent_state, into, result)}
+    end
+  end
+
+  defp route_profile(profile, context) do
+    case prepared(context, Jido.AI.Plugins.ModelRouting) do
+      model when model in [nil, ""] ->
+        {:ok, profile}
+
+      model ->
+        profile
+        |> put_in([Access.key(:models), profile.reasoning.model, :model], model)
+        |> Jido.AI.Actions.Reasoning.RunStrategy.validate_profile()
     end
   end
 

@@ -1,14 +1,11 @@
 defmodule Jido.AI.Plugins.Reasoning.TRM do
   @moduledoc """
-  Supplies defaults for isolated TRM requests on `reasoning.trm.run`.
+  Binds a fixed reasoning method for core Agent composition.
 
-  Declare this Plugin with keyword options `default_model`, `timeout`, `options`
-  and `into` (default `:result`). Declare the route separately with
-  `Jido.AI.Actions.Reasoning.RunCapability`, or use `signal_routes/1` in an Agent
-  source map. The Agent schema must contain the result field.
-
-  Core owns the `:reasoning_trm` state key. Caller strategy input cannot
-  change this capability's method. Execution uses the common AI Profile and Flow.
+  Configure with `[profile: profile]`, using a resolved session Profile for this
+  method. Declare the route with `RunCapability`. The Agent schema must contain
+  `profile.result.into` and accept the callable result envelope. Core owns the
+  Plugin state; the Profile stays in Plugin configuration.
   """
   use Jido.AI.ReasoningCapability,
     strategy: :trm,
