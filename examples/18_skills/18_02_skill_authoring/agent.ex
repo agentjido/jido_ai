@@ -1,21 +1,3 @@
-defmodule JidoAI.Examples.SkillAuthoring.Echo do
-  use Jido.Action, name: "skill_echo", schema: Zoi.object(%{text: Zoi.string()})
-
-  def run(%{text: text}, context) do
-    send(context.observer, {:skill_echo, text})
-    {:ok, %{text: text}}
-  end
-end
-
-defmodule JidoAI.Examples.SkillAuthoring.Review do
-  use Jido.AI.Skill,
-    name: "review",
-    description: "Review a document.",
-    metadata: %{owner: :native_module},
-    actions: [JidoAI.Examples.SkillAuthoring.Echo],
-    body: "Module review instructions"
-end
-
 defmodule JidoAI.Examples.SkillAuthoring.Public do
   use Jido.AI.Agent, name: "automatic_skills"
 
@@ -55,8 +37,4 @@ defmodule JidoAI.Examples.SkillAuthoring.Public do
   routes do
     route("ai.ask", ai(:assistant))
   end
-end
-
-defmodule JidoAI.Examples.SkillAuthoring.Trust do
-  def allow(path, suffix), do: String.ends_with?(path, suffix)
 end

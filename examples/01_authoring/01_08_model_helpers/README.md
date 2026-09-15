@@ -1,19 +1,34 @@
-# 01_08 — Model aliases with native ReqLLM calls
+# 01_08 — Public model helpers
 
-- [Alias implementation](../../../lib/jido_ai/models.ex)
-- [Example tests](../../../test/examples/01_authoring/01_08_model_helpers/01_08_model_helpers_test.exs)
+Resolve model IDs and aliases through the shared public model API.
 
-`Jido.AI.Models` has one job. It maps application names such as `:fast`,
-`:capable`, and `:example` to native ReqLLM model inputs.
+## Read the code
 
-```elixir
-model = Jido.AI.Models.resolve(:fast)
-{:ok, response} = ReqLLM.generate_text(model, "Summarize this change.")
+This direct public-API lesson keeps executable calls in its matching tests;
+it needs no placeholder Agent module.
+
+## Run it
+
+From the package root:
+
+```sh
+mix test test/examples/01_authoring/01_08_model_helpers --include example --seed 0
 ```
 
-The examples test text, structured, and streaming calls through the public
-ReqLLM API. Jido AI does not wrap provider calls or own generation defaults.
-ReqLLM keeps its response, stream, option, header, usage, and error contracts.
+The default test path needs no credentials or remote provider. Model cases use
+[the local HTTP/SSE server](../../support/mock_llm.ex) with real ReqLLM transport.
+Shared setup and fault fixtures stay in [test support](../../../test/examples/support).
 
-The header cases have the `HIST-01/stream-headers` tag. They give partial
-evidence for issue 212 and commits `8f669705` and `26bb4106`.
+## Expected result and failure behavior
+
+The tests resolve valid model inputs and reject invalid aliases or settings without starting unwanted provider work.
+
+## Limits
+
+This direct API lesson has no Agent source file. It does not export a rich model record as portable configuration.
+
+## Files
+
+- [01_08_model_helpers_test.exs](../../../test/examples/01_authoring/01_08_model_helpers/01_08_model_helpers_test.exs)
+
+Previous: [01_07](../01_07_ai_runtime/README.md)

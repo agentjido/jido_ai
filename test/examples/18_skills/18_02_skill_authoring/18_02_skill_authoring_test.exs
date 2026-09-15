@@ -95,8 +95,9 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
     assert index =~ "review"
     refute index =~ "Module review instructions"
     assert {:ok, "Done"} = Public.ask_sync(server, "Review", context: context)
-    assert_receive {:skill_echo, "Checked"}
     [first, final] = MockLLM.report(mock).requests
+    echo_result = Enum.find(final.body["messages"], &(&1["tool_call_id"] == "echo"))
+    assert Jason.decode!(echo_result["content"]) == %{"ok" => true, "result" => %{"text" => "Checked"}}
     assert first_prompt(first) =~ "Base prompt"
     assert first_prompt(first) =~ index
     refute first_prompt(first) =~ "Module review instructions"

@@ -11,19 +11,29 @@ operation with real providers. Passing deterministic tests does not establish
 model answer quality, production capacity, or long-running reliability.
 
 The branch is `v3-spike`; the package still declares version `2.3.0`.
-The working tree includes the authoring tests and fixes after baseline commit
-`c0e8d9c1`. These results do not describe that commit alone.
+Commit `2210629c` contains the authoring tests, fixes, and Hex V3 beta dependency
+update after baseline commit `c0e8d9c1`. The example refactor separates application
+code from test fixtures, adds public lesson checks, and checks catalog integrity.
+The earlier suite and coverage records below predate those changes.
 Current dependency declarations and lock entries select Jido `3.0.0-beta.1`,
 Jido Action `3.0.0-beta.11`, and Jido Signal `3.0.0-beta.4` from Hex.
-The latest full run passed on this Hex dependency set. The earlier authoring
-and coverage runs below used sibling path dependencies.
+ReqLLM now uses a GitHub dependency pinned to
+`888fca022fea50785e2a54f7eabfcc47d289ae41`. It includes the numeric-string usage
+fix from [ReqLLM #1009](https://github.com/agentjido/req_llm/pull/1009).
+The focused HTTP/SSE regressions pass, and their skip tags have been removed.
+The earlier authoring and coverage runs below used sibling path dependencies.
 
 ## Verification record
 
 | Check | Recorded result | Scope |
 | --- | --- | --- |
+| Full suite after example and test timing fixes | 2,894 passed; 1 flaky test excluded; no skips | Authoring and examples included; ReqLLM `888fca02`; seed 0; warnings as errors; 134.5 seconds |
+| Refined example suite on ReqLLM pin `888fca02` | 679 passed; no skips | Seed 0; warnings as errors; 141.8 seconds; includes public lesson and catalog checks |
 | Current format and compile checks | Passed | `mix format --check-formatted` and `mix compile --warnings-as-errors` |
-| Current full tests, including authoring and examples | 2,876 passed; 4 skipped; 1 excluded | Hex V3 beta dependencies; seed 0; warnings treated as errors; 131.5 seconds |
+| Full tests on ReqLLM GitHub pin `39cf3eb3`, including authoring and examples | 2,879 passed; 4 skipped; 1 excluded | Seed 0; warnings as errors; 121.3 seconds; numeric-string usage skips retained |
+| Refreshed example suite | 664 passed; 4 skipped | Includes three catalog checks; Hex V3 beta dependencies; seed 0; warnings as errors |
+| Refreshed example suite with skips enabled | 664 passed; 4 failed | All 668 cases ran; only numeric-string usage fails in ReqLLM 1.22.0 |
+| Full tests before the three catalog checks, including authoring and examples | 2,876 passed; 4 skipped; 1 excluded | Hex V3 beta dependencies; seed 0; warnings treated as errors; 131.5 seconds |
 | Full tests with authoring and examples, before the last nine authoring tests | 2,867 passed; 4 skipped; 1 excluded | Local sibling V3 dependencies; warnings treated as errors |
 | Latest authoring-only run | 233 passed | Includes the last nine authoring tests; local sibling V3 dependencies |
 | Full line coverage audit, before the last nine tests | 92.2% | Whole package; configured minimum 90%; 2,866 passed, 5 skipped, 1 excluded |
@@ -42,7 +52,7 @@ mix compile --warnings-as-errors
 mix test --include authoring --include example --warnings-as-errors --seed 0
 ```
 
-The current test log is `/tmp/jido-ai-status-full.log` on the verification host.
+The current test log is `/tmp/jido-ai-refined-full-final.log` on the verification host.
 The result above is retained here because temporary logs are not release artifacts.
 
 ## What works
@@ -70,8 +80,23 @@ metadata and source normalization, and enforcement of the complete state-size
 limit. The last nine added tests found no further confirmed product bug.
 This does not mean the package has no other bugs.
 
+The example refactor uses native AI Agent declarations, except where core Plugin
+composition or direct standalone APIs are the lesson. Test observers, fault
+injection, and process barriers now live in test support. New public checks run
+the cleaned completion, tool-limit, skill, and standalone configuration lessons.
+The catalog checks guide structure, links, IDs, test pairs, and skipped lessons.
+
+Verification also corrected test defects: a steering check did not prove control
+admission and queue insertion before releasing its model; runtime examples competed with
+concurrent unit tests for short application budgets; and a Session idempotence
+assertion compared separate clock readings. The fresh-VM launcher now loads
+runtime and declared tool modules instead of every unrelated fixture.
+
 ## Explicit limits
 
+- Hex ReqLLM 1.22.0 and the old Git pin do not include the numeric-string usage
+  fix. Keep the updated pin until a release includes it. The example suite now
+  runs those regressions without skips.
 - Dynamic `tool_sources` are on hold. Native requests reject them before model
   work; they do not silently omit tools. The skill runtime is a separate feature.
 - Rich model export is out of scope. Public export accepts model IDs and aliases;

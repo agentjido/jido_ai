@@ -89,7 +89,6 @@ defmodule JidoAI.Examples.AoTTest do
     assert result.usage.total_tokens == 15
     assert %{reason: :success, status: :completed, duration_ms: n} = result.termination
     assert n >= 0
-    assert_receive {:aot_checked, ^result}
     assert Method.get_result(Server.agent(server), request.id) == result
     assert Server.agent(server).state.reply == result
     assert record(server, request).meta.model_calls == 1
@@ -362,7 +361,6 @@ defmodule JidoAI.Examples.AoTTest do
     assert {:ok, handle} = request(server, Map.put(context, :reject, rejection))
     assert {:error, {:failed, :error, result}} = Request.await(handle)
     assert result.diagnostics.cause == rejection
-    assert_receive {:aot_checked, %{answer: "(4 + (8 - 6)) * 4 = 24"}}
     assert Server.agent(server).state.reply == nil
     assert_script_done(mock)
   end

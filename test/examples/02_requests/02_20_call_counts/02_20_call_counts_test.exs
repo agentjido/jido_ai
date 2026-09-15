@@ -153,22 +153,20 @@ defmodule JidoAI.Examples.CallCountsTest do
        %{jido: jido} do
     {mock, context} =
       mock([
-        %{reply: {:tools, [%{id: "held", name: "wait", arguments: %{n: 2}}]}},
+        %{reply: {:wait, :owner_loss, {:text, "Unused"}}},
         %{reply: {:text, "Recovered"}}
       ])
 
-    module = JidoAI.Examples.Session.Agent
-    server = start_agent(jido, module.new!())
-    assert {:ok, request} = module.ask(server, "Wait", context: context, stream_to: self())
-    id = request.id
-    assert_receive {:session_owner, owner, ^id}, 2_000
-    assert_receive {:tool_waiting, worker, 2}, 2_000
+    server = start_agent(jido, Agent.new!())
+    assert {:ok, request} = submit(server, context)
+    assert_receive {:mock_llm_waiting, ^mock, :owner_loss, worker}, 2_000
+    owner = Server.children(server)[{:plugin, Session.Plugin}].pid
     monitor = Process.monitor(worker)
     Process.exit(owner, :kill)
     assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 2_000
     assert {:error, :stream_interrupted} = Request.await(request)
     refute Map.has_key?(record(server, request).meta, :model_calls)
-    assert {:ok, next} = module.ask(server, "Next", context: context, stream_to: self())
+    assert {:ok, next} = submit(server, context)
     assert {:ok, "Recovered"} = Request.await(next)
     assert_counts(server, next, 1)
     assert_script_done(mock)
@@ -176,7 +174,20 @@ defmodule JidoAI.Examples.CallCountsTest do
 
   test "cancellation before model work retains a known zero count", %{jido: jido} do
     {mock, context} = mock([])
-    server = start_agent(jido, Agent.new!())
+    profile = Jido.AI.Agent.profile(Agent, :assistant) |> Map.from_struct()
+    profile = put_in(profile.controls.input, [JidoAI.Examples.CallCounts.HeldInput])
+
+    {:ok, definition} =
+      Jido.AI.Authoring.lower(
+        %{
+          name: "held_counts",
+          schema: Agent.domain_schema(),
+          routes: [{"case.review", Jido.AI.Authoring.ai(:assistant)}]
+        },
+        [profile]
+      )
+
+    server = start_agent(jido, definition)
     assert {:ok, request} = submit(server, Map.put(context, :hold_input, true))
     assert_receive {:input_held, worker}, 2_000
     monitor = Process.monitor(worker)

@@ -1,13 +1,35 @@
-# 09_02: Linear Method APIs
+# 09_02 — Linear method APIs
 
-This example lowers one Agent definition with separate Chain of Thought and
-Chain of Draft profiles. Both profiles use the shared Session runtime and keep
-their results separate.
+Select Chain of Thought and Chain of Draft through their public method APIs.
 
-Use `method/0` to select a method in a profile. Use `get_steps/2`,
-`get_conclusion/2`, and `get_raw_response/2` to inspect committed results.
-There is no Strategy adapter or separate Machine API.
+## Read the code
+
+Read [agent.ex](agent.ex).
+Then read the matching tests below.
+
+## Run it
+
+From the package root:
 
 ```sh
 mix test test/examples/09_reasoning/09_02_method_api --include example --seed 0
 ```
+
+The default test path needs no credentials or remote provider. Model cases use
+[the local HTTP/SSE server](../../support/mock_llm.ex) with real ReqLLM transport.
+Shared setup and fault fixtures stay in [test support](../../../test/examples/support).
+
+## Expected result and failure behavior
+
+Separate profiles run through the same Session runtime. Public accessors read steps, conclusions and raw responses from committed results.
+
+## Limits
+
+This lesson teaches method selection through source definitions. It does not introduce a separate executor or measure reasoning quality.
+
+## Files
+
+- [09_02_method_api_test.exs](../../../test/examples/09_reasoning/09_02_method_api/09_02_method_api_test.exs)
+- [Shared mock_llm.ex](../../support/mock_llm.ex)
+
+Next: [09_03](../09_03_aot/README.md)

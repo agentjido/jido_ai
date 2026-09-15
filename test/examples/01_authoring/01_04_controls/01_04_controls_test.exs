@@ -1,58 +1,41 @@
 defmodule JidoAI.Examples.ControlsTest do
-  use JidoAI.Examples.Case, async: true
-  alias JidoAI.Examples.Controls
+  use JidoAI.Examples.Case
+  alias JidoAI.Examples.Controls.Agent
 
-  test "input rejection makes no model call", %{jido: jido} do
-    {mock, context} = mock([])
-    server = start_agent(jido, Controls.Agent.new!())
-    before = Server.snapshot(server)
-    assert {:error, _} = ask(server, Map.put(context, :authorized, false))
-    assert Server.snapshot(server) == before
-    assert_receive :input_control
-    refute_received :output_control
+  test "missing or refused authorization prevents model work", %{jido: jido} do
+    {mock, context} = native_mock([])
+    server = start_agent(jido, Agent.new!())
+    before = Server.agent(server).state
+
+    for host_context <- [context, Map.put(context, :authorized, false), Map.put(context, :authorized, "true")] do
+      assert {:error, _} = Agent.answer(server, "Help", context: host_context)
+      assert Server.agent(server).state == before
+    end
+
     assert MockLLM.report(mock).requests == []
     assert_script_done(mock)
   end
 
-  test "output rejection prevents a live commit", %{jido: jido} do
-    {mock, context} = mock([%{reply: {:text, "Unsupported answer"}}])
-    server = start_agent(jido, Controls.Agent.new!())
-    before = Server.snapshot(server)
-    assert {:error, _} = ask(server, Map.put(context, :authorized, true))
-    assert Server.snapshot(server) == before
-    assert_receive :input_control
-    assert_receive :output_control
+  test "output rejection preserves prior state and accepted output can follow", %{jido: jido} do
+    {mock, context} = native_mock([%{reply: {:text, "Unsupported answer"}}, %{reply: {:text, "Answer [evidence]"}}])
+    context = Map.put(context, :authorized, true)
+    server = start_agent(jido, Agent.new!(state: %{answer: "Previous", case_id: "existing"}))
+    before = Server.agent(server).state
+    assert {:error, _} = Agent.answer(server, "Help", context: context)
+    assert Server.agent(server).state == before
+    assert {:ok, agent} = Agent.answer(server, "Try again", context: context)
+    assert %{answer: "Answer [evidence]", case_id: "existing"} = agent.state
     assert_script_done(mock)
   end
 
-  test "provider failure stops before output controls and state assembly", %{jido: jido} do
-    {mock, context} = mock([%{reply: {:error, 503, "Unavailable"}}])
-    server = start_agent(jido, Controls.Agent.new!())
-    before = Server.snapshot(server)
-    assert {:error, _} = ask(server, Map.put(context, :authorized, true))
-    assert Server.snapshot(server) == before
-    assert_receive :input_control
-    refute_received :output_control
-    assert_script_done(mock)
-  end
-
-  test "accepted output reaches one complete commit", %{jido: jido} do
-    {mock, context} = mock([%{reply: {:text, "Answer [evidence]"}}])
-    server = start_agent(jido, Controls.Agent.new!())
-    assert {:ok, agent} = ask(server, Map.put(context, :authorized, true))
-    assert agent.state == %{answer: "Answer [evidence]", commits: 1, case_id: "case-42"}
-    assert_receive :input_control
-    assert_receive :output_control
-    assert_script_done(mock)
-  end
-
-  test "a provider decoder exception becomes a command error and preserves state", %{jido: jido} do
-    {mock, context} = mock([%{reply: {:raw, %{choices: "invalid"}}}])
-    server = start_agent(jido, Controls.Agent.new!())
-    before = Server.snapshot(server)
-    assert {:error, _} = ask(server, Map.put(context, :authorized, true))
-    assert Server.snapshot(server) == before
-    refute_received :output_control
-    assert_script_done(mock)
+  for reply <- [{:error, 400, "Invalid request"}, {:raw, %{choices: "invalid"}}] do
+    test "provider failure #{inspect(reply)} preserves complete state", %{jido: jido} do
+      {mock, context} = native_mock([%{reply: unquote(Macro.escape(reply))}])
+      server = start_agent(jido, Agent.new!())
+      before = Server.agent(server).state
+      assert {:error, _} = Agent.answer(server, "Help", context: Map.put(context, :authorized, true))
+      assert Server.agent(server).state == before
+      assert_script_done(mock)
+    end
   end
 end

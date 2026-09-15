@@ -1,5 +1,8 @@
 # Retrieval examples
 
+Read the table from top to bottom for the learning order. Gaps in the IDs
+are intentional; the remaining examples keep their published IDs.
+
 These checked examples use the current Jido AI public contract. Each feature
 keeps its source and detailed guide in one folder. Its tests live in the
 matching `test/examples/07_retrieval` folder.

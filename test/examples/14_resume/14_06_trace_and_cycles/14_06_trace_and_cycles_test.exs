@@ -5,6 +5,20 @@ defmodule JidoAI.Examples.TraceAndCyclesTest do
   alias JidoAI.Examples.CheckpointResume
   alias JidoAI.Examples.TraceAndCycles.{Agent, Check}
 
+  setup do
+    JidoAI.Examples.ToolEvents.attach_action(Check)
+  end
+
+  defp fingerprints(mock) do
+    wire = List.last(MockLLM.report(mock).requests)
+
+    for %{"role" => "tool", "content" => content} <- wire.body["messages"],
+        do: Jason.decode!(content)["result"]["fingerprint"]
+  end
+
+  defp digest(payload),
+    do: :crypto.hash(:sha256, :erlang.term_to_binary(payload, [:deterministic])) |> Base.encode16(case: :lower)
+
   for redact? <- [true, false] do
     @redact? redact?
     test "tool start redaction #{@redact?} leaves the real tool input intact", %{jido: jido} do
@@ -17,7 +31,8 @@ defmodule JidoAI.Examples.TraceAndCyclesTest do
       config = config(mock, redact_tool_args?: @redact?)
       result = ReAct.run("Check", config, opts(jido))
       assert result.result == "Checked"
-      assert_receive {:checked_payload, ^payload}
+      assert_receive {:example_action_started, "check"}
+      assert fingerprints(mock) == [digest(payload)]
       event = Enum.find(result.trace, &(&1.kind == :tool_started))
 
       expected =
@@ -58,7 +73,8 @@ defmodule JidoAI.Examples.TraceAndCyclesTest do
              "payload" => payload
            }
 
-    assert_receive {:checked_payload, ^payload}
+    assert_receive {:example_action_started, "check"}
+    assert fingerprints(mock) == [digest(payload)]
     assert_script_done(mock)
   end
 
@@ -162,7 +178,8 @@ defmodule JidoAI.Examples.TraceAndCyclesTest do
     config = config(mock, tool_concurrency: 1)
     result = ReAct.run("Check twice", config, opts(jido))
     assert result.result == "Done"
-    for n <- [1, 2, 2, 1], do: assert_receive({:checked_payload, %{"n" => ^n}})
+    for _ <- 1..4, do: assert_receive({:example_action_started, "check"})
+    assert fingerprints(mock) == Enum.map([1, 2, 2, 1], &digest(%{"n" => &1}))
     [_, second_wire, third_wire] = MockLLM.report(mock).requests
     assert warnings(second_wire) == []
     assert length(warnings(third_wire)) == 1
@@ -217,9 +234,10 @@ defmodule JidoAI.Examples.TraceAndCyclesTest do
     result = ReAct.collect_stream(next.events)
     assert result.result == "Resumed"
     assert length(warnings(List.last(MockLLM.report(mock).requests))) == 1
-    assert_receive {:checked_payload, %{"n" => 1}}
-    assert_receive {:checked_payload, %{"n" => 1}}
-    refute_receive {:checked_payload, _}, 20
+    assert_receive {:example_action_started, "check"}
+    assert_receive {:example_action_started, "check"}
+    assert fingerprints(mock) == [digest(%{"n" => 1}), digest(%{"n" => 1})]
+    refute_received {:example_action_started, "check"}
     assert_script_done(mock)
   end
 
@@ -240,8 +258,9 @@ defmodule JidoAI.Examples.TraceAndCyclesTest do
 
     assert result.result == "Two names"
     assert Enum.all?(MockLLM.report(mock).requests, &(warnings(&1) == []))
-    assert_receive {:checked_payload, %{"n" => 1}}
-    assert_receive {:checked_payload, %{"n" => 1}}
+    assert_receive {:example_action_started, "check"}
+    assert_receive {:example_action_started, "check"}
+    assert fingerprints(mock) == [digest(%{"n" => 1}), digest(%{"n" => 1})]
     assert_script_done(mock)
   end
 

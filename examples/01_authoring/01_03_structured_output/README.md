@@ -1,14 +1,40 @@
 # 01_03 — Structured output
 
-Task: obtain a nonempty typed answer, with at most one repair.
+Validate a model result with Zoi and allow one repair before committing it.
 
-- [Agent and repair Flow](agent.ex)
-- [Acceptance tests](../../../test/examples/01_authoring/01_03_structured_output/01_03_structured_output_test.exs)
+## Read the code
 
-ReqLLM sends the application JSON schema. The application validates the result
-with Zoi. A schema failure becomes Iterate state and real feedback in the next
-model request. Two total attempts bound the work. Exhaustion preserves a
-non-default prior Agent state. Provider errors do not become schema repairs.
+Read [the Agent](agent.ex), then the tests. The result schema requires a
+non-empty `answer`. `max_repairs 1` and `max_model_calls 2` bound the work;
+no custom repair Flow is needed.
 
-Status: two passing example tests. Imported schemas, attachments, result
-metadata, and current AI repair callbacks remain part of the full port.
+## Run it
+
+From the package root:
+
+```sh
+mix test test/examples/01_authoring/01_03_structured_output --include example --seed 0
+```
+
+Expected result: all tests pass without credentials or a remote provider.
+They use the [local model server](../../support/mock_llm.ex) through real ReqLLM
+transport and AgentServer, with [test setup](../../../test/examples/support/example_case.ex).
+
+## Important behavior
+
+An invalid object produces validation feedback for the next model call.
+The valid result becomes `state.answer == %{answer: "Fixed"}`. Repair exhaustion
+preserves the previous state. Provider errors do not start schema repair.
+A later request can succeed.
+
+## Limits
+
+Schema validation checks structure, not factual accuracy. The model response
+is scripted; this is not a live-provider quality test.
+
+## Files
+
+- [Agent](agent.ex)
+- [Tests](../../../test/examples/01_authoring/01_03_structured_output/01_03_structured_output_test.exs)
+
+Previous: [01_02](../01_02_tool_flow/README.md) | Next: [01_04](../01_04_controls/README.md)

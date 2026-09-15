@@ -222,7 +222,7 @@ defmodule JidoAI.Examples.TypedSignalsTest do
     assert_receive {:jido_ai_request_event, %{kind: :llm_delta, data: %{chunk_type: :tool_call}} = early},
                    1_000
 
-    refute_receive {:echo_executed, _}, 0
+    refute_received {:jido_ai_request_event, %{kind: :tool_started}}
     publish(publisher, %{event: early})
     assert_receive {:signal, %Jido.Signal{type: "ai.llm.delta"} = delta}
     assert delta.data.delta == "echo" and delta.data.call_id == early.llm_call_id
@@ -233,7 +233,6 @@ defmodule JidoAI.Examples.TypedSignalsTest do
     refute Map.has_key?(delta.data, :tool_call_id)
     assert :ok = MockLLM.release(mock, :arguments)
     assert {:ok, "Done now"} = Request.await(request)
-    assert_receive {:echo_executed, "ready"}
     remaining = request |> Request.Stream.events(stream_event_timeout_ms: 1_000) |> Enum.to_list()
 
     projected =
@@ -529,9 +528,7 @@ defmodule JidoAI.Examples.TypedSignalsTest do
     assert {:ok, %{echo: "direct"}, []} =
              Turn.execute("echo", %{"value" => "direct"}, %{observer: self()}, tools: [Echo])
 
-    assert_receive {:echo_executed, "direct"}
     assert {:error, _, []} = Turn.execute_module(Echo, %{}, %{observer: self()})
-    refute_receive {:echo_executed, _}, 0
     parent = self()
     task = Task.async(fn -> Turn.execute_module(Hold, %{}, %{observer: parent}, timeout: 80) end)
     assert_receive {:held_action, worker}

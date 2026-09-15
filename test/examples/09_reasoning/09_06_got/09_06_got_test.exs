@@ -38,7 +38,6 @@ defmodule JidoAI.Examples.GoTTest do
     assert record(server, handle).meta.model_calls == 3
     assert record(server, handle).method == :graph_of_thoughts
     assert Server.agent(server).state.reply == "Combined conclusion"
-    assert_receive {:got_checked, "Combined conclusion"}
     [first, second, aggregate] = MockLLM.report(mock).requests
     assert hd(first.body["messages"])["content"] == Machine.default_generation_prompt()
     assert List.last(second.body["messages"])["content"] =~ "First analysis"

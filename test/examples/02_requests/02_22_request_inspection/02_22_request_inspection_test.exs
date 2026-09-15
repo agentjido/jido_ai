@@ -11,6 +11,36 @@ defmodule JidoAI.Examples.RequestInspectionTest do
     )
   end
 
+  defp fixture_agent do
+    profile = Jido.AI.Agent.profile(Agent, :assistant) |> Map.from_struct()
+
+    profile = %{
+      profile
+      | tools: [
+          %{
+            name: "inspect_hold",
+            target: JidoAI.Examples.RequestInspection.Hold,
+            forward_context: [:observer],
+            timeout: 8_000
+          }
+        ]
+    }
+
+    {:ok, definition} =
+      Jido.AI.Authoring.lower(
+        %{
+          name: Agent.definition().name,
+          module: Agent,
+          vsn: Agent.vsn(),
+          schema: Agent.domain_schema(),
+          routes: [{"case.ask", Jido.AI.Authoring.ai(:assistant)}]
+        },
+        [profile]
+      )
+
+    Jido.Agent.instantiate!(definition)
+  end
+
   defp owner(server), do: Server.children(server)[{:plugin, Session.Plugin}].pid
   defp events(request), do: Enum.to_list(Request.Stream.events(request))
 
@@ -58,7 +88,7 @@ defmodule JidoAI.Examples.RequestInspectionTest do
   test "held tools expose redacted arguments and completed tool results survive the next model",
        %{jido: jido} do
     {mock, context} = mock([tools(), %{reply: {:wait, :final, {:text, "Checked"}}}])
-    server = start_agent(jido, Agent.new!())
+    server = start_agent(jido, fixture_agent())
     {:ok, request} = submit(server, context)
     assert_receive {:inspection_tool, tool}, 2_000
     {:ok, view} = Session.snapshot(server, request_id: request.id)
@@ -169,7 +199,7 @@ defmodule JidoAI.Examples.RequestInspectionTest do
   test "terminal inspection keeps the observed stream prefix and remains selectable after another request",
        %{jido: jido} do
     {mock, context} = mock([%{reply: {:text, "First"}}, %{reply: {:text, "Next"}}])
-    server = start_agent(jido, Agent.new!())
+    server = start_agent(jido, fixture_agent())
     {:ok, first} = submit(server, context, stream_to: self())
     assert {:ok, "First"} = Request.await(first)
     streamed = events(first)
@@ -196,7 +226,7 @@ defmodule JidoAI.Examples.RequestInspectionTest do
 
   test "cancellation keeps its raw reason and the observed prefix before commit", %{jido: jido} do
     {mock, context} = mock([%{reply: {:wait, :cancel, {:text, "Unused"}}}])
-    server = start_agent(jido, Agent.new!())
+    server = start_agent(jido, fixture_agent())
     {:ok, request} = submit(server, context, stream_to: self())
     assert_receive {:mock_llm_waiting, ^mock, :cancel, provider}, 2_000
     monitor = Process.monitor(provider)
@@ -216,7 +246,7 @@ defmodule JidoAI.Examples.RequestInspectionTest do
     jido: jido
   } do
     {mock, context} = mock([%{reply: {:wait, :crash, {:text, "Unused"}}}])
-    server = start_agent(jido, Agent.new!())
+    server = start_agent(jido, fixture_agent())
     {:ok, request} = submit(server, context, stream_to: self())
     assert_receive {:mock_llm_waiting, ^mock, :crash, _}, 2_000
     {:ok, view} = Session.snapshot(server)
@@ -234,7 +264,7 @@ defmodule JidoAI.Examples.RequestInspectionTest do
     jido: jido
   } do
     {mock, context} = mock([tools(), %{reply: {:wait, :recovery, {:text, "Unused"}}}])
-    server = start_agent(jido, Agent.new!())
+    server = start_agent(jido, fixture_agent())
     {:ok, request} = submit(server, context)
     assert_receive {:inspection_tool, tool}, 2_000
     send(tool, :release)
@@ -260,7 +290,7 @@ defmodule JidoAI.Examples.RequestInspectionTest do
   test "the trace cap keeps the first 2000 events and records overflow without hiding completion",
        %{jido: jido} do
     {mock, context} = mock([%{reply: {:wait, :overflow, {:text, "Done"}}}])
-    server = start_agent(jido, Agent.new!())
+    server = start_agent(jido, fixture_agent())
     {:ok, request} = submit(server, context)
     assert_receive {:mock_llm_waiting, ^mock, :overflow, _}, 2_000
     {:ok, view} = Session.snapshot(server)
@@ -291,7 +321,7 @@ defmodule JidoAI.Examples.RequestInspectionTest do
 
   test "wrong-run data cannot enter the live or retained request trace", %{jido: jido} do
     {mock, context} = mock([%{reply: {:wait, :wrong_run, {:text, "Done"}}}])
-    server = start_agent(jido, Agent.new!())
+    server = start_agent(jido, fixture_agent())
     {:ok, request} = submit(server, context)
     assert_receive {:mock_llm_waiting, ^mock, :wrong_run, _}, 2_000
     {:ok, before} = Session.snapshot(server)
@@ -333,7 +363,7 @@ defmodule JidoAI.Examples.RequestInspectionTest do
        }}
 
     {mock, context} = mock([%{reply: reply}])
-    server = start_agent(jido, Agent.new!())
+    server = start_agent(jido, fixture_agent())
     {:ok, request} = submit(server, context)
     assert {:ok, "Checked"} = Request.await(request)
     {:ok, view} = Session.snapshot(server)

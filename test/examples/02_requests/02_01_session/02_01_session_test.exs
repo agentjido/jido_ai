@@ -10,16 +10,25 @@ defmodule JidoAI.Examples.SessionTest do
     do: server |> Server.agent() |> Map.fetch!(:state) |> Map.delete(:commits)
 
   defp session_definition(changes \\ %{}, schema \\ Agent.domain_schema()) do
-    {_, opts} = Enum.find(Agent.definition().plugins, &(elem(&1, 0) == Jido.AI.Runtime.Plugin))
-    profile = opts[:profiles].assistant |> Map.from_struct() |> Map.merge(changes)
+    profile = Jido.AI.Agent.profile(Agent, :assistant) |> Map.from_struct()
+
+    profile = %{
+      profile
+      | controls: Map.put(profile.controls, :input, [JidoAI.Examples.Session.ObserveOwner]),
+        tools:
+          profile.tools ++
+            [%{name: "wait", target: JidoAI.Examples.AIRuntime.WaitTool, forward_context: [:observer], timeout: 8_000}]
+    }
+
+    profile = Map.merge(profile, changes)
 
     base = %{
       name: "source_session",
       schema: schema,
-      plugins: [JidoAI.Examples.AIRuntime.Audit],
+      plugins: [JidoAI.Examples.Support.CommitCounter],
       routes: [
         {"ai.ask", Jido.AI.Authoring.ai(:assistant)},
-        {"case.close", JidoAI.Examples.AIRuntime.Close}
+        {"case.close", JidoAI.Examples.Support.CloseCase}
       ]
     }
 
@@ -34,12 +43,25 @@ defmodule JidoAI.Examples.SessionTest do
     start_agent(jido, Jido.Agent.instantiate!(definition))
   end
 
+  defp start_fixture(jido) do
+    {definition, _, _} = session_definition()
+    start_agent(jido, Jido.Agent.instantiate!(definition))
+  end
+
+  test "the authored session runs without test controls or blocking tools", %{jido: jido} do
+    {mock, context} = mock([%{reply: {:text, "Ready"}}])
+    server = start_agent(jido, Agent.new!())
+    assert {:ok, request} = Agent.ask(server, "Help", context: context)
+    assert {:ok, "Ready"} = Request.await(request)
+    assert_script_done(mock)
+  end
+
   @tag history_case: "HIST-07/public-stream"
   test "admission commits before work and the final Turn preserves intervening domain changes", %{
     jido: jido
   } do
     {mock, context} = mock([%{reply: {:wait, :answer, {:text, "Done"}}}])
-    server = start_agent(jido, Agent.new!())
+    server = start_fixture(jido)
     assert {:ok, request, events} = Agent.ask_stream(server, "Work", context: context)
     id = request.id
     assert_receive {:mock_llm_waiting, ^mock, :answer, _}, 2_000
@@ -82,7 +104,7 @@ defmodule JidoAI.Examples.SessionTest do
 
   test "busy and duplicate IDs reject before work and preserve the first stream", %{jido: jido} do
     {mock, context} = mock([%{reply: {:wait, :answer, {:text, "First"}}}])
-    server = start_agent(jido, Agent.new!())
+    server = start_fixture(jido)
 
     assert {:ok, first, events} =
              Agent.ask_stream(server, "First", context: context, request_id: "first")
@@ -117,7 +139,7 @@ defmodule JidoAI.Examples.SessionTest do
   @tag history_case: "HIST-07/consumer-timeout"
   test "caller and consumer timeouts leave the accepted work alive", %{jido: jido} do
     {mock, context} = mock([%{reply: {:wait, :answer, {:text, "Later"}}}])
-    server = start_agent(jido, Agent.new!())
+    server = start_fixture(jido)
 
     assert {:ok, request, events} =
              Agent.ask_stream(server, "Work", context: context, stream_event_timeout_ms: 10)
@@ -137,7 +159,7 @@ defmodule JidoAI.Examples.SessionTest do
         %{reply: {:text, "Next"}}
       ])
 
-    server = start_agent(jido, Agent.new!())
+    server = start_fixture(jido)
     assert {:ok, request, events} = Agent.ask_stream(server, "Wait", context: context)
     assert_receive {:tool_waiting, worker, 1}, 2_000
     monitor = Process.monitor(worker)
@@ -160,7 +182,7 @@ defmodule JidoAI.Examples.SessionTest do
         %{reply: {:text, "Recovered"}}
       ])
 
-    server = start_agent(jido, Agent.new!())
+    server = start_fixture(jido)
     assert {:ok, request} = Agent.ask(server, "Wait", context: context, stream_to: self())
     id = request.id
     assert_receive {:session_owner, owner, ^id}, 2_000
@@ -179,7 +201,7 @@ defmodule JidoAI.Examples.SessionTest do
 
   test "untrusted completion input cannot publish a result", %{jido: jido} do
     {mock, context} = mock([%{reply: {:wait, :answer, {:text, "Real"}}}])
-    server = start_agent(jido, Agent.new!())
+    server = start_fixture(jido)
     {:ok, request} = Agent.ask(server, "Work", context: context)
     assert_receive {:mock_llm_waiting, ^mock, :answer, _}, 2_000
     before = request_state(server)
@@ -197,7 +219,7 @@ defmodule JidoAI.Examples.SessionTest do
 
   test "invalid sinks and unsupported options reject before admission", %{jido: jido} do
     {mock, context} = mock([])
-    server = start_agent(jido, Agent.new!())
+    server = start_fixture(jido)
     before = Server.snapshot(server)
 
     assert {:error, {:invalid_stream_to, :invalid}} =
@@ -217,7 +239,9 @@ defmodule JidoAI.Examples.SessionTest do
         %{reply: {:text, "Twelve"}}
       ])
 
-    server = start_agent(jido, Agent.new!())
+    server = start_fixture(jido)
+
+    observe_tools()
 
     query = [
       ReqLLM.Message.ContentPart.text("Read this"),
@@ -232,7 +256,7 @@ defmodule JidoAI.Examples.SessionTest do
       )
 
     assert {:ok, "Twelve"} = Request.await(request)
-    assert_receive {:tool_executed, 3, 4}
+    assert_receive {:example_tool_started, "multiply"}
     [first, second] = MockLLM.report(mock).requests
     assert first.body["temperature"] == 0.3
     assert List.last(first.body["messages"])["content"] |> Enum.any?(&(&1["type"] == "image_url"))
@@ -250,7 +274,7 @@ defmodule JidoAI.Examples.SessionTest do
 
   test "completed requests have bounded retention and await_many keeps input order", %{jido: jido} do
     {mock, context} = mock(for text <- ["One", "Two", "Three"], do: %{reply: {:text, text}})
-    server = start_agent(jido, Agent.new!())
+    server = start_fixture(jido)
 
     requests =
       for text <- ["One", "Two", "Three"] do
@@ -347,16 +371,17 @@ defmodule JidoAI.Examples.SessionTest do
       ])
 
     server = streaming_server(jido)
+    observe_tools()
     {:ok, request, events} = Agent.ask_stream(server, "Calculate", context: context)
     assert {:ok, "Forty-two"} = Request.await(request)
-    assert_receive {:tool_executed, 6, 7}
-    refute_receive {:tool_executed, 6, 7}, 20
+    assert_receive {:example_tool_started, "multiply"}
+    refute_received {:example_tool_started, "multiply"}
     events = Enum.to_list(events)
     assert Enum.map(events, & &1.seq) == Enum.to_list(1..length(events))
     starts = Enum.filter(events, &(&1.kind == :llm_started))
     assert Enum.map(starts, & &1.iteration) == [1, 2]
     assert length(Enum.uniq_by(starts, & &1.llm_call_id)) == 2
-    assert Enum.any?(events, &(&1.kind == :tool_completed and &1.tool_call_id == "multiply"))
+    assert Enum.count(events, &(&1.kind == :tool_completed and &1.tool_call_id == "multiply")) == 1
     assert_script_done(mock)
   end
 
@@ -418,7 +443,9 @@ defmodule JidoAI.Examples.SessionTest do
   end
 
   test "DSL, source profiles, source JSON and Builder use the same session targets", %{jido: jido} do
-    {definition, base, profile} = session_definition()
+    {definition, base, profile} =
+      session_definition(Jido.AI.Agent.profile(Agent, :assistant) |> Map.from_struct())
+
     assert definition.plugins == Agent.definition().plugins
     assert definition.routes == Agent.definition().routes
     attrs = definition |> Map.from_struct() |> Map.drop([:id, :state])
@@ -469,7 +496,7 @@ defmodule JidoAI.Examples.SessionTest do
       :forward_context,
       :observer,
       JidoAI.Examples.Session.ObserveOwner,
-      JidoAI.Examples.ToolFlow.Multiply,
+      JidoAI.Examples.Support.Multiply,
       JidoAI.Examples.AIRuntime.WaitTool
     ]
 
@@ -492,7 +519,7 @@ defmodule JidoAI.Examples.SessionTest do
 
   test "Signal profile input cannot replace the declared session route binding", %{jido: jido} do
     {mock, context} = mock([%{reply: {:text, "Bound"}}])
-    server = start_agent(jido, Agent.new!())
+    server = start_fixture(jido)
 
     signal =
       Jido.Signal.new!("ai.ask", %{request_id: "bound", query: "Work", profile_id: :unknown}, source: "/example")
@@ -509,7 +536,7 @@ defmodule JidoAI.Examples.SessionTest do
     {mock, context} =
       mock([%{reply: {:tools, [%{id: "held", name: "wait", arguments: %{n: 9}}]}}])
 
-    server = start_agent(jido, Agent.new!())
+    server = start_fixture(jido)
     {:ok, _request} = Agent.ask(server, "Wait", context: context)
     assert_receive {:tool_waiting, worker, 9}, 2_000
     monitor = Process.monitor(worker)
@@ -537,7 +564,9 @@ defmodule JidoAI.Examples.SessionTest do
     :code.delete(module)
 
     {output, status} =
-      System.cmd("mix", ["run", "examples/02_requests/02_01_session/unloaded_tool_session.exs", dir],
+      System.cmd(
+        "mix",
+        ["run", "--no-compile", "--no-deps-check", "test/examples/support/unloaded_tool_session.exs", dir],
         stderr_to_stdout: true,
         env: [{"MIX_ENV", "test"}]
       )

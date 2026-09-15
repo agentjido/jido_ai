@@ -1,15 +1,38 @@
-# 01_01 — Authoring formats
+# 01_01 — One AI answer
 
-Task: ask one question through equivalent core authoring forms.
+Use an AI profile and a generated command to write one answer into Agent state.
 
-- [Agent and Flow](agent.ex)
-- [Acceptance tests](../../../test/examples/01_authoring/01_01_authoring_formats/01_01_authoring_formats_test.exs)
+## Read the code
 
-The Agent and Flow each have equal DSL, Builder, direct-data, and JSON values.
-All forms run real model work. The Agent forms produce equal direct and live
-results. The terminal Action preserves the case ID and increments the commit
-counter. Only AgentServer commits the candidate.
+Read [the Agent](agent.ex), then the tests. The `ai` block owns the model,
+limits, and result destination. Call `Agent.answer/3` through AgentServer.
 
-Status: two passing example tests. Registry IDs in this fixture are generated
-for a single-version round trip. Stable application-owned artifact IDs and AI
-source-profile formats remain authoring implementation requirements.
+## Run it
+
+From the package root:
+
+```sh
+mix test test/examples/01_authoring/01_01_authoring_formats --include example --seed 0
+```
+
+Expected result: all tests pass without credentials or a remote provider.
+They use the [local model server](../../support/mock_llm.ex) through real ReqLLM
+transport and AgentServer, with [test setup](../../../test/examples/support/example_case.ex).
+
+## Important behavior
+
+The answer is `Ready`; existing domain data remains unchanged. A provider
+failure leaves the previous state unchanged. A later request can succeed.
+
+## Limits
+
+This lesson uses one static AI DSL definition, not an authoring-format matrix.
+See [AI extension composition](../01_06_ai_extension/README.md) and the
+[authoring tests](../../../test/authoring) for alternate forms.
+
+## Files
+
+- [Agent](agent.ex)
+- [Tests](../../../test/examples/01_authoring/01_01_authoring_formats/01_01_authoring_formats_test.exs)
+
+Next: [01_02](../01_02_tool_flow/README.md)

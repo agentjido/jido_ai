@@ -1,38 +1,27 @@
 defmodule JidoAI.Examples.ToolFlowTest do
-  use JidoAI.Examples.Case, async: true
-  alias JidoAI.Examples.ToolFlow
+  use JidoAI.Examples.Case
+  alias JidoAI.Examples.ToolFlow.Agent
 
-  test "an Action and nested Flow produce correlated tool results for the next model call", %{
-    jido: jido
-  } do
+  test "an Action and Flow supply real, correlated results to the next model call", %{jido: jido} do
     calls = [
       %{id: "direct", name: "multiply", arguments: %{a: 2, b: 3}},
       %{id: "nested", name: "quote", arguments: %{a: 4, b: 5}}
     ]
 
-    {mock, context} =
-      mock([%{reply: {:tools, calls}}, %{reply: {:text, "The results are 6 and 20"}}])
-
-    server = start_agent(jido, ToolFlow.Agent.new!())
-    assert {:ok, agent} = ask(server, context)
-    assert agent.state == %{answer: "The results are 6 and 20", case_id: "case-42", commits: 1}
-    assert_receive {:tool_executed, 2, 3}
-    assert_receive {:tool_executed, 4, 5}
+    {mock, context} = native_mock([%{reply: {:tools, calls}}, %{reply: {:text, "The results are 6 and 20"}}])
+    server = start_agent(jido, Agent.new!())
+    observe_tools()
+    assert {:ok, agent} = Agent.calculate(server, "Calculate both prices", context: context)
+    assert %{answer: "The results are 6 and 20", case_id: "case-42"} = agent.state
+    assert_receive {:example_tool_started, "multiply"}
+    assert_receive {:example_tool_started, "quote"}
     assert [first, final] = MockLLM.report(mock).requests
-
-    assert Enum.map(first.body["tools"], &get_in(&1, ["function", "name"])) == [
-             "multiply",
-             "quote"
-           ]
-
-    messages = final.body["messages"]
-    assert Enum.map(messages, & &1["role"]) == ["user", "assistant", "tool", "tool"]
-    [_, assistant, one, two] = messages
-    assert Enum.map(assistant["tool_calls"], & &1["id"]) == ["direct", "nested"]
-    assert one["tool_call_id"] == "direct"
-    assert two["tool_call_id"] == "nested"
-    assert Jason.decode!(one["content"]) == %{"value" => 6}
-    assert Jason.decode!(two["content"]) == %{"value" => 20}
+    assert Enum.map(first.body["tools"], & &1["name"]) == ["multiply", "quote"]
+    [one, two] = Enum.filter(final.body["input"], &(&1["type"] == "function_call_output"))
+    assert one["call_id"] == "direct"
+    assert two["call_id"] == "nested"
+    assert Jason.decode!(one["output"]) == %{"ok" => true, "result" => %{"value" => 6}}
+    assert Jason.decode!(two["output"]) == %{"ok" => true, "result" => %{"value" => 20}}
     assert_script_done(mock)
   end
 
@@ -40,15 +29,27 @@ defmodule JidoAI.Examples.ToolFlowTest do
         %{id: "invalid", name: "unknown", arguments: %{a: 1, b: 2}},
         %{id: "invalid", name: "quote", arguments: %{a: "wrong", b: 2}}
       ] do
-    test "the entire tool batch is validated before work: #{inspect(invalid)}", %{jido: jido} do
+    test "batch preflight rejects #{inspect(invalid)} before any tool starts", %{jido: jido} do
       valid = %{id: "valid", name: "multiply", arguments: %{a: 2, b: 3}}
-      {mock, context} = mock([%{reply: {:tools, [valid, unquote(Macro.escape(invalid))]}}])
-      server = start_agent(jido, ToolFlow.Agent.new!())
-      before = Server.snapshot(server)
-      assert {:error, _} = ask(server, context)
-      assert Server.snapshot(server) == before
-      refute_received {:tool_executed, _, _}
+      {mock, context} = native_mock([%{reply: {:tools, [valid, unquote(Macro.escape(invalid))]}}])
+      server = start_agent(jido, Agent.new!())
+      observe_tools()
+      before = Server.agent(server).state
+      assert {:error, _} = Agent.calculate(server, "Calculate", context: context)
+      assert Server.agent(server).state == before
+      refute_received {:example_tool_started, _}
       assert_script_done(mock)
     end
+  end
+
+  test "the model call limit rejects another tool round without committing an answer", %{jido: jido} do
+    call = %{id: "one", name: "multiply", arguments: %{a: 2, b: 3}}
+    {mock, context} = native_mock([%{reply: {:tools, [call]}}, %{reply: {:tools, [%{call | id: "two"}]}}])
+    server = start_agent(jido, Agent.new!())
+    before = Server.agent(server).state
+    assert {:error, _} = Agent.calculate(server, "Calculate", context: context)
+    assert Server.agent(server).state == before
+    assert length(MockLLM.report(mock).requests) == 2
+    assert_script_done(mock)
   end
 end

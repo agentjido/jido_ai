@@ -298,7 +298,7 @@ defmodule JidoAI.Examples.CheckpointResumeTest do
 
     script =
       Path.expand(
-        "../../../../examples/14_resume/14_03_checkpoint_resume/resume_vm.exs",
+        "../../support/resume_vm.exs",
         __DIR__
       )
 

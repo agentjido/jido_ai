@@ -6,9 +6,8 @@ defmodule JidoAI.Examples.StreamUsageTest do
   alias JidoAI.Examples.StreamUsage.{Agent, QuietAgent, Echo}
 
   for api <- [:agent, :standalone], capture? <- [true, false] do
+    # Regression for https://github.com/agentjido/req_llm/issues/1008 (fixed in #1009).
     @tag history_case: "HIST-13/usage-source-precedence"
-    @tag upstream_failure: "ReqLLM does not normalize numeric-string stream usage"
-    @tag skip: "Blocked by ReqLLM numeric-string stream usage handling"
     test "#{api} retains numeric-string provider usage with delta capture #{capture?}", %{jido: jido} do
       usage = %{prompt_tokens: "3", completion_tokens: "1", total_tokens: "4"}
       {mock, context} = mock([%{reply: {:stream, [%{content: "Done"}], "stop", usage}}])
@@ -65,7 +64,6 @@ defmodule JidoAI.Examples.StreamUsageTest do
                &Usage.token_counts(&1.data.usage).total_tokens
              ) == [5, 3]
 
-      assert_receive {:usage_tool, 7}
       [_, last] = MockLLM.report(mock).requests
       [tool] = Enum.filter(last.body["messages"], &(&1["role"] == "tool"))
       assert tool["tool_call_id"] == "one"

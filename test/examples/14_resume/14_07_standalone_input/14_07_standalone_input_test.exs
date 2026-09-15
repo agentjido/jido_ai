@@ -23,7 +23,7 @@ defmodule JidoAI.Examples.StandaloneInputTest do
     assert {:error, :queue_full} = PendingInputServer.enqueue(queue, %{content: "Overflow"})
     {mock, _} = mock([%{reply: {:text, "Both inputs"}}])
     config = config(mock, queue)
-    result = JidoAI.Examples.StandaloneInput.run("Initial", config, jido, self())
+    result = JidoAI.Examples.StandaloneInput.run("Initial", config, %{jido: jido, observer: self()})
     assert result.result == "Both inputs"
     [wire] = MockLLM.report(mock).requests
     assert users(wire) == ["Initial", "First input", "Second input"]
@@ -194,7 +194,7 @@ defmodule JidoAI.Examples.StandaloneInputTest do
 
     consumer =
       spawn(fn ->
-        JidoAI.Examples.StandaloneInput.run("Stop consumer", config, jido, observer)
+        JidoAI.Examples.StandaloneInput.run("Stop consumer", config, %{jido: jido, observer: observer})
       end)
 
     assert_receive {:mock_llm_waiting, ^mock, :consumer, provider}, 2_000
@@ -250,8 +250,12 @@ defmodule JidoAI.Examples.StandaloneInputTest do
     assert {:ok, next} = ReAct.continue(checkpoint.data.token, next_config, opts(jido))
     result = ReAct.collect_stream(next.events)
     assert result.result == "After resume" and result.usage.total_tokens == 30
-    assert_receive {:checked_payload, %{"n" => 1}}
-    refute_receive {:checked_payload, _}, 20
+    [completed] = Enum.filter(result.trace, &(&1.kind == :tool_completed))
+    assert {:ok, %{checked: true, fingerprint: fingerprint}, []} = completed.data.result
+
+    assert fingerprint ==
+             :crypto.hash(:sha256, :erlang.term_to_binary(%{"n" => 1}, [:deterministic]))
+             |> Base.encode16(case: :lower)
 
     assert users(List.last(MockLLM.report(mock).requests)) == [
              "Save",
@@ -356,7 +360,7 @@ defmodule JidoAI.Examples.StandaloneInputTest do
 
   defp run_task(query, config, jido) do
     observer = self()
-    Task.async(fn -> JidoAI.Examples.StandaloneInput.run(query, config, jido, observer) end)
+    Task.async(fn -> JidoAI.Examples.StandaloneInput.run(query, config, %{jido: jido, observer: observer}) end)
   end
 
   defp eventually(fun, tries \\ 100)

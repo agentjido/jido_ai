@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.IncompleteResponse.Agent do
   @moduledoc "A native Agent that preserves provider response status and visible content."
-  use Jido.Agent, name: "incomplete_response_example", extensions: [Jido.AI.DSL]
+  use Jido.AI.Agent, name: "incomplete_response_example"
 
   agent do
     schema(

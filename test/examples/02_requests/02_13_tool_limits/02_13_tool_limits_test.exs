@@ -1,7 +1,8 @@
 defmodule JidoAI.Examples.ToolLimitsTest do
   use JidoAI.Examples.Case
   alias Jido.AI.{Authoring, Request}
-  alias JidoAI.Examples.ToolLimits.{Agent, Probe}
+  alias JidoAI.Examples.ToolLimits.FixtureAgent, as: Agent
+  alias JidoAI.Examples.ToolLimits.{Probe}
 
   defp call(id, n, name \\ "timed_probe"), do: %{id: id, name: name, arguments: %{n: n}}
 

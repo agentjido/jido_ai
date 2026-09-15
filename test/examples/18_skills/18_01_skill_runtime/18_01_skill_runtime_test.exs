@@ -4,7 +4,8 @@ defmodule JidoAI.Examples.SkillRuntimeTest do
   alias Jido.AI.Actions.Skill.{LoadSkill, RuntimeContext}
   alias Jido.Thread
   alias Jido.AI.Skill.{Activation, AgentIntegration, Registry, Spec}
-  alias JidoAI.Examples.SkillRuntime.{Agent, Imposter, Interceptor, Provider}
+  alias JidoAI.Examples.SkillRuntime.FixtureAgent, as: Agent
+  alias JidoAI.Examples.SkillRuntime.{Imposter, Interceptor, Provider}
 
   setup do
     start_supervised!(Registry)

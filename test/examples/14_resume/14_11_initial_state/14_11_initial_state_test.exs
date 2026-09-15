@@ -2,6 +2,11 @@ defmodule JidoAI.Examples.InitialStateTest do
   use JidoAI.Examples.Case
   alias Jido.AI.{Agent, Configuration, Context, Request}
   alias JidoAI.Examples.InitialState
+
+  setup do
+    JidoAI.Examples.ToolEvents.attach_action(InitialState.Echo)
+  end
+
   alias ReqLLM.Message.ContentPart
 
   defp saved_context(prompt) do
@@ -78,7 +83,7 @@ defmodule JidoAI.Examples.InitialStateTest do
       assert Enum.count(wire.body["messages"], &(&1["role"] == "tool")) == 1
       assert Enum.all?(MockLLM.report(mock).requests, &(&1.body["stream"] == unquote(streaming?)))
       assert length(Server.agent(restored).state.messages) == 8
-      refute_receive {:import_tool_ran, _}, 30
+      refute_received {:example_action_started, "import_echo"}
       assert_script_done(mock)
     end
   end

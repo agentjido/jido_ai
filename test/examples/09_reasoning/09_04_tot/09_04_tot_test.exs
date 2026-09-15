@@ -36,7 +36,6 @@ defmodule JidoAI.Examples.ToTTest do
     assert result.termination.reason == :max_depth and result.termination.status == "completed"
     assert result.termination.node_count == 3 and result.termination.depth_reached == 1
     assert result.usage.total_tokens == 30
-    assert_receive {:tot_checked, ^result}
     assert Server.agent(server).state.reply == result
     assert record(server, handle).meta.model_calls == 2
     assert record(server, handle).meta.tool_calls == 0

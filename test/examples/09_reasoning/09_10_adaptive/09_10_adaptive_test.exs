@@ -52,7 +52,6 @@ defmodule JidoAI.Examples.AdaptiveTest do
       assert is_float(data.meta.adaptive.complexity_score)
       assert data.meta.model_calls == length(Adaptive.script(method))
       assert data.meta.usage.total_tokens == length(Adaptive.script(method)) * 15
-      assert_receive {:adaptive_checked, ^result}
       selected = data.meta.adaptive.method
       calls = Enum.filter(events(handle), &(&1.kind == :llm_completed))
       assert Enum.all?(calls, &(&1.method == :adaptive and &1.data.selected_method == selected))
@@ -135,13 +134,12 @@ defmodule JidoAI.Examples.AdaptiveTest do
     server = start(jido)
     assert {:ok, handle} = request(server, context, "Use the tool")
     assert {:ok, "Work complete"} = Request.await(handle)
-    assert_receive {:tree_work, 4, _}
-    assert_receive {:tree_work_finished, 4}
     assert record(server, handle).meta.adaptive.strategy == :react
     assert record(server, handle).meta.tool_calls == 1
     tool_events = Enum.filter(events(handle), &(&1.kind in [:tool_started, :tool_completed]))
     assert length(tool_events) == 2
     assert Enum.all?(tool_events, &(&1.data.selected_method == :react))
+    assert Enum.find(tool_events, &(&1.kind == :tool_completed)).data.result == {:ok, %{n: 4}, []}
     assert_script_done(mock)
   end
 
@@ -203,8 +201,6 @@ defmodule JidoAI.Examples.AdaptiveTest do
     assert {:ok, handle} = request(server, context, "Explore the options")
     assert {:ok, result} = Request.await(handle)
     assert answer(:tot, result) == "Better path"
-    assert_receive {:tree_work, 8, _}
-    assert_receive {:tree_work_finished, 8}
     assert record(server, handle).meta.tool_calls == 1
     assert record(server, handle).meta.model_calls == 3
     assert record(server, handle).meta.usage.total_tokens == 45
@@ -212,6 +208,7 @@ defmodule JidoAI.Examples.AdaptiveTest do
     all = events(handle)
     tool_events = Enum.filter(all, &(&1.kind in [:tool_started, :tool_completed]))
     assert Enum.all?(tool_events, &(&1.data.selected_method == :tree_of_thoughts))
+    assert Enum.find(tool_events, &(&1.kind == :tool_completed)).data.result == {:ok, %{n: 8}, []}
 
     assert Enum.filter(all, &(&1.kind == :llm_completed)) |> Enum.map(& &1.data.reasoning_phase) ==
              [:generation, :generation, :evaluation]
@@ -306,7 +303,6 @@ defmodule JidoAI.Examples.AdaptiveTest do
     assert details.adaptive.strategy == :got
     assert details.result == "Combined conclusion"
     assert details.usage.total_tokens == 45 and Server.agent(server).state.reply == nil
-    assert_receive {:adaptive_checked, "Combined conclusion"}
     assert_script_done(mock)
   end
 

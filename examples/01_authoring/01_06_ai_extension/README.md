@@ -1,15 +1,35 @@
-# 01_06 — AI authoring extension
+# 01_06 — AI extension composition
 
-Task: author AI behavior inside the existing Agent DSL and common lowering API.
+Add AI behavior to a core Agent with `extensions: [Jido.AI.DSL]`.
 
-- [DSL source](spec.exs)
-- [Acceptance tests](../../../test/examples/01_authoring/01_06_ai_extension/01_06_ai_extension_test.exs)
+## Read the code
 
-Four enabled example tests prove compilation and live execution of the AI
-DSL, common lowering and lowered Builder/data/Agent-JSON equality, and invalid
-profile rejection before model work, and rich alias resolution at request time. The code under test is in the production
-AI package. Example tests remain excluded by default.
+Read [spec.exs](spec.exs).
+Then read the matching tests below.
 
-The source model record selects the mock server's chat protocol. It remains a
-real ReqLLM request. Source-profile JSON, stable Flow IDs, mixed routes/Plugins,
-and bounded runtime cases are covered by [01_07](../01_07_ai_runtime/README.md).
+## Run it
+
+From the package root:
+
+```sh
+mix test test/examples/01_authoring/01_06_ai_extension --include example --seed 0
+```
+
+The default test path needs no credentials or remote provider. Model cases use
+[the local HTTP/SSE server](../../support/mock_llm.ex) with real ReqLLM transport.
+Shared setup and fault fixtures stay in [test support](../../../test/examples/support).
+
+## Expected result and failure behavior
+
+A typed answer commits while existing case data remains unchanged. Invalid profile declarations fail before model work.
+
+## Limits
+
+This is the explicit core-extension form. Use `Jido.AI.Agent` for a normal static AI Agent. Definition matrices belong in the authoring suite.
+
+## Files
+
+- [01_06_ai_extension_test.exs](../../../test/examples/01_authoring/01_06_ai_extension/01_06_ai_extension_test.exs)
+- [Shared mock_llm.ex](../../support/mock_llm.ex)
+
+Previous: [01_05](../01_05_streaming/README.md) | Next: [01_07](../01_07_ai_runtime/README.md)

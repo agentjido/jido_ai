@@ -1,59 +1,36 @@
-# 02_13: Tool preflight and time limits
+# 02_13 — Tool preflight and time limits
 
-The [Agent and tools](agent.ex)
-and [example tests](../../../test/examples/02_requests/02_13_tool_limits/02_13_tool_limits_test.exs)
-use the shared model mock and real core execution. The long case holds three
-real tool processes for more than 31 seconds. It is part of the full acceptance
-run and is excluded with the other example cases by default.
+Bound tool attempts, retries and the complete request.
+
+## Read the code
+
+Read [agent.ex](agent.ex).
+Then read the matching tests below.
+
+## Run it
+
+From the package root:
 
 ```sh
-mix test --include example test/examples/02_requests/02_13_tool_limits/02_13_tool_limits_test.exs
+mix test test/examples/02_requests/02_13_tool_limits --include example --seed 0
 ```
 
-Native tools can declare their attempt and retry limits:
+The default test path needs no credentials or remote provider. Model cases use
+[the local HTTP/SSE server](../../support/mock_llm.ex) with real ReqLLM transport.
+Shared setup and fault fixtures stay in [test support](../../../test/examples/support).
 
-```elixir
-tools do
-  action MyApp.Lookup,
-    as: :lookup,
-    timeout: 45_000,
-    max_retries: 1,
-    retry_backoff: 150
-end
-```
+## Expected result and failure behavior
 
-All time values are milliseconds. A timeout must be positive; retry count and
-backoff can be zero. Omitted retry settings keep the native catalog defaults
-of zero. DSL, source data, Builder and source JSON produce the same definition
-and execute the same retries. The total request deadline bounds all attempts,
-backoff and callbacks. Each attempt also has its own shorter tool timeout.
+The complete prepared batch is validated before execution. A rejected second call starts no tool. Timeout and cancellation stop owned work.
 
-Core execution owns cleanup. A core Action timeout or Flow timeout stops the
-actual child work and carries `retry: false`. AI retains that decision, even
-when the tool has unused retries. A tool that permits another attempt can
-return `Jido.Action.Error.timeout_error(message, %{retry: true})`. The example
-executes two such attempts and a backoff whose total exceeds one attempt
-budget. Killing a tool does not reverse I/O that already occurred.
+## Limits
 
-Core timeout errors prevent an automatic retry. A tool can permit another
-attempt when it returns `Jido.Action.Error.timeout_error/2` with `retry: true`.
+A core timeout is not retried unless the error permits retry. Cancellation cannot undo external I/O. The long acceptance test exceeds 31 seconds to check the configured 45-second tool budget.
 
-The PR 260 case checks the complete batch before tool start:
+## Files
 
-- Resolve tool identities, prepare arguments, and validate the full batch.
-- Run all native operation controls for each prepared call. A rejection on the
-  second call starts no tool.
-- `:ok` permits execution. `{:error, reason}` fails the request, and
-  `{:interrupt, value}` fails it with `{:interrupt, value}`. No successful
-  result or tool-start event occurs.
+- [02_13_tool_limits_test.exs](../../../test/examples/02_requests/02_13_tool_limits/02_13_tool_limits_test.exs)
+- [public_agent_test.exs](../../../test/examples/02_requests/02_13_tool_limits/public_agent_test.exs)
+- [Shared multiply.ex](../../support/multiply.ex)
 
-Native operation controls can also return `{:interrupt, value}`. Other control
-stages still accept only `:ok` or `{:error, reason}`.
-
-The long-running case runs named Action and Flow tools plus direct
-`Jido.Exec.run/4`. Monitors and elapsed times prove that actual work survives
-and completes inside the configured 45-second budget. Shorter tests prove
-attempt timeout cleanup and total-deadline cleanup.
-
-This example covers request tool limits and preflight controls. Approval,
-resume, recovery, keepalives, and stream idle limits have separate examples.
+Previous: [02_11](../02_11_completion/README.md) | Next: [02_16](../02_16_typed_signals/README.md)

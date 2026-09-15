@@ -23,10 +23,8 @@ defmodule JidoAI.Examples.NumericInputsTest do
       assert {:ok, handle} = request(server, context)
       assert {:ok, "Read"} = Request.await(handle)
 
-      assert_receive {:numeric_input, %{count: 0, factor: 1.5, items: [%{count: -2, factor: factor}]}}
-
-      assert factor === 3.0
-      refute_receive {:numeric_input, _}, 20
+      assert_receive {:jido_ai_request_event, %{kind: :tool_started, tool_name: unquote(tool)}}
+      refute_received {:jido_ai_request_event, %{kind: :tool_started}}
 
       [_, second] = MockLLM.report(mock).requests
       assert [message] = Enum.filter(second.body["messages"], &(&1["role"] == "tool"))
@@ -45,6 +43,9 @@ defmodule JidoAI.Examples.NumericInputsTest do
 
       assert [%{status: :ok, attempts: 1, result: {:ok, %{count: 0, factor: 1.5}, []}}] =
                record.meta.tool_results
+
+      [%{result: {:ok, %{items: [%{factor: factor}]}, []}}] = record.meta.tool_results
+      assert factor === 3.0
 
       assert record.meta.model_calls == 2
       assert {:ok, %{live: nil, details: %{phase: :request_completed}}} = Session.snapshot(server)
@@ -69,7 +70,7 @@ defmodule JidoAI.Examples.NumericInputsTest do
       assert {:ok, handle} = request(server, context)
       assert {:error, reason} = Request.await(handle)
       assert Jido.AI.Error.normalize(reason).type == :validation_error
-      refute_receive {:numeric_input, _}, 20
+      refute_received {:jido_ai_request_event, %{kind: :tool_started}}
       assert length(MockLLM.report(mock).requests) == 1
       assert Server.agent(server).state.requests[handle.id].status == :failed
       assert Server.agent(server).state.reply == ""

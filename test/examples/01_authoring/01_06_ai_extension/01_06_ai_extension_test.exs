@@ -78,7 +78,7 @@ defmodule JidoAI.Examples.AIExtensionTest do
 
   test "invalid AI profiles fail before model work" do
     {mock, _context} = mock([])
-    base = Jido.Agent.new!(name: "invalid_ai_assistant", schema: JidoAI.Examples.Schema.state())
+    base = Jido.Agent.new!(name: "invalid_ai_assistant", schema: Zoi.object(%{answer: Zoi.string()}))
 
     assert {:error, error} =
              apply(Jido.AI.Authoring, :lower, [

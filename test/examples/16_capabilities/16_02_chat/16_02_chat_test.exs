@@ -1,6 +1,11 @@
 defmodule JidoAI.Examples.ChatTest do
   use JidoAI.Examples.Case
   alias JidoAI.Examples.Chat, as: Example
+
+  setup do
+    JidoAI.Examples.ToolEvents.attach_action(Example.Echo)
+  end
+
   alias Jido.AI.Actions.LLM.{Chat, Complete, Embed, GenerateObject}
   alias Jido.AI.Actions.ToolCalling.{CallWithTools, ExecuteTool, ListTools}
 
@@ -110,7 +115,7 @@ defmodule JidoAI.Examples.ChatTest do
     assert %{type: :final_answer, text: "Ready", turns: 1, usage: %{total_tokens: 30}} =
              agent.state.result
 
-    assert_receive {:chat_echo, %{label: "ready", count: 1}}
+    assert_receive {:example_action_started, "echo"}
     [first, second] = MockLLM.report(mock).requests
     assert [%{"function" => %{"name" => "label"}}] = first.body["tools"]
     assert Enum.map(second.body["messages"], & &1["role"]) == ["user", "assistant", "tool"]
@@ -124,7 +129,7 @@ defmodule JidoAI.Examples.ChatTest do
     assert {:ok, %{type: :tool_calls, tool_calls: [%{name: "label"}]}} =
              Jido.Exec.run(CallWithTools, %{prompt: "Prepare the case"}, context)
 
-    refute_receive {:chat_echo, _}, 20
+    refute_received {:example_action_started, "echo"}
     assert_script_done(mock)
   end
 
@@ -155,8 +160,8 @@ defmodule JidoAI.Examples.ChatTest do
              :assistant
            ]
 
-    assert_receive {:chat_echo, %{label: "one"}}
-    assert_receive {:chat_echo, %{label: "two"}}
+    assert_receive {:example_action_started, "echo"}
+    assert_receive {:example_action_started, "echo"}
     [_, second, third] = requests = MockLLM.report(mock).requests
     assert Enum.map(second.body["messages"], & &1["role"]) == ["user", "assistant", "tool"]
 
@@ -195,8 +200,8 @@ defmodule JidoAI.Examples.ChatTest do
 
       assert result.usage.total_tokens == (limit + 1) * 15
       refute Map.has_key?(result, :messages)
-      if limit == 1, do: assert_receive({:chat_echo, _})
-      refute_receive {:chat_echo, _}, 20
+      if limit == 1, do: assert_receive({:example_action_started, "echo"})
+      refute_received {:example_action_started, "echo"}
       assert_script_done(mock)
     end
   end
@@ -217,7 +222,8 @@ defmodule JidoAI.Examples.ChatTest do
     messages = Enum.filter(request.body["messages"], &(&1["role"] == "tool"))
     assert Enum.map(messages, & &1["tool_call_id"]) == ["unknown", "invalid"]
     assert Enum.all?(messages, &(Jason.decode!(&1["content"])["ok"] == false))
-    refute_receive {:chat_echo, _}, 20
+    # Core starts the execution attempt before schema validation rejects it.
+    assert_receive {:example_action_started, "echo"}
     assert_script_done(mock)
   end
 
@@ -231,7 +237,7 @@ defmodule JidoAI.Examples.ChatTest do
              CallWithTools.run(%{prompt: "Label", auto_execute: true}, context)
 
     assert reason.details.target == Jido.AI.Actions.ToolCalling.Decide
-    assert_receive {:chat_echo, _}
+    assert_receive {:example_action_started, "echo"}
     assert_script_done(mock)
   end
 
@@ -298,7 +304,7 @@ defmodule JidoAI.Examples.ChatTest do
     assert hd(omitted.body["messages"])["content"] == "Use the case label"
     assert explicit.body["max_tokens"] == 1024 and explicit.body["temperature"] == 0.7
     assert hd(explicit.body["messages"])["content"] == "Explicit instruction"
-    refute_receive {:chat_echo, _}, 20
+    refute_received {:example_action_started, "echo"}
     assert_script_done(mock)
   end
 
@@ -383,7 +389,7 @@ defmodule JidoAI.Examples.ChatTest do
 
     assert Enum.find(schema, &(&1.name == :count)).default == 1
     assert Enum.find(schema, &(&1.name == :label)).required == true
-    refute_receive {:chat_echo, _}, 20
+    refute_received {:example_action_started, "echo"}
     assert_script_done(mock)
   end
 
@@ -694,7 +700,6 @@ defmodule JidoAI.Examples.ChatTest do
              Server.call(server, Example.signal("message", %{prompt: "Label"}), context: context)
 
     assert agent.state.result.text == "Ready"
-    assert_receive {:chat_echo, %{label: "ready", count: 1}}
     assert_script_done(mock)
   end
 
@@ -755,7 +760,7 @@ defmodule JidoAI.Examples.ChatTest do
     agent = Server.agent(server)
     assert agent.state.result == nil
     assert agent.state.case_id == "case-17"
-    assert_receive {:chat_echo, _}
+    assert_receive {:example_action_started, "echo"}
     assert_script_done(mock)
   end
 

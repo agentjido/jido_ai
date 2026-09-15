@@ -43,7 +43,6 @@ defmodule JidoAI.Examples.TRMTest do
     assert record(server, handle).meta.model_calls == 3
     assert record(server, handle).method == :trm
     assert Server.agent(server).state.reply == "Unreviewed improvement"
-    assert_receive {:trm_checked, "Unreviewed improvement"}
     [reason, review, improve] = MockLLM.report(mock).requests
     assert reason.body["max_tokens"] == 1024 and reason.body["temperature"] == 0.2
     assert hd(reason.body["messages"])["content"] == Reasoning.default_reasoning_system_prompt()
@@ -180,7 +179,6 @@ defmodule JidoAI.Examples.TRMTest do
     assert {:error, {:failed, :unapproved, result}} = Request.await(handle)
     assert result.trm.best_answer == "First answer" and result.usage.total_tokens == 45
     assert Server.agent(server).state.reply == nil
-    assert_receive {:trm_checked, "Unreviewed improvement"}
     assert_script_done(mock)
   end
 

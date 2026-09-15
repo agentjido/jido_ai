@@ -1,15 +1,6 @@
-defmodule JidoAI.Examples.Steering.ObserveQueue do
-  @moduledoc "Exposes the owned queue for failure checks."
-  @behaviour Jido.AI.Control
-  def check(_, context) do
-    send(context.observer, {:input_queue, context.jido_ai_input_queue})
-    :ok
-  end
-end
-
 defmodule JidoAI.Examples.Steering.Agent do
   @moduledoc "Visible queued input continues one request and commits consumed history."
-  use Jido.Agent, name: "ai_steering_example", extensions: [Jido.AI.DSL]
+  use Jido.AI.Agent, name: "ai_steering_example"
 
   agent do
     schema Zoi.object(%{
@@ -38,15 +29,10 @@ defmodule JidoAI.Examples.Steering.Agent do
       end
 
       tools do
-        action JidoAI.Examples.AIRuntime.WaitTool,
-          as: :wait,
-          forward_context: [:observer],
-          timeout: 8_000
       end
 
       controls do
         timeout(10_000)
-        input(JidoAI.Examples.Steering.ObserveQueue)
       end
 
       result(nil, into: :reply)

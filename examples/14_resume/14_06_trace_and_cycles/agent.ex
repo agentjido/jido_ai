@@ -1,19 +1,6 @@
-defmodule JidoAI.Examples.TraceAndCycles.Check do
-  @moduledoc "Observe the real tool input while its event can hide secret values."
-  use Jido.Action,
-    name: "check",
-    description: "Check a supplied payload",
-    schema: Zoi.object(%{payload: Zoi.map()})
-
-  def run(%{payload: payload}, context) do
-    send(context.observer, {:checked_payload, payload})
-    {:ok, %{checked: true}}
-  end
-end
-
 defmodule JidoAI.Examples.TraceAndCycles.Agent do
   @moduledoc "The native Agent DSL uses the same tool event controls as ReAct Config."
-  use Jido.Agent, name: "trace_and_cycles", extensions: [Jido.AI.DSL]
+  use Jido.AI.Agent, name: "trace_and_cycles"
 
   agent do
     schema Zoi.object(%{result: Zoi.any() |> Zoi.default(nil)})
@@ -28,7 +15,7 @@ defmodule JidoAI.Examples.TraceAndCycles.Agent do
       end
 
       tools do
-        action JidoAI.Examples.TraceAndCycles.Check, as: :check, forward_context: [:observer]
+        action JidoAI.Examples.TraceAndCycles.Check, as: :check
       end
 
       requests do

@@ -1,13 +1,3 @@
-defmodule JidoAI.Examples.StreamUsage.Echo do
-  @moduledoc "A real tool used to separate usage from two model calls."
-  use Jido.Action, name: "usage_echo", schema: Zoi.object(%{n: Zoi.integer()})
-
-  def run(%{n: n}, context) do
-    send(context.observer, {:usage_tool, n})
-    {:ok, %{n: n}}
-  end
-end
-
 for {module, capture?} <- [
       {JidoAI.Examples.StreamUsage.Agent, true},
       {JidoAI.Examples.StreamUsage.QuietAgent, false}
@@ -15,7 +5,7 @@ for {module, capture?} <- [
   defmodule module do
     @moduledoc "A native Agent with explicit stream observation and shared model accounting."
     @capture capture?
-    use Jido.Agent, name: "stream_usage_example", extensions: [Jido.AI.DSL]
+    use Jido.AI.Agent, name: "stream_usage_example"
 
     agent do
       schema(Zoi.object(%{reply: Zoi.string() |> Zoi.default("")}))
@@ -30,7 +20,7 @@ for {module, capture?} <- [
         end
 
         tools do
-          action(JidoAI.Examples.StreamUsage.Echo, as: :usage_echo, forward_context: [:observer])
+          action(JidoAI.Examples.StreamUsage.Echo, as: :usage_echo)
         end
 
         requests do

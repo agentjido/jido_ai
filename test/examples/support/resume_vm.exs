@@ -6,12 +6,17 @@ alias JidoAI.Examples.MockLLM
 true = URI.parse(base_url).host == "127.0.0.1"
 {:ok, _} = Application.ensure_all_started(:jido_ai)
 
-# Safe ETF decoding can use only atoms already known in this VM. Load the
-# declared application code before reading a trusted signed checkpoint.
-for app <- [:jido_ai, :req_llm, :zoi] do
-  {:ok, modules} = :application.get_key(app, :modules)
-  :ok = Code.ensure_all_loaded(modules)
-end
+# Load only the checkpoint's declared data and tool modules. Loading every
+# example and test fixture is not part of a receiving application's contract.
+{:ok, modules} = :application.get_key(:jido_ai, :modules)
+
+runtime_modules =
+  Enum.filter(modules, fn module ->
+    name = Atom.to_string(module)
+    String.starts_with?(name, "Elixir.Jido.AI.") and not String.starts_with?(name, "Elixir.Jido.AI.Test.")
+  end)
+
+:ok = Code.ensure_all_loaded(runtime_modules ++ [ReqLLM.Context, ReqLLM.Message, ReqLLM.ToolCall, Add])
 
 {:ok, _} = Jido.start_link(name: :checkpoint_resume_vm)
 

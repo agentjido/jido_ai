@@ -1,42 +1,35 @@
-# 02_25: Blank failures and partial response content
+# 02_25 — Blank failures and partial content
 
-The [native Agent](agent.ex)
-declares its model, session, saved history and result field through `agent do`.
-The [16 example cases](../../../test/examples/02_requests/02_25_incomplete_response/02_25_incomplete_response_test.exs)
-use this Agent and the standalone ReAct API. They run the real ReqLLM Chat
-stream decoder against the shared model server. No live provider is required.
+Keep failed blank responses distinct from usable partial output.
+
+## Read the code
+
+Read [agent.ex](agent.ex).
+Then read the matching tests below.
+
+## Run it
+
+From the package root:
 
 ```sh
-mix test test/examples/02_requests/02_25_incomplete_response/02_25_incomplete_response_test.exs --include example
+mix test test/examples/02_requests/02_25_incomplete_response --include example --seed 0
 ```
 
-Ten cases send blank responses with five finish-reason strings through both
-APIs. The current Chat decoder maps `incomplete`, `error` and `cancelled` to
-`:error`; it retains `length` and `content_filter` as their corresponding atoms.
-The tests state that mapping. These are canonical Chat error checks, not proof
-that the Responses API preserves its exact incomplete/cancelled status.
+The default test path needs no credentials or remote provider. Model cases use
+[the local HTTP/SSE server](../../support/mock_llm.ex) with real ReqLLM transport.
+Shared setup and fault fixtures stay in [test support](../../../test/examples/support).
 
-Each blank failure retains usage, emits one failure with
-`error_type: :llm_response`, and saves only the user input. There is no successful
-model-completed event, request completion or after-model checkpoint. The
-native result field stays unchanged. Standalone execution emits a portable
-failed terminal token with the same cause and usage.
+## Expected result and failure behavior
 
-Four cases accept actual partial text and generated image bytes with a `length`
-finish reason. They retain the provider reason in the model event and save the
-usable answer. This preserves the existing rule that visible partial content
-can complete without a typed-output constraint. Two cases retain the separate
-blank successful `stop` behavior.
-
-The shared terminal check now uses `Jido.AI.Turn.result/1`, as other result
-paths already do. It sets the failure type before returning a failed blank
-response. This fixes the retained root blank-response test without changing
-its input or assertions. The first valid fixture run passed 4/16 cases: ten
-were missing failure type and two rejected partial images. All 16 now pass.
+Blank failed responses retain usage and fail without an answer commit. Usable length-limited text and image content can complete under the existing untyped contract.
 
 ## Limits
 
-The generated Agent helper returns the raw failure cause. Exact Responses status
-handling, typed partial-output validation and failed transport continuation
-remain separate required checks in [history review 07](../../../docs/v3-spike/history-reviews/07-streams-and-checkpoints.md).
-No history row is closed by this example.
+These tests exercise the Chat decoder. They do not establish exact Responses status mapping or typed partial-output acceptance. Provider finish reasons and output-control errors are different boundaries.
+
+## Files
+
+- [02_25_incomplete_response_test.exs](../../../test/examples/02_requests/02_25_incomplete_response/02_25_incomplete_response_test.exs)
+- [Shared mock_llm.ex](../../support/mock_llm.ex)
+
+Previous: [02_24](../02_24_stream_usage/README.md) | Next: [02_27](../02_27_thread_session_values/README.md)

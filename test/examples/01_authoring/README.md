@@ -3,6 +3,10 @@
 These tests run the source examples in `examples/01_authoring`. They use the
 `:example` tag and do not run with the normal `mix test` command.
 
+The first five lessons cover one answer, tools, structured output, controls, and
+streaming. They exercise the public AI runtime. Complete definition and format
+matrices remain in [the authoring suite](../../authoring).
+
 | Feature guide | Tests |
 | --- | --- |
 | [01_01_authoring_formats](../../../examples/01_authoring/01_01_authoring_formats/README.md) | [01_01_authoring_formats_test.exs](01_01_authoring_formats/01_01_authoring_formats_test.exs) |

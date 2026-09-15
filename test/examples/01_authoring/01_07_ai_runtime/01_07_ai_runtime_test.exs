@@ -1,5 +1,5 @@
 defmodule JidoAI.Examples.AIRuntimeTest do
-  use JidoAI.Examples.Case, async: true
+  use JidoAI.Examples.Case
   alias JidoAI.Examples.AIRuntime
   alias Jido.AI.{Authoring, Profile}
 
@@ -7,23 +7,30 @@ defmodule JidoAI.Examples.AIRuntimeTest do
     Jido.Agent.new!(
       name: "ai_runtime_data",
       schema: AIRuntime.Agent.definition().schema,
-      plugins: [AIRuntime.Audit],
-      routes: [{"case.close", AIRuntime.Close}]
+      plugins: [JidoAI.Examples.Support.CommitCounter],
+      routes: [{"case.close", JidoAI.Examples.Support.CloseCase}]
     )
   end
 
   defp profile do
-    {Jido.AI.Runtime.Plugin, options} =
-      Enum.find(AIRuntime.Agent.definition().plugins, fn {module, _options} ->
-        module == Jido.AI.Runtime.Plugin
-      end)
+    profile = Jido.AI.Agent.profile(AIRuntime.Agent, :assistant) |> Map.from_struct()
 
-    options[:profiles].assistant |> Map.from_struct() |> Map.put(:routes, ["ai.ask"])
+    controls =
+      Map.merge(profile.controls, %{
+        input: [AIRuntime.Record],
+        model: [AIRuntime.Record],
+        operation: [AIRuntime.Record],
+        output: [AIRuntime.Record]
+      })
+
+    %{profile | controls: controls} |> Map.put(:routes, ["ai.ask"])
   end
 
   defp start(jido, profile) do
     {:ok, definition} = Authoring.lower(base(), [profile])
-    start_agent(jido, Jido.Agent.instantiate!(definition))
+    server = start_agent(jido, Jido.Agent.instantiate!(definition))
+    observe_tools()
+    server
   end
 
   test "DSL helper executes Action and Flow tools and preserves Plugin ownership", %{jido: jido} do
@@ -36,12 +43,13 @@ defmodule JidoAI.Examples.AIRuntimeTest do
       mock([%{reply: {:tools, calls}}, %{reply: {:object, %{answer: "6 and 20"}}}])
 
     server = start_agent(jido, AIRuntime.Agent.new!())
+    observe_tools()
 
     assert {:ok, %{state: %{reply: %{answer: "6 and 20"}, case_id: "case-42", commits: 1}}} =
              AIRuntime.Agent.answer(server, "Calculate", context: context)
 
-    assert_receive {:tool_executed, 2, 3}
-    assert_receive {:tool_executed, 4, 5}
+    assert_receive {:example_tool_started, "multiply"}
+    assert_receive {:example_tool_started, "quote"}
 
     assert {:ok, %{state: %{case_id: "closed", commits: 2}}} =
              AIRuntime.Agent.close(server, "closed")
@@ -93,11 +101,11 @@ defmodule JidoAI.Examples.AIRuntimeTest do
       Jido.Codec.Registry.new!(%{
         "agents/core" => {:agent, Jido.Agent},
         "schemas/domain" => {:schema, definition.schema},
-        "plugins/audit" => {:plugin, AIRuntime.Audit},
+        "plugins/audit" => {:plugin, JidoAI.Examples.Support.CommitCounter},
         "plugins/ai" => {:plugin, Jido.AI.Runtime.Plugin},
         "plugins/session" => {:plugin, Jido.AI.Session.Plugin},
         "actions/assistant-v1" => {:action, target},
-        "actions/close" => {:action, AIRuntime.Close},
+        "actions/close" => {:action, JidoAI.Examples.Support.CloseCase},
         "actions/configure" => {:action, Jido.AI.Configuration.Apply},
         "atoms/operation" => {:atom, :operation},
         "atoms/register" => {:atom, :register},
@@ -251,7 +259,7 @@ defmodule JidoAI.Examples.AIRuntimeTest do
       before = Server.snapshot(server)
       assert {:error, _} = ask(server, context)
       assert Server.snapshot(server) == before
-      refute_received {:tool_executed, _, _}
+      refute_received {:example_tool_started, _}
       assert_script_done(mock)
     end
   end
@@ -261,7 +269,7 @@ defmodule JidoAI.Examples.AIRuntimeTest do
     {mock, context} = mock([%{reply: {:tools, calls}}])
     server = start(jido, put_in(profile(), [:controls, :operation], [AIRuntime.Reject]))
     assert {:error, _} = ask(server, context)
-    refute_received {:tool_executed, _, _}
+    refute_received {:example_tool_started, _}
     assert_script_done(mock)
   end
 
@@ -349,7 +357,7 @@ defmodule JidoAI.Examples.AIRuntimeTest do
     server = start(jido, put_in(profile(), [:controls, :max_iterations], 1))
     before = Server.snapshot(server)
     assert {:error, _} = ask(server, context)
-    assert_receive {:tool_executed, 2, 3}
+    assert_receive {:example_tool_started, "multiply"}
     assert Server.snapshot(server) == before
     assert_script_done(mock)
   end
@@ -471,8 +479,8 @@ defmodule JidoAI.Examples.AIRuntimeTest do
       :forward_context,
       :observer,
       :temperature,
-      JidoAI.Examples.ToolFlow.Multiply,
-      JidoAI.Examples.ToolFlow.Quote,
+      JidoAI.Examples.Support.Multiply,
+      JidoAI.Examples.Authoring.Support.Quote,
       AIRuntime.Record
     ]
 

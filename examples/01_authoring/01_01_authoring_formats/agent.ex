@@ -1,26 +1,30 @@
-defmodule JidoAI.Examples.AuthoringFormats.Flow do
-  @moduledoc "A model result becomes complete Agent state at the last step."
-  use Jido.Flow, name: "v3_example_authoring", schema: JidoAI.Examples.Schema.prompt()
-
-  flow do
-    step "model", action: JidoAI.Examples.Generate, params: %{query: input(:query)}
-    step "candidate", action: JidoAI.Examples.Commit, params: result("model")
-    output result("candidate")
-  end
-end
-
 defmodule JidoAI.Examples.AuthoringFormats.Agent do
-  @moduledoc "01_01: Core authoring forms use the same Flow and live commit."
-  use Jido.Agent, name: "v3_example_authoring_agent"
+  @moduledoc "One question produces one committed answer through the public AI runtime."
+  use Jido.AI.Agent, name: "v3_example_authoring_agent"
 
   agent do
-    schema JidoAI.Examples.Schema.state()
+    schema Zoi.object(%{
+             answer: Zoi.string() |> Zoi.default(""),
+             case_id: Zoi.string() |> Zoi.default("case-42")
+           })
+
+    ai :assistant do
+      model "openai:gpt-4o-mini"
+      instructions "Give a short answer."
+
+      controls do
+        timeout 5_000
+        max_model_calls 1
+      end
+
+      result into: :answer
+    end
   end
 
   routes do
-    signal_source "/examples/ai"
+    signal_source "/examples/ai/01_authoring/01_01"
 
-    route "ai.ask", JidoAI.Examples.AuthoringFormats.Flow do
+    route "examples.ai.01_01.answer", ai: :assistant do
       define :answer, args: [:query]
     end
   end

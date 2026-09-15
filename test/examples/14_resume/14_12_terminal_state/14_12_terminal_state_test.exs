@@ -4,6 +4,10 @@ defmodule JidoAI.Examples.TerminalStateTest do
   alias Jido.AI.Reasoning.ReAct
   alias JidoAI.Examples.TerminalState
 
+  setup do
+    JidoAI.Examples.ToolEvents.attach_action(TerminalState.Echo)
+  end
+
   defp submit(server, context, query) do
     Request.create_and_send(server, query,
       signal_type: "ai.ask",
@@ -65,8 +69,8 @@ defmodule JidoAI.Examples.TerminalStateTest do
       server = start_agent(jido, unquote(module).new!())
       assert {:ok, request} = submit(server, Map.put(context, :failure, raw), "Use the tool")
       assert Request.await(request) == expected
-      assert_receive {:terminal_tool, 5}, 2_000
-      refute_receive {:terminal_tool, _}, 30
+      assert_receive {:example_action_started, "terminal_echo"}, 2_000
+      refute_received {:example_action_started, "terminal_echo"}
       assert {:ok, view} = Session.snapshot(server)
       assert view.live == nil and view.details.active_request_id == nil
       assert view.request.status == status
@@ -104,7 +108,7 @@ defmodule JidoAI.Examples.TerminalStateTest do
       assert saved.live == nil and saved.details.active_request_id == nil
       assert saved.details.phase == phase
       assert length(MockLLM.report(mock).requests) == 2
-      refute_receive {:terminal_tool, _}, 30
+      refute_received {:example_action_started, "terminal_echo"}
 
       assert {:ok, next} = submit(restored, context, "Continue")
       assert {:ok, "Next"} = Request.await(next)
@@ -116,7 +120,7 @@ defmodule JidoAI.Examples.TerminalStateTest do
       wires = MockLLM.report(mock).requests
       assert Enum.all?(wires, &(&1.body["stream"] == unquote(stream?)))
       assert Enum.count(List.last(wires).body["messages"], &(&1["role"] == "tool")) == 1
-      refute_receive {:terminal_tool, _}, 30
+      refute_received {:example_action_started, "terminal_echo"}
       assert_script_done(mock)
     end
   end

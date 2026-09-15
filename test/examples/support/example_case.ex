@@ -34,6 +34,15 @@ defmodule JidoAI.Examples.Case do
     server
   end
 
+  # Keep provider substitution in test support, not in the teaching Agent.
+  def native_mock(script) do
+    {server, _context} = mock(script)
+
+    {server, %{ai: %{assistant: %{options: JidoAI.Examples.MockLLM.options(server)}}}}
+  end
+
+  def observe_tools, do: JidoAI.Examples.ToolEvents.attach()
+
   def ask(server, context) do
     Jido.AgentServer.call(server, signal(), context: context, timeout: 10_000)
   end

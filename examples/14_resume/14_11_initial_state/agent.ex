@@ -1,21 +1,9 @@
-defmodule JidoAI.Examples.InitialState.Echo do
-  use Jido.Action,
-    name: "import_echo",
-    description: "Report any new tool execution",
-    schema: Zoi.object(%{value: Zoi.integer()})
-
-  def run(%{value: value}, context) do
-    send(context.observer, {:import_tool_ran, value})
-    {:ok, %{value: value}}
-  end
-end
-
 for {module, stream} <- [
       {JidoAI.Examples.InitialState.Buffered, false},
       {JidoAI.Examples.InitialState.Streamed, true}
     ] do
   defmodule module do
-    use Jido.Agent, name: "initial_state", extensions: [Jido.AI.DSL]
+    use Jido.AI.Agent, name: "initial_state"
     @stream stream
 
     agent do
@@ -37,8 +25,7 @@ for {module, stream} <- [
 
         tools do
           action(JidoAI.Examples.InitialState.Echo,
-            as: :import_echo,
-            forward_context: [:observer]
+            as: :import_echo
           )
         end
 
@@ -66,7 +53,7 @@ for {module, stream} <- [
 end
 
 defmodule JidoAI.Examples.InitialState.Profiles do
-  use Jido.Agent, name: "initial_profiles", extensions: [Jido.AI.DSL]
+  use Jido.AI.Agent, name: "initial_profiles"
 
   agent do
     schema(

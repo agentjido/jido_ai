@@ -1,7 +1,8 @@
 defmodule JidoAI.Examples.CompletionTest do
   use JidoAI.Examples.Case
   alias Jido.AI.Request
-  alias JidoAI.Examples.Completion.{Agent, Ledger, Store}
+  alias JidoAI.Examples.Completion.FixtureAgent, as: Agent
+  alias JidoAI.Examples.Completion.{Ledger, Store}
 
   defp start(jido, limit \\ nil, plugin_opts \\ []) do
     definition = Agent.definition()

@@ -29,9 +29,7 @@ defmodule JidoAI.Examples.ModelOptionsTest do
         assert Enum.map(Enum.filter(events, &(&1.kind == kind)), & &1.data.model) == labels
       end
 
-      assert_receive {:provider_tool, 1}
-      assert_receive {:provider_tool, 2}
-      for iteration <- 1..3, do: assert_receive({:provider_transform, ^iteration, _})
+      assert Enum.count(events, &(&1.kind == :tool_completed)) == 2
       deltas = Enum.filter(events, &(&1.kind == :llm_delta))
 
       if unquote(streaming?),

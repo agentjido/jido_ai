@@ -3,7 +3,7 @@ defmodule JidoAI.Examples.FailurePositionTest do
   alias Jido.AI.{Request, Session}
   alias Jido.AI.Reasoning.ReAct
   alias ReAct.{Config, Token}
-  alias JidoAI.Examples.FailurePosition, as: Example
+  alias JidoAI.Examples.FailurePosition.Fault, as: Example
   alias JidoAI.Examples.StandaloneAuthoring.Add
   alias JidoAI.Examples.CheckpointResume
 
@@ -196,6 +196,7 @@ defmodule JidoAI.Examples.FailurePositionTest do
   end
 
   defp assert_position(result, config, position, calls, new_calls \\ nil) do
+    assert {:ok, ^position} = JidoAI.Examples.FailurePosition.saved_position(result.final_token, config)
     assert {:ok, state, _} = Token.decode_state(result.final_token, config)
     assert state.iteration == position
     terminal = Enum.find(result.trace, &Request.Stream.terminal_kind?(&1.kind))

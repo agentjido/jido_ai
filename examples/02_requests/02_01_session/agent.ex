@@ -1,15 +1,6 @@
-defmodule JidoAI.Examples.Session.ObserveOwner do
-  @moduledoc "Exposes the resource owner to the example's failure checks."
-  @behaviour Jido.AI.Control
-  def check(_, context) do
-    {owner, id, _} = context.jido_ai_events
-    send(context.observer, {:session_owner, owner, id})
-    :ok
-  end
-end
-
 defmodule JidoAI.Examples.Session.Agent do
   @moduledoc "A request session can run while ordinary domain commands commit."
+  # This lesson composes the core extension with explicit Request helpers.
   use Jido.Agent, name: "ai_session_example", extensions: [Jido.AI.DSL]
 
   agent do
@@ -18,7 +9,7 @@ defmodule JidoAI.Examples.Session.Agent do
              case_id: Zoi.string() |> Zoi.default("open")
            })
 
-    plugin JidoAI.Examples.AIRuntime.Audit
+    plugin JidoAI.Examples.Support.CommitCounter
 
     ai :assistant do
       instructions("Use tools when required.")
@@ -39,16 +30,10 @@ defmodule JidoAI.Examples.Session.Agent do
 
       controls do
         timeout(10_000)
-        input(JidoAI.Examples.Session.ObserveOwner)
       end
 
       tools do
-        action JidoAI.Examples.ToolFlow.Multiply, as: :multiply, forward_context: [:observer]
-
-        action JidoAI.Examples.AIRuntime.WaitTool,
-          as: :wait,
-          forward_context: [:observer],
-          timeout: 8_000
+        action JidoAI.Examples.Support.Multiply, as: :multiply
       end
 
       result(nil, into: :reply)
@@ -59,7 +44,7 @@ defmodule JidoAI.Examples.Session.Agent do
     signal_source "/examples/ai/session"
     route "ai.ask", ai(:assistant)
 
-    route "case.close", JidoAI.Examples.AIRuntime.Close do
+    route "case.close", JidoAI.Examples.Support.CloseCase do
       define :close, args: [:reason]
     end
   end

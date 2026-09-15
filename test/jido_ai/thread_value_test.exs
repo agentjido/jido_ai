@@ -19,7 +19,8 @@ defmodule Jido.ThreadValueTest do
     session = Session.new(now: 10)
     assert Session.append(session, nil) == session
     assert Session.append(session, []) == session
-    assert Session.close(Session.close(session)) == Session.close(session)
+    closed = Session.close(session)
+    assert Session.close(closed) == closed
   end
 
   test "Entry rejects invalid input and decodes supported kind forms" do

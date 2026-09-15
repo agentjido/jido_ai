@@ -1,65 +1,37 @@
-# 02_11: Completion commit and failure
+# 02_11 — Completion and post-commit failure
 
-The [Agent and Plugin](agent.ex),
-[storage adapter](store.ex), and
-[11 example tests](../../../test/examples/02_requests/02_11_completion/02_11_completion_test.exs)
-use the shared HTTP model mock and real core validation, commits and storage
-callbacks.
+Distinguish an answer commit from later Directive delivery.
+
+## Read the code
+
+Read [agent.ex](agent.ex), then [receipt.ex](receipt.ex), then [receipts.ex](receipts.ex), then [record_receipt.ex](record_receipt.ex).
+Then read the matching tests below.
+
+## Run it
+
+From the package root:
 
 ```sh
-mix test --include example test/examples/02_requests/02_11_completion/02_11_completion_test.exs
+mix test test/examples/02_requests/02_11_completion --include example --seed 0
 ```
 
-Core replies to an Agent call after the state commit. It then dispatches the
-Directives. The AI request owner now observes that reply. It can detect a
-failed completion commit without repeating model or tool work.
+The default test path needs no credentials or remote provider. Model cases use
+[the local HTTP/SSE server](../../support/mock_llm.ex) with real ReqLLM transport.
+Shared setup and fault fixtures stay in [test support](../../../test/examples/support).
 
-The example proves these cases:
+## Expected result and failure behavior
 
-- A Plugin can reject final state reduction, or produce state that exceeds
-  the Agent limit. AI submits a failure record with no original tool effects.
-  Tool execution and the rejected effect reduction occur only once. The Agent
-  accepts a later request.
-- An oversized answer becomes a small failure record. A new pending record
-  reserves 512 string bytes for that failure. Completion and cancellation
-  release those bytes. If full failure details do not fit, the stored error is
-  `{:completion_failed, :details_elided}` and metadata is
-  `%{completion: %{details_elided?: true}}`. The answer is not stored as success.
-- Another Turn can fill the state to its exact byte limit while the model
-  waits. The small failure still fits, and the other Turn's changes remain.
-  If the reserve cannot fit at admission, no model work starts.
-- A post-commit Directive failure preserves the committed answer. Core stops
-  the remaining Directive batch. AI emits one completed event and does not
-  repeat the effects. `Request.await` confirms the answer commit; it does not
-  confirm that every post-commit Directive succeeded.
-- A Plugin that denies every settlement causes one failed stream event with
-  `committed?: false`. Await returns `{:error, {:completion_uncommitted, reason}}`.
-  The actual stored request stays pending. A later explicit cancellation can
-  update it without sending a second terminal stream event.
-- A storage conflict makes core stop the Agent. The last stored request stays
-  pending, and AI does not submit another completion write against the stale
-  revision. Await on the stopped PID reports `:agent_server_unavailable`.
-- A storage adapter can save the answer and then return an indeterminate
-  result or raise before returning its reply. Core stops the Agent. The stored
-  answer can be loaded, but the pending Directives were not dispatched and AI
-  did not repeat the tool or completion write. Await on the stopped PID reports
-  `:agent_server_unavailable`.
-- A pending record without a reservation is marked interrupted during
-  activation.
+The authored Agent commits a receipt count and its answer together. Both the
+Agent and reasoning effect policies must permit the receipt Directive.
+The fault tests separately prove that a failed completion commit retains a small failure record when space permits. A post-commit dispatch failure does not undo the answer or repeat tool work.
 
-When the owner observes an unknown call or storage result before it stops, its
-failure is `{:completion_uncertain, reason}` with `committed?: :unknown`.
-Terminal delivery is not guaranteed after owner or Agent loss. Do not treat a
-missing reply as proof that storage did not change.
+## Limits
 
-The storage fixture selects the actual terminal request write from the core
-checkpoint and counts completion attempts separately from observation writes.
-Automatic Signal publication adds normal core commits. A lost completion
-reply increments the fixture attempt count after core selected the stored
-revision. The tests prove that the difference is one and that the completion
-attempt is not repeated.
+A storage result can be uncertain even when data was saved. Await confirms request state, not delivery of every effect. Fault adapters in the tests are not durable storage.
 
-The storage adapter is an in-memory fault fixture. It exercises the real core
-storage protocol; it is not durable disk storage. This example does not cover
-full recovery, sink recovery, every cancellation and storage failure, or
-durable post-commit work.
+## Files
+
+- [02_11_completion_test.exs](../../../test/examples/02_requests/02_11_completion/02_11_completion_test.exs)
+- [public_lessons_test.exs](../../../test/examples/02_requests/02_11_completion/public_lessons_test.exs)
+
+Previous: [02_02](../02_02_steering/README.md) | Next: [02_13](../02_13_tool_limits/README.md)

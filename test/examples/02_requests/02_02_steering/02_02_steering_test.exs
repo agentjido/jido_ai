@@ -12,8 +12,17 @@ defmodule JidoAI.Examples.SteeringTest do
 
   defp start(jido, changes \\ %{}) do
     definition = Agent.definition()
-    {_, options} = Enum.find(definition.plugins, &(elem(&1, 0) == Jido.AI.Runtime.Plugin))
-    profile = options[:profiles].assistant |> Map.from_struct() |> Map.merge(changes)
+    profile = Jido.AI.Agent.profile(Agent, :assistant) |> Map.from_struct()
+
+    profile = %{
+      profile
+      | controls: Map.put(profile.controls, :input, [JidoAI.Examples.Steering.ObserveQueue]),
+        tools: [
+          %{name: "wait", target: JidoAI.Examples.AIRuntime.WaitTool, forward_context: [:observer], timeout: 8_000}
+        ]
+    }
+
+    profile = Map.merge(profile, changes)
 
     {:ok, definition} =
       Jido.AI.Authoring.lower(
@@ -38,7 +47,7 @@ defmodule JidoAI.Examples.SteeringTest do
         %{reply: {:text, "History retained"}}
       ])
 
-    server = start_agent(jido, Agent.new!())
+    server = start(jido)
     {:ok, request, events} = API.ask_stream(server, "Review the code", context: context)
     id = request.id
     assert_receive {:tool_waiting, tool, 7}, 2_000
@@ -269,16 +278,21 @@ defmodule JidoAI.Examples.SteeringTest do
     {:ok, request} = API.ask(server, "Report", context: context)
     assert_receive {:input_queue, queue}, 2_000
     assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
+    JidoAI.Examples.ToolEvents.attach_action(Jido.AI.Session.ControlAction)
     :sys.suspend(queue)
 
     result =
       try do
-        Session.steer(request, "Delayed input", timeout: 10)
+        Session.steer(request, "Delayed input", timeout: 1_000)
       after
         :sys.resume(queue)
       end
 
     assert {:error, _} = result
+    assert_receive {:example_action_started, "ai_session_control"}, 2_000
+    # The caller timed out, but the admitted control Turn still runs. Wait for
+    # its queue write before allowing the model to finish and seal the queue.
+    assert pending_before?(queue, System.monotonic_time(:millisecond) + 2_000)
     MockLLM.release(mock, :held)
     assert {:ok, "After timeout"} = Request.await(request)
     assert texts(server) == ["Report", "Delayed input"]
@@ -325,6 +339,14 @@ defmodule JidoAI.Examples.SteeringTest do
     assert {:ok, %{answer: "Repaired"}} = Request.await(request)
     assert texts(server) == ["Report"]
     assert_script_done(mock)
+  end
+
+  defp pending_before?(queue, deadline) do
+    cond do
+      Jido.AI.PendingInputServer.has_pending?(queue) -> true
+      System.monotonic_time(:millisecond) >= deadline -> false
+      true -> pending_before?(queue, deadline)
+    end
   end
 
   test "history fields and steering policy fail at the authoring boundary" do

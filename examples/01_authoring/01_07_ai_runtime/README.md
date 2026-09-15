@@ -1,20 +1,39 @@
-# 01_07 — Production AI runtime
+# 01_07 — AI profiles and core composition
 
-- [Agent and controls](agent.ex)
-- [Example tests](../../../test/examples/01_authoring/01_07_ai_runtime/01_07_ai_runtime_test.exs)
+Combine a typed AI result, Action and Flow tools, and Plugin-owned state.
 
-The AI block declares named models, generation options, Action and Flow tools,
-ordered controls, concurrency limits and typed output with bounded repair.
-Ordinary routes and a Plugin share the same core Agent. Core commits the complete
-candidate only after the Flow succeeds. A terminal Action now carries that
-candidate and any typed Directives across the core commit boundary.
+## Read the code
 
-Tests check real tool IDs and results in the next model input, source-profile
-JSON with host Registry IDs, a stored AI entry Action, repair feedback,
-model and iteration budgets, full-batch preflight, each control boundary,
-concurrency, cancellation and child cleanup, a blocked-control deadline,
-provider errors, route defaults, and malformed definitions. A separate case
-checks redaction of provider structs in output errors.
+Read [agent.ex](agent.ex).
+Then read the matching tests below.
 
-This is one-Turn execution. Session requests, streaming, steering, approval,
-and recovery use their own profiles and examples.
+## Run it
+
+From the package root:
+
+```sh
+mix test test/examples/01_authoring/01_07_ai_runtime --include example --seed 0
+```
+
+The default test path needs no credentials or remote provider. Model cases use
+[the local HTTP/SSE server](../../support/mock_llm.ex) with real ReqLLM transport.
+Shared setup and fault fixtures stay in [test support](../../../test/examples/support).
+
+## Expected result and failure behavior
+
+Tool results reach the next model call. The commit counter advances only on successful core commits. Rejected work preserves the prior domain result.
+
+## Limits
+
+This is one-Turn execution. Session steering, streaming and restore are separate lessons. Test observers and barriers are supplied only by the tests.
+
+## Files
+
+- [01_07_ai_runtime_test.exs](../../../test/examples/01_authoring/01_07_ai_runtime/01_07_ai_runtime_test.exs)
+- [Shared quote.ex](../support/quote.ex)
+- [Shared close_case.ex](../../support/close_case.ex)
+- [Shared commit_counter.ex](../../support/commit_counter.ex)
+- [Shared mock_llm.ex](../../support/mock_llm.ex)
+- [Shared multiply.ex](../../support/multiply.ex)
+
+Previous: [01_06](../01_06_ai_extension/README.md) | Next: [01_08](../01_08_model_helpers/README.md)

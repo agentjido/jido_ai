@@ -46,7 +46,7 @@ defmodule JidoAI.Examples.StandaloneRuntimeTest do
       ])
 
     config = config(mock, tools: %{"sum" => Add})
-    result = JidoAI.Examples.StandaloneRuntime.run("Sum", config, jido, self())
+    result = JidoAI.Examples.StandaloneRuntime.run("Sum", config, %{jido: jido, observer: self()})
     assert result.result == "Nine" and result.usage.total_tokens == 30
     assert_receive {:standalone_add, _, 4, 5}
     assert Enum.count(result.trace, &(&1.kind == :tool_completed)) == 1
