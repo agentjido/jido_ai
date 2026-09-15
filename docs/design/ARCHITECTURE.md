@@ -1,340 +1,505 @@
 # Jido AI architecture
 
-> High-level current-state map and target reconciliation guide.
-> Review status: Pending approval. Source review: 2026-09-15, `v3-spike`, HEAD `c4e57c8d`.
-> The reviewed worktree includes the uncommitted Orchestration rename.
-> This document does not certify the complete target requirement set.
+> Start here for the package architecture.
+> Review status: Pending approval. Code baseline: `53d19f77` on `v3-spike`.
+> This overview consolidates the former `architecture-seams.md`.
+> Detailed requirements and evidence remain in the numbered seam folders.
 
-## 1. How to read this map
+## 1. The central distinction
 
-Code is the current baseline. Examples and their tests show specific behavior.
-Designs preserve the complete target, including advanced work.
+**Session and Thread hold interaction data. Runtime executes. Reasoning selects
+steps. Orchestration controls live requests. Core Jido validates and commits.**
 
-The [design index](README.md) maps the existing folders and owns document
-approval. Each seam's alignment file owns detailed evidence and gaps. This
-overview explains the connections; it does not create another public API.
+There is one main authoring model: `Jido.AI.Agent` + DSL + Profile.
+Capabilities and skills extend that model. They do not introduce another Agent
+or execution framework. All eight reasoning methods and standalone ReAct remain
+in scope.
 
-Module names below use the `Jido.AI.` prefix unless written in full.
+This document separates three things:
 
-## Selected direction, not yet implemented
+- **Current:** behavior or structure present in the source.
+- **Selected direction:** a discussed design choice, not a claim of implementation.
+- **Open:** a contract that still needs a decision or evidence.
 
-[Complete the runtime split](04_ai_execution/design.md#selected-direction-complete-the-runtime-split):
-Runtime owns common execution, limits, usage, and output validation/repair.
-Reasoning remains one Profile-selected internal dispatcher with method-owned
-validated state and diagnostics. ReAct conversion and tokens stay in the
-standalone adapter. Shared transformers move to a common execution view and
-Profile; callback compatibility is open. No new registry or execution framework
-is selected. The current-state map below does not claim this work is complete.
+Document approval is separate from all three. The [design index](README.md)
+owns approval status and the dependency graph. Every seam has a briefing,
+a target design, and an alignment file. This overview introduces no new
+requirement IDs and does not approve the detailed targets.
 
-## Data-focused foundation
-
-The [selected direction](00_boundary_invariants/design.md#selected-direction-data-focused-foundation)
-places validated data, stable identity, explicit order, and explicit state
-changes before process and adapter structure. The proposed private request
-boundary uses [batches and receipts](01_ai_values/design.md#proposed-entry-batch-and-receipt-values),
-not another conversation store. [Orchestration](07_request_sessions/design.md#proposed-data-boundary)
-owns lifetime and ordered commit coordination; core validates and commits.
-Detailed adapter, duplicate, and recovery contracts remain proposals.
-
-## Selected conversation commit policy
-
-[Retain evidence; promote only on success](07_request_sessions/design.md#selected-conversation-commit-policy).
-The canonical log retains admitted input, consumed steering, and committed
-intermediate work. Default model context advances only after successful
-settlement. Failure and cancellation do not advance it; unresolved tool
-exchanges stay out. Parent Coordinator accepts delegated results once while
-the parent request is active. This policy is selected but not fully implemented.
-
-## Selected capability policy
-
-[Required stages are explicit](08_capabilities_policy/design.md#selected-policy-stage-direction).
-Shared preparation validates declarations, applies required stages only, and
-rejects unavailable stages without an implicit fallback. Profile-bound and
-defaults-bound inputs remain distinct behind one internal preparation result.
-Detailed stage order still needs core callback review.
-
-## Selected request and attempt policy
-
-[Logical request identity survives retry/resume](07_request_sessions/design.md#selected-request-and-attempt-meanings).
-Each restarted or resumed execution gets a new attempt identity, with prior
-outcomes retained. Execution, commit, and delivery failures have distinct
-meanings. Uncertain effects block automatic retry without evidence, supported
-deduplication, or explicit caller authority. Cancellation is not proof that
-effects stopped. Data representation remains open.
-
-## Selected content permissions
-
-[Destination-specific permissions](12_observation_diagnostics/design.md#selected-content-permissions)
-default off for rich content, reasoning, and diagnostics. Stream permission
-does not permit storage. Reasoning permissions are separately trusted.
-Diagnostics needs trusted access and explicit content permission. Telemetry
-never includes content. Permitted paths still remove credentials and enforce
-size limits; native execution data is unchanged.
-
-## Selected runtime resource ownership
-
-[One AI resource owner per AgentServer](06_runtime_signal_integration/design.md#selected-ai-runtime-resource-ownership)
-uses core Plugin supervision and explicit worker bindings. Request workers use
-the selected Jido Task Supervisor; Coordinator keeps cancellation and commits.
-[Activations are Session-scoped](09_skills_resources/design.md#selected-resource-and-activation-ownership),
-not request-scoped. Restart survival remains open. MockLLM uses explicit
-request options through the same runtime path.
-
-## 2. Package boundary
+## 2. Package boundaries
 
 | Owner | Responsibility |
 | --- | --- |
-| `jido_ai` | AI authoring, model integration, tools, reasoning, request orchestration, AI policy, and canonical Session/Thread values |
-| Core `jido` | Agent values, AgentServer, Plugin contracts, state validation and commit, directives, Agent lifecycle and topology |
+| `jido_ai` | AI authoring, models, tools, reasoning, request orchestration, policy, and canonical Session/Thread values |
+| Core `jido` | Agent values, AgentServer, Plugins, candidate validation, commits, directives, supervision, and topology |
 | `jido_action` | Actions, Instructions, Flow graphs, and in-memory Exec |
-| `jido_signal` | Signal envelope, routing, dispatch, and local bus |
+| `jido_signal` | Signal envelope, serialization, routing, dispatch, and local bus |
 | ReqLLM / LLMDB | Native provider and model contracts |
-| Host application | Durable stores, credentials, external services, business policy, and deployment |
+| `jido_browser` | Browser adapters and browser Actions consumed through the normal tool bridge |
+| Host application | Credentials, external services, durable stores, deployment, business policy, and durable orchestration |
 
-AI orchestration uses core commit and lifecycle contracts. It does not replace
-AgentServer, introduce a generic job scheduler, or promise durable workflow
-execution. A module named `Plugin` can be required integration, not an optional
-feature.
+Jido AI supplies AI decisions and data to lower-package execution contracts.
+It does not replace AgentServer, Flow, Exec, or Signal transport. External work
+before commit has no implied rollback. A checkpoint cannot undo a tool effect.
 
-Source: [package overview](../../lib/jido_ai.ex),
-[authoring lowering](../../lib/jido_ai/authoring.ex),
-[shared execution](../../lib/jido_ai/runtime/flow.ex).
+See [boundary design](00_boundary_invariants/design.md) and
+[boundary evidence](00_boundary_invariants/alignment.md).
 
-## 3. Main values and state owners
+## 3. Values, state, and process owners
 
-| Value or state | Meaning | Owner |
+| Value or owner | Role | Not its role |
 | --- | --- | --- |
-| `Profile` | Validated model, tool, method, limit, result, and memory configuration | Authoring, seam 10 |
-| `Jido.Session` | Portable interaction value that owns one Thread | Values, seam 01 |
-| `Jido.Thread` / `Jido.Thread.Entry` | Ordered interaction log and its entries | Values, seam 01 |
-| `Query`, `Turn`, `Output`, `Usage` | AI input, normalized response, output contract, and usage | Values, seam 01 |
-| `Request.Handle` / `Request.Stream` | Local access to admitted work and its events | Orchestration, seam 07 |
-| `Orchestration.Record` | Validated request map retained in Agent state; pending/completed/failed status | Orchestration, seam 07 |
-| `Runtime.State` | Temporary validated execution map, including ReqLLM context | Execution, seam 04 |
-| `Reasoning.ReAct.State` / `Token` | Standalone adapter state and resume encoding | Recovery, seam 11 |
+| `Profile` | Validated model, tool, method, limits, output, and memory configuration | Live service container |
+| `Jido.Session` | Portable interaction value owning one Thread | Request process or worker |
+| `Jido.Thread` / `Entry` | Ordered canonical interaction log | Second execution engine |
+| `Query`, `Turn`, `Output`, `Usage` | AI input, normalized response, output contract, and usage | Request lifecycle |
+| `Thread.Projection` | Derive model-facing messages from canonical entries | Independent conversation store |
+| `Runtime.State` | Temporary execution data, including native ReqLLM context | Portable Session or checkpoint |
+| `Request.Handle` / `Stream` | Local access to admitted work and events | Durable identity or stored conversation |
+| `Orchestration.Record` | Request status and outcome retained in Agent state | Worker state |
+| `Orchestration.Coordinator` | Worker lifetime, ordered commits, cancellation, and completion | Core validation or a general scheduler |
+| ReAct `State` / `Token` | Standalone adapter state and resume encoding | The shared execution model for all methods |
+| AI resource owner — selected target | AgentServer-scoped catalogs/providers; Session-scoped activations | A global lazy registry or request-scoped activation store |
 
-Not all runtime values are portable. A Request handle can contain a server
-reference. Runtime.State can contain provider values. Neither is another
-conversation store. The checkpoint layer selects portable data explicitly.
-
-`Turn` does not execute tools. `Thread.Projection` adapts canonical entries
-to AI messages. `Orchestration.Transcript` reads the selected Agent field and
-coordinates entry commits. These are different operations on the same
-conversation values.
+Native provider values can exist during execution. Portable exports select and
+validate data explicitly. Runtime PIDs, callbacks, clients, and secrets do not
+become portable data merely because a containing map has a schema.
 
 Source: [Session](../../lib/jido_session.ex),
 [Thread](../../lib/jido_thread.ex), [Entry](../../lib/jido_thread/entry.ex),
 [Profile](../../lib/jido_ai/profile.ex),
-[execution state](../../lib/jido_ai/runtime/state.ex),
-[projection](../../lib/jido_ai/thread/projection.ex),
-[transcript integration](../../lib/jido_ai/orchestration/transcript.ex).
+[Runtime.State](../../lib/jido_ai/runtime/state.ex),
+[Projection](../../lib/jido_ai/thread/projection.ex).
 
-## 4. Request execution and commit
-
-The main authored Agent path has these roles:
+## 4. Execution and commit boundaries
 
 ```text
 Agent + DSL + Profile
         |
         v
-Authoring lowers configuration to core Agent routes and Plugins
+Authoring lowers configuration to core routes and Plugins
         |
         v
-AgentServer admits a request through AI/core integration
+AgentServer admission through AI/core integration
         |
         v
-Orchestration coordinates active work and its result
+Orchestration: active request, input, lifetime, completion
         |
         v
-Runtime prepares and executes the reasoning/model/tool Flow
-        |
+Runtime: bounded shared execution
+        +--> Reasoning: method decisions and transitions
         +--> Model.Transport --> ReqLLM
-        |
-        +--> Tools.Executor --> Jido.Exec --> Action
-        |
-        v
-Orchestration produces settlement through core Agent APIs
+        +--> Tools.Executor --> Jido.Exec --> Action / Flow
         |
         v
-Core validates and commits Agent state; delivery follows its contracts
+Orchestration: ordered entry commits and settlement
+        |
+        v
+Core Jido: candidate validation and commit
+        |
+        v
+Delivery through the core contracts
 ```
 
-This is an ownership view, not a complete state machine. The exact path depends
-on the Profile request mode. Session-mode work has admission and later
-settlement; turn-mode work completes within its owning Turn. Standalone ReAct
-uses an Agent and the shared runtime rather than a separate model/tool engine.
+This is an ownership map, not an exact state machine. Session-mode work has
+admission and later settlement. Turn-mode work finishes within its owning core
+Turn. Standalone ReAct uses the shared runtime through its adapter.
 
-`Orchestration.Coordinator` keeps worker lifetime, pending completion, recovery,
-and ordered commit coordination together. `Runtime` owns the execution steps,
-not the final Agent commit. Active-input and delivery helpers do not define
-durable queues.
+Runtime produces execution results and evidence. Orchestration coordinates
+their commits. Core performs validation and commit. Receiving an event is not
+proof that its entries committed; acknowledging a checkpoint is not proof of
+durable storage. The proposed batch/receipt boundary makes these distinctions
+explicit without creating another conversation store.
 
-Source: [request API](../../lib/jido_ai/request.ex),
-[orchestration API](../../lib/jido_ai/orchestration.ex),
+Coordinator lifetime and ordered commit work remain together. Extracting helper
+functions does not create new process owners.
+
+Source: [Authoring](../../lib/jido_ai/authoring.ex),
+[Runtime.Run](../../lib/jido_ai/runtime/run.ex),
 [Coordinator](../../lib/jido_ai/orchestration/coordinator.ex),
-[start](../../lib/jido_ai/orchestration/start.ex),
-[settle](../../lib/jido_ai/orchestration/settle.ex),
+[settlement](../../lib/jido_ai/orchestration/settle.ex),
 [standalone runner](../../lib/jido_ai/reasoning/react/runner.ex).
 
-## 5. Existing design folders and module families
+### Flow mechanics versus AI meaning
 
-Folders organize contracts, not one-to-one source namespaces. One public
-feature can have a value, an Action adapter, and a Plugin adapter. Its owning
-seam defines the feature; seam 06 defines how it connects to core Jido.
+| Lower-package mechanism | AI responsibility above it |
+| --- | --- |
+| Action / Instruction | Tool schema, context, allowed calls, and result meaning |
+| Flow dependencies, Choice, Dispatch | Model/tool decisions and next-step selection |
+| Map / Reduce | Tool policy and interpretation of collected results |
+| Iterate / continuations | Method state, stopping rules, and AI budgets |
+| Exec timeout, concurrency, cancellation | AI limits, cancellation outcome, and usage |
+| Core candidate and directives | AI result placement and post-commit intent |
 
-| Design seam | Current module families | Boundary |
-| --- | --- | --- |
-| [00 Boundary](00_boundary_invariants/README.md) | `Jido.AI`, package metadata; cross-seam ownership rules | Package duties, not a runtime subsystem |
-| [01 Values](01_ai_values/README.md) | `Jido.Session`, `Jido.Thread.*`, `Query`, `Turn.*`, `Output`, `Usage.*`, `Error.*`, `Thread.Projection` | Values, normalization, and AI projection; no workers |
-| [02 Models](02_model_gateway/README.md) | `Models`, `Model.{Transport,Options,Messages,Generate}`, `PromptBuilder`, `Actions.LLM.*` | ReqLLM integration and request preparation |
-| [03 Tools](03_tool_bridge/README.md) | `ToolAdapter`, `ToolCatalog`, `ToolSource`, `ToolContext`, `ToolInterceptor`, `ToolResult`, `Tools.Executor`, `Effects.*`, `Actions.ToolCalling.*` | Tool contracts, one execution boundary, effect policy |
-| [04 Execution](04_ai_execution/README.md) | `Runtime.{State,Prepare,Run,Flow,ReasonFlow,CallModel,Decide,Continue,NextBatch,ToolsFlow,ToolCycle,ToolAttempt,OutputState}` and execution helpers | Temporary state, progression, limits, retries, and repair |
-| [05 Reasoning](05_reasoning_planning/README.md) | `Reasoning.*`, method machines/results, `Actions.Reasoning.*`, `Actions.Planning.*` | Method algorithms and planning semantics, not a generic Flow engine |
-| [06 Core integration](06_runtime_signal_integration/README.md) | `Runtime.Plugin.*`, `Orchestration.Plugin.*`, `Signal.*`, route and directive adapters | Core Plugin facets, trusted context, routes, candidate and directive contracts |
-| [07 Orchestration](07_request_sessions/README.md) | `Request.*`, `Orchestration.*`, `PendingInputServer`, `Thread.Control.*`, `Thread.Operation` | Live work, input controls, completion, delivery, and commit coordination |
-| [08 Capabilities](08_capabilities_policy/README.md) | `Capability`, `ReasoningCapability`, `PluginConfig`, optional `Plugins.*`, `ModelRouter`, `Quota.*`, `Retrieval.Store`, capability Actions | Optional composition and policy; not another Agent model |
-| [09 Skills](09_skills_resources/README.md) | `Skill.*`, `Actions.Skill.*` | Discovery, loading, activation, prompts, tools, resources, and trust policy |
-| [10 Authoring](10_authoring_definitions/README.md) | `Agent.*`, `DSL.*`, `Profile.*`, `Authoring.*`, `Portable`, `Configuration.*`, `Instructions`, `Control`, input validation helpers | One authoring model, portable definitions, and validated configuration |
-| [11 Recovery](11_checkpoints_resume/README.md) | `Runtime.Checkpoint`, `Reasoning.ReAct.{Checkpoint,State,Token}`; orchestration recovery integration | Portable snapshots and standalone resume, not durable storage |
-| [12 Observation](12_observation_diagnostics/README.md) | `Observe.*`, `Runtime.{Event,Telemetry}`, `Signal.*`, `Orchestration.Inspection`, request metadata | Safe projections and correlation, not execution ownership |
-| [90 Delivery](90_migration_delivery/README.md) | `Test.*`, `TestCase`, `Quality.Checkpoint`, `Mix.Tasks.JidoAi.*`, package metadata | Consumer support, evidence, migration, and release |
+Reasoning search state is useful AI data, not automatically a duplicate
+scheduler. Remove duplicate mechanics based on responsibility, not module names.
+Generic retry scheduling remains a boundary question; current bounded
+tool-attempt delays do not establish a general retry service.
+Live Exec state is not a durable checkpoint.
 
-Shared entries are deliberate interfaces. For example, seam 08 owns routing
-policy while seam 02 owns native model resolution. Seam 03 owns tool policy
-while seam 04 applies that policy within execution. Seam 11 owns snapshot
-meaning while seam 07 owns recovery process lifetime.
+## 5. Architectural seams
 
-## 6. Physical source layout
+Module names use the `Jido.AI.` prefix unless stated otherwise. Folders organize
+contracts; they are not a one-to-one source layout.
+
+### 00 — Package boundary and invariants
+
+**Owns:** package duties, portability, effect timing, and cross-seam rules.
+
+**Current:** AI uses core Agent/Plugin and Action/Flow/Exec contracts.
+
+**Direction:** validated data, stable identities, explicit order, and explicit
+state changes before additional adapters or processes.
+
+**Open:** release wording, generic retry ownership, and exact compatibility
+guarantees. No new execution framework is selected.
+
+[Design](00_boundary_invariants/design.md) · [Evidence and gaps](00_boundary_invariants/alignment.md)
+
+### 01 — Canonical interaction and AI values
+
+**Modules:** `Jido.Session`, `Jido.Thread.*`, `Query`, `Turn.*`, `Output`,
+`Usage.*`, `Error.*`, `Thread.Projection`.
+
+**Current:** one canonical Session/Thread replaces the old conversation store.
+Projection derives AI messages; Turn normalizes responses and does not execute tools.
+
+**Direction:** retain permitted admitted input, consumed steering, and committed
+intermediate work as evidence. Advance default model conversation only after
+successful settlement. Exclude failed/cancelled work and unresolved tool
+exchanges from that completed view. Retention remains subject to storage permissions.
+
+**Open:** promotion metadata, entry-batch/receipt schemas, duplicate IDs,
+revision conflicts, codec versions, and error guarantees. Success-only projection
+is not complete in current code.
+
+[Design](01_ai_values/design.md) · [Evidence and gaps](01_ai_values/alignment.md)
+
+### 02 — Model integration and request preparation
+
+**Modules:** `Models`, `Model.{Transport,Options,Messages,Generate}`,
+`PromptBuilder`, `Actions.LLM.*`.
+
+**Current:** native ReqLLM/LLMDB contracts with separate transport, options, and
+message preparation. Transport can still resolve process-local bindings.
+
+**Direction:** pass explicit bindings to workers. MockLLM uses explicit request
+options through the same runtime path. Shared transformers use a small common
+execution view and Profile, not ReAct adapter state.
+
+**Open:** callback compatibility, named transform stages, and retained ModelRef
+proposals. Native contracts remain the baseline; rich-model export is out of scope.
+
+[Design](02_model_gateway/design.md) · [Evidence and gaps](02_model_gateway/alignment.md)
+
+### 03 — Tools, sources, and effect policy
+
+**Modules:** `ToolCatalog`, `ToolAdapter`, `ToolSource`, `ToolContext`,
+`ToolInterceptor`, `ToolResult`, `Tools.Executor`, `Effects.*`.
+
+**Current:** shared tool execution, validation, interception, result conversion,
+and effect policy exist. Source declarations alone do not prove execution.
+
+**Direction:** one Action/Flow execution boundary. Runtime chooses when to call;
+this seam owns tool admission, bindings, result meaning, and effect policy.
+
+**Open:** dynamic sources remain on hold. Catalog snapshots, approvals,
+replay-safe effects, and model-facing delegation contracts remain advanced work.
+External effects cannot be rolled back by a later failed Agent commit.
+
+[Design](03_tool_bridge/design.md) · [Evidence and gaps](03_tool_bridge/alignment.md)
+
+### 04 — Shared AI execution
+
+**Modules:** `Runtime.State`, `Prepare`, `Run`, `Flow`, `ReasonFlow`,
+model/tool steps, `Decide`, and output-state helpers.
+
+**Current:** shared validated execution state and Flows exist, but common paths
+still contain ReAct-specific conversion and method-state assumptions.
+
+**Direction:** Runtime owns common model/tool execution, limits, usage, output
+validation, and repair. It does not own final Agent commits.
+
+**Open:** common execution-view fields and the private Orchestration interface.
+Portable public Execution proposals do not describe today's temporary State.
+
+[Design](04_ai_execution/design.md) · [Evidence and gaps](04_ai_execution/alignment.md)
+
+### 05 — Reasoning and planning methods
+
+**Modules:** `Reasoning.*`, method machines/results, reasoning and planning Actions.
+
+**Current:** ReAct, CoT, CoD, AoT, ToT, GoT, TRM, and Adaptive remain supported methods.
+
+**Direction:** one Profile-selected internal dispatcher. Each method owns its
+transitions, validated state, scores, stopping rules, and diagnostics. ReAct
+conversion and token encoding stay in its standalone adapter.
+
+**Open:** common method results, trusted custom methods, and portable executable
+Plan proposals. The cleanup does not require a registry or a new method framework.
+Business workflow execution remains outside this seam.
+
+[Design](05_reasoning_planning/design.md) · [Evidence and gaps](05_reasoning_planning/alignment.md)
+
+### 06 — Core runtime and Signal integration
+
+**Modules:** `Runtime.Plugin.*`, `Orchestration.Plugin.*`, `Signal.*`,
+route and directive adapters.
+
+**Current:** Plugins connect AI execution to Agent and AgentServer contracts.
+
+**Direction:** one supervised AI resource owner per AgentServer through the core
+Plugin runtime-child contract. Bind selected services once through runtime
+context and pass them explicitly to workers. Use the selected Jido Task Supervisor.
+A required integration Plugin is not an optional capability.
+
+**Open:** owner placement, restart behavior, route/purity/delivery matrices, and
+integration-layer consolidation. Core continues to own topology and commits.
+
+[Design](06_runtime_signal_integration/design.md) · [Evidence and gaps](06_runtime_signal_integration/alignment.md)
+
+### 07 — Request orchestration and active input
+
+**Modules:** `Request.*`, `Orchestration.*`, `PendingInputServer`,
+`Thread.Control.*`, `Thread.Operation`.
+
+**Current:** live admission, steering, cancellation, transcript commits,
+settlement, inspection, and delivery. Session itself is a value.
+
+**Direction:** keep lifetime and ordered commit coordination together. Preserve
+logical request identity across retry/resume, but give restarted execution a
+new attempt identity. Retain earlier outcomes. Distinguish execution, commit,
+delivery, and uncertain failure. Accept linked delegated results once while the
+parent request is active.
+
+**Open:** validated private messages, batch/receipt details, safe points,
+context transfer, cancellation propagation, and result admission rules.
+Cancellation does not prove that external effects stopped.
+
+[Design](07_request_sessions/design.md) · [Evidence and gaps](07_request_sessions/alignment.md)
+
+### 08 — Capabilities and policy
+
+**Modules:** `Capability`, `ReasoningCapability`, `PluginConfig`, optional
+`Plugins.*`, `ModelRouter`, `Quota.*`, `Retrieval.Store`.
+
+**Current:** Profile-bound and defaults-bound capability paths exist.
+
+**Direction:** explicit required stages, validated declarations, and one internal
+preparation result. Run required stages only; reject unavailable stages without
+implicit fallback. Simple non-model capabilities need no Profile.
+
+**Open:** final semantic stage order and core callback integration. Routing,
+retrieval, quota, and state-version proposals remain. Durable memory and
+authoritative billing are host/service responsibilities.
+
+[Design](08_capabilities_policy/design.md) · [Evidence and gaps](08_capabilities_policy/alignment.md)
+
+### 09 — Skills and resources
+
+**Modules:** `Skill.*`, `Actions.Skill.*`.
+
+**Current:** discovery, loading, prompts, tools, and resources exist. Registry
+still supports lazy startup.
+
+**Direction:** catalogs/providers belong to the Agent runtime. Activations are
+keyed by canonical Session ID. Request completion, cancellation, and worker
+failure retain them; explicit Session closure clears them. Delegated targets
+resolve permitted resource IDs through their own binding and Session scope.
+
+**Open:** activation survival after AgentServer restart, dependency/collision
+rules, shared resources across Agents, and atomic restoration. Resource transfer
+does not itself authorize activation or executable content.
+
+[Design](09_skills_resources/design.md) · [Evidence and gaps](09_skills_resources/alignment.md)
+
+### 10 — Authoring and portable definitions
+
+**Modules:** `Agent.*`, `DSL.*`, `Profile.*`, `Authoring.*`, `Portable`,
+`Configuration.*`, `Instructions`, `Control`.
+
+**Current:** Agent + DSL + Profile, validated lowering, portable definitions,
+and authoring tests.
+
+**Direction:** one authoring model over core Jido. Configuration describes
+behavior; lowering adds the required routes, Plugins, and state. It does not
+create another runtime.
+
+**Open:** reducing repeated preparation and indirect lookup, exact integration
+structure, codec/version guarantees, and declaration-versus-execution parity.
+No blanket Plugin removal is implied.
+
+[Design](10_authoring_definitions/design.md) · [Evidence and gaps](10_authoring_definitions/alignment.md)
+
+### 11 — Checkpoints and resume
+
+**Modules:** `Runtime.Checkpoint`, ReAct `Checkpoint`, `State`, `Token`,
+and Orchestration recovery integration.
+
+**Current:** shared checkpoint boundary with ReAct encoding. Adapter run identity
+does not yet establish the selected request/attempt model.
+
+**Direction:** resume keeps the logical request, creates a new attempt, and
+preserves earlier outcomes. Uncertain external effects block automatic repetition
+without evidence, supported deduplication, or explicit caller authority. Unknown
+core commit outcome is not permission to repeat a commit.
+
+**Open:** binding restoration, Session activation survival, compatibility windows,
+V2 imports, and recovery when content storage is disabled. Snapshots do not
+promise durable execution or exactly-once effects.
+
+[Design](11_checkpoints_resume/design.md) · [Evidence and gaps](11_checkpoints_resume/alignment.md)
+
+### 12 — Observation and diagnostics
+
+**Modules:** `Observe.*`, `Runtime.Event`, `Telemetry`, `Signal.*`,
+`Orchestration.Inspection`.
+
+**Current:** sanitization, typed Signals, telemetry, and bounded inspection.
+
+**Direction:** separate default-off permissions for rich-content streaming and
+storage. Reasoning uses separate trusted permissions. Diagnostics needs trusted
+access and explicit content permission. Telemetry contains no content.
+Permitted output still removes credentials and enforces size limits.
+
+**Open:** option names, migration, common versioned event contracts, and consistent
+enforcement across projections. Stream permission never grants storage permission.
+
+[Design](12_observation_diagnostics/design.md) · [Evidence and gaps](12_observation_diagnostics/alignment.md)
+
+### 90 — Migration and delivery
+
+**Modules:** `Test.*`, `TestCase`, `Quality.Checkpoint`, package Mix tasks.
+
+**Current:** execution CLI removed; install, skill, and quality tasks remain.
+Package metadata still declares 2.3.0 while using V3 beta dependencies.
+
+**Direction:** release evidence tied to specific contracts and supported consumer
+paths. Existing tests and examples are the evidence locations, not a new test framework.
+
+**Open:** compatibility/removal guidance, release version, performance, security,
+operational evidence, and production support boundaries for store adapters.
+A passing suite does not certify every retained proposal.
+
+[Design](90_migration_delivery/design.md) · [Evidence and gaps](90_migration_delivery/alignment.md)
+
+## 6. Delegation crosses existing seams
+
+| Concern | Owner |
+| --- | --- |
+| Agent identity, child lifecycle, peer placement, topology | Core Jido; integration in 06 |
+| Linked request/attempt identity, result admission, cancellation, parent commit | 07 |
+| Model-facing delegation tool and input/output adaptation | 03 |
+| Context selection and portable interaction data | 01, consumed by 07 |
+| Target-side resource permissions and activation | 09 |
+| Resume, duplicate/late results, uncertain effects | 11 with 07 |
+| Correlation and lineage observations | 12 |
+
+A delegated peer need not become a supervised child. Cancelling delegated work
+does not imply stopping the peer. The target still needs bounded fan-out,
+collection, depth/budget limits, target-failure behavior, and handoff authority.
+Inert source declarations and callable reasoning are not proof of this protocol.
+
+## 7. Source layout
 
 ```text
 lib/
 ├── jido_ai.ex
-├── jido_session.ex              Jido.Session
-├── jido_thread.ex               Jido.Thread
-├── jido_thread/entry.ex         Jido.Thread.Entry
+├── jido_session.ex              portable Jido.Session
+├── jido_thread.ex               portable Jido.Thread
+├── jido_thread/entry.ex         portable Jido.Thread.Entry
 ├── jido_ai/
 │   ├── agent/ + dsl/ + profile/ authoring and validation
 │   ├── orchestration/          live request ownership
-│   ├── runtime/                shared execution
+│   ├── runtime/                shared execution and integration adapters
 │   ├── thread/                 AI projection and controls
 │   ├── model/                  provider integration
-│   ├── tools/                  shared executor
+│   ├── tools/                  shared tool executor
 │   ├── reasoning/              methods and standalone ReAct adapter
 │   ├── actions/ + plugins/     callable and core integration adapters
-│   ├── skill/                  optional resources and skills
-│   └── ...                     values, policy, observation, and support
-└── mix/tasks/                  package development tools
+│   ├── skill/                  optional skills and resources
+│   └── ...                     values, policy, observation, support
+└── mix/tasks/                  consumer and development tools
 ```
 
-This is a selected tree, not an exhaustive file list. Tool modules still span
-root files and `tools/`. Standalone ReAct adapter code still shares the method
-directory. These are visible organization questions, not proof of duplicate
-execution engines.
+This is not an exhaustive inventory. Root tool files still coexist with
+`tools/`; standalone ReAct adapters share the method directory. These are
+organization questions, not proof of duplicate engines. The
+[source API inventory](../v3-spike/api-inventory.json) lists the full surface.
 
-## 7. Current state versus retained target
+## 8. Retained migration rationale
 
-These are review findings, not approvals to change runtime behavior.
+The former seam research compared V2.3 with the early V3 port. Its useful
+dispositions remain below; stale paths and historical compile failures are not
+current evidence. Detailed advanced requirements remain in the seam designs.
 
-| Seam | Current fact | Alignment question or retained advanced work |
-| --- | --- | --- |
-| 00 | Uses core Agent, Plugin, Flow, and Exec; metadata still says version 2.3.0 | Complete ownership wording and release requirements |
-| 01 | Session/Thread replace the old Context store; Turn execution was removed | Reconcile old Context signatures with canonical values; decide remaining codec and error guarantees |
-| 02 | Native ReqLLM/LLMDB values; transport/options/messages have separate owners | ModelRef and fully provider-neutral public wrappers remain proposals in tension with the current contract; named transform stages need review |
-| 03 | Shared executor, effects, interception, and inert source declarations exist | Dynamic discovery, catalog snapshots, approvals, and replay-safe effects need explicit evidence and scope; declarations do not prove execution |
-| 04 | Internal validated Runtime.State and shared Flows exist | Public portable Execution values differ from current state; ToolAttempt still sleeps for bounded retry delay |
-| 05 | ReAct, CoT, CoD, AoT, ToT, GoT, TRM, and Adaptive remain | Trusted custom-method registration, common method results, and portable executable Plan proposals remain |
-| 06 | Runtime and Orchestration Plugins use Agent and AgentServer facets | Revalidate the full route, purity, delivery, and correlation matrices; old Thread compile blockers are stale |
-| 07 | Orchestration owns the live API; Session is a value | Replace old live-Session names in detailed documents; specify linked delegation and cancellation policies |
-| 08 | Capabilities use Profile-bound and defaults-bound adapters | Decide whether one contribution contract is needed; keep routing, retrieval, quota, and state-version proposals |
-| 09 | Skill discovery/resources exist; Registry supports lazy startup | Explicit resource ownership, dependency/collision rules, and atomic resource restoration remain under review |
-| 10 | Agent + DSL + Profile, portable definitions, and authoring tests exist | Reconcile illustrative target structs with actual schema; distinguish declaration parity from executable feature support |
-| 11 | Shared checkpoint boundary with ReAct encoding; resume retains its adapter run identity | New-run lineage, all-resource atomic restore, deduplication, and uncertain-effect decisions remain target work |
-| 12 | Sanitization, typed Signals, telemetry, and bounded inspection exist | A common versioned event contract, stricter rich-content policy, and cross-projection conformance remain under review |
-| 90 | Execution CLI removed; install/skill/quality Mix tasks remain; V3 beta dependencies used | Reconcile CLI requirements explicitly; complete release version, migration, performance, security, and operational evidence |
-
-Source checks for specific differences:
-[retry delay](../../lib/jido_ai/runtime/tool_attempt.ex),
-[model contracts](../../lib/jido_ai/models.ex),
-[request transforms](../../lib/jido_ai/runtime/request_transform.ex),
-[capability inputs](../../lib/jido_ai/capability.ex),
-[registry startup](../../lib/jido_ai/skill/registry.ex),
-[resume adapter](../../lib/jido_ai/reasoning/react/checkpoint.ex),
-[package metadata](../../mix.exs).
-
-A gap can mean missing evidence, a deliberate current limit, or a future target.
-None of these meanings automatically requires feature removal.
-
-## 8. Delegation and topology
-
-Current `ToolSource` accepts inert `:subagent` and `:handoff` declarations.
-This is authoring data, not proof of an executable delegation protocol.
-Callable reasoning also does not by itself prove child/peer delegation.
-
-The proposed ownership split is:
-
-| Concern | Design owner |
+| Earlier capability or structure | Current direction and reason |
 | --- | --- |
-| Target Agent identity, child lifecycle, peer placement, topology | Core Jido; AI integration reviewed in 06 |
-| Linked request identity, delivery, cancellation, and parent commit policy | 07 |
-| Model-facing delegation tool and input/output adaptation | 03 |
-| Context selection and portable interaction values | 01, consumed by 07 |
-| Resume, late results, duplicate effects, uncertain outcomes | 11 with 07 |
-| Request lineage and tool/delegation observation | 12 |
+| Strategy-based Agent macros and private Strategy runtime shell | Agent + DSL + Profile over core Agent/Plugin; preserve AI semantics, not duplicate execution machinery |
+| Reasoning machines, scores, candidates, planning values | Retain AI algorithms and data; generic plan execution uses Flow or the host |
+| Model facade, aliases, options, standalone LLM Actions | Retain native integration; no extra public wrapper merely to match old pseudocode |
+| Tool catalog, adapter, interceptor, result, effects | Retain one bridge; graph mechanics use Flow/Exec |
+| Worker/runner Agents and package-owned generic worker pools | Separate identity only where meaningful; use core supervision for execution mechanics |
+| Standalone ReAct stream and tokens | Preserve public use through shared execution; exact adapter lifecycle can still be simplified |
+| Old Context/history stores and StateOps execution | Canonical Session/Thread; core owns candidate validation and commit |
+| Old in-Turn execution directives | Actions/Flows execute work; core directives describe post-commit work |
+| Retrieval, routing, quota, chat, planning, reasoning capabilities | Retain optional policy; durable services and authoritative accounting remain external |
+| Skills, resource augmentation, manifests, activation | Retain with explicit trust, ownership, and Session scope |
+| Agent checkpoint versus AI checkpoint | Core owns Agent persistence contracts; AI owns portable AI phase/effect/binding data |
+| Durable queues, distributed recovery, exactly-once execution | Host or separately approved durable layer, not in-memory Exec |
+| Errors, usage, typed Signals, safe observation | Retain AI meaning using lower-package transport and execution contracts |
+| CLI, installer, quality tooling, consumer test helpers | Execution CLI removed; review remaining tools under delivery, not as a new runtime |
+| Browser-specific behavior | Browser package owns adapters; AI consumes ordinary Actions |
 
-The target needs explicit decisions for context transfer, fan-out and result
-collection, depth and budget limits, cancellation propagation, target failure,
-handoff authority, and late-result handling. A peer can perform delegated work
-without becoming a supervised child. Cancelling that work must not be assumed
-to stop the peer.
+Dynamic discovery, catalog snapshots, approvals, custom methods, executable
+plans, richer recovery, and delegation remain visible target work. Their absence
+is not grounds for silent deletion. Conversely, old proposals are not automatic
+implementation mandates. Rich-model export is explicitly out of scope; dynamic
+tool sources remain deferred.
 
-These are retained design questions. No new delegation module, process owner,
-or transport API is claimed by this document.
+Historical source and detailed migration evidence remain in
+[the history audit](../v3-spike/history-audit.md),
+[feature map](../v3-spike/feature-map.md), and
+[the old root checkpoint](../v3-spike/root-package-checkpoint.md).
+Git history retains the replaced seam research. Its old approval statements do
+not override today's document review table.
 
-Source: [source declarations](../../lib/jido_ai/tool_source.ex),
-[callable reasoning](../../lib/jido_ai/actions/reasoning/run_strategy.ex).
+## 9. Evidence and the next review
 
-## 9. Example and test entry points
+Start with [values](01_ai_values/README.md) and
+[Orchestration](07_request_sessions/README.md) to settle conversation promotion,
+request/attempt meaning, and commit acknowledgement. Then review explicit
+bindings and resource lifetime, followed by method-neutral execution and the
+optional policy layers. The full prerequisite graph stays in [the index](README.md).
 
-These links identify evidence to review. They are not blanket conformance
-claims for all target requirements.
+Use existing unit tests for value and transition rules, runtime integration
+tests for ownership and failures, and examples for the public authoring path.
+An example proves its stated case, not the complete architecture.
 
-| Boundary | Example | Direct test entry point |
-| --- | --- | --- |
-| Authoring | [Authoring forms](../../examples/01_authoring/01_01_authoring_formats/README.md) | [Authoring suite](../../test/authoring/agents/authoring_test.exs) |
-| Model/tool cycle | [Dependent tool rounds](../../examples/01_authoring/01_02_tool_flow/README.md) | [MockLLM multi-round test](../../test/examples/01_authoring/01_02_tool_flow/multi_round_test.exs) |
-| Canonical values | [Thread and Session](../../examples/02_requests/02_27_thread_session_values/README.md) | [Value tests](../../test/jido_ai/thread_value_test.exs) |
-| Requests and observation | [Request inspection](../../examples/02_requests/02_22_request_inspection/README.md) | [Inspection tests](../../test/jido_ai/orchestration/inspection_test.exs) |
-| Execution state | [AI runtime](../../examples/01_authoring/01_07_ai_runtime/README.md) | [State contract](../../test/jido_ai/runtime/state_test.exs) |
-| Tool boundary | [Tool examples](../../examples/03_tools/README.md) | [Executor boundary](../../test/jido_ai/tools/executor_boundary_test.exs) |
-| Core integration | [AI extension](../../examples/01_authoring/01_06_ai_extension/README.md) | [Plugin facets](../../test/jido_ai/plugin_facets_test.exs) |
-| Reasoning | [Method examples](../../examples/09_reasoning/README.md) | [Callable profiles](../../test/authoring/agents/callable_profiles_test.exs) |
-| Planning | [Planning](../../examples/08_planning/08_01_planning/README.md) | [Planning example test](../../test/examples/08_planning/08_01_planning/08_01_planning_test.exs) |
-| Capabilities | [Composition](../../examples/16_capabilities/README.md) | [Routing and policy](../../test/examples/16_capabilities/16_03_routing_policy/16_03_routing_policy_test.exs) |
-| Skills | [Skills](../../examples/18_skills/README.md) | [Skill authoring](../../test/examples/18_skills/18_02_skill_authoring/18_02_skill_authoring_test.exs) |
-| Recovery | [Checkpoint resume](../../examples/14_resume/14_03_checkpoint_resume/README.md) | [Shared checkpoint boundary](../../test/jido_ai/runtime/checkpoint_test.exs) |
-| Safe projections | [Stream usage](../../examples/02_requests/02_24_stream_usage/README.md) | [Observation tests](../../test/jido_ai/observe_test.exs) |
+| Evidence entry point | What to inspect |
+| --- | --- |
+| [Authoring tests](../../test/authoring/agents/authoring_test.exs) | Public definitions and validation |
+| [Conversation tests](../../test/jido_ai/conversation_runtime_test.exs) | Canonical values across requests |
+| [Tool-round example](../../test/examples/01_authoring/01_02_tool_flow/multi_round_test.exs) | Dependent real tool results through MockLLM |
+| [Request lifecycle example](../../test/examples/02_requests/02_01_session/02_01_session_test.exs) | Admission, failure, cancellation, and runtime cleanup |
+| [Core Plugin tests](../../test/jido_ai/plugin_facets_test.exs) | Integration facets |
+| [Checkpoint tests](../../test/jido_ai/runtime/checkpoint_test.exs) | Shared recovery boundary |
+| [Observation tests](../../test/jido_ai/observe_test.exs) | Safe output projections |
 
-The preceding code-change verification reported 2,809 passing tests and one
-existing exclusion, including authoring and MockLLM examples. This
-documentation task does not rerun that suite. The earlier live Haiku result
-proves one dependent-tool example, not all providers or all examples.
+Current session-mode transcript commits can retain failed query/tool work for
+the next model projection even when the last successful reply stays unchanged.
+That is a design gap, not an accepted failure policy. See
+[transcript integration](../../lib/jido_ai/orchestration/transcript.ex) and
+[projection](../../lib/jido_ai/thread/projection.ex); the owning value and
+Orchestration alignment files track success-only conversation promotion.
 
-## 10. Reconciliation sequence
+Foundation verification at `53d19f77`: formatting, forced compilation with
+warnings as errors, API inventory validation, and the full unit, authoring,
+and example suite passed: 2,809 tests, one existing exclusion. This is a dated
+code-baseline result, not certification of the target designs. This subsequent
+consolidation changes documentation only.
 
-1. Reconcile the value and ownership contracts in 00/01, including the meaning
-   of Session versus Orchestration and temporary execution state.
-2. Review model and tool contracts in 02/03 without discarding advanced sources
-   or introducing wrappers solely to satisfy old pseudocode.
-3. Align shared execution and all methods in 04/05.
-4. Review integration and request behavior in 06/07, including delegation.
-5. Align optional capabilities and resources in 08/09.
-6. Reconcile complete authoring and recovery requirements in 10/11.
-7. Complete observation and delivery evidence in 12/90.
-
-For every requirement, record current code, example/test evidence, the exact
-difference, the decision owner, and the acceptance evidence still needed.
-Preserve existing requirement IDs. The seam documents now include current
-ownership and gap reviews, with acceptance rows rebuilt from the target
-requirements. Incomplete evidence stays explicit; this is not a claim that all
-target requirements pass. Proposed delegation requirements live in seam 07
-and depend on the tool, core integration, recovery, and observation seams.
+Open review priorities are the batch/receipt contract, attempt representation,
+activation survival across restart, transformer compatibility, capability stage
+order, delegation authority, and content-permission enforcement. These are
+contract decisions before they are file-layout changes.

@@ -198,8 +198,9 @@ prerequisite alignment changes, review each dependent alignment again.
   describes linked work, context transfer, and result policy above that boundary.
 - Use `ARCHITECTURE.md` for the high-level current module and seam map.
   Put detailed current evidence and gaps in the owning seam's `alignment.md`.
-- The older `architecture-seams.md` is retained research, not current evidence.
-  Its proposals remain available for review.
+- `ARCHITECTURE.md` consolidates the former `architecture-seams.md`. Retain
+  migration rationale there and detailed advanced proposals in the owning seams;
+  do not create a second competing architecture overview.
 - During a documentation-only task, do not change Elixir, dependencies, examples,
   tests, or package metadata. Record required changes as alignment gaps.
 - Validate local links, review-table coverage, seam-map coverage, and identifier

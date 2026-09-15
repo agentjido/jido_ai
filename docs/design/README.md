@@ -208,7 +208,6 @@ inherited by this package.
 | [Design instructions](AGENTS.md) | Pending approval |
 | [Architecture overview](ARCHITECTURE.md) | Pending approval |
 | [Seam template](SEAM_TEMPLATE.md) | Pending approval |
-| [Retained architecture research](architecture-seams.md) | Pending approval |
 | [Package boundary and invariants: briefing](00_boundary_invariants/README.md) | Pending approval |
 | [Package boundary and invariants: design](00_boundary_invariants/design.md) | Pending approval |
 | [Package boundary and invariants: alignment](00_boundary_invariants/alignment.md) | Pending approval |
@@ -259,6 +258,7 @@ The [source API inventory](../v3-spike/api-inventory.json) and
 [current API map](../v3-spike/public-api-map.md) help locate current contracts.
 Neither an API inventory nor a passing example proves the complete target.
 
-Historical proposals and unique rationale remain in
-[the retained architecture research](architecture-seams.md) and the seam designs.
-No advanced requirement is removed by this index update.
+The [architecture overview](ARCHITECTURE.md) consolidates the former seam
+research and retains its migration rationale. Detailed advanced proposals stay
+in the owning seam designs. Historical source remains available in Git history;
+no advanced requirement is removed by this consolidation.
