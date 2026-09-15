@@ -4,15 +4,6 @@ defmodule Jido.AI.StableSmokeTest do
   @moduletag :stable_smoke
   @moduletag :unit
 
-  defmodule StableSmokeCoDAgent do
-    def cli_adapter, do: Jido.AI.Reasoning.ChainOfDraft.CLIAdapter
-  end
-
-  test "strategy fixtures keep CLI adapter wiring intact" do
-    assert {:ok, Jido.AI.Reasoning.ChainOfDraft.CLIAdapter} =
-             Jido.AI.CLI.Adapter.resolve(nil, StableSmokeCoDAgent)
-  end
-
   test "mix aliases expose the stable gate contract" do
     aliases = Mix.Project.config()[:aliases] || []
 

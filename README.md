@@ -280,7 +280,6 @@ Integration and runtime guides:
 - [Retrieval And Quota](guides/user/retrieval_and_quota.md)
 - [Observability Basics](guides/user/observability_basics.md)
 - [Standalone ReAct Runtime](guides/user/standalone_react_runtime.md)
-- [CLI Workflows](guides/user/cli_workflows.md)
 
 Upgrading:
 - [Migration: Plugins And Signals v3](guides/user/migration_plugins_and_signals_v3.md)

@@ -5,7 +5,6 @@ Mimic.copy(ReqLLM.Providers.OpenAI)
 Mimic.copy(ReqLLM.Providers.OpenAICodex)
 Mimic.copy(ReqLLM.StreamResponse)
 Mimic.copy(Jido.AgentServer)
-Mimic.copy(Jido.AI.CLI.Adapter)
 
 coverage_active? =
   :ets.whereis(:excoveralls_conf_server) != :undefined and

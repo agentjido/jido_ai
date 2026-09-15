@@ -36,6 +36,7 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.StrategyTest do
     assert_script_done(mock)
   end
 
+  @tag :stable_smoke
   test "request completion extracts #### final answer", %{jido: jido} do
     mock = mock([%{reply: {:text, "20 - x = 12; x = 8. #### 8"}}])
     server = start_reasoning(jido, :chain_of_draft)

@@ -168,7 +168,6 @@ defmodule JidoAi.MixProject do
         "guides/user/observability_basics.md",
         "guides/user/standalone_react_runtime.md",
         "guides/user/turn_and_tool_results.md",
-        "guides/user/cli_workflows.md",
         # Upgrading
         "guides/user/migration_plugins_and_signals_v3.md",
         # Extend Jido.AI
@@ -186,7 +185,7 @@ defmodule JidoAi.MixProject do
       ],
       groups_for_extras: [
         {"Build With Jido.AI",
-         ~r/guides\/user\/(package_overview|getting_started|first_react_agent|strategy_selection_playbook|strategy_recipes|request_lifecycle_and_concurrency|thread_context_and_message_projection|tool_calling_with_actions|llm_facade_quickstart|model_routing_and_policy|retrieval_and_quota|observability_basics|standalone_react_runtime|turn_and_tool_results|cli_workflows)\.md/},
+         ~r/guides\/user\/(package_overview|getting_started|first_react_agent|strategy_selection_playbook|strategy_recipes|request_lifecycle_and_concurrency|thread_context_and_message_projection|tool_calling_with_actions|llm_facade_quickstart|model_routing_and_policy|retrieval_and_quota|observability_basics|standalone_react_runtime|turn_and_tool_results)\.md/},
         {"Upgrading", ~r/guides\/user\/migration_plugins_and_signals_v3\.md/},
         {"Extend Jido.AI",
          ~r/guides\/developer\/(architecture_and_runtime_flow|strategy_internals|signals_namespaces_contracts|plugins_and_actions_composition|skills_system|security_and_validation|error_model_and_recovery)\.md/},
@@ -258,9 +257,6 @@ defmodule JidoAi.MixProject do
         "Quality & Quota": [
           Jido.AI.Quality.Checkpoint,
           Jido.AI.Quota.Store
-        ],
-        CLI: [
-          Jido.AI.CLI.Adapter
         ],
         "Mix Tasks": [
           ~r/Mix\.Tasks\..*/

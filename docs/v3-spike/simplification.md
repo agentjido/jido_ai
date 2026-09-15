@@ -1,0 +1,117 @@
+# V3 AI simplification
+
+Use `Jido.AI.Agent` + `Jido.AI.DSL` + `Jido.AI.Profile` as the main AI
+authoring model. Keep each change small and commit each verified step.
+This record covers `jido_ai` on `v3-spike` only.
+
+## Checkpoints
+
+1. `e5937dd4` preserves the prior example refactor, test fixtures, Session test
+   correction, and ReqLLM pin `888fca022fea50785e2a54f7eabfcc47d289ae41`.
+2. This checkpoint removes the execution CLI and its private support.
+   It does not change the reasoning engines or request runtime.
+
+## Inventory and caller evidence
+
+Paths below are relative to this package. Proposed work is not part of this
+checkpoint.
+
+| Decision | Surface | Caller evidence and scope |
+| --- | --- | --- |
+| Keep | `Jido.AI.Agent`, DSL, Profile | `agent/definition.ex` installs the DSL and request helpers. `authoring/dsl.ex` lowers declarations through `Authoring` and Profile. This is the main authoring path. |
+| Keep | `Authoring.lower/2`, Portable, Codec | DSL, import/export, `RunStrategy`, and standalone ReAct use these paths. They share Profile validation; they are not CLI-only builders. |
+| Keep | Request, Session, runtime Plugins | `agent/interface.ex` submits requests and waits for results. `session/inspection.ex` builds the public snapshot. Request, stream, cancellation, and reasoning unit tests cover these paths. |
+| Keep | Eight reasoning methods and their data APIs | `reasoning.ex` dispatches Profile methods. `reasoning/*` parsers, machines, results, and inspection helpers serve the native runtime and method tests. Removing a CLI adapter does not remove its method. |
+| Keep | Standalone ReAct Config, State, Token, Runner and Actions | `react.ex` provides run, stream, resume, collect, and cancel. `authoring/react_authoring.ex` lowers Config to a native Agent. `examples/14_resume` and ReAct unit tests call these APIs. |
+| Keep | Capability Plugins, planning, retrieval, quota, skills | `authoring/plugins/*` supplies core Agent composition. Examples in groups 07, 08, 13, 16, and 18 use it. `RunStrategy` is also a callable tool in 09_14 and 09_16. |
+| Keep | Session/Thread values and AI Context | Core Jido owns `Jido.Session` and `Jido.Thread`. AI history, initial-state conversion, and unit tests use them. No value API is removed here. |
+| Keep | Install, skill, and quality Mix tasks | These configure applications, manage skills, or run quality checks. They have separate unit tests and no dependency on `Mix.Tasks.JidoAi` or its adapters. |
+| Remove; complete | `mix jido_ai` and `Mix.Tasks.JidoAi` | The execution task was the CLI entry point. Its option parsing, stdin batches, output formatting, and telemetry display have no other runtime caller. |
+| Remove; complete | `Jido.AI.CLI.Adapter`, `Jido.AI.CLI.EphemeralAgent`, eight `CLIAdapter` modules | Adapter resolution and temporary module creation were called only by the task, adapters, and CLI tests. No retained source, example, or authoring fixture calls them. |
+| Remove; complete | `Jido.AI.Tools.Arithmetic` and Add, Subtract, Multiply, Divide, Square | ReAct's CLI adapter was the only runtime caller. The CLI task documentation was the only other use outside that implementation. Examples already have their own Actions. |
+| Simplify; proposed | `Jido.AI.get_strategy_config/1,2` and `get_strategy_context/1,2` | `Session.Inspection` still calls both. Four unit test files and two example test files also use them. Move internal reads to Profile/history before removing these V2-style public names. |
+| Simplify; proposed | Generated `ask`, `ask_sync`, `ask_stream`, `await`, `cancel`, `steer` helpers | `agent/definition.ex` generates them; `agent/interface.ex` resolves routes. Native Agent unit tests and examples still call them. Review overlap with route `define` helpers as a separate change. |
+| Move; proposed | Historical API and CLI obligations | Old audit files still describe the CLI as retained work. Keep historical evidence separate from the current supported API inventory. This record supersedes their CLI retention decision. |
+| Move; proposed | Any future execution shell or arithmetic demonstration | Put application-specific command behavior in a consumer application, and teaching Actions in examples. There is no retained caller that requires a replacement package now. |
+
+## Removed API details
+
+- `Mix.Tasks.JidoAi`: `run/1`, `prepare_invocation/1`, `supported_types/0`,
+  `option_parser_config/0`, `build_config/1`, `validate_format/1`,
+  `validate_invocation/2`, `format_error/1`, and `handle_trace_event/4`.
+- `Jido.AI.CLI.Adapter`: behaviour callbacks, `resolve/2`, `supported_types/0`,
+  `status/1`, and the optional caller convention `cli_adapter/0`.
+- `Jido.AI.CLI.EphemeralAgent.create/2`.
+- `Jido.AI.Reasoning.{ReAct,AlgorithmOfThoughts,ChainOfDraft,ChainOfThought,
+  TreeOfThoughts,GraphOfThoughts,TRM,Adaptive}.CLIAdapter`, including
+  `start_agent/3`, `submit/3`, `await/3`, `stop/1`, and
+  `create_ephemeral_agent/1`.
+- `Jido.AI.Tools.Arithmetic` and its five Action modules.
+
+Use a declared AI Agent and its request API for application execution.
+No replacement command or compatibility adapter is added. No dependency was
+used only by the CLI, so this removal does not change the dependency list.
+
+## Unit coverage and verification
+
+The unit file selection is `test/jido_ai/**/*_test.exs`, excluding
+`test/jido_ai/authoring/**`, plus `test/jido_ai_test.exs`. It includes the
+deterministic runtime tests under `test/jido_ai/integration`. It does not
+select `test/authoring` or `test/examples`. The existing `:flaky` exclusion
+also excludes the live provider test.
+
+Run from the package in zsh:
+
+```sh
+mix format --check-formatted
+mix compile --warnings-as-errors
+unit_tests=(${(f)"$(rg --files test/jido_ai test/jido_ai_test.exs -g '*_test.exs' -g '!test/jido_ai/authoring/**' | sort)"})
+mix test "${unit_tests[@]}" --warnings-as-errors --seed 0
+```
+
+Foundation result: 151 files; 1,907 passed, 1 excluded; no failures or skips.
+Format, compile, and `mix deps.get` passed. The first file filter was incorrect;
+that run was stopped and is not verification evidence.
+
+Removal result: 139 files; 1,794 passed, 1 excluded; no failures or skips.
+Format and compile passed. Both completed test runs used seed 0 and warnings
+as errors. The foundation run took 20.2 seconds; the removal run took 16.1 seconds.
+
+The 112 CLI-only tests and their mock helper are deleted with the implementation.
+The obsolete smoke wiring test is deleted. The existing native Chain-of-Draft
+completion test now has `:stable_smoke`. It checks the request result, retained
+status, method inspection, termination metadata, and Session cleanup. Supported
+request, reasoning, standalone, Plugin, and task tests remain.
+
+## Deferred documentation and example work
+
+- The CLI guide and its README, skills-guide, and ExDoc entries are removed.
+  No current example source or test refers to a removed CLI module.
+- `public-api-map.md`, `feature-map.md`, `api-inventory.json`,
+  `root-package-checkpoint.md`, `history-audit.md`, `history-audit.json`, and
+  `history-reviews/*` still contain CLI obligations or removed-file links.
+  Update their current-status sections in a later documentation step. Preserve
+  historical evidence. Their old CLI retention requirement no longer applies.
+- Authoring and example suites are deferred. Existing Mix settings still
+  compile example source and test support during dev/test builds. No example
+  repair was needed for this removal. Earlier results in `status.md` are prior
+  evidence, not a fresh run for this checkpoint.
+- Removing strategy inspection helpers later affects example tests 14_11 and
+  18_01. Record or update that work in its own checkpoint.
+
+## Recommended remaining pieces
+
+1. **Next: retire the two root strategy inspection helpers.** Change
+   `Session.Inspection` to read Profile configuration and committed history
+   directly. Preserve `Session.snapshot/2` output. Transfer the four affected
+   unit test files to supported Profile/Session/history APIs, then remove
+   `get_strategy_config/1,2` and `get_strategy_context/1,2`. Do not change method
+   execution or initial-state conversion in that step.
+2. Review generated Agent request helpers against route `define` helpers.
+   Choose one normal calling form. Keep request admission, stream, and cancel
+   behavior covered before removing any helper.
+3. Review capability and callable-reasoning defaults against Profile fields.
+   Remove duplicate option translation only where callers can use the shared
+   validation. Keep Plugin composition and all reasoning methods.
+4. Reconcile current guides and API inventories. Run the deferred authoring
+   and example suites after the API decisions are complete.

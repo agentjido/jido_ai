@@ -501,4 +501,3 @@ Do not use skills when:
 
 - [Plugins And Actions Composition](plugins_and_actions_composition.md)
 - [Configuration Reference](configuration_reference.md)
-- [CLI Workflows](../user/cli_workflows.md)

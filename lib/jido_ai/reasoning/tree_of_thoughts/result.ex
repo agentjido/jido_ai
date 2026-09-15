@@ -3,7 +3,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts.Result do
   Canonical structured result contract for Tree-of-Thoughts executions.
 
   This module builds a stable result payload from machine state that is safe for
-  SDK consumers and CLI projections.
+  SDK consumers.
   """
 
   alias Jido.AI.Reasoning.TreeOfThoughts.Machine
