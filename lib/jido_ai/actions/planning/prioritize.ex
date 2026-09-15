@@ -140,7 +140,7 @@ defmodule Jido.AI.Actions.Planning.Prioritize do
          {:ok, params, model, opts} <- Request.prepare(schema(), params, context),
          {:ok, req_context} <- build_prioritize_messages(params),
          {:ok, response} <-
-           Jido.AI.Runtime.ModelCall.request(:text, model, req_context.messages, opts, nil, context) do
+           Jido.AI.Model.Transport.request(:text, model, req_context.messages, opts, nil, context) do
       {:ok, format_result(response, model)}
     end
   end

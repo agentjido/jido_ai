@@ -708,7 +708,7 @@
       "modules": [
         "Jido.AI"
       ],
-      "sha256": "e0d4138ce55064d8594ae5d329fab71ababdf3e379fd5bb76f003fc4647e705c",
+      "sha256": "fb67ffa160b7e5c619b2fecf57f9ae4a98f6ce00ad78478134553505ffd05f52",
       "declarations": [
         {
           "line": 1,
@@ -726,161 +726,7 @@
           "quoted": false
         },
         {
-          "line": 65,
-          "module": "Jido.AI",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 66,
-          "module": "Jido.AI",
-          "name": "profile",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1,
-            2
-          ],
-          "clause_lines": [
-            66
-          ]
-        },
-        {
-          "line": 68,
-          "module": "Jido.AI",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 69,
-          "module": "Jido.AI",
-          "name": "profile!",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1,
-            2
-          ],
-          "clause_lines": [
-            69
-          ]
-        },
-        {
-          "line": 71,
-          "module": "Jido.AI",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 72,
-          "module": "Jido.AI",
-          "name": "inspect",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1,
-            2
-          ],
-          "clause_lines": [
-            72
-          ]
-        },
-        {
-          "line": 74,
-          "module": "Jido.AI",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 75,
-          "module": "Jido.AI",
-          "name": "preflight",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2,
-            3
-          ],
-          "clause_lines": [
-            75
-          ]
-        },
-        {
-          "line": 77,
-          "module": "Jido.AI",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 78,
-          "module": "Jido.AI",
-          "name": "export",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2,
-            3
-          ],
-          "clause_lines": [
-            78
-          ]
-        },
-        {
-          "line": 80,
-          "module": "Jido.AI",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 81,
-          "module": "Jido.AI",
-          "name": "import",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1,
-            2
-          ],
-          "clause_lines": [
-            81
-          ]
-        },
-        {
-          "line": 85,
-          "module": "Jido.AI",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 88,
-          "module": "Jido.AI",
-          "name": "register_tool",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2,
-            3
-          ],
-          "clause_lines": [
-            88
-          ]
-        },
-        {
-          "line": 93,
+          "line": 95,
           "module": "Jido.AI",
           "name": "doc",
           "status": "documented",
@@ -890,19 +736,41 @@
         {
           "line": 96,
           "module": "Jido.AI",
-          "name": "unregister_tool",
+          "name": "profile",
           "kind": "def",
           "quoted": false,
           "arities": [
-            2,
-            3
+            1,
+            2
           ],
           "clause_lines": [
             96
           ]
         },
         {
+          "line": 98,
+          "module": "Jido.AI",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
           "line": 99,
+          "module": "Jido.AI",
+          "name": "profile!",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1,
+            2
+          ],
+          "clause_lines": [
+            99
+          ]
+        },
+        {
+          "line": 101,
           "module": "Jido.AI",
           "name": "doc",
           "status": "documented",
@@ -912,19 +780,19 @@
         {
           "line": 102,
           "module": "Jido.AI",
-          "name": "set_system_prompt",
+          "name": "inspect",
           "kind": "def",
           "quoted": false,
           "arities": [
-            2,
-            3
+            1,
+            2
           ],
           "clause_lines": [
             102
           ]
         },
         {
-          "line": 105,
+          "line": 104,
           "module": "Jido.AI",
           "name": "doc",
           "status": "documented",
@@ -932,9 +800,9 @@
           "quoted": false
         },
         {
-          "line": 107,
+          "line": 105,
           "module": "Jido.AI",
-          "name": "set_tool_context",
+          "name": "preflight",
           "kind": "def",
           "quoted": false,
           "arities": [
@@ -942,7 +810,29 @@
             3
           ],
           "clause_lines": [
-            107
+            105
+          ]
+        },
+        {
+          "line": 107,
+          "module": "Jido.AI",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 108,
+          "module": "Jido.AI",
+          "name": "export",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2,
+            3
+          ],
+          "clause_lines": [
+            108
           ]
         },
         {
@@ -954,17 +844,17 @@
           "quoted": false
         },
         {
-          "line": 112,
+          "line": 111,
           "module": "Jido.AI",
-          "name": "set_tool_context_direct",
+          "name": "import",
           "kind": "def",
           "quoted": false,
           "arities": [
-            2,
-            3
+            1,
+            2
           ],
           "clause_lines": [
-            112
+            111
           ]
         },
         {
@@ -978,7 +868,7 @@
         {
           "line": 118,
           "module": "Jido.AI",
-          "name": "steer",
+          "name": "register_tool",
           "kind": "def",
           "quoted": false,
           "arities": [
@@ -990,7 +880,7 @@
           ]
         },
         {
-          "line": 127,
+          "line": 123,
           "module": "Jido.AI",
           "name": "doc",
           "status": "documented",
@@ -998,9 +888,9 @@
           "quoted": false
         },
         {
-          "line": 130,
+          "line": 126,
           "module": "Jido.AI",
-          "name": "inject",
+          "name": "unregister_tool",
           "kind": "def",
           "quoted": false,
           "arities": [
@@ -1008,11 +898,55 @@
             3
           ],
           "clause_lines": [
-            130
+            126
           ]
         },
         {
-          "line": 139,
+          "line": 129,
+          "module": "Jido.AI",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 132,
+          "module": "Jido.AI",
+          "name": "set_system_prompt",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2,
+            3
+          ],
+          "clause_lines": [
+            132
+          ]
+        },
+        {
+          "line": 135,
+          "module": "Jido.AI",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 137,
+          "module": "Jido.AI",
+          "name": "set_tool_context",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2,
+            3
+          ],
+          "clause_lines": [
+            137
+          ]
+        },
+        {
+          "line": 140,
           "module": "Jido.AI",
           "name": "doc",
           "status": "documented",
@@ -1022,19 +956,19 @@
         {
           "line": 142,
           "module": "Jido.AI",
-          "name": "list_tools",
+          "name": "set_tool_context_direct",
           "kind": "def",
           "quoted": false,
           "arities": [
-            1
+            2,
+            3
           ],
           "clause_lines": [
-            142,
-            149
+            142
           ]
         },
         {
-          "line": 151,
+          "line": 145,
           "module": "Jido.AI",
           "name": "doc",
           "status": "documented",
@@ -1042,7 +976,73 @@
           "quoted": false
         },
         {
-          "line": 154,
+          "line": 148,
+          "module": "Jido.AI",
+          "name": "steer",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2,
+            3
+          ],
+          "clause_lines": [
+            148
+          ]
+        },
+        {
+          "line": 157,
+          "module": "Jido.AI",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 160,
+          "module": "Jido.AI",
+          "name": "inject",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2,
+            3
+          ],
+          "clause_lines": [
+            160
+          ]
+        },
+        {
+          "line": 169,
+          "module": "Jido.AI",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 172,
+          "module": "Jido.AI",
+          "name": "list_tools",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            172,
+            179
+          ]
+        },
+        {
+          "line": 181,
+          "module": "Jido.AI",
+          "name": "doc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 184,
           "module": "Jido.AI",
           "name": "has_tool?",
           "kind": "def",
@@ -1051,12 +1051,12 @@
             2
           ],
           "clause_lines": [
-            154,
-            161
+            184,
+            191
           ]
         },
         {
-          "line": 164,
+          "line": 194,
           "module": "Jido.AI",
           "name": "doc",
           "status": "documented",
@@ -1064,7 +1064,7 @@
           "quoted": false
         },
         {
-          "line": 167,
+          "line": 197,
           "module": "Jido.AI",
           "name": "register_tool_direct",
           "kind": "def",
@@ -1074,11 +1074,11 @@
             3
           ],
           "clause_lines": [
-            167
+            197
           ]
         },
         {
-          "line": 172,
+          "line": 202,
           "module": "Jido.AI",
           "name": "doc",
           "status": "documented",
@@ -1086,7 +1086,7 @@
           "quoted": false
         },
         {
-          "line": 175,
+          "line": 205,
           "module": "Jido.AI",
           "name": "unregister_tool_direct",
           "kind": "def",
@@ -1095,11 +1095,11 @@
             2
           ],
           "clause_lines": [
-            175
+            205
           ]
         },
         {
-          "line": 178,
+          "line": 208,
           "module": "Jido.AI",
           "name": "doc",
           "status": "documented",
@@ -1107,7 +1107,7 @@
           "quoted": false
         },
         {
-          "line": 180,
+          "line": 210,
           "module": "Jido.AI",
           "name": "set_system_prompt_direct",
           "kind": "def",
@@ -1116,7 +1116,7 @@
             2
           ],
           "clause_lines": [
-            180
+            210
           ]
         }
       ]
@@ -1990,7 +1990,7 @@
       "modules": [
         "Jido.AI.Actions.LLM.Request"
       ],
-      "sha256": "6cc4c594e725dc4f3d7607ca11f7c7741f07095970b8bbf2435d4a0e4dab995d",
+      "sha256": "3960858b13541c8ad799480598afc1a566b6aed307b6eb31bf80a9564500507e",
       "declarations": [
         {
           "line": 1,
@@ -2027,7 +2027,7 @@
       "modules": [
         "Jido.AI.Actions.Planning.Decompose"
       ],
-      "sha256": "443abca73e6a5640980842cbf24a2f2a8caa148bc09d8eff32080662a68f7ecb",
+      "sha256": "e6ac18e5d77eaaa04ee6b3f42d637ccde05162f1b3b1bf2aa99d1bd4a3af95e4",
       "declarations": [
         {
           "line": 1,
@@ -2131,7 +2131,7 @@
       "modules": [
         "Jido.AI.Actions.Planning.Plan"
       ],
-      "sha256": "d057bdd0bafd92b43c679bbdc4499e87777c4f1460544d78c39cc61d437ad0ee",
+      "sha256": "0664a072e280aa7828cdee0a2a72fbcb6abb7c7f2e0f24ba7324f81aaf91e24d",
       "declarations": [
         {
           "line": 1,
@@ -2235,7 +2235,7 @@
       "modules": [
         "Jido.AI.Actions.Planning.Prioritize"
       ],
-      "sha256": "5c5ffb96b91ab6577a2401cdcca92a5a358f6ac7a034236c630bb6efd79dd699",
+      "sha256": "c0e51afa169241ef431ed87dbdcf1fc991012666b0bd8c92689a106f6e408592",
       "declarations": [
         {
           "line": 1,
@@ -4162,7 +4162,7 @@
       "modules": [
         "Jido.AI.Actions.ToolCalling.RequestModel"
       ],
-      "sha256": "af0ff1515822bbc7891bfea1333520269a3e7ed8e733af086adcd164785be535",
+      "sha256": "ac205ddaeb87a6a66b48bccb74db45d045309c6ed0af1a7b6d6e6e5ea28f1310",
       "declarations": [
         {
           "line": 1,
@@ -5048,7 +5048,7 @@
       "modules": [
         "Jido.AI.Capability"
       ],
-      "sha256": "3f12edcfa21e049aa930dbb18f26cc5337adf1696f1cc8aa068e9e042dba4ffd",
+      "sha256": "1867c98b7d95c964d7991410fc2055efe07c38efbd766f42bb751a00ea535497",
       "declarations": [
         {
           "line": 1,
@@ -5066,7 +5066,7 @@
           "quoted": false
         },
         {
-          "line": 4,
+          "line": 6,
           "module": "Jido.AI.Capability",
           "name": "prepared",
           "kind": "def",
@@ -5075,11 +5075,11 @@
             2
           ],
           "clause_lines": [
-            4
+            6
           ]
         },
         {
-          "line": 11,
+          "line": 13,
           "module": "Jido.AI.Capability",
           "name": "prepared_reasoning",
           "kind": "def",
@@ -5088,11 +5088,11 @@
             1
           ],
           "clause_lines": [
-            11
+            13
           ]
         },
         {
-          "line": 24,
+          "line": 26,
           "module": "Jido.AI.Capability",
           "name": "bind",
           "kind": "def",
@@ -5101,11 +5101,11 @@
             3
           ],
           "clause_lines": [
-            24
+            26
           ]
         },
         {
-          "line": 30,
+          "line": 32,
           "module": "Jido.AI.Capability",
           "name": "run",
           "kind": "def",
@@ -5114,8 +5114,8 @@
             4
           ],
           "clause_lines": [
-            30,
-            49
+            32,
+            51
           ]
         }
       ]
@@ -7308,11 +7308,55 @@
       ]
     },
     {
+      "path": "lib/jido_ai/model/generate.ex",
+      "modules": [
+        "Jido.AI.Model.Generate"
+      ],
+      "sha256": "5529f3091c9915662a20a82f563107c961f7155f5d40b2e96c13fed658449edf",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Model.Generate",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Model.Generate",
+          "name": "moduledoc",
+          "status": "documented",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 3,
+          "module": "Jido.AI.Model.Generate",
+          "source": "[Jido.Action, [name: \"ai_generate\"]]",
+          "kind": "use",
+          "quoted": false
+        },
+        {
+          "line": 6,
+          "module": "Jido.AI.Model.Generate",
+          "name": "run",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            6
+          ]
+        }
+      ]
+    },
+    {
       "path": "lib/jido_ai/model/messages.ex",
       "modules": [
         "Jido.AI.Model.Messages"
       ],
-      "sha256": "8ed7649ba060071a0532bf7de42fedcf021c217b9e71e86533fc96594eceb36d",
+      "sha256": "c2a37f9a8392d0b900d9a3bd9801903f62c846de008275e9dacf0642a5afb89e",
       "declarations": [
         {
           "line": 1,
@@ -7422,6 +7466,228 @@
           "clause_lines": [
             61
           ]
+        },
+        {
+          "line": 67,
+          "module": "Jido.AI.Model.Messages",
+          "name": "align_context",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            67,
+            90
+          ]
+        },
+        {
+          "line": 92,
+          "module": "Jido.AI.Model.Messages",
+          "name": "bind_response",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            92,
+            110
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_ai/model/options.ex",
+      "modules": [
+        "Jido.AI.Model.Options"
+      ],
+      "sha256": "a570a5db591f2d91c61504d2a75b21ad92f5a5bff387d8f5f756df0dcbad4683",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Model.Options",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Model.Options",
+          "name": "moduledoc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 7,
+          "module": "Jido.AI.Model.Options",
+          "name": "merge",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3
+          ],
+          "clause_lines": [
+            7,
+            9
+          ]
+        },
+        {
+          "line": 12,
+          "module": "Jido.AI.Model.Options",
+          "name": "normalize",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            12
+          ]
+        },
+        {
+          "line": 15,
+          "module": "Jido.AI.Model.Options",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 16,
+          "module": "Jido.AI.Model.Options",
+          "name": "merge_http_options",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            16,
+            18
+          ]
+        },
+        {
+          "line": 21,
+          "module": "Jido.AI.Model.Options",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 22,
+          "module": "Jido.AI.Model.Options",
+          "name": "normalize_option_names",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            22,
+            28,
+            35
+          ]
+        }
+      ]
+    },
+    {
+      "path": "lib/jido_ai/model/transport.ex",
+      "modules": [
+        "Jido.AI.Model.Transport"
+      ],
+      "sha256": "a84d6b2bdd383b2312e77d57b2162bb9bde615176f24bd417f1ff336d736b202",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Model.Transport",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Model.Transport",
+          "name": "moduledoc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 12,
+          "module": "Jido.AI.Model.Transport",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 13,
+          "module": "Jido.AI.Model.Transport",
+          "name": "put_option_binder",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            13
+          ]
+        },
+        {
+          "line": 18,
+          "module": "Jido.AI.Model.Transport",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 19,
+          "module": "Jido.AI.Model.Transport",
+          "name": "bind_options",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            19
+          ]
+        },
+        {
+          "line": 56,
+          "module": "Jido.AI.Model.Transport",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 57,
+          "module": "Jido.AI.Model.Transport",
+          "name": "request",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            4,
+            5,
+            6
+          ],
+          "clause_lines": [
+            57,
+            61
+          ]
+        },
+        {
+          "line": 60,
+          "module": "Jido.AI.Model.Transport",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
         }
       ]
     },
@@ -7476,7 +7742,7 @@
       "modules": [
         "Jido.AI.Models"
       ],
-      "sha256": "9404194fe79f4ba522fe8c37e2c4998f622ec3d43c102befb9e079a1a7534ee4",
+      "sha256": "634fabc734085afcc1189eb006da25373706dbd650be28d1c4a05e0e57a89536",
       "declarations": [
         {
           "line": 1,
@@ -7494,7 +7760,7 @@
           "quoted": false
         },
         {
-          "line": 15,
+          "line": 16,
           "module": "Jido.AI.Models",
           "name": "doc",
           "status": "documented",
@@ -7502,7 +7768,7 @@
           "quoted": false
         },
         {
-          "line": 17,
+          "line": 18,
           "module": "Jido.AI.Models",
           "name": "aliases",
           "kind": "def",
@@ -7511,11 +7777,11 @@
             0
           ],
           "clause_lines": [
-            17
+            18
           ]
         },
         {
-          "line": 23,
+          "line": 24,
           "module": "Jido.AI.Models",
           "name": "doc",
           "status": "documented",
@@ -7523,7 +7789,7 @@
           "quoted": false
         },
         {
-          "line": 25,
+          "line": 26,
           "module": "Jido.AI.Models",
           "name": "resolve",
           "kind": "def",
@@ -7532,13 +7798,80 @@
             1
           ],
           "clause_lines": [
-            25,
-            37,
+            26,
             38,
             39,
-            41,
-            45,
-            48
+            40,
+            42,
+            46,
+            49
+          ]
+        },
+        {
+          "line": 85,
+          "module": "Jido.AI.Models",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 86,
+          "module": "Jido.AI.Models",
+          "name": "label",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            86,
+            87,
+            89
+          ]
+        },
+        {
+          "line": 96,
+          "module": "Jido.AI.Models",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 97,
+          "module": "Jido.AI.Models",
+          "name": "fingerprint_segment",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            97,
+            100,
+            102
+          ]
+        },
+        {
+          "line": 109,
+          "module": "Jido.AI.Models",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 110,
+          "module": "Jido.AI.Models",
+          "name": "provider_option_keys",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            110
           ]
         }
       ]
@@ -8049,50 +8382,6 @@
           ],
           "clause_lines": [
             122
-          ]
-        }
-      ]
-    },
-    {
-      "path": "lib/jido_ai/operations/generate.ex",
-      "modules": [
-        "Jido.AI.Operations.Generate"
-      ],
-      "sha256": "9da7dec5868235ce10f3e42298dd9a8f43f488e6a729bcf6585fba7df405b6b3",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.AI.Operations.Generate",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.AI.Operations.Generate",
-          "name": "moduledoc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 3,
-          "module": "Jido.AI.Operations.Generate",
-          "source": "[Jido.Action, [name: \"ai_generate\"]]",
-          "kind": "use",
-          "quoted": false
-        },
-        {
-          "line": 6,
-          "module": "Jido.AI.Operations.Generate",
-          "name": "run",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            6
           ]
         }
       ]
@@ -15094,7 +15383,7 @@
       "modules": [
         "Jido.AI.Reasoning.ReAct.Config"
       ],
-      "sha256": "ada55b72f6c1253d2a82d1b30ff42fd4b72a3d03cecf4d656a23febfefbf738b",
+      "sha256": "b5d5d64c9a18eda26f778a5477aa012d9c050b24b30fef5166a89236e00c38bd",
       "declarations": [
         {
           "line": 1,
@@ -15112,14 +15401,14 @@
           "quoted": false
         },
         {
-          "line": 80,
+          "line": 76,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "source": "[Zoi.Struct.struct_fields(@schema)]",
           "kind": "defstruct",
           "quoted": false
         },
         {
-          "line": 82,
+          "line": 78,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "doc",
           "status": "hidden",
@@ -15127,7 +15416,7 @@
           "quoted": false
         },
         {
-          "line": 83,
+          "line": 79,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "schema",
           "kind": "def",
@@ -15136,11 +15425,11 @@
             0
           ],
           "clause_lines": [
-            83
+            79
           ]
         },
         {
-          "line": 85,
+          "line": 81,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "doc",
           "status": "documented",
@@ -15148,7 +15437,7 @@
           "quoted": false
         },
         {
-          "line": 89,
+          "line": 85,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "new",
           "kind": "def",
@@ -15158,11 +15447,11 @@
             1
           ],
           "clause_lines": [
-            89
+            85
           ]
         },
         {
-          "line": 177,
+          "line": 172,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "doc",
           "status": "documented",
@@ -15170,7 +15459,7 @@
           "quoted": false
         },
         {
-          "line": 181,
+          "line": 176,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "fingerprint",
           "kind": "def",
@@ -15179,11 +15468,11 @@
             1
           ],
           "clause_lines": [
-            181
+            176
           ]
         },
         {
-          "line": 203,
+          "line": 198,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "doc",
           "status": "documented",
@@ -15191,7 +15480,7 @@
           "quoted": false
         },
         {
-          "line": 207,
+          "line": 202,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "reqllm_tools",
           "kind": "def",
@@ -15200,11 +15489,11 @@
             1
           ],
           "clause_lines": [
-            207
+            202
           ]
         },
         {
-          "line": 213,
+          "line": 208,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "doc",
           "status": "documented",
@@ -15212,7 +15501,7 @@
           "quoted": false
         },
         {
-          "line": 221,
+          "line": 216,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "stream_timeout",
           "kind": "def",
@@ -15221,11 +15510,11 @@
             1
           ],
           "clause_lines": [
-            221
+            216
           ]
         },
         {
-          "line": 228,
+          "line": 223,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "doc",
           "status": "documented",
@@ -15233,7 +15522,7 @@
           "quoted": false
         },
         {
-          "line": 237,
+          "line": 232,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "tool_heartbeat_ms",
           "kind": "def",
@@ -15242,12 +15531,12 @@
             1
           ],
           "clause_lines": [
-            237,
-            240
+            232,
+            235
           ]
         },
         {
-          "line": 242,
+          "line": 237,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "doc",
           "status": "documented",
@@ -15255,7 +15544,7 @@
           "quoted": false
         },
         {
-          "line": 247,
+          "line": 242,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "llm_opts",
           "kind": "def",
@@ -15264,98 +15553,7 @@
             1
           ],
           "clause_lines": [
-            247
-          ]
-        },
-        {
-          "line": 265,
-          "module": "Jido.AI.Reasoning.ReAct.Config",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 274,
-          "module": "Jido.AI.Reasoning.ReAct.Config",
-          "name": "merge_llm_opts",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3,
-            4
-          ],
-          "clause_lines": [
-            274,
-            278,
-            281
-          ]
-        },
-        {
-          "line": 287,
-          "module": "Jido.AI.Reasoning.ReAct.Config",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 288,
-          "module": "Jido.AI.Reasoning.ReAct.Config",
-          "name": "merge_model_opts",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3
-          ],
-          "clause_lines": [
-            288,
-            290
-          ]
-        },
-        {
-          "line": 383,
-          "module": "Jido.AI.Reasoning.ReAct.Config",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 384,
-          "module": "Jido.AI.Reasoning.ReAct.Config",
-          "name": "merge_http_options",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            384,
-            386
-          ]
-        },
-        {
-          "line": 389,
-          "module": "Jido.AI.Reasoning.ReAct.Config",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 390,
-          "module": "Jido.AI.Reasoning.ReAct.Config",
-          "name": "normalize_option_names",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            390,
-            396,
-            403
+            242
           ]
         }
       ]
@@ -15536,7 +15734,7 @@
       "modules": [
         "Jido.AI.Reasoning.ReAct.Runner"
       ],
-      "sha256": "eea3fe788a1381aa8b23feeab7334e52692b31995e7ce57ca73978db536abeb4",
+      "sha256": "f7844c903d4bdd1c2f35c91a44d0568855c5bafe5de96fade0fc879702457882",
       "declarations": [
         {
           "line": 1,
@@ -18698,7 +18896,7 @@
         "Jido.AI.Request",
         "Jido.AI.Request.Handle"
       ],
-      "sha256": "f74b559263cae093595ce1216d9c0a8b7b43df0724912b0aabaa32c895e65cc3",
+      "sha256": "513c36ddd3f0f28897863550b9fa615924c644a7d378a96611329dbf18ec6ffb",
       "declarations": [
         {
           "line": 1,
@@ -19358,7 +19556,7 @@
       "modules": [
         "Jido.AI.Runtime.CallModel"
       ],
-      "sha256": "b9ccd5acf877a6639c026d6e942032440f6792ee76aee38ebbc6096ba375155f",
+      "sha256": "ff9fa110bd323d4db7960f1dd94576e8e9b4d3fda2ef900cc3152c4d1c78975f",
       "declarations": [
         {
           "line": 1,
@@ -19729,7 +19927,7 @@
       "modules": [
         "Jido.AI.Runtime.Event"
       ],
-      "sha256": "ee5a95a394b98b7d2884fa662cc5b3679374efeee848a2119ba5aa165736b0c9",
+      "sha256": "6dc91ee5c41ce483e7d8594db7b4270c696e6bcef650c2da29542ba0f0a706ac",
       "declarations": [
         {
           "line": 1,
@@ -19806,6 +20004,27 @@
           ],
           "clause_lines": [
             62
+          ]
+        },
+        {
+          "line": 85,
+          "module": "Jido.AI.Runtime.Event",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 86,
+          "module": "Jido.AI.Runtime.Event",
+          "name": "model_response",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3
+          ],
+          "clause_lines": [
+            86
           ]
         }
       ]
@@ -19892,176 +20111,11 @@
       ]
     },
     {
-      "path": "lib/jido_ai/runtime/model_call.ex",
-      "modules": [
-        "Jido.AI.Runtime.ModelCall"
-      ],
-      "sha256": "5ba2827617d91ea57ed5b8a1ac6d862e061e13984ba57bc54672296e837825ea",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.AI.Runtime.ModelCall",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.AI.Runtime.ModelCall",
-          "name": "moduledoc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 12,
-          "module": "Jido.AI.Runtime.ModelCall",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 13,
-          "module": "Jido.AI.Runtime.ModelCall",
-          "name": "put_option_binder",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            13
-          ]
-        },
-        {
-          "line": 18,
-          "module": "Jido.AI.Runtime.ModelCall",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 19,
-          "module": "Jido.AI.Runtime.ModelCall",
-          "name": "bind_options",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            19
-          ]
-        },
-        {
-          "line": 56,
-          "module": "Jido.AI.Runtime.ModelCall",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 57,
-          "module": "Jido.AI.Runtime.ModelCall",
-          "name": "request",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            4,
-            5,
-            6
-          ],
-          "clause_lines": [
-            57,
-            61
-          ]
-        },
-        {
-          "line": 60,
-          "module": "Jido.AI.Runtime.ModelCall",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 78,
-          "module": "Jido.AI.Runtime.ModelCall",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 79,
-          "module": "Jido.AI.Runtime.ModelCall",
-          "name": "label",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            79,
-            80,
-            82
-          ]
-        },
-        {
-          "line": 89,
-          "module": "Jido.AI.Runtime.ModelCall",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 90,
-          "module": "Jido.AI.Runtime.ModelCall",
-          "name": "fingerprint_segment",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            90,
-            93,
-            95
-          ]
-        },
-        {
-          "line": 102,
-          "module": "Jido.AI.Runtime.ModelCall",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 103,
-          "module": "Jido.AI.Runtime.ModelCall",
-          "name": "provider_option_keys",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            103
-          ]
-        }
-      ]
-    },
-    {
       "path": "lib/jido_ai/runtime/next_batch.ex",
       "modules": [
         "Jido.AI.Runtime.NextBatch"
       ],
-      "sha256": "3b97c50aae20ae384f42898e6733f8144e523ea98bcecdf3afcaeb9195e2573b",
+      "sha256": "5122c1cf39bf71aeacf47b9239d23d4336e5bdfa097946d9200e9fb976ff8962",
       "declarations": [
         {
           "line": 1,
@@ -20105,7 +20159,7 @@
       "modules": [
         "Jido.AI.Runtime.OutputState"
       ],
-      "sha256": "d882a5e60059201669f70bac92c532421ac7edab98c038f0781e88222f895654",
+      "sha256": "b0a3067fdf7d5d28b9cef45f073cf1fd42cec29e49865e1490ce1933ed95b06e",
       "declarations": [
         {
           "line": 1,
@@ -20219,7 +20273,7 @@
       "modules": [
         "Jido.AI.Runtime.PendingInput"
       ],
-      "sha256": "ecd7377c254907c9f0f01e17617acb1df9c709a693017fd2b544e5d4b06f5c1b",
+      "sha256": "110b0c4ff29a73091519a58c56fec7c124d614228905d213f8de76d15515fba4",
       "declarations": [
         {
           "line": 1,
@@ -20582,7 +20636,7 @@
       "modules": [
         "Jido.AI.Runtime.Prepare"
       ],
-      "sha256": "998788acddb4a2cff380f9aa14e785200feba1038d7c4cbaee854ee18b03e861",
+      "sha256": "0e310d4ea8991665f27d828a494de04646fe5f14e32449f31c0c503b5e92db35",
       "declarations": [
         {
           "line": 1,
@@ -20657,7 +20711,7 @@
       "modules": [
         "Jido.AI.Runtime.RequestTransform"
       ],
-      "sha256": "daead7f9dbaf33c4403e23dab6dbce4160986e170483c4e3e22714e5170bb820",
+      "sha256": "cdab9dc4b880133081926f4b0b88605f82febd619d62b6c21d7bc77fd4f7ee56",
       "declarations": [
         {
           "line": 1,
@@ -20711,57 +20765,6 @@
           ],
           "clause_lines": [
             195
-          ]
-        }
-      ]
-    },
-    {
-      "path": "lib/jido_ai/runtime/response.ex",
-      "modules": [
-        "Jido.AI.Runtime.Response"
-      ],
-      "sha256": "fae97e14e16d1a43bc568d230faf57e705946a8006a6f63a29a97c7c32fac469",
-      "declarations": [
-        {
-          "line": 1,
-          "module": null,
-          "name": "Jido.AI.Runtime.Response",
-          "kind": "defmodule",
-          "quoted": false
-        },
-        {
-          "line": 2,
-          "module": "Jido.AI.Runtime.Response",
-          "name": "moduledoc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 7,
-          "module": "Jido.AI.Runtime.Response",
-          "name": "align_context",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            7,
-            30
-          ]
-        },
-        {
-          "line": 32,
-          "module": "Jido.AI.Runtime.Response",
-          "name": "event",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3
-          ],
-          "clause_lines": [
-            32
           ]
         }
       ]
@@ -23322,7 +23325,7 @@
       "modules": [
         "Jido.AI.Session.Runtime"
       ],
-      "sha256": "a6f70a46e202b23a5b41296b0e0fe0dd2ad186402b5925d0c30c49c580cb66ab",
+      "sha256": "b0ead5e0d2f5a93141e4c4a9f8075d5c8925e7cda5495fbbcd6f274eb1a162c1",
       "declarations": [
         {
           "line": 1,
@@ -23553,7 +23556,7 @@
       "modules": [
         "Jido.AI.Session.Transcript"
       ],
-      "sha256": "b12cc0c15dd92e50a2addbbd6834533bebb022330dc1dc7acaaa9a62c5079971",
+      "sha256": "81ddd95078263cce9fed82c987822de95ad67fa4ef971c79d05fe21eab2cf79a",
       "declarations": [
         {
           "line": 1,
@@ -23614,33 +23617,19 @@
         {
           "line": 36,
           "module": "Jido.AI.Session.Transcript",
-          "name": "bind_message",
+          "name": "request_refs",
           "kind": "def",
           "quoted": false,
           "arities": [
-            2,
-            3
+            1,
+            2
           ],
           "clause_lines": [
             36
           ]
         },
         {
-          "line": 46,
-          "module": "Jido.AI.Session.Transcript",
-          "name": "bind_response",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            46,
-            64
-          ]
-        },
-        {
-          "line": 66,
+          "line": 43,
           "module": "Jido.AI.Session.Transcript",
           "name": "start",
           "kind": "def",
@@ -23649,11 +23638,11 @@
             4
           ],
           "clause_lines": [
-            66
+            43
           ]
         },
         {
-          "line": 71,
+          "line": 48,
           "module": "Jido.AI.Session.Transcript",
           "name": "append",
           "kind": "def",
@@ -23662,12 +23651,12 @@
             3
           ],
           "clause_lines": [
-            71,
-            73
+            48,
+            50
           ]
         },
         {
-          "line": 80,
+          "line": 57,
           "module": "Jido.AI.Session.Transcript",
           "name": "record",
           "kind": "def",
@@ -23676,7 +23665,7 @@
             3
           ],
           "clause_lines": [
-            80
+            57
           ]
         }
       ]
@@ -28575,7 +28564,7 @@
       "modules": [
         "Jido.AI.Test.ReActScript"
       ],
-      "sha256": "040342b8e5162a7f6dfafe10b9b3a5469f0f2c5b0a450b665a40ddefb4d6b3b2",
+      "sha256": "d82da5ac3c8e79fe0e902f3c597675e95d4f09d89d36751fe5e64ba627d9bc20",
       "declarations": [
         {
           "line": 1,
@@ -31685,7 +31674,7 @@
   ],
   "historical_inventory": "api-inventory-v2.json",
   "contract_map": "public-api-map.md",
-  "source_digest": "e312ea688ee6da9b4ec4efdcbb002a1bf4136366f06809e62485e95fb50f156c",
+  "source_digest": "a67f53bb6b25368d8dfeaf6d94a5bf5dd43ae1a524d56e13fc1ff135f94a0b3e",
   "file_count": 255,
   "ownership": {
     "Jido.Session": "jido_ai",

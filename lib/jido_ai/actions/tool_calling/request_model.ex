@@ -4,7 +4,7 @@ defmodule Jido.AI.Actions.ToolCalling.RequestModel do
   alias Jido.AI.{Turn, Usage}
 
   def run(state, context) do
-    case Jido.AI.Runtime.ModelCall.request(
+    case Jido.AI.Model.Transport.request(
            :text,
            state.model,
            state.messages,

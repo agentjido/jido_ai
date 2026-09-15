@@ -171,7 +171,7 @@ defmodule Jido.AI.TestHelpersTest do
       mock = start_supervised!({Jido.AI.Test.MockLLM, script: [%{reply: {:text, "plain reply"}}]})
 
       assert {:ok, response} =
-               Jido.AI.Runtime.ModelCall.request(
+               Jido.AI.Model.Transport.request(
                  :text,
                  Jido.AI.Test.MockLLM.model(),
                  "plain input",

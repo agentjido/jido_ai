@@ -5,11 +5,41 @@ defmodule Jido.AI do
   Jido.AI adds AI authoring and runtime behavior to normal Jido Agents.
   ReqLLM and LLMDB remain the native model APIs.
 
-  ## Features
+  ## Core values and execution
 
-  - Model aliases for semantic model references
-  - Action-based AI workflows
-  - Splode-based error handling
+  Use `Jido.AI.Agent` + `Jido.AI.DSL` + `Jido.AI.Profile` to define an AI Agent.
+  There is one shared model/tool runtime, including for standalone ReAct.
+
+  - `Jido.AI.Profile` defines the model, tools, limits, and result destination.
+  - `Jido.AI.Request` provides handles for individual requests.
+  - `Jido.Session` owns one `Jido.Thread` of `Jido.Thread.Entry` values.
+    These values belong to this package. They do not own processes.
+  - `Jido.AI.Session` is the live request-control API, not a second Session value.
+  - `Jido.AI.Tools.Executor` executes tools. `Jido.AI.Turn` only represents
+    responses and projects messages.
+
+  Internal ownership under lib is:
+
+  ```text
+  agent/ + dsl/       authoring and lowering through Profile
+  session/           admission, worker lifetime, commit, delivery
+  runtime/           temporary execution state and shared reasoning Flow
+  thread/            AI entry projection and conversation controls
+  model/             provider transport, options, and message adaptation
+  tools/             shared tool execution through core Exec
+  ```
+
+  Runtime and Session Plugins install core integration. A Plugin is an
+  implementation mechanism; it does not necessarily mean an optional feature.
+
+  ## Optional capabilities
+
+  Reasoning methods, Skills and resources, retrieval, planning, quota services,
+  model routing, structured output, tool interception, and conversation controls
+  attach to the core request path. Portable authoring import/export and the
+  standalone ReAct interface are adapters over that path. They do not define
+  another Agent or conversation store. All eight reasoning methods remain
+  supported; resumable tokens are specific to the standalone ReAct adapter.
 
   ## Model Aliases
 

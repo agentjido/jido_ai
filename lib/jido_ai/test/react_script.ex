@@ -71,7 +71,7 @@ defmodule Jido.AI.Test.ReActScript do
 
   @doc false
   def install_option_binder,
-    do: Jido.AI.Runtime.ModelCall.put_option_binder(&__MODULE__.bind_model_options/2)
+    do: Jido.AI.Model.Transport.put_option_binder(&__MODULE__.bind_model_options/2)
 
   @doc false
   def bind_model_options(%ReqLLM.Context{messages: messages}, options),

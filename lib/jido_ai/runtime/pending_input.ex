@@ -64,7 +64,12 @@ defmodule Jido.AI.Runtime.PendingInput do
                at_ms: item.at_ms
              }) do
           :ok ->
-            message = Jido.AI.Session.Transcript.bind_message(ReqLLM.Context.user(item.content), context, entry.refs)
+            message =
+              Jido.AI.Model.Messages.put_refs(
+                ReqLLM.Context.user(item.content),
+                Jido.AI.Session.Transcript.request_refs(context, entry.refs)
+              )
+
             messages = ReqLLM.Context.append(state.messages, message)
             {:cont, {:ok, %{state | messages: messages}}}
 

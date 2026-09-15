@@ -70,7 +70,7 @@ defmodule Jido.AI.Actions.LLM.Request do
          options =
            if(kind == :embed, do: Keyword.put(options, :return_usage, true), else: options),
          {:ok, response} <-
-           Jido.AI.Runtime.ModelCall.request(
+           Jido.AI.Model.Transport.request(
              request_kind(kind),
              model,
              input,

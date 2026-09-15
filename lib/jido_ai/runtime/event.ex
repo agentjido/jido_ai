@@ -81,4 +81,27 @@ defmodule Jido.AI.Runtime.Event do
     raise ArgumentError,
           "invalid runtime event kind: #{inspect(kind)}; expected one of #{inspect(@kind_values)}"
   end
+
+  @doc false
+  def model_response(response, state, request) do
+    calls = ReqLLM.Response.tool_calls(response)
+
+    Map.merge(
+      %{
+        call_id: state.llm_call_id,
+        response_id: response.id,
+        iteration: state.model_calls + 1,
+        model: Jido.AI.Models.label(request.model),
+        turn_type: if(request.schema != nil or calls == [], do: :final_answer, else: :tool_calls),
+        text: ReqLLM.Response.text(response),
+        content_parts: if(response.message, do: response.message.content, else: []),
+        thinking_content: ReqLLM.Response.thinking(response),
+        reasoning_details: if(response.message, do: response.message.reasoning_details),
+        tool_calls: Enum.map(calls, &ReqLLM.ToolCall.to_map/1),
+        usage: response.usage,
+        finish_reason: response.finish_reason
+      },
+      Jido.AI.Reasoning.event(state)
+    )
+  end
 end

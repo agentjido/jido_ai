@@ -72,7 +72,7 @@ defmodule Jido.AI.Runtime.CallModel do
                %{
                  model_call: state.model_calls + 1,
                  call_id: state.llm_call_id,
-                 model: Jido.AI.Runtime.ModelCall.label(request.model)
+                 model: Jido.AI.Models.label(request.model)
                },
                Jido.AI.Reasoning.event(state)
              )
@@ -80,7 +80,7 @@ defmodule Jido.AI.Runtime.CallModel do
          {:model_result, {:ok, %{response: response}}} <-
            {:model_result,
             Jido.Exec.run(
-              Jido.AI.Operations.Generate,
+              Jido.AI.Model.Generate,
               request,
               context
               |> Map.take([:jido_ai_events, :jido_ai_quota])
@@ -88,13 +88,13 @@ defmodule Jido.AI.Runtime.CallModel do
               timeout: remaining
             )},
          :ok <- Control.check(state.profile, :model, response, context, state.deadline),
-         response = Jido.AI.Session.Transcript.bind_response(response, context),
+         response = Jido.AI.Model.Messages.bind_response(response, Jido.AI.Session.Transcript.request_refs(context)),
          :ok <- Jido.AI.Session.account(context, response.usage),
          :ok <- terminal_response(response, request, state, context),
          {:ok, state} <-
            Jido.AI.Session.Transcript.record(state, Jido.AI.Model.Messages.entries([response.message]), context),
          true <- System.monotonic_time(:millisecond) < state.deadline do
-      event = Jido.AI.Runtime.Response.event(response, state, request)
+      event = Jido.AI.Runtime.Event.model_response(response, state, request)
       :ok = Jido.AI.Session.emit(context, :llm_completed, event)
 
       response_meta =

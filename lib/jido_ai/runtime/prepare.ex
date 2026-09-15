@@ -23,9 +23,9 @@ defmodule Jido.AI.Runtime.Prepare do
 
       options =
         Jido.AI.Reasoning.generation(profile, entry.generation)
-        |> Jido.AI.Reasoning.ReAct.Config.merge_http_options(runtime_options[:req_http_options])
+        |> Jido.AI.Model.Options.merge_http_options(runtime_options[:req_http_options])
         |> Keyword.merge(Keyword.delete(runtime_options, :req_http_options))
-        |> then(&Jido.AI.Reasoning.ReAct.Config.merge_model_opts([], &1, model))
+        |> then(&Jido.AI.Model.Options.merge([], &1, model))
 
       instructions =
         Jido.AI.Reasoning.instructions(profile, output)
@@ -38,9 +38,9 @@ defmodule Jido.AI.Runtime.Prepare do
         messages ++
           history_messages ++
           [
-            Jido.AI.Session.Transcript.bind_message(
+            Jido.AI.Model.Messages.put_refs(
               ReqLLM.Context.user(Jido.AI.Reasoning.query(profile, query)),
-              context
+              Jido.AI.Session.Transcript.request_refs(context)
             )
           ]
 

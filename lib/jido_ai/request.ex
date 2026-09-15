@@ -190,7 +190,7 @@ defmodule Jido.AI.Request do
     req_http_options = Keyword.get(opts, :req_http_options, [])
 
     llm_opts =
-      Jido.AI.Runtime.ModelCall.bind_options([%{role: :user, content: query}], Keyword.get(opts, :llm_opts, []))
+      Jido.AI.Model.Transport.bind_options([%{role: :user, content: query}], Keyword.get(opts, :llm_opts, []))
 
     output = Keyword.get(opts, :output)
     request_id = Keyword.get_lazy(opts, :request_id, &generate_id/0)

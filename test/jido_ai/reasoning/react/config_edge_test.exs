@@ -40,11 +40,11 @@ defmodule Jido.AI.Reasoning.ReAct.ConfigEdgeTest do
   test "drops invalid option keys and handles non-list stored options" do
     config = Config.new(model: :fast)
 
-    assert Config.merge_model_opts([], %{12 => :ignored, provider_options: %{12 => :ignored}}, config.model) == [
+    assert Jido.AI.Model.Options.merge([], %{12 => :ignored, provider_options: %{12 => :ignored}}, config.model) == [
              provider_options: []
            ]
 
-    assert Config.merge_model_opts([max_tokens: 10], :invalid, config.model) == [max_tokens: 10]
+    assert Jido.AI.Model.Options.merge([max_tokens: 10], :invalid, config.model) == [max_tokens: 10]
 
     malformed = %{config | llm: %{config.llm | llm_opts: :invalid}}
     assert Config.llm_opts(malformed)[:max_tokens] == config.llm.max_tokens

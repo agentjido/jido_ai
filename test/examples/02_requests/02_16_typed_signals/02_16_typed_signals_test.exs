@@ -326,7 +326,7 @@ defmodule JidoAI.Examples.TypedSignalsTest do
 
     assert {:ok, %{response: response}} =
              Jido.Exec.run(
-               Jido.AI.Operations.Generate,
+               Jido.AI.Model.Generate,
                %{
                  model: context.model,
                  messages: "Convert",

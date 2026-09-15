@@ -754,10 +754,10 @@ defmodule Jido.AI.Session.Runtime do
     model = profile.models[profile.reasoning.model].model
 
     options =
-      Jido.AI.Reasoning.ReAct.Config.merge_model_opts(options, resources[:llm_opts], model)
+      Jido.AI.Model.Options.merge(options, resources[:llm_opts], model)
 
     options =
-      Jido.AI.Reasoning.ReAct.Config.merge_http_options(options, resources[:req_http_options])
+      Jido.AI.Model.Options.merge_http_options(options, resources[:req_http_options])
 
     ai =
       Map.update(

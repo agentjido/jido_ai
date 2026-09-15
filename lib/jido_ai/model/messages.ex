@@ -60,4 +60,52 @@ defmodule Jido.AI.Model.Messages do
 
   def clear_refs(%ReqLLM.Message{metadata: metadata} = message),
     do: %{message | metadata: Map.drop(metadata, [@refs_key, Atom.to_string(@refs_key)])}
+
+  # Some provider builders add an empty text marker after putting the assistant
+  # message in response.context. Keep both views equal only for that exact,
+  # lossless difference. Distinct unresolved tool messages must still fail.
+  def align_context(
+        %ReqLLM.Response{
+          message:
+            %ReqLLM.Message{
+              role: :assistant,
+              content: [%ReqLLM.Message.ContentPart{type: :text, text: ""}],
+              tool_calls: calls
+            } = message,
+          context: %ReqLLM.Context{messages: messages} = context
+        } = response
+      )
+      when is_list(calls) and calls != [] do
+    case List.pop_at(messages, -1) do
+      {%ReqLLM.Message{content: []} = previous, prefix} ->
+        if previous == %{message | content: []},
+          do: %{response | context: %{context | messages: prefix ++ [message]}},
+          else: response
+
+      _ ->
+        response
+    end
+  end
+
+  def align_context(response), do: response
+
+  def bind_response(%ReqLLM.Response{message: %ReqLLM.Message{} = original} = response, refs) do
+    message = original |> clear_refs() |> put_refs(refs)
+
+    updated =
+      case response.context do
+        %ReqLLM.Context{messages: messages} = conversation ->
+          case List.pop_at(messages, -1) do
+            {^original, prefix} -> %{conversation | messages: prefix ++ [message]}
+            _ -> conversation
+          end
+
+        other ->
+          other
+      end
+
+    %{response | message: message, context: updated}
+  end
+
+  def bind_response(response, _), do: response
 end

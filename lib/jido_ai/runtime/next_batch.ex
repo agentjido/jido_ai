@@ -14,7 +14,9 @@ defmodule Jido.AI.Runtime.NextBatch do
          results =
            Enum.map(state.tool_results, fn result ->
              ReqLLM.Context.tool_result(result.id, result.name, result.content)
-             |> Jido.AI.Session.Transcript.bind_message(context, Map.get(result, :refs, %{}))
+             |> Jido.AI.Model.Messages.put_refs(
+               Jido.AI.Session.Transcript.request_refs(context, Map.get(result, :refs, %{}))
+             )
            end),
          {:ok, messages} <-
            ReqLLM.Context.append_tool_exchange(state.response.context, state.response, results),

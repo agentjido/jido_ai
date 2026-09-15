@@ -25,7 +25,7 @@ defmodule Jido.AI.Test.ReasoningCase do
     generation =
       opts
       |> Keyword.get(:llm_opts, [])
-      |> Jido.AI.Reasoning.ReAct.Config.normalize_option_names()
+      |> Jido.AI.Model.Options.normalize_option_names()
       |> Enum.into([])
       |> then(fn values ->
         values = if opts[:temperature], do: Keyword.put(values, :temperature, opts[:temperature]), else: values

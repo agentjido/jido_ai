@@ -4,8 +4,9 @@ defmodule Jido.AI.Models do
 
   ReqLLM owns model validation, normalization, provider calls, messages,
   responses, tools, and errors. LLMDB owns model records and catalog data.
-  This module adds only application-level names such as `:fast` and
-  `:capable`.
+  This module adds application-level names such as `:fast` and `:capable`.
+  Internal identity and provider-option helpers use those same native inputs;
+  they do not call a model or define another model value.
   """
 
   @type alias_name :: atom()
@@ -79,5 +80,64 @@ defmodule Jido.AI.Models do
   defp invalid_model_message(model, reason) do
     detail = if is_exception(reason), do: Exception.message(reason), else: inspect(reason)
     "Expected a valid ReqLLM model input, got: #{inspect(model)}. #{detail}"
+  end
+
+  @doc false
+  def label(model) when is_atom(model), do: model |> resolve() |> label()
+  def label(model) when is_binary(model), do: model
+
+  def label(model) do
+    case ReqLLM.model(model) do
+      {:ok, %LLMDB.Model{} = normalized} -> format_label(normalized)
+      _ -> inspect(model)
+    end
+  end
+
+  @doc false
+  def fingerprint_segment(model) when is_atom(model),
+    do: model |> resolve() |> fingerprint_segment()
+
+  def fingerprint_segment(model) when is_binary(model), do: model
+
+  def fingerprint_segment(model) do
+    model
+    |> normalized_fingerprint_term()
+    |> :erlang.term_to_binary([:deterministic])
+    |> Base.url_encode64(padding: false)
+  end
+
+  @doc false
+  def provider_option_keys(model) do
+    with {:ok, %LLMDB.Model{} = normalized} <- ReqLLM.model(resolve(model)),
+         provider when is_atom(provider) <- normalized.provider,
+         {:ok, provider_module} <- ReqLLM.provider(provider),
+         true <- function_exported?(provider_module, :provider_schema, 0) do
+      provider_module.provider_schema().schema
+      |> Keyword.keys()
+      |> Map.new(&{Atom.to_string(&1), &1})
+    else
+      _ -> %{}
+    end
+  end
+
+  defp format_label(%LLMDB.Model{} = model) do
+    model_id = model.model || model.id
+
+    if (is_atom(model.provider) or is_binary(model.provider)) and is_binary(model_id),
+      do: "#{model.provider}:#{model_id}",
+      else: inspect(model)
+  end
+
+  defp normalized_fingerprint_term(model) do
+    case ReqLLM.model(model) do
+      {:ok, %LLMDB.Model{} = normalized} ->
+        normalized
+        |> Map.from_struct()
+        |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+        |> Map.new()
+
+      _ ->
+        model
+    end
   end
 end

@@ -1,5 +1,7 @@
 defmodule Jido.AI.Capability do
   @moduledoc false
+  # Optional Plugin capability adapter. Native Profile requests are owned by
+  # Runtime and Session; this module does not define another Agent lifecycle.
 
   def prepared(context, package) when is_map(context) do
     context

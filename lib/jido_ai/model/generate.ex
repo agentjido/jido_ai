@@ -1,4 +1,4 @@
-defmodule Jido.AI.Operations.Generate do
+defmodule Jido.AI.Model.Generate do
   @moduledoc "One provider request through ReqLLM. Core Exec owns its work lifetime."
   use Jido.Action, name: "ai_generate"
 
@@ -24,7 +24,7 @@ defmodule Jido.AI.Operations.Generate do
        ) do
     kind = if is_nil(schema), do: :stream, else: :stream_object
 
-    with {:ok, stream} <- Jido.AI.Runtime.ModelCall.request(kind, model, messages, opts, schema) do
+    with {:ok, stream} <- Jido.AI.Model.Transport.request(kind, model, messages, opts, schema) do
       try do
         callbacks = [
           on_chunk: fn chunk ->
@@ -42,7 +42,7 @@ defmodule Jido.AI.Operations.Generate do
         ]
 
         with {:ok, response} <- Jido.AI.Usage.Stream.process(stream, callbacks),
-             do: {:ok, %{response: Jido.AI.Runtime.Response.align_context(response)}}
+             do: {:ok, %{response: Jido.AI.Model.Messages.align_context(response)}}
       after
         ReqLLM.StreamResponse.close(stream)
       end
@@ -52,8 +52,8 @@ defmodule Jido.AI.Operations.Generate do
   defp execute(%{model: model, messages: messages, options: opts, schema: schema}, _, _progress) do
     kind = if is_nil(schema), do: :text, else: :object
 
-    with {:ok, response} <- Jido.AI.Runtime.ModelCall.request(kind, model, messages, opts, schema),
-         do: {:ok, %{response: Jido.AI.Runtime.Response.align_context(response)}}
+    with {:ok, response} <- Jido.AI.Model.Transport.request(kind, model, messages, opts, schema),
+         do: {:ok, %{response: Jido.AI.Model.Messages.align_context(response)}}
   end
 
   defp delta(_, _, _, text) when text in [nil, ""], do: :ok
@@ -63,6 +63,6 @@ defmodule Jido.AI.Operations.Generate do
       Jido.AI.Session.emit(context, :llm_delta, %{
         chunk_type: kind,
         delta: text,
-        model: Jido.AI.Runtime.ModelCall.label(model)
+        model: Jido.AI.Models.label(model)
       })
 end

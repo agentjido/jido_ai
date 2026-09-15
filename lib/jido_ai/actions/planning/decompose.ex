@@ -124,7 +124,7 @@ defmodule Jido.AI.Actions.Planning.Decompose do
     with {:ok, params, model, opts} <- Request.prepare(schema(), params, context),
          {:ok, req_context} <- build_decompose_messages(params),
          {:ok, response} <-
-           Jido.AI.Runtime.ModelCall.request(:text, model, req_context.messages, opts, nil, context) do
+           Jido.AI.Model.Transport.request(:text, model, req_context.messages, opts, nil, context) do
       {:ok, format_result(response, model, params[:goal], clamp_depth(params[:max_depth] || 3))}
     end
   end

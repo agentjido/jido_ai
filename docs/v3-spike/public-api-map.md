@@ -60,6 +60,18 @@ This separation does not add resume support to other reasoning methods.
 
 ## Models, tools, and capabilities
 
+Provider transport now lives under `Model`: `Model.Transport` owns the ReqLLM
+call boundary and test-option binding; `Model.Generate` owns the bounded
+generation Action; `Model.Options` owns provider option normalization and
+HTTP option merging; `Model.Messages` owns message metadata and response
+alignment. `Models` resolves model identities. Runtime events remain in
+`Runtime.Event`. The old `Runtime.ModelCall`, `Runtime.Response`, and
+`Operations.Generate` modules are removed without forwarding modules.
+
+ReAct Config no longer supplies generic model option helpers. Its standalone
+configuration construction and `llm_opts/1` projection use `Model.Options`.
+Internal callers pass the selected model explicitly when merging options.
+
 `Jido.AI.Tools.Executor` owns direct tool execution (`execute`, `execute_module`,
 `run_tools`, and `run_tool_calls`). Profile tool attempts use its internal
 target boundary before applying Profile policy. `Jido.AI.Turn` only normalizes

@@ -33,35 +33,12 @@ defmodule Jido.AI.Session.Transcript do
 
   def read(_, _), do: Profile.error("memory.history", "Expected initialized Agent state")
 
-  def bind_message(message, context, extra_refs \\ %{}) do
-    refs =
-      case context[:jido_ai_request_record] do
-        nil -> extra_refs
-        record -> Map.merge(refs(record, context.jido_ai_input_source), extra_refs)
-      end
-
-    Messages.put_refs(message, refs)
+  def request_refs(context, extra_refs \\ %{}) do
+    case context[:jido_ai_request_record] do
+      nil -> extra_refs
+      record -> Map.merge(refs(record, context.jido_ai_input_source), extra_refs)
+    end
   end
-
-  def bind_response(%ReqLLM.Response{message: %ReqLLM.Message{} = original} = response, context) do
-    message = original |> Messages.clear_refs() |> bind_message(context)
-
-    updated =
-      case response.context do
-        %ReqLLM.Context{messages: messages} = conversation ->
-          case List.pop_at(messages, -1) do
-            {^original, prefix} -> %{conversation | messages: prefix ++ [message]}
-            _ -> conversation
-          end
-
-        other ->
-          other
-      end
-
-    %{response | message: message, context: updated}
-  end
-
-  def bind_response(response, _), do: response
 
   def start(state, profile, record, source) do
     with {:ok, _} <- read(state, profile),

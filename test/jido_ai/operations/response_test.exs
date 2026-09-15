@@ -5,11 +5,11 @@ defmodule Jido.AI.Runtime.ResponseTest do
 
   test "an empty text marker keeps the exact same assistant in the response and context" do
     {response, prefix} = response("one")
-    fixed = Jido.AI.Runtime.Response.align_context(response)
+    fixed = Jido.AI.Model.Messages.align_context(response)
     assert fixed.message == response.message
     assert fixed.context.messages == prefix ++ [fixed.message]
     assert fixed.context.tools == response.context.tools
-    assert Jido.AI.Runtime.Response.align_context(fixed) == fixed
+    assert Jido.AI.Model.Messages.align_context(fixed) == fixed
     result = Context.tool_result("one", "echo", "7")
     assert {:ok, context} = Context.append_tool_exchange(fixed.context, fixed, [result])
     assert context.messages == prefix ++ [fixed.message, result]
@@ -26,7 +26,7 @@ defmodule Jido.AI.Runtime.ResponseTest do
 
       previous = %{response.message | content: [], tool_calls: [call]}
       response = %{response | context: %{response.context | messages: prefix ++ [previous]}}
-      assert Jido.AI.Runtime.Response.align_context(response) == response
+      assert Jido.AI.Model.Messages.align_context(response) == response
 
       assert {:error, %{tag: :tool_context_continuation, context: [kind: :pending_tool_calls]}} =
                Context.append_tool_exchange(response.context, response, [Context.tool_result("one", "echo", "7")])

@@ -2,7 +2,7 @@ defmodule Jido.AI.Runtime.ModelCallTest do
   use ExUnit.Case, async: true
 
   alias Jido.AI.Quota.Store
-  alias Jido.AI.Runtime.ModelCall
+  alias Jido.AI.Model.Transport, as: ModelCall
   alias Jido.AI.Test.MockLLM
 
   @schema %{type: "object", properties: %{name: %{type: "string"}}, required: ["name"], additionalProperties: false}

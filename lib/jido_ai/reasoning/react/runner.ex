@@ -26,7 +26,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp build_stream(state, config, opts) do
     messages = if opts[:query], do: [%{role: :user, content: opts[:query]}], else: State.messages(state.context)
 
-    model_options = Jido.AI.Runtime.ModelCall.bind_options(messages, config.llm.llm_opts)
+    model_options = Jido.AI.Model.Transport.bind_options(messages, config.llm.llm_opts)
     opts = Keyword.put(opts, :model_call_options, model_options)
 
     Stream.resource(
