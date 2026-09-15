@@ -147,7 +147,8 @@ Tests: `test/jido_ai/skills/reasoning/actions/run_strategy_{action,profile}_test
 `test/jido_ai/plugins/reasoning/*_test.exs`, schema/Plugin-facet tests. Stronger success/lifecycle
 fixtures: `test/examples/09_reasoning/` (09_14, 09_16),
 `test/examples/16_capabilities/16_01_reasoning/`, and `test/authoring/agents/interfaces_test.exs`;
-those suites are currently deferred.
+those suites were deferred during implementation. Their migration and execution
+are now in scope (2026-09-15).
 
 ## Implementation notes
 
@@ -170,5 +171,8 @@ those suites are currently deferred.
 - Named model roles, host provider options, Profile routers, tool context,
   controls, result schemas, quota, and method limits use the existing runtime.
   The selected unit tests cover nested callable tools and parent cancellation.
-- Authoring/example suites and broad documentation repairs remain deferred.
-  See `simplification.md` for compile-only example changes and test results.
+- Authoring/example suites were deferred at this implementation checkpoint.
+  Their migration and execution are now in scope. See `simplification.md` for
+  the earlier compile-only changes and test results; these are historical evidence.
+- `jido_ai` owns `Jido.Session`, `Jido.Thread`, and `Jido.Thread.Entry`.
+  Keep these value modules in this package with their existing names.

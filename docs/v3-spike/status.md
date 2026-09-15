@@ -1,4 +1,29 @@
-# Jido AI V3 status — 2026-09-14
+# Jido AI V3 status — 2026-09-15
+
+## Current simplification checkpoint
+
+The runtime simplification and callable Profile migration are implemented.
+`jido_ai` owns `Jido.Session`, `Jido.Thread`, and `Jido.Thread.Entry`; their
+module names stay unchanged. The execution CLI and root strategy inspection
+helpers are removed. Agent + DSL + Profile is the main authoring model.
+
+Examples now use prompt-only callable input, host-bound Profiles, and public
+Configuration/History inspection. Detailed callable method and deadline cases
+stay in unit tests. Examples retain route, raw-tool, quota, transport, failure,
+and cancellation proofs. New authoring checks cover callable Plugin Profiles
+through core definitions, Builder, and Codec with a host Registry.
+
+No new runtime defect was confirmed during this consumer migration. The
+failures were obsolete API expectations and test transport configuration.
+Provider options must be bound under each Profile ID, including nested calls.
+
+The dated records below include historical results. Use the latest entry in
+the verification table and [simplification report](simplification.md) for this
+checkpoint. The old line-coverage percentage has not been measured again.
+
+Commit `087afb8c` contains these repairs. The complete deterministic suite
+passes. The package is ready for further API review and application integration,
+but is not a verified stable V3 release.
 
 ## Maturity assessment
 
@@ -27,6 +52,9 @@ The earlier authoring and coverage runs below used sibling path dependencies.
 
 | Check | Recorded result | Scope |
 | --- | --- | --- |
+| Profile-bound consumer migration (`087afb8c`) | 2,857 passed; 1 existing flaky exclusion; no skips | Full suite with authoring and examples; seed 0; warnings as errors; 126.8 seconds |
+| Profile-bound example suite | 658 passed; no skips | Includes catalog checks and final context-forwarding cleanup; seed 0; warnings as errors; 81.3 seconds |
+| Profile-bound format and forced compile | Passed | Format check and `mix compile --force --warnings-as-errors` |
 | Full suite after example and test timing fixes | 2,894 passed; 1 flaky test excluded; no skips | Authoring and examples included; ReqLLM `888fca02`; seed 0; warnings as errors; 134.5 seconds |
 | Refined example suite on ReqLLM pin `888fca02` | 679 passed; no skips | Seed 0; warnings as errors; 141.8 seconds; includes public lesson and catalog checks |
 | Current format and compile checks | Passed | `mix format --check-formatted` and `mix compile --warnings-as-errors` |
@@ -52,7 +80,8 @@ mix compile --warnings-as-errors
 mix test --include authoring --include example --warnings-as-errors --seed 0
 ```
 
-The current test log is `/tmp/jido-ai-refined-full-final.log` on the verification host.
+The current test logs are `/tmp/jido-ai-refinement-full.log` and
+`/tmp/jido-ai-refinement-examples.log` on the verification host.
 The result above is retained here because temporary logs are not release artifacts.
 
 ## What works
@@ -77,7 +106,7 @@ This does not prove migration between source versions.
 All nine [authoring findings](../../test/authoring/BUGS.md) have regression
 tests for their resolved behavior. Fixes include caller-context propagation,
 metadata and source normalization, and enforcement of the complete state-size
-limit. The last nine added tests found no further confirmed product bug.
+limit. The later callable Profile tests found no further confirmed product bug.
 This does not mean the package has no other bugs.
 
 The example refactor uses native AI Agent declarations, except where core Plugin

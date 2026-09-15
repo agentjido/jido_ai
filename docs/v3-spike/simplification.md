@@ -4,6 +4,46 @@ Use `Jido.AI.Agent` + `Jido.AI.DSL` + `Jido.AI.Profile` as the main AI
 authoring model. Keep each change small and commit each verified step.
 This record covers `jido_ai` on `v3-spike` only.
 
+## Current scope: 2026-09-15
+
+`jido_ai` owns `Jido.Session`, `Jido.Thread`, and `Jido.Thread.Entry`.
+Keep these modules and their value contracts in this package; no transfer to
+core Jido is planned. Their existing module names remain unchanged.
+
+Authoring and example migration and tests are now approved work. Refine and
+consolidate these consumers around the Agent, DSL, and Profile contracts.
+Run the full package test suite after repairs. Earlier deferrals and test
+counts below describe earlier checkpoints, not current permission or proof
+that the full suite passes.
+
+### Consumer migration completed
+
+`087afb8c` updates callable examples and tests to the Profile-bound API.
+Quota Flows explicitly forward the Profile. Resume and skill tests read
+Configuration and History. Planning and reasoning keep separate results.
+Five new authoring tests cover callable Plugins, Builder, Codec, host Registry
+requirements, and invalid configuration. Detailed method and deadline matrices
+stay in unit tests. Examples retain route, raw-tool, quota, transport, failure,
+and cancellation proofs. Unused flat-input and label fixtures were removed.
+
+Verification on 2026-09-15:
+
+- Full suite: 2,857 passed, 1 existing flaky exclusion, no failures or skips;
+  authoring and examples included, seed 0, warnings as errors, 126.8 seconds.
+- Separate example suite: 658 passed, no failures or skips, seed 0, warnings
+  as errors, 81.3 seconds. This also verifies the last context-forwarding cleanup.
+- Format and forced compile with warnings as errors passed.
+- Existing authoring selections: 308 passed; five new callable authoring tests
+  also passed separately and in the full suite.
+- Empty fixture and temporary directories were removed with `rmdir`. Build,
+  dependencies, Git data, and nonempty directories were not removed.
+
+No new runtime defect was confirmed. Failures were stale API expectations or
+test setup. Nested provider transport must be bound under the inner Profile ID;
+the examples and their instructions now show this. No production runtime code
+or dependency version changed. Live-provider quality, load testing, and fresh
+line coverage remain unverified.
+
 ## Checkpoints
 
 1. `e5937dd4` preserves the prior example refactor, test fixtures, Session test
@@ -48,7 +88,7 @@ Source paths below are relative to `lib/jido_ai/` unless they start with
 | Keep | Standalone ReAct Config, State, Token, Runner and Actions | `reasoning/react.ex` provides run, stream, resume, collect, and cancel. `reasoning/react/authoring.ex` lowers Config to a native Agent. `examples/14_resume` and ReAct unit tests call these APIs. |
 | Keep | Capability Plugins, planning, retrieval, quota, skills | `plugins/*` supplies core Agent composition. Examples in groups 07, 08, 13, 16, and 18 use it. `RunStrategy` is also a callable tool in 09_14 and 09_16. |
 | Replace; complete | Callable configuration | `RunStrategy` takes only prompt input and a host-bound resolved Profile. Seven fixed-method Plugins use `[profile: profile]`. The Action validates the binding; Authoring also validates it when it lowers the private Agent. |
-| Keep; ownership unresolved | Session/Thread values and AI Context | This `jido_ai` repository defines `Jido.Session`, `Jido.Thread`, and `Jido.Thread.Entry`. They were in `lib/jido_session.ex` and `lib/jido_thread.ex`; they now use `lib/jido/session.ex`, `lib/jido/thread.ex`, and `lib/jido/thread/entry.ex`. The prior claim that core Jido owns the current code was incorrect. Intended package ownership remains unresolved. AI history, initial-state conversion, and unit tests use these values. No module moves to another repository and no value API is removed here. |
+| Keep; owned by `jido_ai` | Session/Thread values and AI Context | This `jido_ai` repository owns `Jido.Session`, `Jido.Thread`, and `Jido.Thread.Entry`. They were in `lib/jido_session.ex` and `lib/jido_thread.ex`; they now use `lib/jido/session.ex`, `lib/jido/thread.ex`, and `lib/jido/thread/entry.ex`. The prior claim that core Jido owns them was incorrect. AI history, initial-state conversion, and unit tests use these values. No module moves to another repository and no value API is removed here. |
 | Keep | Install, skill, and quality Mix tasks | These configure applications, manage skills, or run quality checks. They have separate unit tests and no dependency on `Mix.Tasks.JidoAi` or its adapters. |
 | Remove; complete | `mix jido_ai` and `Mix.Tasks.JidoAi` | The execution task was the CLI entry point. Its option parsing, stdin batches, output formatting, and telemetry display have no other runtime caller. |
 | Remove; complete | `Jido.AI.CLI.Adapter`, `Jido.AI.CLI.EphemeralAgent`, eight `CLIAdapter` modules | Adapter resolution and temporary module creation were called only by the task, adapters, and CLI tests. No retained source, example, or authoring fixture calls them. |
@@ -549,7 +589,11 @@ completion test now has `:stable_smoke`. It checks the request result, retained
 status, method inspection, termination metadata, and Session cleanup. Supported
 request, reasoning, standalone, Plugin, and task tests remain.
 
-## Deferred documentation and example work
+## Documentation and example repair inventory
+
+This inventory records gaps at the unit-only checkpoints. The 2026-09-15 scope
+above supersedes the earlier authoring and example deferral. Verify each repair
+before marking it complete.
 
 - Source links in `public-api-map.md`, `feature-map.md`, `implementation.md`,
   `provider-test-transfer.md`, `api-inventory.json`, `history-audit.json`,
@@ -590,23 +634,22 @@ request, reasoning, standalone, Plugin, and task tests remain.
 
 ## Recommended remaining pieces
 
-The bounded structural work is complete. These API and ownership choices
-remain undecided; this checkpoint does not authorize more feature removal.
+The bounded structural work is complete. Authoring and example repairs are
+now approved. Keep further changes focused on simpler supported contracts.
 
 1. The request-helper review is complete in `callable-v3-contract.md`.
    Keep `ask_sync` for answers, `ask` plus Request APIs for lifecycle control,
    and `ask_stream` for events. Core `define` returns an Agent and does not
    replace these contracts. Removing the generated `await` and `steer` aliases
    remains an optional API decision, not a required runtime change.
-2. The callable Profile migration is approved and implemented. Repair the
-   deferred callable examples and authoring consumers listed above before release.
+2. The callable Profile migration and consumer repairs are complete and tested.
    Keep Plugin composition and all reasoning methods.
 3. Session.Runtime was also reviewed. It coordinates jobs, recovery,
    completion commits, input queues, and observed events. Keep those process
    and commit boundaries together for now; no Runtime extraction is included
-   in this recommendation. Resolve the intended ownership
-   of `Jido.Session` and `Jido.Thread` before any package transfer.
-4. Reconcile current guides and API inventories. Repair the two example test
-   files listed above, then run the deferred authoring and example suites
-   after the API decisions are complete. Their prior results are not current
-   verification evidence.
+   in this recommendation. `jido_ai` owns `Jido.Session` and `Jido.Thread`;
+   keep them in this package.
+4. Reconcile remaining package guides and API inventories. Example guides and
+   the inspection-helper tests are repaired. Authoring and example suites now
+   pass; use the current record above. Release metadata, fresh coverage, and
+   live-provider verification remain separate release work.
