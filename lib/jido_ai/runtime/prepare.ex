@@ -1,0 +1,78 @@
+defmodule Jido.AI.Runtime.Prepare do
+  @moduledoc false
+  use Jido.Action, name: "ai_prepare"
+  alias Jido.AI.{Control, Models, Profile}
+
+  @impl Jido.Action
+  def run(params, context), do: Jido.AI.Error.capture(fn -> execute(params, context) end)
+
+  defp execute(%{profile_id: id, query: query}, context) do
+    with %Profile{} = profile <- get_in(context, [:jido_ai_profiles, id]),
+         deadline = System.monotonic_time(:millisecond) + profile.controls.timeout,
+         :ok <- Control.check(profile, :input, %{query: query}, context, deadline),
+         {:ok, profile} <-
+           Jido.AI.Instructions.resolve(profile, %{query: query}, context, deadline),
+         {:ok, profile} <- Jido.AI.ModelRouter.select(profile, %{query: query}, context),
+         {:ok, profile, adaptive} <- Jido.AI.Reasoning.select(profile, query),
+         {:ok, output} <- Profile.output_contract(profile.result),
+         {:ok, history} <- Jido.AI.History.read(context.agent_state, profile),
+         {:ok, history_messages} <- Jido.AI.History.messages(history) do
+      entry = profile.models[profile.reasoning.model]
+      model = Models.resolve(entry.model)
+      runtime_options = get_in(context, [:ai, id, :options]) || []
+
+      options =
+        Jido.AI.Reasoning.generation(profile, entry.generation)
+        |> Jido.AI.Reasoning.ReAct.Config.merge_http_options(runtime_options[:req_http_options])
+        |> Keyword.merge(Keyword.delete(runtime_options, :req_http_options))
+        |> then(&Jido.AI.Reasoning.ReAct.Config.merge_model_opts([], &1, model))
+
+      instructions =
+        Jido.AI.Reasoning.instructions(profile, output)
+        |> Enum.reject(&(&1 in [nil, ""]))
+        |> Enum.join("\n\n")
+
+      messages = if instructions == "", do: [], else: [ReqLLM.Context.system(instructions)]
+
+      messages =
+        messages ++
+          history_messages ++
+          [Jido.AI.History.bind_message(ReqLLM.Context.user(Jido.AI.Reasoning.query(profile, query)), context)]
+
+      refs =
+        case context[:jido_ai_request_record] do
+          nil -> %{}
+          record -> Jido.AI.History.refs(record, context.jido_ai_input_source)
+        end
+
+      state = %{
+        profile: profile,
+        effect_plan: Jido.AI.Effects.Candidate.new(context.agent_state),
+        request_id: Jido.Signal.ID.generate!(),
+        run_id: Jido.Signal.ID.generate!(),
+        started_at_ms: System.system_time(:millisecond),
+        model: model,
+        options: options,
+        messages: ReqLLM.Context.new(messages),
+        output: output,
+        iterations: 0,
+        model_calls: 0,
+        tool_calls: 0,
+        repairs: 0,
+        usage: %{},
+        deadline: deadline,
+        history_delta: Jido.AI.History.query(query, refs)
+      }
+
+      state = if adaptive, do: Map.put(state, :adaptive, adaptive), else: state
+
+      with {:ok, state} <- Jido.AI.Reasoning.ReAct.Checkpoint.restore(state, context),
+           {:ok, state} <- Jido.AI.Reasoning.prepare(state, query),
+           :ok <- Jido.AI.Session.publish_selection(context, adaptive, deadline),
+           do: {:ok, state}
+    else
+      {:error, _} = error -> error
+      _ -> Profile.error("profile", "No trusted profile binding")
+    end
+  end
+end

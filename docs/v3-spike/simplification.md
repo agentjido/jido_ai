@@ -8,23 +8,25 @@ This record covers `jido_ai` on `v3-spike` only.
 
 1. `e5937dd4` preserves the prior example refactor, test fixtures, Session test
    correction, and ReqLLM pin `888fca022fea50785e2a54f7eabfcc47d289ae41`.
-2. This checkpoint removes the execution CLI and its private support.
+2. `5cbdf5f1` removes the execution CLI and its private support.
    It does not change the reasoning engines or request runtime.
+3. This checkpoint puts source files at paths that match module names and
+   splits mixed files. It preserves module names, contracts, and behavior.
 
 ## Inventory and caller evidence
 
-Paths below are relative to this package. Proposed work is not part of this
-checkpoint.
+Source paths below are relative to `lib/jido_ai/` unless they start with
+`lib/` or `examples/`. Proposed work is not part of this checkpoint.
 
 | Decision | Surface | Caller evidence and scope |
 | --- | --- | --- |
-| Keep | `Jido.AI.Agent`, DSL, Profile | `agent/definition.ex` installs the DSL and request helpers. `authoring/dsl.ex` lowers declarations through `Authoring` and Profile. This is the main authoring path. |
+| Keep | `Jido.AI.Agent`, DSL, Profile | `agent/definition.ex` installs the DSL and request helpers. `dsl.ex` lowers declarations through `Authoring` and Profile. This is the main authoring path. |
 | Keep | `Authoring.lower/2`, Portable, Codec | DSL, import/export, `RunStrategy`, and standalone ReAct use these paths. They share Profile validation; they are not CLI-only builders. |
 | Keep | Request, Session, runtime Plugins | `agent/interface.ex` submits requests and waits for results. `session/inspection.ex` builds the public snapshot. Request, stream, cancellation, and reasoning unit tests cover these paths. |
 | Keep | Eight reasoning methods and their data APIs | `reasoning.ex` dispatches Profile methods. `reasoning/*` parsers, machines, results, and inspection helpers serve the native runtime and method tests. Removing a CLI adapter does not remove its method. |
-| Keep | Standalone ReAct Config, State, Token, Runner and Actions | `react.ex` provides run, stream, resume, collect, and cancel. `authoring/react_authoring.ex` lowers Config to a native Agent. `examples/14_resume` and ReAct unit tests call these APIs. |
-| Keep | Capability Plugins, planning, retrieval, quota, skills | `authoring/plugins/*` supplies core Agent composition. Examples in groups 07, 08, 13, 16, and 18 use it. `RunStrategy` is also a callable tool in 09_14 and 09_16. |
-| Keep | Session/Thread values and AI Context | Core Jido owns `Jido.Session` and `Jido.Thread`. AI history, initial-state conversion, and unit tests use them. No value API is removed here. |
+| Keep | Standalone ReAct Config, State, Token, Runner and Actions | `reasoning/react.ex` provides run, stream, resume, collect, and cancel. `reasoning/react/authoring.ex` lowers Config to a native Agent. `examples/14_resume` and ReAct unit tests call these APIs. |
+| Keep | Capability Plugins, planning, retrieval, quota, skills | `plugins/*` supplies core Agent composition. Examples in groups 07, 08, 13, 16, and 18 use it. `RunStrategy` is also a callable tool in 09_14 and 09_16. |
+| Keep; ownership unresolved | Session/Thread values and AI Context | This `jido_ai` repository defines `Jido.Session`, `Jido.Thread`, and `Jido.Thread.Entry`. They were in `lib/jido_session.ex` and `lib/jido_thread.ex`; they now use `lib/jido/session.ex`, `lib/jido/thread.ex`, and `lib/jido/thread/entry.ex`. The prior claim that core Jido owns the current code was incorrect. Intended package ownership remains unresolved. AI history, initial-state conversion, and unit tests use these values. No module moves to another repository and no value API is removed here. |
 | Keep | Install, skill, and quality Mix tasks | These configure applications, manage skills, or run quality checks. They have separate unit tests and no dependency on `Mix.Tasks.JidoAi` or its adapters. |
 | Remove; complete | `mix jido_ai` and `Mix.Tasks.JidoAi` | The execution task was the CLI entry point. Its option parsing, stdin batches, output formatting, and telemetry display have no other runtime caller. |
 | Remove; complete | `Jido.AI.CLI.Adapter`, `Jido.AI.CLI.EphemeralAgent`, eight `CLIAdapter` modules | Adapter resolution and temporary module creation were called only by the task, adapters, and CLI tests. No retained source, example, or authoring fixture calls them. |
@@ -52,6 +54,34 @@ Use a declared AI Agent and its request API for application execution.
 No replacement command or compatibility adapter is added. No dependency was
 used only by the CLI, so this removal does not change the dependency list.
 
+## Source organization result
+
+- Root public helpers now have root files: Authoring, Capability, Portable,
+  PluginConfig, ReasoningCapability, ToolSource, Configuration, Control,
+  History, Instructions, ModelRouter, ToolCatalog, and ToolContext.
+  `authoring/` now contains only `Authoring.Codec`.
+- Plugins use `plugins/`. Their Agent and AgentServer modules have separate
+  files, as the Runtime and Session Plugin modules already do.
+- The DSL uses `dsl.ex` and `dsl/` for Entities, Macros, Compiler, and
+  StateSizeTransformer. Small nested entity values stay in `dsl/entities.ex`.
+- ReAct Runner, Authoring, and Actions use `reasoning/react/`.
+- Actions use `actions/` and runtime modules use `runtime/`. The old
+  `operations/runtime.ex` is split by module. `operations/` now contains
+  only `generate.ex`, which matches the retained
+  `Jido.AI.Operations.Generate` name. It is no longer a general source folder.
+- Session, Skill, and Signal use `session.ex`, `skill.ex`, and `signal.ex`.
+  Signal children use `signal/`. Context operations use `context/operations/`
+  and `context/operations.ex`.
+- Session actions, history support, and delivery support have separate files.
+  Configuration, tool-calling flows, ToolInterception/ToolHook,
+  Effects.State/Candidate, and Thread/Entry are also split by module.
+  Small error classes and values remain grouped in their existing error files.
+- All 266 top-level module bodies match the prior source after removal of
+  whitespace between modules. No function implementation, module name, or
+  contract changed. Profile and Session.Runtime internals are unchanged.
+- One unit source-layout check covers AI module paths. It allows the two
+  existing groups of small error values and the established ReAct spelling.
+
 ## Unit coverage and verification
 
 The unit file selection is `test/jido_ai/**/*_test.exs`, excluding
@@ -64,7 +94,7 @@ Run from the package in zsh:
 
 ```sh
 mix format --check-formatted
-mix compile --warnings-as-errors
+mix compile --force --warnings-as-errors
 unit_tests=(${(f)"$(rg --files test/jido_ai test/jido_ai_test.exs -g '*_test.exs' -g '!test/jido_ai/authoring/**' | sort)"})
 mix test "${unit_tests[@]}" --warnings-as-errors --seed 0
 ```
@@ -77,6 +107,13 @@ Removal result: 139 files; 1,794 passed, 1 excluded; no failures or skips.
 Format and compile passed. Both completed test runs used seed 0 and warnings
 as errors. The foundation run took 20.2 seconds; the removal run took 16.1 seconds.
 
+Source organization result: 140 files; 1,795 passed, 1 excluded; no failures
+or skips. The run took 18.1 seconds with seed 0 and warnings as errors.
+`mix format --check-formatted` and
+`mix compile --force --warnings-as-errors` passed. The added test is
+`test/jido_ai/source_layout_test.exs`. Authoring and example suites were not
+run. No example or existing unit test source changes were needed.
+
 The 112 CLI-only tests and their mock helper are deleted with the implementation.
 The obsolete smoke wiring test is deleted. The existing native Chain-of-Draft
 completion test now has `:stable_smoke`. It checks the request result, retained
@@ -85,6 +122,12 @@ request, reasoning, standalone, Plugin, and task tests remain.
 
 ## Deferred documentation and example work
 
+- Source links in `public-api-map.md`, `feature-map.md`, `implementation.md`,
+  `provider-test-transfer.md`, `api-inventory.json`, `history-audit.json`,
+  `history-reviews/*`, `docs/design/*`, and
+  `docs/jido-ai-agent-dsl-kitchen-sink.md` still use old paths. Update current
+  links in the documentation step. Preserve historical evidence and use the
+  source map above to locate the current implementation.
 - The CLI guide and its README, skills-guide, and ExDoc entries are removed.
   No current example source or test refers to a removed CLI module.
 - `public-api-map.md`, `feature-map.md`, `api-inventory.json`,
@@ -94,7 +137,7 @@ request, reasoning, standalone, Plugin, and task tests remain.
   historical evidence. Their old CLI retention requirement no longer applies.
 - Authoring and example suites are deferred. Existing Mix settings still
   compile example source and test support during dev/test builds. No example
-  repair was needed for this removal. Earlier results in `status.md` are prior
+  repair was needed for these changes. Earlier results in `status.md` are prior
   evidence, not a fresh run for this checkpoint.
 - Removing strategy inspection helpers later affects example tests 14_11 and
   18_01. Record or update that work in its own checkpoint.
@@ -113,5 +156,9 @@ request, reasoning, standalone, Plugin, and task tests remain.
 3. Review capability and callable-reasoning defaults against Profile fields.
    Remove duplicate option translation only where callers can use the shared
    validation. Keep Plugin composition and all reasoning methods.
-4. Reconcile current guides and API inventories. Run the deferred authoring
+4. Review Profile validation and Session.Runtime in separate, focused pieces.
+   Define clear internal responsibilities before extracting functions. Their
+   size alone is not a reason to split them. Resolve the intended ownership
+   of `Jido.Session` and `Jido.Thread` before any package transfer.
+5. Reconcile current guides and API inventories. Run the deferred authoring
    and example suites after the API decisions are complete.
