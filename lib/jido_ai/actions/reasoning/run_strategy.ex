@@ -81,7 +81,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
           |> Zoi.optional()
       })
 
-  alias Jido.AI.{Authoring, Profile, Request, Session}
+  alias Jido.AI.{Authoring, Request, Session}
   alias Jido.AgentServer, as: Server
 
   @methods %{
@@ -138,7 +138,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
            {:ok, server} <-
              Server.start_link([agent: definition] ++ Map.to_list(Map.take(context, [:jido]))) do
         try do
-          run_request(server, strategy, params, normalize_context(context))
+          run_request(server, strategy, params, context)
         after
           stop_runner(server)
         end
@@ -172,7 +172,6 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
   end
 
   defp apply_context_defaults(params, context) when is_map(params) do
-    context = normalize_context(context)
     provided = provided_params(context)
     strategy = params[:strategy]
     strategy_defaults = strategy_plugin_defaults(context, strategy)
@@ -259,7 +258,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
       routes: [{"reasoning.run", Authoring.ai(:assistant)}]
     }
 
-    with {:ok, profile} <- Profile.new(profile), do: Authoring.lower(base, [profile])
+    Authoring.lower(base, [profile])
   end
 
   defp strategy_option(params, key) do
