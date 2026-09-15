@@ -188,7 +188,10 @@ defmodule Jido.AI.Request do
 
     tool_heartbeat_ms = Keyword.get(opts, :tool_heartbeat_ms)
     req_http_options = Keyword.get(opts, :req_http_options, [])
-    llm_opts = Jido.AI.Test.ReActScript.bind_options(query, Keyword.get(opts, :llm_opts, []))
+
+    llm_opts =
+      Jido.AI.Runtime.ModelCall.bind_options([%{role: :user, content: query}], Keyword.get(opts, :llm_opts, []))
+
     output = Keyword.get(opts, :output)
     request_id = Keyword.get_lazy(opts, :request_id, &generate_id/0)
     stream_to = Keyword.get(opts, :stream_to)

@@ -26,11 +26,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp build_stream(state, config, opts) do
     messages = if opts[:query], do: [%{role: :user, content: opts[:query]}], else: Context.to_messages(state.context)
 
-    scripted =
-      Jido.AI.Test.ReActScript.bind_messages(messages, config.llm.llm_opts)
-      |> Keyword.take([:jido_ai_react_script])
-
-    opts = Keyword.put(opts, :jido_ai_test_llm_opts, scripted)
+    model_options = Jido.AI.Runtime.ModelCall.bind_options(messages, config.llm.llm_opts)
+    opts = Keyword.put(opts, :model_call_options, model_options)
 
     Stream.resource(
       fn ->
@@ -169,7 +166,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
          {:ok, base} <- base(context, state),
          {:ok, definition, model_context} <- Authoring.lower(config, limits, base, tool_interceptor(context)),
          model_context =
-           update_in(model_context, [:ai, :assistant, :options], &Keyword.merge(&1, opts[:jido_ai_test_llm_opts] || [])),
+           update_in(model_context, [:ai, :assistant, :options], &Keyword.merge(&1, opts[:model_call_options] || [])),
          {:ok, server} <-
            Server.start_link([agent: definition] ++ Map.to_list(Map.take(context, [:jido]))) do
       server_monitor = Process.monitor(server)

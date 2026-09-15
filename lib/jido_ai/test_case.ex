@@ -27,6 +27,7 @@ defmodule Jido.AI.TestCase do
 
   setup _tags do
     Jido.AI.Test.reset_react_scripts()
+    Jido.AI.Test.ReActScript.install_option_binder()
 
     on_exit(fn ->
       Jido.AI.Test.reset_react_scripts()

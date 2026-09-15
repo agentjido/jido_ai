@@ -10,8 +10,11 @@ This record covers `jido_ai` on `v3-spike` only.
    correction, and ReqLLM pin `888fca022fea50785e2a54f7eabfcc47d289ae41`.
 2. `5cbdf5f1` removes the execution CLI and its private support.
    It does not change the reasoning engines or request runtime.
-3. This checkpoint puts source files at paths that match module names and
+3. `20cd98d1` puts source files at paths that match module names and
    splits mixed files. It preserves module names, contracts, and behavior.
+4. This checkpoint removes direct test-script dependencies from Request,
+   Runtime.ModelCall, and ReAct.Runner. It preserves the public test helpers
+   through an internal model-call boundary.
 
 ## Inventory and caller evidence
 
@@ -23,6 +26,7 @@ Source paths below are relative to `lib/jido_ai/` unless they start with
 | Keep | `Jido.AI.Agent`, DSL, Profile | `agent/definition.ex` installs the DSL and request helpers. `dsl.ex` lowers declarations through `Authoring` and Profile. This is the main authoring path. |
 | Keep | `Authoring.lower/2`, Portable, Codec | DSL, import/export, `RunStrategy`, and standalone ReAct use these paths. They share Profile validation; they are not CLI-only builders. |
 | Keep | Request, Session, runtime Plugins | `agent/interface.ex` submits requests and waits for results. `session/inspection.ex` builds the public snapshot. Request, stream, cancellation, and reasoning unit tests cover these paths. |
+| Separate; complete | Test script selection and model calls | `Test.ReActScript` owns script options, prompt matching, errors, and HTTP replies. Request and ReAct.Runner capture generic call options before they start work in another process. Runtime.ModelCall uses ReqLLM by default. |
 | Keep | Eight reasoning methods and their data APIs | `reasoning.ex` dispatches Profile methods. `reasoning/*` parsers, machines, results, and inspection helpers serve the native runtime and method tests. Removing a CLI adapter does not remove its method. |
 | Keep | Standalone ReAct Config, State, Token, Runner and Actions | `reasoning/react.ex` provides run, stream, resume, collect, and cancel. `reasoning/react/authoring.ex` lowers Config to a native Agent. `examples/14_resume` and ReAct unit tests call these APIs. |
 | Keep | Capability Plugins, planning, retrieval, quota, skills | `plugins/*` supplies core Agent composition. Examples in groups 07, 08, 13, 16, and 18 use it. `RunStrategy` is also a callable tool in 09_14 and 09_16. |
@@ -82,6 +86,33 @@ used only by the CLI, so this removal does not change the dependency list.
 - One unit source-layout check covers AI module paths. It allows the two
   existing groups of small error values and the established ReAct spelling.
 
+## Model-call boundary
+
+- `Runtime.ModelCall` accepts one internal `:jido_ai_model_call` option. Its
+  callback receives the call data and the default ReqLLM function. Call data
+  contains kind, model, input, options, and schema. The boundary removes its
+  own option before it calls the callback or ReqLLM. No provider framework or
+  application configuration is added.
+- An optional process-local binder converts options before Request sends its
+  signal and before Runner creates its lazy stream. It can use the current
+  process or its Task callers. Explicit call options take precedence. The
+  captured options travel with the request and work after the binder owner
+  exits. Runner stores them in live model context; it does not change Config
+  or the checkpoint fingerprint.
+- `Test.ReActScript` installs the binder when it registers a script.
+  `TestCase` also installs it, including support for malformed legacy script
+  options. The public `expect_react`, `react_opts`, `react_llm_opts`, reset,
+  and assertion helpers remain. Explicit helper options carry the callback
+  and work in processes without a script registry. Only test modules know
+  the script format and select scripted replies.
+- Scripted text and stream calls still use `Test.MockLLM` and real ReqLLM
+  HTTP/SSE code. Script errors retain their tagged results. The callback runs
+  in the existing Exec lifetime and quota scope. Quota, cancellation, Session,
+  and structured output implementation are unchanged.
+- With no callback, ModelCall still calls ReqLLM for text, objects, embeddings,
+  text streams, and object streams. Tests exercise all five paths through the
+  local HTTP server. No live provider request was needed for these checks.
+
 ## Unit coverage and verification
 
 The unit file selection is `test/jido_ai/**/*_test.exs`, excluding
@@ -114,6 +145,19 @@ or skips. The run took 18.1 seconds with seed 0 and warnings as errors.
 `test/jido_ai/source_layout_test.exs`. Authoring and example suites were not
 run. No example or existing unit test source changes were needed.
 
+Model-call boundary result: 141 files; 1,810 passed, 1 excluded; no failures
+or skips. The run took 18.7 seconds with seed 0 and warnings as errors.
+`mix format --check-formatted` and
+`mix compile --force --warnings-as-errors` passed. The existing flaky
+exclusion is unchanged. All existing unit tests remain.
+
+The 15 added tests cover default ReqLLM calls, callback data and delegation,
+explicit option precedence, quota admission and accounting, cancellation,
+binding through Task callers, use after the binder owner exits, native request
+isolation, explicit helpers outside the caller tree, and plain text inputs.
+Existing tests retain script errors, token usage, tool loops, concurrent
+callers with the same prompt, and checkpoint fingerprints.
+
 The 112 CLI-only tests and their mock helper are deleted with the implementation.
 The obsolete smoke wiring test is deleted. The existing native Chain-of-Draft
 completion test now has `:stable_smoke`. It checks the request result, retained
@@ -139,6 +183,9 @@ request, reasoning, standalone, Plugin, and task tests remain.
   compile example source and test support during dev/test builds. No example
   repair was needed for these changes. Earlier results in `status.md` are prior
   evidence, not a fresh run for this checkpoint.
+- The model-call boundary required no authoring or example source repairs.
+  Those suites remain deferred. Broader guide and API work remains below;
+  no capability, strategy helper, or other public API is removed in this step.
 - Removing strategy inspection helpers later affects example tests 14_11 and
   18_01. Record or update that work in its own checkpoint.
 

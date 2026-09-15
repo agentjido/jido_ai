@@ -113,6 +113,95 @@ defmodule Jido.AI.TestHelpersTest do
       assert {:ok, "agent hi"} = EchoAgent.ask_sync(pid, "agent hello", react_opts(script))
     end
 
+    test "binds implicit scripts per request on an existing AgentServer" do
+      server = start_echo_agent()
+
+      for answer <- ["first", "second"] do
+        expect_react do
+          user("same request")
+          answer(answer)
+        end
+
+        assert {:ok, handle} = EchoAgent.ask(server, "same request")
+        reset_react_scripts()
+        assert {:ok, ^answer} = EchoAgent.await(handle)
+      end
+
+      mock = start_supervised!({Jido.AI.Test.MockLLM, script: [%{reply: {:text, "default transport"}}]})
+
+      assert {:ok, "default transport"} =
+               EchoAgent.ask_sync(server, "same request",
+                 model: Jido.AI.Test.MockLLM.model(),
+                 llm_opts: Jido.AI.Test.MockLLM.options(mock)
+               )
+
+      assert %{remaining: [], unexpected: []} = Jido.AI.Test.MockLLM.report(mock)
+    end
+
+    test "a lazy standalone stream retains the script after its owner exits" do
+      {owner, stream} =
+        Task.async(fn ->
+          expect_react do
+            user("deferred")
+            answer("captured")
+          end
+
+          {self(), ReAct.stream("deferred", %{model: :fast, tools: []})}
+        end)
+        |> Task.await()
+
+      refute Process.alive?(owner)
+      assert_final_answer(ReAct.collect_stream(stream), "captured")
+    end
+
+    test "explicit helper options work in a process without a script registry" do
+      script = ReActScript.new(%{user: "explicit", turns: [%{type: :answer, text: "portable"}]})
+      options = react_opts(script)
+      parent = self()
+      server = start_echo_agent()
+
+      spawn(fn ->
+        send(parent, {:explicit_result, EchoAgent.ask_sync(server, "explicit", options)})
+      end)
+
+      assert_receive {:explicit_result, {:ok, "portable"}}, 5_000
+    end
+
+    test "an installed script binder preserves plain text model inputs" do
+      mock = start_supervised!({Jido.AI.Test.MockLLM, script: [%{reply: {:text, "plain reply"}}]})
+
+      assert {:ok, response} =
+               Jido.AI.Runtime.ModelCall.request(
+                 :text,
+                 Jido.AI.Test.MockLLM.model(),
+                 "plain input",
+                 Jido.AI.Test.MockLLM.options(mock)
+               )
+
+      assert ReqLLM.Response.text(response) == "plain reply"
+      assert %{remaining: [], unexpected: []} = Jido.AI.Test.MockLLM.report(mock)
+    end
+
+    test "cancelling a request stops its bound model call" do
+      server = start_echo_agent()
+      parent = self()
+
+      callback = fn _, _ ->
+        send(parent, {:model_call_started, self()})
+
+        receive do
+          :finish -> {:error, :unexpected_finish}
+        end
+      end
+
+      assert {:ok, handle} = EchoAgent.ask(server, "cancel", llm_opts: [jido_ai_model_call: callback])
+      assert_receive {:model_call_started, model_task}, 5_000
+      monitor = Process.monitor(model_task)
+      assert :ok = Jido.AI.Session.cancel(handle)
+      assert_receive {:DOWN, ^monitor, :process, ^model_task, _}, 5_000
+      assert {:error, _} = EchoAgent.await(handle)
+    end
+
     test "scripts terminal model failures" do
       expect_react do
         user("fail now")
@@ -391,5 +480,11 @@ defmodule Jido.AI.TestHelpersTest do
                  fn _, _ -> flunk("request callback must not run") end
                )
     end
+  end
+
+  defp start_echo_agent do
+    start_supervised!(
+      {Jido.AgentServer, agent: EchoAgent, id: "model-call-#{System.unique_integer([:positive, :monotonic])}"}
+    )
   end
 end

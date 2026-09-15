@@ -47,7 +47,7 @@ defmodule Jido.AI.Test.ReActScript do
 
   @doc false
   @spec llm_opts(t()) :: keyword()
-  def llm_opts(%__MODULE__{} = script), do: [{@option_key, script}]
+  def llm_opts(%__MODULE__{} = script), do: [{:jido_ai_model_call, &__MODULE__.model_call/2}, {@option_key, script}]
 
   @doc false
   @spec react_opts(t()) :: keyword()
@@ -56,6 +56,7 @@ defmodule Jido.AI.Test.ReActScript do
   @doc false
   @spec register(t()) :: t()
   def register(%__MODULE__{} = script) do
+    install_option_binder()
     scripts = Process.get(@registry_key, %{})
     Process.put(@registry_key, Map.put(scripts, script.user, script))
     script
@@ -66,6 +67,43 @@ defmodule Jido.AI.Test.ReActScript do
   def clear_current_owner do
     Process.delete(@registry_key)
     :ok
+  end
+
+  @doc false
+  def install_option_binder,
+    do: Jido.AI.Runtime.ModelCall.put_option_binder(&__MODULE__.bind_model_options/2)
+
+  @doc false
+  def bind_model_options(%ReqLLM.Context{messages: messages}, options),
+    do: bind_model_options(messages, options)
+
+  def bind_model_options(messages, options) when is_list(messages) do
+    case bind_messages(messages, options) do
+      options when is_list(options) ->
+        if Keyword.keyword?(options) and Keyword.has_key?(options, @option_key),
+          do: Keyword.put(options, :jido_ai_model_call, &__MODULE__.model_call/2),
+          else: options
+
+      options when is_map(options) and not is_struct(options) ->
+        if Map.has_key?(options, @option_key) or Map.has_key?(options, Atom.to_string(@option_key)),
+          do: Map.put(options, :jido_ai_model_call, &__MODULE__.model_call/2),
+          else: options
+
+      options ->
+        options
+    end
+  end
+
+  def bind_model_options(_input, options), do: options
+
+  @doc false
+  def model_call(call, next) do
+    case request(call.kind, call.input, call.options, fn model, options ->
+           next.(call.kind, model, call.input, options, call.schema)
+         end) do
+      :not_scripted -> next.(call.kind, call.model, call.input, call.options, call.schema)
+      result -> result
+    end
   end
 
   @doc false
@@ -141,7 +179,11 @@ defmodule Jido.AI.Test.ReActScript do
         # A stream keeps its server until the model task exits.
         reply = http_reply(response, kind)
         {:ok, server} = Jido.AI.Test.MockLLM.start_link(script: [%{reply: reply}], owner: self())
-        options = options |> Keyword.delete(@option_key) |> Keyword.merge(Jido.AI.Test.MockLLM.options(server))
+
+        options =
+          options
+          |> Keyword.drop([@option_key, :jido_ai_model_call])
+          |> Keyword.merge(Jido.AI.Test.MockLLM.options(server))
 
         try do
           request_fun.(Jido.AI.Test.MockLLM.model(), options)
