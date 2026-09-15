@@ -15,9 +15,13 @@ This record covers `jido_ai` on `v3-spike` only.
 4. `2dd33ebb` removes direct test-script dependencies from Request,
    Runtime.ModelCall, and ReAct.Runner. It preserves the public test helpers
    through an internal model-call boundary.
-5. This checkpoint removes the root strategy inspection helpers. Session
+5. `af68e568` removes the root strategy inspection helpers. Session
    inspection reads the selected Profile and committed History. Snapshot
    fields and request execution remain the same.
+6. This checkpoint extracts internal Profile reference resolution into
+   `Jido.AI.Profile.References.resolve/2`. Profile keeps defaults, canonical
+   policy validation, schema construction, and public errors. No additional
+   feature is removed. Session.Runtime and dependency versions are unchanged.
 
 ## Inventory and caller evidence
 
@@ -28,6 +32,7 @@ Source paths below are relative to `lib/jido_ai/` unless they start with
 | --- | --- | --- |
 | Keep | `Jido.AI.Agent`, DSL, Profile | `agent/definition.ex` installs the DSL and request helpers. `dsl.ex` lowers declarations through `Authoring` and Profile. This is the main authoring path. |
 | Keep | `Authoring.lower/2`, Portable, Codec | DSL, import/export, `RunStrategy`, and standalone ReAct use these paths. They share Profile validation; they are not CLI-only builders. |
+| Separate; complete | Profile reference resolution | `Profile.new/2` is the only caller of `Profile.References.resolve/2`. It resolves explicit references before defaults and policy validation. ToolSource still validates separated source declarations. |
 | Keep | Request, Session, runtime Plugins | `agent/interface.ex` submits requests and waits for results. `session/inspection.ex` builds the public snapshot. Request, stream, cancellation, and reasoning unit tests cover these paths. |
 | Separate; complete | Test script selection and model calls | `Test.ReActScript` owns script options, prompt matching, errors, and HTTP replies. Request and ReAct.Runner capture generic call options before they start work in another process. Runtime.ModelCall uses ReqLLM by default. |
 | Keep | Eight reasoning methods and their data APIs | `reasoning.ex` dispatches Profile methods. `reasoning/*` parsers, machines, results, and inspection helpers serve the native runtime and method tests. Removing a CLI adapter does not remove its method. |
@@ -84,9 +89,10 @@ used only by the CLI, so this removal does not change the dependency list.
   Configuration, tool-calling flows, ToolInterception/ToolHook,
   Effects.State/Candidate, and Thread/Entry are also split by module.
   Small error classes and values remain grouped in their existing error files.
-- All 266 top-level module bodies match the prior source after removal of
+- At the source organization checkpoint, all 266 top-level module bodies matched the prior source after removal of
   whitespace between modules. No function implementation, module name, or
-  contract changed. Profile and Session.Runtime internals are unchanged.
+  contract changed at that checkpoint. Profile reference resolution is now
+  extracted as described below. Session.Runtime internals remain unchanged.
 - One unit source-layout check covers AI module paths. It allows the two
   existing groups of small error values and the established ReAct spelling.
 
@@ -169,6 +175,26 @@ and imported content parts, tool messages, refs, and context lane switches.
 Existing tests still cover pending tools, stream text, cancellation, failure,
 recovery, deferred context replacement, checkpoints, and trace truncation.
 
+## Profile reference resolution
+
+- `profile/references.ex` contains the former private resolution group with
+  one internal `resolve/2` entry. It calls Profile's existing field, traversal,
+  and error helpers. Control input conversion retains its original error paths;
+  control defaults and policy checks stay in Profile.
+- Explicit map registries retain atom or string namespace keys. Core
+  `Codec.Registry` retains Action, Flow, alias, and error behavior, including
+  its existing rejection of schema, router, and control references here.
+  Nested instruction, tool, schema, repair Action, router, and control
+  references retain their order and normalization. Explicit tool sources
+  precede inline sources; ToolSource still owns their validation and references.
+- Twelve selected unit tests cover these contracts, invalid containers and
+  fields, Flow values, defaults, and inert construction. Eleven passed against
+  the original implementation before extraction. Action, router, and control
+  test callbacks raise if construction executes them.
+- The root `AGENTS.md` now records the main V3 authoring model, current release
+  state, bounded checks, and deferred suites. Broader documentation remains
+  deferred. This step adds no public authoring API or execution framework.
+
 ## Unit coverage and verification
 
 The unit file selection is `test/jido_ai/**/*_test.exs`, excluding
@@ -218,6 +244,19 @@ Authoring and example suites were not run. Their compiled source and support
 needed no repair. After the checks, safe `rmdir` removed the empty
 `test/fixtures/skills` and `test/jido_ai/fixtures` directories left by tests.
 There were no empty source directories.
+
+Profile reference extraction result: 143 files; 1,832 passed, 1 excluded;
+no failures or skips. The selected run took 20.7 seconds with seed 0 and
+warnings as errors. `mix format --check-formatted` and
+`mix compile --force --warnings-as-errors` passed; the forced dev compile
+compiled 337 files. Twelve focused tests were added. The first eleven also
+passed before and after extraction. The existing flaky exclusion is unchanged.
+Source comparison confirmed that Profile only changes the resolver call and
+removes the extracted group; the moved function bodies retain their behavior.
+Authoring and example suites remain deferred. Dev/test compilation needed no
+example source or support repairs. After verification, `rmdir` removed the two
+empty test fixture directories listed above and 160 empty directories under
+`tmp/`. No build, dependency, or Git directory was touched.
 
 The 15 tests added at the model-call checkpoint cover default ReqLLM calls,
 callback data and delegation,
@@ -274,27 +313,21 @@ request, reasoning, standalone, Plugin, and task tests remain.
 
 ## Recommended remaining pieces
 
-1. **Next: extract Profile reference resolution.** Move the private
-   `resolve_references/2` group in `profile.ex` (currently lines 221-444) to
-   an internal `Jido.AI.Profile.References` module with one `resolve/2`
-   entry point. This group resolves explicit registry references for
-   instructions, tools, schemas, repair Actions, model routers, and controls.
-   It also separates tool-source inputs. Its only entry caller is Profile
-   construction. Keep defaults, canonical validation, schema construction,
-   and public errors in Profile. Preserve map and Codec.Registry behavior.
-   This separates input reference resolution from policy validation with a
-   bounded, inert contract. No new provider, process, or public root API is
-   needed. This recommendation is not implemented here.
-2. Review generated Agent request helpers against route `define` helpers.
+The bounded structural work is complete. These API and ownership choices
+remain undecided; this checkpoint does not authorize more feature removal.
+
+1. Review generated Agent request helpers against route `define` helpers.
    Choose one normal calling form. Keep request admission, stream, and cancel
    behavior covered before removing any helper.
-3. Review capability and callable-reasoning defaults against Profile fields.
+2. Review capability and callable-reasoning defaults against Profile fields.
    Remove duplicate option translation only where callers can use the shared
    validation. Keep Plugin composition and all reasoning methods.
-4. Session.Runtime was also reviewed. It coordinates jobs, recovery,
+3. Session.Runtime was also reviewed. It coordinates jobs, recovery,
    completion commits, input queues, and observed events. Keep those process
    and commit boundaries together for now; no Runtime extraction is included
    in this recommendation. Resolve the intended ownership
    of `Jido.Session` and `Jido.Thread` before any package transfer.
-5. Reconcile current guides and API inventories. Run the deferred authoring
-   and example suites after the API decisions are complete.
+4. Reconcile current guides and API inventories. Repair the two example test
+   files listed above, then run the deferred authoring and example suites
+   after the API decisions are complete. Their prior results are not current
+   verification evidence.
