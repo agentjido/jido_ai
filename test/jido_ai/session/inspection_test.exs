@@ -1,7 +1,7 @@
 defmodule Jido.AI.Session.InspectionTest do
   use Jido.AI.Test.ReasoningCase, async: false
 
-  alias Jido.AI.{Agent, Authoring, Context, History, Profile}
+  alias Jido.AI.{Agent, Authoring, History, Profile}
   alias ReqLLM.Message.ContentPart
 
   defp profile(id, history, attrs \\ %{}) do
@@ -223,15 +223,26 @@ defmodule Jido.AI.Session.InspectionTest do
     refs = %{case_id: "saved"}
     parts = [ContentPart.text("Question"), ContentPart.image(<<1, 2, 3>>, "image/png")]
 
-    context =
-      Context.new(system_prompt: "Saved prompt")
-      |> Context.append_user(parts, refs: refs)
-      |> Context.append_assistant(nil, [%{id: "tool", name: "echo", arguments: %{value: 5}}], refs: refs)
-      |> Context.append_tool_result("tool", "echo", "5", refs: refs)
-      |> Context.append_assistant("Answer", nil, refs: refs)
+    thread = Jido.Thread.new(metadata: %{system_prompt: "Saved prompt"})
+
+    {:ok, session} =
+      Jido.AI.Conversation.append(
+        Jido.Session.new(thread: thread),
+        [
+          ReqLLM.Context.user(parts),
+          %ReqLLM.Message{
+            role: :assistant,
+            content: [],
+            tool_calls: [ReqLLM.ToolCall.new("tool", "echo", ~s({"value":5}))]
+          },
+          ReqLLM.Context.tool_result("tool", "echo", "5"),
+          ReqLLM.Context.assistant("Answer")
+        ],
+        refs
+      )
 
     source = source([profile(:assistant, :messages)])
-    assert {:ok, agent} = Agent.from_initial_state(source, %{context: context})
+    assert {:ok, agent} = Agent.from_initial_state(source, %{messages: session})
     server = start_agent(jido, agent)
     assert {:ok, view} = Session.snapshot(server)
     assert [system, user, call, tool, answer] = view.details.conversation

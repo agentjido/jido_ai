@@ -1,120 +1,107 @@
 defmodule Jido.AI.InitialStateTest do
   use Jido.AI.Test.ReasoningCase, async: false
-  alias Jido.AI.{Agent, Context, History, Profile}
+  alias Jido.AI.{Agent, Conversation, History, Profile}
 
-  defp source do
-    definition(:react, tools: [], model: MockLLM.model(), system_prompt: "Configured")
+  defp source, do: definition(:react, tools: [], model: MockLLM.model(), system_prompt: "Configured")
+
+  defp saved(prompt \\ "Saved", messages \\ [%{role: :user, content: "Previous"}]) do
+    thread = Jido.Thread.new(metadata: %{system_prompt: prompt})
+    {:ok, session} = Conversation.append(Jido.Session.new(thread: thread), messages)
+    session
   end
 
-  defp context, do: Context.new(system_prompt: "Saved") |> Context.append_user("Previous")
-
-  test "import supplies a required history field and retains required domain data" do
+  test "import preserves the canonical value and required domain fields" do
     source = source()
     fields = source.schema.fields |> Keyword.put(:messages, Jido.Session.schema()) |> Keyword.put(:count, Zoi.integer())
     source = %{source | schema: %{source.schema | fields: fields}}
-    assert {:ok, agent} = Agent.from_initial_state(source, %{context: context(), count: 7}, id: "restored")
+    session = saved()
+    assert {:ok, agent} = Agent.from_initial_state(source, %{messages: session, count: 7}, id: "restored")
     assert agent.id == "restored" and agent.state.count == 7
-    assert {:ok, [%{role: :user, content: content}]} = Jido.AI.Conversation.messages(agent.state.messages)
-    assert Jido.AI.Query.summarize(content) == "Previous"
+    assert agent.state.messages == session
     assert source.state == nil
-    assert {:error, _} = Agent.from_initial_state(source, %{context: context(), count: "invalid"})
+    assert {:error, _} = Agent.from_initial_state(source, %{messages: session, count: "invalid"})
+    assert {:error, _} = Agent.from_initial_state(source, %{count: 7})
   end
 
-  test "missing Context uses core domain defaults and an empty prompt remains explicit" do
-    source = source()
-    assert {:ok, agent} = Agent.from_initial_state(source, %{})
+  test "missing conversation uses defaults and an empty saved prompt remains explicit" do
+    assert {:ok, agent} = Agent.from_initial_state(source(), %{})
     assert is_nil(agent.state.messages)
     assert {:ok, %Profile{instructions: "Configured"} = profile} = Configuration.profile(agent)
     assert {:ok, []} = History.read(agent.state, profile)
-    assert Agent.profile(source, :assistant).instructions == "Configured"
-    assert {:ok, empty} = Agent.from_initial_state(source, %{context: %{context() | system_prompt: ""}})
-    assert {:ok, %Profile{instructions: ""} = profile} = Configuration.profile(empty)
-    assert {:ok, [%{role: :user, content: content}]} = History.read(empty.state, profile)
-    assert Jido.AI.Query.summarize(content) == "Previous"
+    assert {:ok, empty} = Agent.from_initial_state(source(), %{messages: saved("")})
+    assert {:ok, %Profile{instructions: ""}} = Configuration.profile(empty)
   end
 
-  test "import rejects old runtime state, Plugin state, unknown fields and duplicate field aliases" do
+  test "import rejects runtime fields, legacy context, and duplicate aliases" do
     for state <- [
           %{__strategy__: %{}},
           %{requests: %{}},
           %{jido_ai_config: %{}},
           %{unknown: 1},
-          %{:context => context(), "context" => context()}
+          %{context: saved()},
+          %{:messages => saved(), "messages" => saved()}
         ] do
       assert {:error, _} = Agent.from_initial_state(source(), state)
     end
   end
 
-  test "import rejects ambiguous history and a profile without history" do
-    assert {:error, _} = Agent.from_initial_state(source(), %{context: context(), messages: []})
-    source = definition(:tree_of_thoughts, tools: [], model: MockLLM.model())
-    assert {:error, _} = Agent.from_initial_state(source, %{context: context()})
-  end
-
-  test "import rejects invalid options, unknown profiles and an existing instance" do
+  test "import rejects invalid options and existing instances" do
     for opts <- [[profile: :absent], [id: "a", id: "b"], [unknown: true], %{}] do
-      assert {:error, _} = Agent.from_initial_state(source(), %{context: context()}, opts)
+      assert {:error, _} = Agent.from_initial_state(source(), %{messages: saved()}, opts)
     end
 
-    assert {:error, _} = Agent.from_initial_state(Jido.Agent.instantiate!(source()), %{context: context()})
+    assert {:error, _} = Agent.from_initial_state(Jido.Agent.instantiate!(source()), %{messages: saved()})
     assert {:error, _} = Agent.from_initial_state(:not_an_agent, %{})
   end
 
-  test "malformed and process-local Context data cannot enter stored state" do
-    for context <- [
-          nil,
-          %{context() | id: nil},
-          %{context() | system_prompt: false},
-          %{context() | entries: [42]},
-          Context.append_user(Context.new(), "live", refs: %{pid: self()})
+  test "malformed and process-local Session data is rejected" do
+    session = saved()
+    [entry] = session.thread.entries
+
+    for invalid <- [
+          %{session | id: nil},
+          %{session | thread: %{session.thread | entries: [42]}},
+          %{session | thread: %{session.thread | metadata: %{system_prompt: false}}},
+          %{session | thread: %{session.thread | entries: [%{entry | refs: %{pid: self()}}]}}
         ] do
-      assert {:error, _} = Agent.from_initial_state(source(), %{context: context})
+      assert {:error, _} = Agent.from_initial_state(source(), %{messages: invalid})
     end
   end
 
-  test "import rejects an open, orphaned, duplicate or interrupted tool exchange" do
-    call = %{id: "one", name: "echo", arguments: %{value: 5}}
-    open = Context.new() |> Context.append_assistant(nil, [call])
-    complete = Context.append_tool_result(open, "one", "echo", "5")
+  test "import requires a complete and correctly ordered tool exchange" do
+    call = ReqLLM.ToolCall.new("one", "echo", ~s({"value":5}))
+    assistant = %ReqLLM.Message{role: :assistant, content: [], tool_calls: [call]}
+    result = ReqLLM.Context.tool_result("one", "echo", "5")
 
-    for context <- [
-          open,
-          Context.new() |> Context.append_tool_result("one", "echo", "5"),
-          Context.append_tool_result(complete, "one", "echo", "5"),
-          Context.append_user(open, "Interrupted")
+    for messages <- [
+          [assistant],
+          [result],
+          [assistant, result, result],
+          [assistant, ReqLLM.Context.user("Interrupted")]
         ] do
-      assert {:error, _} = Agent.from_initial_state(source(), %{context: context})
+      assert {:error, _} = Agent.from_initial_state(source(), %{messages: saved(nil, messages)})
     end
 
-    assert {:ok, agent} = Agent.from_initial_state(source(), %{context: complete})
+    assert {:ok, agent} = Agent.from_initial_state(source(), %{messages: saved(nil, [assistant, result])})
     assert Jido.Thread.entry_count(agent.state.messages.thread) == 2
   end
 
-  test "decoded Context maps retain chronological data and reject unknown format fields" do
-    input = %{
-      "id" => "saved",
-      "system_prompt" => "Imported",
-      "entries" => [
-        %{"role" => "assistant", "content" => "Old answer", "refs" => %{"case" => "one"}},
-        %{"role" => "user", "content" => "Old question"}
-      ]
-    }
-
-    assert {:ok, agent} = Agent.from_initial_state(source(), %{"context" => input})
-    assert {:ok, projected} = Jido.AI.Conversation.messages(agent.state.messages)
-    assert Enum.map(projected, &Jido.AI.Query.summarize(&1.content)) == ["Old question", "Old answer"]
+  test "encoded Session imports without copying entries or losing references" do
+    {:ok, session} = Conversation.append(saved(), [ReqLLM.Context.assistant("Old answer")], %{case: "one"})
+    input = session |> Jido.Session.encode() |> Jason.encode!() |> Jason.decode!()
+    assert {:ok, agent} = Agent.from_initial_state(source(), %{"messages" => input})
+    assert agent.state.messages.id == session.id
+    assert Enum.map(agent.state.messages.thread.entries, & &1.id) == Enum.map(session.thread.entries, & &1.id)
     assert List.last(agent.state.messages.thread.entries).refs["case"] == "one"
-    assert {:ok, %Profile{instructions: "Imported"} = profile} = Configuration.profile(agent)
-    assert {:ok, history} = History.read(agent.state, profile)
-    assert Enum.map(history, &Jido.AI.Query.summarize(&1.content)) == ["Old question", "Old answer"]
-    assert {:error, _} = Agent.from_initial_state(source(), %{context: Map.put(input, "version", 999)})
-    assert {:error, _} = Agent.from_initial_state(source(), %{context: Map.put(input, :id, "conflicting")})
+    assert {:ok, projected} = Conversation.messages(agent.state.messages)
+    assert Enum.map(projected, &Jido.AI.Query.summarize(&1.content)) == ["Previous", "Old answer"]
+    assert {:ok, %Profile{instructions: "Saved"}} = Configuration.profile(agent)
+    assert {:error, _} = Agent.from_initial_state(source(), %{messages: Map.put(input, "version", 999)})
   end
 
-  test "the final state size limit includes the imported prompt" do
+  test "final state size includes the imported prompt" do
     assert {:ok, source} = Jido.AI.Authoring.with_state_size_limit(source(), 8_000)
-    assert {:ok, _} = Agent.from_initial_state(source, %{context: context()})
-    large = %{context() | system_prompt: String.duplicate("x", 9_000)}
-    assert {:error, _} = Agent.from_initial_state(source, %{context: large})
+    assert {:ok, _} = Agent.from_initial_state(source, %{messages: saved()})
+    assert {:error, _} = Agent.from_initial_state(source, %{messages: saved(String.duplicate("x", 9_000))})
   end
 end

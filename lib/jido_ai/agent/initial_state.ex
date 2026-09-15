@@ -1,11 +1,10 @@
 defmodule Jido.AI.Agent.InitialState do
   @moduledoc false
-  alias Jido.AI.{Configuration, Context, History, Profile}
+  alias Jido.AI.{Configuration, Conversation, Profile}
 
   def import(source, state, opts) do
     with {:ok, opts} <- options(opts),
          {:ok, definition} <- definition(source),
-         :ok <- thread_key(state),
          {:ok, state} <- domain(state, definition),
          {:ok, profile} <- Configuration.profile(definition, opts[:profile]),
          {:ok, state, prompt} <- context(state, profile),
@@ -53,47 +52,30 @@ defmodule Jido.AI.Agent.InitialState do
 
   defp domain(state, definition) do
     # Core validates each admitted domain field, its defaults, and the final size.
-    Profile.fields(state, [:context | Keyword.keys(definition.schema.fields)], "initial_state")
+    Profile.fields(state, Keyword.keys(definition.schema.fields), "initial_state")
   end
 
-  defp thread_key(%{thread: %Context{}}), do: unsupported_thread_error()
-  defp thread_key(%{"thread" => %Context{}}), do: unsupported_thread_error()
-  defp thread_key(_), do: :ok
+  defp context(state, %{memory: %{history: nil}}), do: {:ok, state, nil}
 
-  defp unsupported_thread_error,
-    do: error("initial_state[:thread] cannot contain an AI context; use :context")
+  defp context(state, profile) do
+    case Map.get(state, profile.memory.history) do
+      nil ->
+        {:ok, state, nil}
 
-  defp context(%{context: input} = state, profile) do
-    with true <- profile.memory.history != nil,
-         false <- Map.has_key?(state, profile.memory.history),
-         {:ok, context} <- normalize_context(input),
-         true <- is_binary(context.id) and context.id != "" and is_list(context.entries),
-         true <- is_nil(context.system_prompt) or is_binary(context.system_prompt),
-         :ok <- Jido.Action.validate_static_data(context),
-         {:ok, values} <- History.prepare_entries(context.entries),
-         {:ok, messages} <- History.messages(values),
-         {:ok, open} <- History.open_tool_calls(messages),
-         true <- map_size(open) == 0 do
-      state =
-        state
-        |> Map.delete(:context)
-        |> Map.put(profile.memory.history, Jido.Session.new(id: context.id))
-        |> History.append(profile, values)
-
-      {:ok, state, context.system_prompt}
-    else
-      {:error, _} = failure -> failure
-      _ -> error("Expected a portable complete Context, a profile with history, and no competing history field")
+      input ->
+        with {:ok, session} <- Jido.Session.decode(input),
+             {:ok, messages} <- Conversation.messages(session),
+             {:ok, open} <- Conversation.open_tool_calls(messages),
+             true <- map_size(open) == 0,
+             {:ok, selected} <- Conversation.select(session),
+             prompt = Map.get(selected.metadata, :system_prompt, selected.metadata["system_prompt"]),
+             true <- is_nil(prompt) or is_binary(prompt) do
+          {:ok, Map.put(state, profile.memory.history, session), prompt}
+        else
+          {:error, _} = failure -> failure
+          _ -> error("Expected a canonical Session with a complete tool exchange")
+        end
     end
-  end
-
-  defp context(state, _), do: {:ok, state, nil}
-
-  defp normalize_context(%Context{} = context), do: {:ok, context}
-
-  defp normalize_context(input) do
-    with {:ok, fields} <- Profile.fields(input, [:id, :entries, :system_prompt], "initial_state.context"),
-         do: Context.coerce(fields)
   end
 
   defp error(message), do: Profile.error("initial_state", message)

@@ -137,7 +137,7 @@ Do not use this when:
 
 ## Breaking Change
 
-`Jido.AI.Thread` remains removed. Use `Jido.AI.Context` for model messages.
+`Jido.AI.Thread` remains removed. Use canonical Session and Thread values for conversations.
 The `jido_ai` package now provides `Jido.Thread` as a portable interaction log
 and `Jido.Session` as a portable envelope that owns one thread. These values do
 not restore the old core Thread Plugin or `Jido.Thread.Agent` helper.
@@ -145,9 +145,11 @@ not restore the old core Thread Plugin or `Jido.Thread.Agent` helper.
 `Jido.Session` can span many requests. `Jido.AI.Session` is the separate live
 request API for admission, steering, cancellation, completion, and inspection.
 If you previously restored state with `initial_state: %{thread: ...}`,
-use `Jido.AI.Agent.from_initial_state(MyAgent, %{context: context})` before
+use `Jido.AI.Agent.from_initial_state(MyAgent, %{messages: session})` before
 starting the Server. Declare any unrelated application `:thread` field in the
-v3 Agent schema. See the [import example](../../examples/14_resume/14_11_initial_state/README.md).
+v3 Agent schema. Use the Profile's declared conversation field in place of
+`messages` when it has another name. The special `:context` import is removed.
+See the [import example](../../examples/14_resume/14_11_initial_state/README.md).
 
 ## Next
 

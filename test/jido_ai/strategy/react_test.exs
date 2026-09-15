@@ -1699,19 +1699,21 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert_script_done(mock)
     end
 
-    test "initial Context import preserves history and its saved prompt", %{jido: jido} do
-      context =
-        Context.new(id: "saved-context", system_prompt: "Restored")
-        |> Context.append_messages([
-          %{role: :user, content: "Previous question"},
-          %{role: :assistant, content: "Previous answer"}
-        ])
+    test "initial Session import preserves history and its saved prompt", %{jido: jido} do
+      {:ok, session} =
+        Jido.AI.Conversation.append(
+          Jido.Session.new(thread: Jido.Thread.new(metadata: %{system_prompt: "Restored"})),
+          [
+            %{role: :user, content: "Previous question"},
+            %{role: :assistant, content: "Previous answer"}
+          ]
+        )
 
       source = definition(:react, tools: [TestCalculator], model: MockLLM.model(), system_prompt: "Configured")
-      assert {:ok, agent} = Jido.AI.Agent.from_initial_state(source, %{context: context}, id: "restored-agent")
+      assert {:ok, agent} = Jido.AI.Agent.from_initial_state(source, %{messages: session}, id: "restored-agent")
       assert {:ok, %Profile{id: :assistant, instructions: "Restored"} = profile} = Configuration.profile(agent)
       assert {:ok, history} = History.read(agent.state, profile)
-      assert Enum.map(history, &message_data/1) == history_entries(context)
+      assert Enum.map(history, &Jido.AI.Query.summarize(&1.content)) == ["Previous question", "Previous answer"]
       assert agent.id == "restored-agent"
       refute Map.has_key?(agent.state, :context)
       mock = mock([%{reply: {:text, "Continued"}}])
@@ -1730,19 +1732,18 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert_script_done(mock)
     end
 
-    test "initial Context import fills a nil prompt from the profile", %{jido: jido} do
-      context =
-        Context.new()
-        |> Context.append_messages([
+    test "initial Session import fills a nil prompt from the profile", %{jido: jido} do
+      {:ok, session} =
+        Jido.AI.Conversation.append(Jido.Session.new(), [
           %{role: :user, content: "Previous question"},
           %{role: :assistant, content: "Previous answer"}
         ])
 
       source = definition(:react, tools: [TestCalculator], model: MockLLM.model(), system_prompt: "Config prompt")
-      assert {:ok, agent} = Jido.AI.Agent.from_initial_state(source, %{context: context})
+      assert {:ok, agent} = Jido.AI.Agent.from_initial_state(source, %{messages: session})
       assert {:ok, %Profile{instructions: "Config prompt"} = profile} = Configuration.profile(agent)
       assert {:ok, history} = History.read(agent.state, profile)
-      assert Enum.map(history, &message_data/1) == history_entries(context)
+      assert Enum.map(history, &Jido.AI.Query.summarize(&1.content)) == ["Previous question", "Previous answer"]
       mock = mock([%{reply: {:text, "Continued"}}])
       server = start_agent(jido, agent)
       assert {:ok, handle} = request(server, mock, :react, "Next question")
@@ -1763,7 +1764,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       source = definition(:react, tools: [])
       context = Context.new(system_prompt: "Legacy key") |> Context.append_user("legacy")
       assert {:error, error} = Jido.AI.Agent.from_initial_state(source, %{thread: context})
-      assert Exception.message(error) =~ "initial_state[:thread] cannot contain an AI context"
+      assert Exception.message(error) =~ "Unknown field :thread"
       assert source.state == nil
     end
 

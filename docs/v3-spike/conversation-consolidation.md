@@ -82,6 +82,17 @@ Remaining work:
 
 ## Work log (historical steps, not current status)
 
+- Initial-state import now uses the declared Session field, including encoded
+  Session maps. It no longer accepts the special legacy Context input or copies
+  message entries into a new Session. Eight import unit tests and five live-
+  runtime MockLLM import examples pass, including saved identity, references,
+  multimodal history, selected prompts, and no tool replay. Logs:
+  `/tmp/jido-ai-session-import.log` and `/tmp/jido-ai-session-import-example.log`.
+  The final full gate passed all 2,875 tests with one existing exclusion:
+  `/tmp/jido-ai-session-import-final.log`. Format, forced compilation, and the
+  current inventory check passed. Import snippets and the public API map are
+  updated; the broader conversation guide still needs consolidation.
+
 - Active standalone migration: ReAct.State.context now holds a canonical
   Thread. Its checkpoint format is version 4 and encodes the Thread for JSON.
   Runner, checkpoint capture/continuation, and request-transform state views

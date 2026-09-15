@@ -198,15 +198,15 @@ saved_messages = snapshot.details.conversation
   end
 
 # Import the saved conversation before Server startup:
-context =
-  Jido.AI.Context.new(system_prompt: saved_system_prompt)
-  |> Jido.AI.Context.append_messages(conversation_messages)
+thread = Jido.Thread.new(metadata: %{system_prompt: saved_system_prompt})
+{:ok, session} =
+  Jido.AI.Conversation.append(Jido.Session.new(thread: thread), conversation_messages)
 
-{:ok, agent} = Jido.AI.Agent.from_initial_state(MyAgent, %{context: context})
+{:ok, agent} = Jido.AI.Agent.from_initial_state(MyAgent, %{messages: session})
 {:ok, server} = Jido.start_agent(MyJido, agent)
 ```
 
-A nil `context.system_prompt` uses the Agent's configured prompt. A saved prompt
+A nil `system_prompt` in Thread metadata uses the Agent's configured prompt. A saved prompt
 overrides it. Use `profile: :review` to select another AI profile. This imports
 conversation data; it does not resume execution. Use native checkpoint restore
 for current V3 state.

@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.InitialStateTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Agent, Configuration, Context, History, Request}
+  alias Jido.AI.{Agent, Configuration, Conversation, History, Request}
   alias JidoAI.Examples.InitialState
 
   setup do
@@ -12,13 +12,22 @@ defmodule JidoAI.Examples.InitialStateTest do
   defp saved_context(prompt) do
     refs = %{request_id: "old-request", run_id: "old-run", source: "/saved", case_id: "one"}
 
-    Context.new(id: "old-context", system_prompt: prompt)
-    |> Context.append_user([ContentPart.text("Previous question"), ContentPart.image(<<1, 2, 3>>, "image/png")],
-      refs: refs
-    )
-    |> Context.append_assistant(nil, [%{id: "saved-tool", name: "import_echo", arguments: %{value: 5}}], refs: refs)
-    |> Context.append_tool_result("saved-tool", "import_echo", ~s({"ok":true,"result":{"value":5}}), refs: refs)
-    |> Context.append_assistant("Previous answer", nil, refs: refs)
+    thread = Jido.Thread.new(metadata: %{system_prompt: prompt})
+    call = ReqLLM.ToolCall.new("saved-tool", "import_echo", ~s({"value":5}))
+
+    {:ok, session} =
+      Conversation.append(
+        Jido.Session.new(id: "old-session", thread: thread),
+        [
+          ReqLLM.Context.user([ContentPart.text("Previous question"), ContentPart.image(<<1, 2, 3>>, "image/png")]),
+          %ReqLLM.Message{role: :assistant, content: [], tool_calls: [call]},
+          ReqLLM.Context.tool_result("saved-tool", "import_echo", ~s({"ok":true,"result":{"value":5}})),
+          ReqLLM.Context.assistant("Previous answer")
+        ],
+        refs
+      )
+
+    session
   end
 
   defp submit(server, context, query, route \\ "ai.react.query") do
@@ -37,7 +46,7 @@ defmodule JidoAI.Examples.InitialStateTest do
     test "#{module} imports history before startup and restores later native state without tool replay", %{jido: jido} do
       old = saved_context("Saved prompt")
 
-      state = %{context: old, count: 9, thread: %{id: "application-thread", rev: 2}}
+      state = %{messages: old, count: 9, thread: %{id: "application-thread", rev: 2}}
 
       assert {:ok, agent} = Agent.from_initial_state(unquote(module), state, id: "imported")
       assert {:ok, profile} = Configuration.profile(agent, :assistant)
@@ -101,12 +110,13 @@ defmodule JidoAI.Examples.InitialStateTest do
 
   for {prompt, expected} <- [{nil, "Review prompt"}, {"Saved review", "Saved review"}] do
     test "profile selection keeps unrelated history and uses #{inspect(prompt)} prompt", %{jido: jido} do
-      old = Context.new(system_prompt: unquote(prompt)) |> Context.append_user("Old review")
+      thread = Jido.Thread.new(metadata: %{system_prompt: unquote(prompt)})
+      {:ok, old} = Conversation.append(Jido.Session.new(thread: thread), [ReqLLM.Context.user("Old review")])
       {:ok, primary} = Jido.AI.Conversation.append(Jido.Session.new(), [ReqLLM.Context.user("Old primary")])
       source = InitialState.Profiles.definition()
 
       assert {:ok, agent} =
-               Agent.from_initial_state(source, %{context: old, primary_messages: primary}, profile: :review)
+               Agent.from_initial_state(source, %{review_messages: old, primary_messages: primary}, profile: :review)
 
       assert agent.state.primary_messages == primary
       assert {:ok, review_profile} = Configuration.profile(agent, :review)
@@ -135,7 +145,7 @@ defmodule JidoAI.Examples.InitialStateTest do
   test "invalid and ambiguous imports leave the source definition unchanged" do
     {mock, _} = mock([])
     source = InitialState.Profiles.definition()
-    old = Context.new() |> Context.append_user("Saved")
+    old = saved_context(nil)
     assert {:error, _} = Agent.from_initial_state(source, %{context: old})
     assert {:error, _} = Agent.from_initial_state(source, %{context: old}, profile: :absent)
     assert {:error, _} = Agent.from_initial_state(source, %{context: old, review_messages: []}, profile: :review)

@@ -4608,7 +4608,7 @@
       "modules": [
         "Jido.AI.Agent.InitialState"
       ],
-      "sha256": "20c8c6e6a9b9d893bffb9bbc6e7551b73532ae17364b41ad6cf7d0457af95323",
+      "sha256": "3b13c707d8a0234078866c27587fd1930962e752e4ec11037dc5931f515dae79",
       "declarations": [
         {
           "line": 1,
@@ -31901,7 +31901,7 @@
   "schema_version": 2,
   "historical_inventory": "api-inventory-v2.json",
   "contract_map": "public-api-map.md",
-  "source_digest": "a51d62f974a5c1f915056b81ad81c0b062041d2656f6b564ddc2d750fdcf92e6",
+  "source_digest": "91c60df6f0e7e43558773ce36b82eb7f0a387ac841805929e3dcde7ebde8ee0c",
   "file_count": 252,
   "ownership": {
     "Jido.Session": "jido_ai",

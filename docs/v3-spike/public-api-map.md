@@ -50,9 +50,10 @@ contract; they are not separate authoring models.
 
 ## Compatibility, internal code, and removed APIs
 
-- Retained compatibility: `Agent.from_initial_state/2,3` converts supported old
-  state; root `update_context_entries/2` updates declared History. These do not
-  restore private V2 strategy state. See [conversion](../../lib/jido_ai/agent/initial_state.ex)
+- `Agent.from_initial_state/2,3` accepts canonical Session values or encoded
+  Session maps in declared conversation fields. The special `:context` input
+  is removed. Root `update_context_entries/2` remains pending consolidation.
+  These do not restore private V2 strategy state. See [import](../../lib/jido_ai/agent/initial_state.ex)
   and [boundary tests](../../test/authoring/agents/boundaries_test.exs).
 - Internal implementation: `Agent.Definition`, `Agent.Interface`, DSL compiler,
   `Profile.References`, Runtime steps, and Session process/commit helpers support
