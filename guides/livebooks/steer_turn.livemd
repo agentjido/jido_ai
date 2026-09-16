@@ -1,0 +1,117 @@
+# Steer a running turn
+
+## Section
+
+Steering queues a correction for the current request. Mock mode holds the
+first model response so the correction is accepted before the request closes.
+In live mode the same call may finish quickly; a late correction can be
+rejected. Change `backend` to `:live` and set `OPENAI_API_KEY` to try it.
+
+## Install this checkout
+
+```elixir
+jido_ai = Path.expand("../..", __DIR__)
+
+Mix.install([
+  {:jido_ai, path: jido_ai},
+  {:jido, path: Path.expand("../jido", jido_ai), override: true},
+  {:jido_action, path: Path.expand("../jido_action", jido_ai), override: true},
+  {:jido_signal, path: Path.expand("../jido_signal", jido_ai), override: true}
+])
+```
+
+## Choose the model service
+
+```elixir
+backend = :mock
+
+if backend == :live and is_nil(System.get_env("OPENAI_API_KEY")) do
+  raise "Set OPENAI_API_KEY before you select :live"
+end
+
+mock =
+  if backend == :mock do
+    {:ok, pid} =
+      Jido.AI.Test.MockLLM.start_link(
+        script: [
+          %{reply: {:wait, :held, {:text, "Initial answer"}}},
+          %{reply: {:text, "Revised answer"}}
+        ],
+        observer: self()
+      )
+
+    pid
+  end
+
+context = if mock, do: %{ai: %{assistant: %{options: Jido.AI.Test.MockLLM.options(mock)}}}, else: %{}
+```
+
+## Define a steerable Agent
+
+```elixir
+defmodule Guide.SteerTurn do
+  use Jido.AI.Agent, name: "guide_steer_turn"
+
+  agent do
+    schema Zoi.object(%{
+      answer: Zoi.string() |> Zoi.default(""),
+      messages: Jido.AI.Thread.Projection.schema()
+    })
+
+    ai :assistant do
+      model "openai:gpt-4o-mini"
+      instructions "Use the latest correction before you finish."
+      reasoning :react
+      memory history: :messages
+
+      controls do
+        steering true
+        timeout 10_000
+        max_model_calls 2
+      end
+
+      result into: :answer
+    end
+  end
+
+  routes do
+    route "guides.ai.steer_turn", ai: :assistant
+  end
+end
+```
+
+## Queue a correction
+
+```elixir
+{:ok, _jido} = Jido.start()
+{:ok, server} = Jido.start_agent(Guide.SteerTurn, id: "guide-steer-turn")
+{:ok, request} = Guide.SteerTurn.ask(server, "Give a short review.", context: context)
+
+if mock do
+  receive do
+    {:mock_llm_waiting, ^mock, :held, _worker} -> :ok
+  after
+    5_000 -> raise "The mock provider did not reach its barrier"
+  end
+end
+
+steering = Jido.AI.Orchestration.steer(request, "Also mention the tests.")
+if mock, do: Jido.AI.Test.MockLLM.release(mock, :held)
+result = Jido.AI.Request.await(request, timeout: 10_000)
+
+%{steering: steering, result: result}
+```
+
+In mock mode, steering is queued and the second model call returns the revised
+answer. Live mode shows either accepted input or a clean late-input rejection.
+
+```elixir
+if mock do
+  %{remaining: [], unexpected: [], requests: [_, _]} = Jido.AI.Test.MockLLM.report(mock)
+end
+
+:ok = Jido.stop_agent(server)
+:ok = Jido.stop()
+```
+
+Read [Stream, steer, and cancel](../v3/12_stream_steer_cancel.md).

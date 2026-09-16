@@ -1,0 +1,118 @@
+# Resume saved Context
+
+## Section
+
+Import a portable Session before you start the AgentServer. This restores
+conversation data, not a pending worker or an execution checkpoint. Change
+`backend` to `:live` and set `OPENAI_API_KEY` to continue with a real model.
+
+## Install this checkout
+
+```elixir
+jido_ai = Path.expand("../..", __DIR__)
+
+Mix.install([
+  {:jido_ai, path: jido_ai},
+  {:jido, path: Path.expand("../jido", jido_ai), override: true},
+  {:jido_action, path: Path.expand("../jido_action", jido_ai), override: true},
+  {:jido_signal, path: Path.expand("../jido_signal", jido_ai), override: true}
+])
+```
+
+## Choose the model service
+
+```elixir
+backend = :mock
+
+if backend == :live and is_nil(System.get_env("OPENAI_API_KEY")) do
+  raise "Set OPENAI_API_KEY before you select :live"
+end
+
+mock =
+  if backend == :mock do
+    {:ok, pid} = Jido.AI.Test.MockLLM.start_link(script: [%{reply: {:text, "The code is ALPHA."}}])
+    pid
+  end
+
+context = if mock, do: %{ai: %{assistant: %{options: Jido.AI.Test.MockLLM.options(mock)}}}, else: %{}
+```
+
+## Define the Agent
+
+```elixir
+defmodule Guide.ResumeContext do
+  use Jido.AI.Agent, name: "guide_resume_context"
+
+  agent do
+    schema Zoi.object(%{
+      answer: Zoi.string() |> Zoi.default(""),
+      messages: Jido.AI.Thread.Projection.schema()
+    })
+
+    ai :assistant do
+      model "openai:gpt-4o-mini"
+      instructions "Use the saved Context."
+      reasoning :react
+      memory history: :messages
+
+      controls do
+        timeout 10_000
+        max_model_calls 1
+      end
+
+      result into: :answer
+    end
+  end
+
+  routes do
+    route "guides.ai.resume_context", ai: :assistant
+  end
+end
+```
+
+## Save and import a Session
+
+```elixir
+thread = Jido.Thread.new(metadata: %{system_prompt: "Use the saved case facts."})
+saved = Jido.Session.new(id: "saved-case-session", thread: thread)
+
+{:ok, saved} =
+  Jido.AI.Thread.Projection.append(saved, [
+    ReqLLM.Context.user("Remember the code ALPHA."),
+    ReqLLM.Context.assistant("I will remember ALPHA.")
+  ])
+
+{:ok, agent} =
+  Jido.AI.Agent.from_initial_state(
+    Guide.ResumeContext,
+    %{messages: saved},
+    id: "guide-resumed-agent"
+  )
+
+%{saved_session_id: saved.id, imported_session_id: agent.state.messages.id}
+```
+
+No model call occurs during import. Start the imported Agent and ask a new
+question. The new request uses the saved exchange as Context.
+
+```elixir
+{:ok, _jido} = Jido.start()
+{:ok, server} = Jido.start_agent(agent)
+{:ok, answer} = Guide.ResumeContext.ask_sync(server, "What is the code?", context: context)
+
+%{answer: answer, session_id: Jido.AgentServer.agent(server).state.messages.id}
+```
+
+```elixir
+if mock do
+  %{remaining: [], unexpected: [], requests: [request]} = Jido.AI.Test.MockLLM.report(mock)
+  true = String.contains?(Jason.encode!(request.body), "ALPHA")
+end
+
+:ok = Jido.stop_agent(server)
+:ok = Jido.stop()
+```
+
+Read [Checkpoint and resume](../v3/20_checkpoint_resume.md). For a paused
+ReAct execution, use the separate checkpoint contract instead of initial
+Context import.

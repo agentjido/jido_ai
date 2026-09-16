@@ -1,0 +1,154 @@
+# Switch Context
+
+## Section
+
+Keep two saved conversation lanes in one Session. Select one lane, ask a
+question, then select the other lane and ask again. Change `backend` to
+`:live` and set `OPENAI_API_KEY` to use the same Agent with a real model.
+
+## Install this checkout
+
+```elixir
+jido_ai = Path.expand("../..", __DIR__)
+
+Mix.install([
+  {:jido_ai, path: jido_ai},
+  {:jido, path: Path.expand("../jido", jido_ai), override: true},
+  {:jido_action, path: Path.expand("../jido_action", jido_ai), override: true},
+  {:jido_signal, path: Path.expand("../jido_signal", jido_ai), override: true}
+])
+```
+
+## Choose the model service
+
+```elixir
+backend = :mock
+
+if backend == :live and is_nil(System.get_env("OPENAI_API_KEY")) do
+  raise "Set OPENAI_API_KEY before you select :live"
+end
+
+script = [
+  %{reply: {:text, "ALPHA is the active case."}},
+  %{reply: {:text, "BETA is the active case."}}
+]
+
+mock = if backend == :mock, do: elem(Jido.AI.Test.MockLLM.start_link(script: script), 1)
+context = if mock, do: %{ai: %{assistant: %{options: Jido.AI.Test.MockLLM.options(mock)}}}, else: %{}
+```
+
+## Define one Agent with memory
+
+```elixir
+defmodule Guide.SwitchContext do
+  use Jido.AI.Agent, name: "guide_switch_context"
+
+  agent do
+    schema Zoi.object(%{
+      answer: Zoi.string() |> Zoi.default(""),
+      messages: Jido.AI.Thread.Projection.schema()
+    })
+
+    ai :assistant do
+      model "openai:gpt-4o-mini"
+      instructions "Answer from the selected case Context."
+      reasoning :react
+      memory history: :messages
+
+      controls do
+        timeout 10_000
+        max_model_calls 1
+      end
+
+      result into: :answer
+    end
+  end
+
+  routes do
+    route "guides.ai.switch_context", ai: :assistant
+  end
+end
+```
+
+## Build two portable Threads
+
+These are completed conversation data, not running requests. The public
+projection validates each message before it enters a Thread.
+
+```elixir
+make_thread = fn code ->
+  thread = Jido.Thread.new(metadata: %{system_prompt: "Use the saved case facts."})
+
+  {:ok, thread} =
+    Jido.AI.Thread.Projection.append(thread, [
+      ReqLLM.Context.user("The case code is #{code}."),
+      ReqLLM.Context.assistant("I will use #{code}.")
+    ])
+
+  thread
+end
+
+alpha = make_thread.("ALPHA")
+beta = make_thread.("BETA")
+```
+
+## Select each lane and ask
+
+```elixir
+{:ok, _jido} = Jido.start()
+{:ok, server} = Jido.start_agent(Guide.SwitchContext, id: "guide-switch-context")
+
+{:ok, _} =
+  Jido.AI.Orchestration.modify_context(server,
+    %{type: :replace, result_context: alpha},
+    context_ref: "alpha",
+    op_id: "load-alpha"
+  )
+
+{:ok, _} =
+  Jido.AI.Orchestration.modify_context(server,
+    %{type: :replace, result_context: beta},
+    context_ref: "beta",
+    op_id: "load-beta"
+  )
+
+{:ok, _} =
+  Jido.AI.Orchestration.modify_context(server,
+    %{type: :switch},
+    context_ref: "alpha",
+    op_id: "select-alpha"
+  )
+
+{:ok, alpha_answer} = Guide.SwitchContext.ask_sync(server, "Which case is active?", context: context)
+
+{:ok, _} =
+  Jido.AI.Orchestration.modify_context(server,
+    %{type: :switch},
+    context_ref: "beta",
+    op_id: "select-beta"
+  )
+
+{:ok, beta_answer} = Guide.SwitchContext.ask_sync(server, "Which case is active?", context: context)
+
+%{alpha: alpha_answer, beta: beta_answer}
+```
+
+Mock mode checks that each model request used its selected case. A switch
+changes selected Context; it does not start another AgentServer.
+
+```elixir
+if mock do
+  %{remaining: [], unexpected: [], requests: [first, second]} =
+    Jido.AI.Test.MockLLM.report(mock)
+
+  true = String.contains?(Jason.encode!(first.body), "ALPHA")
+  true = String.contains?(Jason.encode!(second.body), "BETA")
+end
+```
+
+```elixir
+:ok = Jido.stop_agent(server)
+:ok = Jido.stop()
+```
+
+Read [Multiple Contexts](../v3/19_multiple_contexts.md).

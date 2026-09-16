@@ -1,0 +1,107 @@
+# Two requests in one Session
+
+## Section
+
+The Agent retains a portable `Jido.Session` in `:messages`. The second model
+request can see the first completed exchange. Change `backend` to `:live` and
+set `OPENAI_API_KEY` to use the same Agent with a real model.
+
+## Install this checkout
+
+```elixir
+jido_ai = Path.expand("../..", __DIR__)
+
+Mix.install([
+  {:jido_ai, path: jido_ai},
+  {:jido, path: Path.expand("../jido", jido_ai), override: true},
+  {:jido_action, path: Path.expand("../jido_action", jido_ai), override: true},
+  {:jido_signal, path: Path.expand("../jido_signal", jido_ai), override: true}
+])
+```
+
+## Choose the model service
+
+```elixir
+backend = :mock
+
+if backend == :live and is_nil(System.get_env("OPENAI_API_KEY")) do
+  raise "Set OPENAI_API_KEY before you select :live"
+end
+
+script = [
+  %{reply: {:text, "The case code is ALPHA."}},
+  %{reply: {:text, "The code is ALPHA."}}
+]
+
+mock = if backend == :mock, do: elem(Jido.AI.Test.MockLLM.start_link(script: script), 1)
+context = if mock, do: %{ai: %{assistant: %{options: Jido.AI.Test.MockLLM.options(mock)}}}, else: %{}
+```
+
+## Declare retained Context
+
+```elixir
+defmodule Guide.TwoRequests do
+  use Jido.AI.Agent, name: "guide_two_requests"
+
+  agent do
+    schema Zoi.object(%{
+      reply: Zoi.string() |> Zoi.default(""),
+      messages: Jido.AI.Thread.Projection.schema()
+    })
+
+    ai :assistant do
+      model "openai:gpt-4o-mini"
+      instructions "Use the prior completed conversation when it helps."
+      memory history: :messages
+
+      controls do
+        timeout 10_000
+        max_model_calls 1
+      end
+
+      result into: :reply
+    end
+  end
+
+  routes do
+    route "guides.ai.two_requests", ai: :assistant
+  end
+end
+```
+
+## Ask twice
+
+```elixir
+{:ok, _jido} = Jido.start()
+{:ok, server} = Jido.start_agent(Guide.TwoRequests, id: "guide-two-requests")
+
+{:ok, first} =
+  Guide.TwoRequests.ask_sync(server, "Remember that the case code is ALPHA.", context: context)
+
+{:ok, second} = Guide.TwoRequests.ask_sync(server, "What is the case code?", context: context)
+
+session = Jido.AgentServer.agent(server).state.messages
+{:ok, selected} = Jido.AI.Thread.Projection.select(session)
+{:ok, messages} = Jido.AI.Thread.Projection.messages(selected)
+
+%{first: first, second: second, session_id: session.id, selected_roles: Enum.map(messages, & &1.role)}
+```
+
+The raw Thread can contain more than the selected model messages. Mock mode
+checks that the second provider request contains the first case code.
+
+```elixir
+if mock do
+  %{remaining: [], unexpected: [], requests: [_, second_request]} =
+    Jido.AI.Test.MockLLM.report(mock)
+
+  true = String.contains?(Jason.encode!(second_request.body), "ALPHA")
+end
+```
+
+```elixir
+:ok = Jido.stop_agent(server)
+:ok = Jido.stop()
+```
+
+Read [Session, Thread, and Context](../v3/17_session_thread_context.md).

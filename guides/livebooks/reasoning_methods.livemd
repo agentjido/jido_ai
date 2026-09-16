@@ -1,0 +1,111 @@
+# Compare two reasoning methods
+
+## Section
+
+One Agent has two DSL profiles and two routes. The mock responses use each
+method's expected text format. This compares result routing, not reasoning
+quality. Change `backend` to `:live` to explore both with `OPENAI_API_KEY`.
+
+## Install this checkout
+
+```elixir
+jido_ai = Path.expand("../..", __DIR__)
+
+Mix.install([
+  {:jido_ai, path: jido_ai},
+  {:jido, path: Path.expand("../jido", jido_ai), override: true},
+  {:jido_action, path: Path.expand("../jido_action", jido_ai), override: true},
+  {:jido_signal, path: Path.expand("../jido_signal", jido_ai), override: true}
+])
+```
+
+## Choose the model service
+
+```elixir
+backend = :mock
+
+if backend == :live and is_nil(System.get_env("OPENAI_API_KEY")) do
+  raise "Set OPENAI_API_KEY before you select :live"
+end
+
+script = [
+  %{reply: {:text, "Step 1: Add 2 and 3.\nConclusion: 5"}},
+  %{reply: {:text, "1. Add the values.\n#### 5"}}
+]
+
+mock = if backend == :mock, do: elem(Jido.AI.Test.MockLLM.start_link(script: script), 1)
+
+context =
+  if mock do
+    options = Jido.AI.Test.MockLLM.options(mock)
+    %{ai: %{cot: %{options: options}, cod: %{options: options}}}
+  else
+    %{}
+  end
+```
+
+## Define two profiles
+
+```elixir
+defmodule Guide.ReasoningMethods do
+  use Jido.AI.Agent, name: "guide_reasoning_methods"
+
+  agent do
+    schema Zoi.object(%{reply: Zoi.string() |> Zoi.default("")})
+
+    ai :cot do
+      model "openai:gpt-4o-mini"
+      reasoning :chain_of_thought
+
+      controls do
+        timeout 10_000
+      end
+
+      result into: :reply
+    end
+
+    ai :cod do
+      model "openai:gpt-4o-mini"
+      reasoning :chain_of_draft
+
+      controls do
+        timeout 10_000
+      end
+
+      result into: :reply
+    end
+  end
+
+  routes do
+    route "guides.ai.cot", ai: :cot
+    route "guides.ai.cod", ai: :cod
+  end
+end
+```
+
+## Run both profiles
+
+```elixir
+{:ok, _jido} = Jido.start()
+{:ok, server} = Jido.start_agent(Guide.ReasoningMethods, id: "guide-reasoning-methods")
+
+{:ok, cot} = Guide.ReasoningMethods.ask_sync(server, "What is 2 + 3?", profile: :cot, context: context)
+{:ok, cod} = Guide.ReasoningMethods.ask_sync(server, "What is 2 + 3?", profile: :cod, context: context)
+
+%{chain_of_thought: cot, chain_of_draft: cod}
+```
+
+Both mock conclusions are `"5"`. The internal steps and raw responses have
+method-specific accessors. The two profiles share one AgentServer but retain
+separate method results.
+
+```elixir
+if mock do
+  %{remaining: [], unexpected: [], requests: [_, _]} = Jido.AI.Test.MockLLM.report(mock)
+end
+
+:ok = Jido.stop_agent(server)
+:ok = Jido.stop()
+```
+
+Read [Choose a reasoning method](../v3/08_reasoning_methods.md).

@@ -1,0 +1,110 @@
+# First answer
+
+## Section
+
+Define one AI Agent and ask one question. The default path uses a local MockLLM
+server. Change only `backend` to `:live` to use the model in the Agent definition.
+Live mode needs `OPENAI_API_KEY`. Run the cells in order from this checkout.
+
+## Install this checkout
+
+```elixir
+jido_ai = Path.expand("../..", __DIR__)
+
+Mix.install([
+  {:jido_ai, path: jido_ai},
+  {:jido, path: Path.expand("../jido", jido_ai), override: true},
+  {:jido_action, path: Path.expand("../jido_action", jido_ai), override: true},
+  {:jido_signal, path: Path.expand("../jido_signal", jido_ai), override: true}
+])
+```
+
+## Choose the model service
+
+```elixir
+backend = :mock
+
+if backend == :live and is_nil(System.get_env("OPENAI_API_KEY")) do
+  raise "Set OPENAI_API_KEY before you select :live"
+end
+
+mock =
+  if backend == :mock do
+    {:ok, pid} = Jido.AI.Test.MockLLM.start_link(script: [%{reply: {:text, "Ready"}}])
+    pid
+  end
+
+context =
+  if mock do
+    %{ai: %{assistant: %{options: Jido.AI.Test.MockLLM.options(mock)}}}
+  else
+    %{}
+  end
+```
+
+The mock changes the model transport only. The request still uses ReqLLM,
+Jido Flow, and AgentServer.
+
+## Define the Agent
+
+```elixir
+defmodule Guide.FirstAnswer do
+  use Jido.AI.Agent, name: "guide_first_answer"
+
+  agent do
+    schema Zoi.object(%{answer: Zoi.string() |> Zoi.default("")})
+
+    ai :assistant do
+      model "openai:gpt-4o-mini"
+      instructions "Answer in one short sentence."
+
+      controls do
+        timeout 10_000
+        max_model_calls 1
+      end
+
+      result into: :answer
+    end
+  end
+
+  routes do
+    signal_source "/guides/ai/first_answer"
+
+    route "guides.ai.first_answer", ai: :assistant do
+      define :answer, args: [:query]
+    end
+  end
+end
+```
+
+The `ai` block describes the request. `result into:` stores the final answer
+in the Agent's domain state. The route lets the generated `ask_sync/3` helper
+submit the request.
+
+## Ask and inspect
+
+```elixir
+{:ok, _jido} = Jido.start()
+{:ok, server} = Jido.start_agent(Guide.FirstAnswer, id: "guide-first-answer")
+{:ok, answer} = Guide.FirstAnswer.ask_sync(server, "Say you are ready.", context: context)
+state = Jido.AgentServer.agent(server).state
+
+%{answer: answer, stored_answer: state.answer}
+```
+
+In mock mode, both answers are `"Ready"`. In live mode, the wording can vary.
+The completed request is not the same as the short AgentServer admission Turn.
+
+```elixir
+if mock do
+  %{remaining: [], unexpected: []} = Jido.AI.Test.MockLLM.report(mock)
+end
+
+:ok = Jido.stop_agent(server)
+:ok = Jido.stop()
+```
+
+Continue with [Three tool rounds](three_tool_rounds.livemd) or read
+[Your first AI agent](../v3/01_first_agent.md).
+
+<!-- livebook:{"offset":2673,"stamp":{"token":"XCP.G278stYmLHVRoDElUxI69LPAxn45__7G7mfXQ3FQf3-_DFxhzp3cGjxY62wSYKU-LzWOqmzbU7JyJy2pi5qfG5QkFN1Ok1ZPEMRcbdU9bxmGZURk9Ku7N2nXXepjrpRChqIDAEGgb57vvAlWteBr","version":2}} -->

@@ -1,0 +1,114 @@
+# A bounded long turn
+
+## Section
+
+`ask/3` returns a handle while AI work continues. In mock mode, the provider
+holds its answer long enough for one public inspection. The same Agent runs in
+live mode, but a real provider may finish before inspection. Change `backend`
+to `:live` and set `OPENAI_API_KEY` to explore that path.
+
+## Install this checkout
+
+```elixir
+jido_ai = Path.expand("../..", __DIR__)
+
+Mix.install([
+  {:jido_ai, path: jido_ai},
+  {:jido, path: Path.expand("../jido", jido_ai), override: true},
+  {:jido_action, path: Path.expand("../jido_action", jido_ai), override: true},
+  {:jido_signal, path: Path.expand("../jido_signal", jido_ai), override: true}
+])
+```
+
+## Choose the model service
+
+```elixir
+backend = :mock
+
+if backend == :live and is_nil(System.get_env("OPENAI_API_KEY")) do
+  raise "Set OPENAI_API_KEY before you select :live"
+end
+
+mock =
+  if backend == :mock do
+    {:ok, pid} =
+      Jido.AI.Test.MockLLM.start_link(
+        script: [%{reply: {:wait, :held, {:text, "Finished"}}}],
+        observer: self()
+      )
+
+    pid
+  end
+
+context = if mock, do: %{ai: %{assistant: %{options: Jido.AI.Test.MockLLM.options(mock)}}}, else: %{}
+```
+
+## Define bounded work
+
+```elixir
+defmodule Guide.LongTurn do
+  use Jido.AI.Agent, name: "guide_long_turn"
+
+  agent do
+    schema Zoi.object(%{answer: Zoi.string() |> Zoi.default("")})
+
+    ai :assistant do
+      model "openai:gpt-4o-mini"
+      instructions "Answer in one sentence."
+
+      controls do
+        timeout 10_000
+        max_model_calls 1
+      end
+
+      result into: :answer
+    end
+  end
+
+  routes do
+    route "guides.ai.long_turn", ai: :assistant
+  end
+end
+```
+
+## Inspect, release, and await
+
+The mock barrier is notebook coordination. It is not an Agent tool or a
+production callback. The request handle keeps its identity before and after
+the held provider response.
+
+```elixir
+{:ok, _jido} = Jido.start()
+{:ok, server} = Jido.start_agent(Guide.LongTurn, id: "guide-long-turn")
+{:ok, request} = Guide.LongTurn.ask(server, "Say you finished.", context: context)
+
+pending =
+  if mock do
+    receive do
+      {:mock_llm_waiting, ^mock, :held, _worker} -> :ok
+    after
+      5_000 -> raise "The mock provider did not reach its barrier"
+    end
+
+    {:ok, view} = Jido.AI.Orchestration.snapshot(server, request_id: request.id)
+    :ok = Jido.AI.Test.MockLLM.release(mock, :held)
+    view.request.status
+  end
+
+{:ok, answer} = Jido.AI.Request.await(request, timeout: 10_000)
+%{request_id: request.id, status_during_mock_wait: pending, answer: answer}
+```
+
+Mock mode shows `:pending` before release and `"Finished"` after it. The
+caller wait does not keep the AgentServer admission Turn open.
+
+```elixir
+if mock do
+  %{remaining: [], unexpected: [], requests: [_]} = Jido.AI.Test.MockLLM.report(mock)
+end
+
+:ok = Jido.stop_agent(server)
+:ok = Jido.stop()
+```
+
+Read [Long-running turns](../v3/10_long_running_turns.md).

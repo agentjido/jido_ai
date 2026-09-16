@@ -1,0 +1,122 @@
+# Three tool rounds
+
+## Section
+
+This Agent uses one Action in three dependent ReAct rounds. The mock script
+fixes the sequence; a real model can choose a different sequence. Change only
+`backend` to `:live` to explore it with `OPENAI_API_KEY`.
+
+## Install this checkout
+
+```elixir
+jido_ai = Path.expand("../..", __DIR__)
+
+Mix.install([
+  {:jido_ai, path: jido_ai},
+  {:jido, path: Path.expand("../jido", jido_ai), override: true},
+  {:jido_action, path: Path.expand("../jido_action", jido_ai), override: true},
+  {:jido_signal, path: Path.expand("../jido_signal", jido_ai), override: true}
+])
+```
+
+## Choose the model service
+
+```elixir
+backend = :mock
+
+if backend == :live and is_nil(System.get_env("OPENAI_API_KEY")) do
+  raise "Set OPENAI_API_KEY before you select :live"
+end
+
+script = [
+  %{reply: {:tools, [%{id: "first", name: "multiply", arguments: %{a: 2, b: 3}}]}},
+  %{reply: {:tools, [%{id: "second", name: "multiply", arguments: %{a: 6, b: 4}}]}},
+  %{reply: {:tools, [%{id: "third", name: "multiply", arguments: %{a: 24, b: 5}}]}},
+  %{reply: {:text, "The final product is 120."}}
+]
+
+mock = if backend == :mock, do: elem(Jido.AI.Test.MockLLM.start_link(script: script), 1)
+context = if mock, do: %{ai: %{assistant: %{options: Jido.AI.Test.MockLLM.options(mock)}}}, else: %{}
+```
+
+## Define the Action and Agent
+
+```elixir
+defmodule Guide.Multiply do
+  use Jido.Action,
+    name: "guide_multiply",
+    schema: Zoi.object(%{a: Zoi.integer(), b: Zoi.integer()})
+
+  @impl Jido.Action
+  def run(%{a: a, b: b}, _context), do: {:ok, %{value: a * b}}
+end
+
+defmodule Guide.ThreeRounds do
+  use Jido.AI.Agent, name: "guide_three_rounds"
+
+  agent do
+    schema Zoi.object(%{answer: Zoi.string() |> Zoi.default("")})
+
+    ai :assistant do
+      model "openai:gpt-4o-mini"
+      instructions "Use multiply once per round. Use each result in the next call."
+      reasoning :react
+
+      tools do
+        action Guide.Multiply, as: :multiply
+      end
+
+      controls do
+        timeout 30_000
+        max_iterations 4
+        max_model_calls 4
+        max_tool_calls 3
+      end
+
+      result into: :answer
+    end
+  end
+
+  routes do
+    signal_source "/guides/ai/three_tool_rounds"
+
+    route "guides.ai.three_rounds", ai: :assistant do
+      define :calculate, args: [:query]
+    end
+  end
+end
+```
+
+## Run and inspect
+
+```elixir
+{:ok, _jido} = Jido.start()
+{:ok, server} = Jido.start_agent(Guide.ThreeRounds, id: "guide-three-rounds")
+
+{:ok, answer} =
+  Guide.ThreeRounds.ask_sync(
+    server,
+    "Multiply 2 by 3, that result by 4, and that result by 5. Use the tool for each step.",
+    context: context
+  )
+
+%{answer: answer, stored_answer: Jido.AgentServer.agent(server).state.answer}
+```
+
+In mock mode, the fourth provider request follows three tool results. Inspect
+the request count and names. Live mode can use fewer or different calls.
+
+```elixir
+if mock do
+  report = Jido.AI.Test.MockLLM.report(mock)
+  %{remaining: [], unexpected: [], requests: [_, _, _, _]} = report
+  Enum.map(report.requests, & &1.body["model"])
+end
+```
+
+```elixir
+:ok = Jido.stop_agent(server)
+:ok = Jido.stop()
+```
+
+Read [Add a tool and ReAct](../v3/02_tools_and_react.md).

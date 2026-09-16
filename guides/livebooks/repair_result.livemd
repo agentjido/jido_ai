@@ -1,0 +1,103 @@
+# Break and repair a result
+
+## Section
+
+The first mock object has an empty answer. The result schema rejects it and
+gives the model one repair call. Change `backend` to `:live` to try the same
+Agent with a real provider. Live mode needs `OPENAI_API_KEY`.
+
+## Install this checkout
+
+```elixir
+jido_ai = Path.expand("../..", __DIR__)
+
+Mix.install([
+  {:jido_ai, path: jido_ai},
+  {:jido, path: Path.expand("../jido", jido_ai), override: true},
+  {:jido_action, path: Path.expand("../jido_action", jido_ai), override: true},
+  {:jido_signal, path: Path.expand("../jido_signal", jido_ai), override: true}
+])
+```
+
+## Choose the model service
+
+```elixir
+backend = :mock
+
+if backend == :live and is_nil(System.get_env("OPENAI_API_KEY")) do
+  raise "Set OPENAI_API_KEY before you select :live"
+end
+
+script = [
+  %{reply: {:object, %{answer: ""}}},
+  %{reply: {:object, %{answer: "The repair worked."}}}
+]
+
+mock = if backend == :mock, do: elem(Jido.AI.Test.MockLLM.start_link(script: script), 1)
+context = if mock, do: %{ai: %{assistant: %{options: Jido.AI.Test.MockLLM.options(mock)}}}, else: %{}
+```
+
+## Define the output contract
+
+```elixir
+defmodule Guide.RepairResult do
+  use Jido.AI.Agent, name: "guide_repair_result"
+
+  agent do
+    schema Zoi.object(%{answer: Zoi.map() |> Zoi.default(%{})})
+
+    ai :assistant do
+      model "openai:gpt-4o-mini"
+      instructions "Return an object with one nonempty answer."
+
+      controls do
+        timeout 10_000
+        max_model_calls 2
+      end
+
+      result(Zoi.object(%{answer: Zoi.string() |> Zoi.min(1)}),
+        into: :answer,
+        max_repairs: 1
+      )
+    end
+  end
+
+  routes do
+    signal_source "/guides/ai/repair_result"
+
+    route "guides.ai.repair_result", ai: :assistant do
+      define :answer, args: [:query]
+    end
+  end
+end
+```
+
+## Ask and inspect
+
+```elixir
+{:ok, _jido} = Jido.start()
+{:ok, server} = Jido.start_agent(Guide.RepairResult, id: "guide-repair-result")
+{:ok, result} = Guide.RepairResult.ask_sync(server, "Give one short answer.", context: context)
+
+%{result: result, stored: Jido.AgentServer.agent(server).state.answer}
+```
+
+The first invalid result never becomes domain state. In mock mode, two model
+requests are visible. A live model can return a valid result on its first
+call, so repair is not guaranteed there.
+
+```elixir
+if mock do
+  %{remaining: [], unexpected: [], requests: [first, second]} =
+    Jido.AI.Test.MockLLM.report(mock)
+
+  %{first_format: first.body["text"]["format"]["type"], repair_input: second.body["input"]}
+end
+```
+
+```elixir
+:ok = Jido.stop_agent(server)
+:ok = Jido.stop()
+```
+
+Read [Structured results and repair](../v3/07_structured_results.md).

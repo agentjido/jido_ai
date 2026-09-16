@@ -1,0 +1,116 @@
+# Allow and deny a tool
+
+## Section
+
+The Agent declares `multiply`. One request permits it. The next request
+narrows access with `allowed_tools: []`. The mock script makes the offered
+tool set easy to inspect. Change `backend` to `:live` and set
+`OPENAI_API_KEY` to see how a real model behaves with each request.
+
+## Install this checkout
+
+```elixir
+jido_ai = Path.expand("../..", __DIR__)
+
+Mix.install([
+  {:jido_ai, path: jido_ai},
+  {:jido, path: Path.expand("../jido", jido_ai), override: true},
+  {:jido_action, path: Path.expand("../jido_action", jido_ai), override: true},
+  {:jido_signal, path: Path.expand("../jido_signal", jido_ai), override: true}
+])
+```
+
+## Choose the model service
+
+```elixir
+backend = :mock
+
+if backend == :live and is_nil(System.get_env("OPENAI_API_KEY")) do
+  raise "Set OPENAI_API_KEY before you select :live"
+end
+
+script = [
+  %{reply: {:tools, [%{id: "allowed", name: "multiply", arguments: %{a: 2, b: 3}}]}},
+  %{reply: {:text, "The product is 6."}},
+  %{reply: {:text, "I cannot use a tool for this request."}}
+]
+
+mock = if backend == :mock, do: elem(Jido.AI.Test.MockLLM.start_link(script: script), 1)
+context = if mock, do: %{ai: %{assistant: %{options: Jido.AI.Test.MockLLM.options(mock)}}}, else: %{}
+```
+
+## Declare the tool
+
+```elixir
+defmodule Guide.PolicyMultiply do
+  use Jido.Action,
+    name: "guide_policy_multiply",
+    schema: Zoi.object(%{a: Zoi.integer(), b: Zoi.integer()})
+
+  @impl Jido.Action
+  def run(%{a: a, b: b}, _context), do: {:ok, %{value: a * b}}
+end
+
+defmodule Guide.ToolPolicy do
+  use Jido.AI.Agent, name: "guide_tool_policy"
+
+  agent do
+    schema Zoi.object(%{answer: Zoi.string() |> Zoi.default("")})
+
+    ai :assistant do
+      model "openai:gpt-4o-mini"
+      reasoning :react
+
+      tools do
+        action Guide.PolicyMultiply, as: :multiply
+      end
+
+      controls do
+        timeout 15_000
+        max_model_calls 2
+        max_tool_calls 1
+      end
+
+      result into: :answer
+    end
+  end
+
+  routes do
+    route "guides.ai.tool_policy", ai: :assistant
+  end
+end
+```
+
+## Ask with two access levels
+
+```elixir
+{:ok, _jido} = Jido.start()
+{:ok, server} = Jido.start_agent(Guide.ToolPolicy, id: "guide-tool-policy")
+
+{:ok, allowed} = Guide.ToolPolicy.ask_sync(server, "Use multiply for 2 times 3.", context: context)
+
+{:ok, narrowed} =
+  Guide.ToolPolicy.ask_sync(server, "Can you use multiply now?",
+    context: context,
+    allowed_tools: []
+  )
+
+%{with_tool: allowed, without_tool: narrowed}
+```
+
+Mock mode has three provider requests: tool choice, tool continuation, and
+the narrowed request. Inspect the last request's offered tools.
+
+```elixir
+if mock do
+  %{remaining: [], unexpected: [], requests: [first, _, last]} = Jido.AI.Test.MockLLM.report(mock)
+  %{first_tools: first.body["tools"], narrowed_tools: last.body["tools"]}
+end
+```
+
+```elixir
+:ok = Jido.stop_agent(server)
+:ok = Jido.stop()
+```
+
+Read [Tool access and effects](../v3/14_tool_policy.md).
