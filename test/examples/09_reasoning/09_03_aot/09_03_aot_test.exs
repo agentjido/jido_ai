@@ -1,6 +1,8 @@
 defmodule JidoAI.Examples.AoTTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Authoring, Request, Orchestration}
+  alias Jido.AI.Authoring
+  alias Jido.AI.Request
+  alias Jido.AI.Orchestration
   alias Jido.AI.Reasoning.AlgorithmOfThoughts, as: Method
   alias JidoAI.Examples.AoT
 
@@ -219,17 +221,17 @@ defmodule JidoAI.Examples.AoTTest do
 
   test "ordinary Agent turns commit the full AoT result", %{jido: jido} do
     {mock, context} = mock([%{reply: {:text, AoT.puzzle()}}])
-    server = start(jido, %{requests: %{mode: :turn}})
+    server = start(jido)
 
     assert {:ok, agent} =
-             Server.call(
+             Jido.AI.Test.Requests.call_and_await(
                server,
                Jido.Signal.new!("ai.aot.query", %{query: "8 6 4 4"}, source: "/aot"),
                context: context
              )
 
     assert agent.state.reply.backtracking_steps == 3
-    refute Map.has_key?(agent.state, :requests)
+    assert [{_, %{status: :completed}}] = Map.to_list(agent.state.requests)
     assert_script_done(mock)
   end
 
@@ -410,7 +412,7 @@ defmodule JidoAI.Examples.AoTTest do
       assert {:error, _} = AoT.definition(options(bad))
     end
 
-    assert {:error, _} = AoT.definition(%{requests: %{mode: :session, steering: true}})
+    assert {:error, _} = AoT.definition(%{controls: %{steering: true}})
     assert {:error, _} = AoT.definition(%{tools: [%{target: JidoAI.Examples.RequestScope.Echo}]})
     MockLLM.release(mock, :held)
     assert {:ok, _} = Request.await(first)

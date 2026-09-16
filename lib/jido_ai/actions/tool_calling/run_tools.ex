@@ -9,7 +9,7 @@ defmodule Jido.AI.Actions.ToolCalling.RunTools do
        %{
          state
          | round: state.round + 1,
-           messages: state.messages ++ Jido.AI.Turn.tool_messages(turn)
+           messages: state.messages ++ Jido.AI.Model.Response.tool_messages(turn)
        }}
     end
   end

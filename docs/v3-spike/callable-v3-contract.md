@@ -25,7 +25,7 @@ Jido.Exec.run(Jido.AI.Actions.Reasoning.RunStrategy, %{prompt: "Review this"},
   %{jido_ai_callable_profile: profile}, timeout: 65_000)
 ```
 
-Require a supported callable method, `requests.mode: :session`, and `result.into`. Missing binding
+Require a supported callable method, `result.into`. Missing binding
 returns `{:error, :reasoning_profile_not_bound}`; invalid binding returns a Profile validation
 error. Keep the Profile ID unchanged. Use `Agent.profile/2` for declared policy, or
 `Configuration.profile(agent, id)` for committed overrides. The host selects an explicit ID and
@@ -62,7 +62,7 @@ Profile is the only default and validation authority. Keep its current defaults:
 `agent_defaults.model` or `:fast`, configured instructions or nil; limits 8 iterations, 12 model
 calls, 16 tool calls, and 60,000 ms; requests reject busy work, retain 100 records,
 streaming/steering false; tools empty, no history, no result schema, and zero repairs. ID and result
-field are required. Explicitly select session mode/method; do not rewrite a turn Profile. Keep
+field are required. Explicitly select the method; do not rewrite the host Profile. Keep
 method option/generation defaults from `lib/jido_ai/reasoning.ex` and its validators.
 
 | Old callable input/configuration | Profile replacement |
@@ -71,7 +71,8 @@ method option/generation defaults from `lib/jido_ai/reasoning.ex` and its valida
 | `strategy: :tot / :got / :trm / :adaptive` | `reasoning.method: :tree_of_thoughts / :graph_of_thoughts / :trm / :adaptive` |
 | `model`, Plugin/context `default_model` | `models[role].model`, selected by `reasoning.model` |
 | `timeout`, context timeout | `controls.timeout`; Exec/tool timeout remains an outer execution limit |
-| `system_prompt`, `llm_timeout_ms`, `request_policy` | `instructions`, `models[role].timeout`, `requests.on_busy` |
+| `system_prompt`, `llm_timeout_ms` | `instructions`, `models[role].timeout` |
+| `request_policy` | Removed; all Agent requests reject concurrent work with `:busy` |
 | `temperature`, `max_tokens` | `models[role].temperature`, `models[role].max_tokens` |
 | `branching_factor`, `max_depth`, `traversal_strategy`, `generation_prompt`, `evaluation_prompt` | Applicable `reasoning.options` fields |
 | `max_nodes`, `aggregation_strategy`, `connection_prompt`, `aggregation_prompt` | Applicable `reasoning.options` fields |
@@ -122,8 +123,7 @@ not call a generated accessor on the module still being compiled.
 
 ## Request helpers and implementation order
 
-`agent/interface.ex` proves `ask` returns an answer in turn mode and a Request Handle in session
-mode; `ask_sync` waits for the answer; `ask_stream` returns `%{request: handle, events: enumerable}`
+`agent/interface.ex` makes `ask` return a Request Handle for every Profile; `ask_sync` waits for the answer; `ask_stream` returns `%{request: handle, events: enumerable}`
 and checks streaming permission. Core `define` calls return `{:ok, committed_agent}`; its Signal
 helpers only build Signals (`deps/jido/lib/jido/agent/interface.ex`,
 `deps/jido/lib/jido/agent/dsl/generator.ex`). Use `ask_sync` as the main answer path, `ask` plus

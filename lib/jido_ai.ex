@@ -15,7 +15,7 @@ defmodule Jido.AI do
   - `Jido.Session` owns one `Jido.Thread` of `Jido.Thread.Entry` values.
     These values belong to this package. They do not own processes.
   - `Jido.AI.Orchestration` is the live request-control API, not a second Session value.
-  - `Jido.AI.Tools.Executor` executes tools. `Jido.AI.Turn` only represents
+  - `Jido.AI.Tools.Executor` executes tools. `Jido.AI.Model.Response` only represents
     responses and projects messages.
 
   Internal ownership under lib is:
@@ -23,22 +23,22 @@ defmodule Jido.AI do
   ```text
   agent/ + dsl/       authoring and lowering through Profile
   orchestration/     admission, worker lifetime, commit, delivery
-  runtime/           temporary execution state and shared reasoning Flow
-  thread/            AI entry projection and conversation controls
+  execution/         temporary execution state and shared reasoning Flow
+  thread/            AI entry projection and Context controls
   model/             provider transport, options, and message adaptation
   tools/             shared tool execution through core Exec
   ```
 
-  Runtime and Orchestration Plugins install core integration. A Plugin is an
+  Configuration and Orchestration Plugins install core integration. A Plugin is an
   implementation mechanism; it does not necessarily mean an optional feature.
 
   ## Optional capabilities
 
   Reasoning methods, Skills and resources, retrieval, planning, quota services,
-  model routing, structured output, tool interception, and conversation controls
+  model routing, structured output, tool interception, and Context controls
   attach to the core request path. Portable authoring import/export and the
   standalone ReAct interface are adapters over that path. They do not define
-  another Agent or conversation store. All eight reasoning methods remain
+  another Agent or Context store. All eight reasoning methods remain
   supported; resumable tokens are specific to the standalone ReAct adapter.
 
   ## Model Aliases

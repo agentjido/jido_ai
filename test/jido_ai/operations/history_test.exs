@@ -63,7 +63,7 @@ defmodule Jido.AI.HistoryTest do
     assert bound.message.metadata.provider_field == "keep"
 
     assert [%{refs: refs}] = Jido.AI.Model.Messages.entries([bound.message])
-    assert refs == %{request_id: "request", run_id: "run", document: "case-1", source: "/test", conversation: :pending}
+    assert refs == %{request_id: "request", run_id: "run", document: "case-1", source: "/test", context: :pending}
 
     assert Jido.AI.Model.Messages.provider_context(bound.context).messages == [
              previous,

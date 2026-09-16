@@ -1,7 +1,8 @@
 defmodule JidoAI.Examples.StreamingTest do
   use JidoAI.Examples.Case
   alias JidoAI.Examples.Streaming.Agent
-  alias Jido.AI.{Request, Orchestration}
+  alias Jido.AI.Request
+  alias Jido.AI.Orchestration
 
   test "public stream events precede the complete answer commit", %{jido: jido} do
     {mock, context} = native_mock([%{reply: {:stream, [%{content: "First "}, {:wait, :middle}, %{content: "last"}]}}])
@@ -30,7 +31,7 @@ defmodule JidoAI.Examples.StreamingTest do
     {mock, context} =
       native_mock([
         %{reply: {:stream, [%{content: "Partial"}, {:wait, :cancel}]}},
-        %{reply: {:stream, [%{content: "Recovered"}]}}
+        %{reply: {:text, "Recovered"}}
       ])
 
     server = start_agent(jido, Agent.new!(state: %{answer: "Previous", case_id: "existing"}))

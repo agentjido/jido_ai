@@ -1,4 +1,4 @@
-# Conversation storage and projection
+# Context storage and projection
 
 ## Ownership
 
@@ -56,15 +56,15 @@ exchanges. It does not import live request or Plugin state. The legacy special
 Standalone `ReAct.State.context` is a canonical Thread. Its state checkpoint
 format is version 4 and encodes that Thread. Execution checkpoint data retains
 the pending runtime position and resumes through the shared Agent/Flow runtime.
-Do not use a conversation import to resume tool execution.
+Do not use a context import to resume tool execution.
 
-`Jido.AI.Runtime.State` defines the temporary execution map used by all reasoning
+`Jido.AI.Execution.State` defines the temporary execution map used by all reasoning
 methods. The model, decision, and tool-batch Actions validate its schema.
 Working provider messages and uncommitted entry deltas are temporary inputs to
-the commit path, not another retained conversation store. Live options remain
+the commit path, not another retained context store. Live options remain
 in memory. Optional method and phase fields stay absent until needed.
 
-`Runtime.Checkpoint` owns the portable execution subset, remaining deadline,
+`Execution.Checkpoint` owns the portable execution subset, remaining deadline,
 effect validation, and pause/ack lifecycle. Its internal format adapter owns
 the standalone value and token. The ReAct adapter implements this contract;
 other methods do not gain resume support from this separation. Orchestration.Coordinator
@@ -72,7 +72,7 @@ still owns the process and commit lifecycle. No new worker process is added.
 
 ## Contract evidence
 
-- [Conversation codec and selection tests](../../test/jido_ai/conversation_test.exs)
+- [Context codec and selection tests](../../test/jido_ai/conversation_test.exs)
 - [Content and reference tests](../../test/jido_ai/conversation_content_test.exs)
 - [Runtime ownership and replacement tests](../../test/jido_ai/conversation_runtime_test.exs)
 - [Import tests](../../test/jido_ai/operations/initial_state_test.exs)

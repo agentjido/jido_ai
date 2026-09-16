@@ -1,6 +1,8 @@
 defmodule JidoAI.Examples.StreamUsageTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Request, Orchestration, Usage}
+  alias Jido.AI.Request
+  alias Jido.AI.Orchestration
+  alias Jido.AI.Usage
   alias Jido.AI.Reasoning.ReAct
   alias Jido.AI.Reasoning.ReAct.{Config, Token}
   alias JidoAI.Examples.StreamUsage.{Agent, QuietAgent, Echo}

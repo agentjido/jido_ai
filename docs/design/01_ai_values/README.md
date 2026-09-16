@@ -20,7 +20,7 @@ and stable requirement IDs are in [design](design.md).
 
 | Area | Current | Target |
 | --- | --- | --- |
-| Architecture | The module and state ownership above is the code baseline | Use canonical Session/Thread values for conversation data. Preserve multimodal content, correlation, output validation, safe errors, and explicit portable encodings. Broader constructor uniformity and strict provider-neutral content remain decisions. |
+| Architecture | The module and state ownership above is the code baseline | Use canonical Session/Thread values for context data. Preserve multimodal content, correlation, output validation, safe errors, and explicit portable encodings. Broader constructor uniformity and strict provider-neutral content remain decisions. |
 | Evidence | Linked example and boundary tests cover specific cases | Direct requirement-level acceptance, including advanced paths |
 | Compatibility | Current APIs remain authoritative | Explicit migration for approved contract changes |
 
@@ -32,7 +32,7 @@ and stable requirement IDs are in [design](design.md).
 | [VAL-GAP-002](alignment.md#gap-register) | Session/Thread codecs and projection replace Context. The former gap cited output requirements as context requirements. | Use VAL-REQ-008/009/021/022 for ordering, projection, and encoding evidence. | 01; dependencies below |
 | [VAL-GAP-004](alignment.md#gap-register) | Current errors use Splode and type/message/details/retryable? envelopes, not one category/code value. | Decide taxonomy and compatibility in the target. | 01; dependencies below |
 | [VAL-GAP-005](alignment.md#gap-register) | Error and observation sanitizers exist; an old leak claim is not carried forward as a current defect without reproduction. | Audit all projections and match tests to VAL-REQ-020. | 01; dependencies below |
-| [VAL-GAP-006](alignment.md#gap-register) | Canonical conversation codecs are versioned. A universal encoding contract for every public value is broader. | Define which values are encoded and which remain runtime-only. | 01; dependencies below |
+| [VAL-GAP-006](alignment.md#gap-register) | Canonical context codecs are versioned. A universal encoding contract for every public value is broader. | Define which values are encoded and which remain runtime-only. | 01; dependencies below |
 
 ## Decisions requested
 

@@ -1,6 +1,7 @@
 defmodule Jido.AI.InitialStateTest do
   use Jido.AI.Test.ReasoningCase, async: false
-  alias Jido.AI.{Agent, Profile}
+  alias Jido.AI.Agent
+  alias Jido.AI.Profile
   alias Jido.AI.Thread.Projection
 
   defp source, do: definition(:react, tools: [], model: MockLLM.model(), system_prompt: "Configured")

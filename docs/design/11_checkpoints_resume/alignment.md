@@ -5,16 +5,16 @@
 ## Status
 
 - Reviewed: 2026-09-15.
-- Code for the example audit: `v3-spike`, HEAD `7bb011e98349af8bf580e7b93afa60990972beae`, plus uncommitted example, test, formatter, and documentation changes. No `lib/` or dependency changes.
+- Code baseline: `v3-spike`, HEAD `4ed6402f`, plus uncommitted runtime, test, example, and documentation refinement. Dependency pins are unchanged.
 - Prerequisite alignments used: [04 Shared AI execution](../04_ai_execution/alignment.md), [07 Request orchestration and active input](../07_request_sessions/alignment.md), [09 Skills and resources](../09_skills_resources/alignment.md).
 - Alignment state: Draft. Current ownership is mapped; target decisions and full acceptance proof remain.
 - Verification: the example-driven review below adds fresh MockLLM runs to the earlier source review. Earlier statements that no tests ran refer to that prior review, not this follow-up.
 
 ## Current architecture
 
-Runtime.Checkpoint owns shared capture/restore, portable field selection, and deadlines. ReAct.Checkpoint owns adapter encoding and fingerprints. ReAct.State and Token retain the standalone format and run identity. Orchestration owns process recovery; restored pending work is not a live saved task. Canonical Session/Thread codecs are separate from runtime snapshots.
+Execution.Checkpoint owns shared capture/restore, portable field selection, and deadlines. ReAct.Checkpoint owns adapter encoding and fingerprints. ReAct.State and Token retain the standalone format and run identity. Orchestration owns process recovery; restored pending work is not a live saved task. Canonical Session/Thread codecs are separate from runtime snapshots.
 
-- Current owner: Runtime.Checkpoint, standalone ReAct Checkpoint/State/Token, and Orchestration recovery integration.
+- Current owner: Execution.Checkpoint, standalone ReAct Checkpoint/State/Token, and Orchestration recovery integration.
 - Cross-package ownership: core Jido owns Agent commit and topology; Flow/Exec and Signal internals remain in their respective packages.
 - Overall placement: [architecture overview](../ARCHITECTURE.md).
 - Full target: [design](design.md). Preserve advanced atomic resource restoration, linked resume identity, no-repeat completed work, bounded codecs, and uncertain-effect decisions. Storage and durable deduplication services remain host concerns.
@@ -25,7 +25,7 @@ Runtime.Checkpoint owns shared capture/restore, portable field selection, and de
 
 | Source | Evidence scope |
 | --- | --- |
-| [lib/jido_ai/runtime/checkpoint.ex](../../../lib/jido_ai/runtime/checkpoint.ex) | Shared snapshot boundary |
+| [lib/jido_ai/execution/checkpoint.ex](../../../lib/jido_ai/execution/checkpoint.ex) | Shared snapshot boundary |
 | [lib/jido_ai/reasoning/react/checkpoint.ex](../../../lib/jido_ai/reasoning/react/checkpoint.ex) | ReAct encoding adapter |
 | [lib/jido_ai/reasoning/react/state.ex](../../../lib/jido_ai/reasoning/react/state.ex) | Standalone format and identity |
 | [lib/jido_ai/reasoning/react/token.ex](../../../lib/jido_ai/reasoning/react/token.ex) | Token codec |
@@ -35,7 +35,7 @@ Runtime.Checkpoint owns shared capture/restore, portable field selection, and de
 
 - [Example briefing](../../../examples/14_resume/14_03_checkpoint_resume/README.md): public behavior and documented limits.
 - [Matching example tests](../../../test/examples/14_resume/14_03_checkpoint_resume): deterministic example evidence.
-- [test/jido_ai/runtime/checkpoint_test.exs](../../../test/jido_ai/runtime/checkpoint_test.exs): detailed boundary evidence.
+- [test/jido_ai/execution/checkpoint_test.exs](../../../test/jido_ai/execution/checkpoint_test.exs): detailed boundary evidence.
 - [test/authoring/agents/recovery_test.exs](../../../test/authoring/agents/recovery_test.exs): detailed boundary evidence.
 
 These are evidence entry points, not blanket acceptance claims. The requirement
@@ -67,7 +67,7 @@ requirement associations are not carried forward as proof.
 
 ## Batch recovery review gap
 
-[Runtime.Checkpoint](../../../lib/jido_ai/runtime/checkpoint.ex) uses a direct
+[Execution.Checkpoint](../../../lib/jido_ai/execution/checkpoint.ex) uses a direct
 Coordinator checkpoint call. Coordinator has a separate checkpoint acknowledgment
 path. Neither an acknowledgment nor an entry ID establishes durable storage
 or a complete deduplication protocol.

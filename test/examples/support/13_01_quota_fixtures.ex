@@ -15,7 +15,7 @@ end
 
 defmodule JidoAI.Examples.Quota do
   def definition(opts \\ []) do
-    {mode, opts} = Keyword.pop(opts, :mode, :turn)
+    {_legacy_mode, opts} = Keyword.pop(opts, :mode, :turn)
     {profile_opts, opts} = Keyword.pop(opts, :profile, %{})
 
     profile =
@@ -25,8 +25,7 @@ defmodule JidoAI.Examples.Quota do
           models: %{answer: %{model: JidoAI.Examples.MockLLM.model()}},
           reasoning: %{method: :react, model: :answer},
           controls: %{timeout: 5_000},
-          result: %{into: :result},
-          requests: %{mode: mode}
+          result: %{into: :result}
         },
         profile_opts
       )

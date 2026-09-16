@@ -1,6 +1,9 @@
 defmodule JidoAI.Examples.SkillAuthoringTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Authoring, Profile, Request, Orchestration}
+  alias Jido.AI.Authoring
+  alias Jido.AI.Profile
+  alias Jido.AI.Request
+  alias Jido.AI.Orchestration
   alias Jido.AI.Skill.{Registry, Spec}
   alias JidoAI.Examples.SkillAuthoring.{Echo, Public, Review, Trust}
   alias JidoAI.Examples.SkillRuntime.Provider
@@ -41,7 +44,6 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
       observability: %{store_content: true},
       models: %{answer: :example},
       reasoning: %{method: :react, model: :answer},
-      requests: %{mode: :session},
       memory: %{history: :messages},
       result: %{into: :reply},
       skills: skills,
@@ -194,7 +196,7 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
           model(:example)
           reasoning(:react)
           skills(paths: ["skills"], trust: true)
-          requests(mode: :session)
+
           memory(history: :messages)
           result(into: :reply)
         end
@@ -355,7 +357,7 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
              Profile.new(
                profile(%{specs: [spec()]})
                |> Map.delete(:routes)
-               |> put_in([:requests, :mode], :turn)
+               |> Map.put(:requests, %{mode: :turn})
              )
   end
 
@@ -429,10 +431,6 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
 
               skills do
                 load_path(unquote(tmp))
-              end
-
-              requests do
-                mode(:session)
               end
 
               memory do
@@ -572,7 +570,7 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
     tool = Enum.find(wire.body["messages"], &(&1["role"] == "tool"))
     assert Jason.decode!(tool["content"])["ok"] == false
     refute text(wire) =~ "Bad instructions"
-    refute Enum.any?(conversation(Server.agent(server)), & &1.refs[:durable])
+    refute Enum.any?(selected_context(Server.agent(server)), & &1.refs[:durable])
     assert_script_done(mock)
   end
 

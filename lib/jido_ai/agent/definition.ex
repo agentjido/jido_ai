@@ -40,7 +40,7 @@ defmodule Jido.AI.Agent.Definition do
       def ask_sync(server, query, opts \\ []),
         do: Jido.AI.Agent.Interface.ask_sync(__MODULE__, server, query, opts)
 
-      @doc "Runs one streaming session request."
+      @doc "Starts one AI request with provider streaming and runtime events."
       def ask_stream(server, query, opts \\ []),
         do: Jido.AI.Agent.Interface.ask_stream(__MODULE__, server, query, opts)
 

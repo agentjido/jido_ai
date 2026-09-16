@@ -13,7 +13,7 @@ defmodule Jido.AI.Integration.ReActSteeringIntegrationTest do
       ai :assistant do
         model("openai:gpt-4o-mini")
         reasoning(:react)
-        requests(mode: :session, streaming: true, steering: true)
+        controls(steering: true)
         memory(history: :messages)
         result(into: :last_result)
       end

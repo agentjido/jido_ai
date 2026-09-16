@@ -5,7 +5,7 @@ defmodule Jido.AI.Thread.SettlementProjectionTest do
   alias ReqLLM.{Context, Message, ToolCall}
 
   test "only a completed matching request attempt promotes pending evidence" do
-    refs = %{request_id: "request", run_id: "attempt", conversation: :pending}
+    refs = %{request_id: "request", run_id: "attempt", context: :pending}
     {:ok, session} = Projection.append(Session.new(), [Context.user("private pending")], refs)
     assert {:ok, []} = Projection.messages(session)
 
@@ -21,7 +21,7 @@ defmodule Jido.AI.Thread.SettlementProjectionTest do
     end
 
     entry =
-      Thread.Entry.new(kind: :ai_request_settled, refs: Map.delete(refs, :conversation), payload: %{status: :completed})
+      Thread.Entry.new(kind: :ai_request_settled, refs: Map.delete(refs, :context), payload: %{status: :completed})
 
     assert {:ok, [message]} = Projection.messages(Session.append(session, entry))
     assert Jido.AI.Query.summarize(message.content) == "private pending"
@@ -53,7 +53,7 @@ defmodule Jido.AI.Thread.SettlementProjectionTest do
     entries = Jido.AI.Model.Messages.entries([Context.user([ReqLLM.Message.ContentPart.image("private", "image/png")])])
     session = Projection.append_entries(Session.new(), entries, %{}, profile.observability)
 
-    assert {:error, :conversation_content_not_retained} =
+    assert {:error, :context_content_not_retained} =
              Jido.AI.Orchestration.Transcript.read(%{messages: session}, profile)
 
     refute :erlang.term_to_binary(session) =~ "private"

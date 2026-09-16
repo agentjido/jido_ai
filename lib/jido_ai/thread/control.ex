@@ -1,6 +1,7 @@
 defmodule Jido.AI.Thread.Control do
   @moduledoc "Portable context lanes, deferred operations, and their Agent-owned sessions."
-  alias Jido.AI.{Configuration, Profile}
+  alias Jido.AI.Configuration
+  alias Jido.AI.Profile
   alias Jido.AI.Thread.Projection
   alias Jido.{Session, Thread}
   alias __MODULE__.Change
@@ -346,7 +347,7 @@ defmodule Jido.AI.Thread.Control do
     with {:ok, thread} <- Thread.decode(value), do: Projection.select(thread)
   end
 
-  defp replacement_context(_), do: {:error, :invalid_conversation}
+  defp replacement_context(_), do: {:error, :invalid_context}
 
   defp nonempty?(value), do: is_binary(value) and value != ""
 end

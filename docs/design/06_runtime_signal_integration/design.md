@@ -5,7 +5,7 @@
 ## Architecture and contract status
 
 - Architecture category: [Core runtime and Signal integration](../ARCHITECTURE.md).
-- Owning subsystem: Runtime.Plugin and Orchestration.Plugin Agent/AgentServer facets, route/directive adapters, and typed Signal data.
+- Owning subsystem: Configuration.Plugin and Orchestration.Plugin Agent/AgentServer facets, route/directive adapters, and typed Signal data.
 - Complete target: Use only public core Plugin, Agent, Flow, and Signal contracts. Preserve route validation, trusted runtime binding, post-commit work, event transport, and topology integration.
 - Decision boundary: Review delivery defaults and callback purity against current core contracts. AI delegation must not introduce a second topology owner.
 - Current implementation, module links, example proof, and exact differences:
@@ -60,11 +60,11 @@ Jido AI integrates at four core extension points.
 - Canonical `Jido.Flow` values.
 - Declared `Jido.Plugin` modules and options.
 
-For Turn mode, a query route targets the generated AI Flow directly. For session mode, it targets one session-admission Action. Jido AI does not add a private route executor.
+Every AI query route targets one request-admission Action. Its post-commit Directive starts the shared AI Flow. Jido AI does not add a private route executor.
 
 ### Plugin roles
 
-`Jido.AI.Runtime.Plugin` owns one portable AI configuration state key and pure command preparation. It resolves effective profiles from declared profiles plus approved portable overrides. It binds trusted request resources into Turn context. It does not need a child process for normal Turn mode.
+`Jido.AI.Configuration.Plugin` owns one portable AI configuration state key and pure command preparation. It resolves effective profiles from declared profiles plus approved portable overrides. It binds trusted request resources into Turn context. It owns portable configuration and does not start a child process.
 
 `Jido.AI.Orchestration.Plugin` owns one portable `:requests` state key and one optional runtime root. The runtime root owns live session tasks, Exec handles, stream sinks, control queues, and transient delivery state. These values never enter Agent state.
 
@@ -99,9 +99,9 @@ Jido AI owns each type string and data schema. `jido_signal` owns the envelope, 
 
 `INT-REQ-003`: Each AI route target shall resolve to a validated core Action or Flow before the Agent definition is accepted.
 
-`INT-REQ-004`: Turn-mode AI routes shall target the canonical AI Flow without a second graph runner.
+`INT-REQ-004`: Retired. AI routes now use the single admission boundary in INT-REQ-005. Execution still uses core Flow and Exec; this identifier is not reused.
 
-`INT-REQ-005`: Session-mode AI routes shall target one admission Action that returns a candidate and a post-commit start-work Directive.
+`INT-REQ-005`: AI Agent routes shall target one admission Action that returns a candidate and a post-commit start-work Directive.
 
 `INT-REQ-006`: AI-generated routes shall use core route conflict validation and shall not override an explicit host route silently.
 
@@ -188,7 +188,7 @@ Recommended Plugin ownership:
 
 | Plugin | Portable state key | Runtime root |
 | --- | --- | --- |
-| `Jido.AI.Runtime.Plugin` | `:ai_config` | None by default |
+| `Jido.AI.Configuration.Plugin` | `:ai_config` | None by default |
 | `Jido.AI.Orchestration.Plugin` | `:requests` | Yes for session profiles |
 | Capability Plugin | One declared capability key or none | Only when the capability needs live state |
 
@@ -234,7 +234,7 @@ Internal settlement and control Signal types use the `jido.ai.session.*` namespa
 
 | ID | Question | Recommended option | Effect |
 | --- | --- | --- | --- |
-| `INT-DEC-001` | Does Turn mode route directly to Flow? | Yes | Removes a wrapper execution layer and uses the core route contract |
+| `INT-DEC-001` | Former direct in-Turn route decision | Superseded | All AI routes now use the admission Action; core Exec runs the Flow after commit |
 | `INT-DEC-002` | Does Runtime Plugin need a process? | No by default | Keeps provider resources host-bound and avoids idle processes |
-| `INT-DEC-003` | Where does conversation history live? | In a declared Agent domain field | Follows the core complete-candidate model |
+| `INT-DEC-003` | Where does context history live? | In a declared Agent domain field | Follows the core complete-candidate model |
 | `INT-DEC-004` | What happens to an unhandled AI event? | Use an explicit dispatcher or no-op target; never hidden self-routing | Prevents event loops |

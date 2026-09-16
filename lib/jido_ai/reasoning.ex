@@ -1,6 +1,7 @@
 defmodule Jido.AI.Reasoning do
   @moduledoc false
-  alias Jido.AI.{Output, Profile}
+  alias Jido.AI.Output
+  alias Jido.AI.Profile
   alias Jido.AI.Reasoning.{Linear, AlgorithmOfThoughts, TreeSearch, GraphSearch, Recursive}
 
   def react_prompt do
@@ -169,7 +170,7 @@ defmodule Jido.AI.Reasoning do
           {:ok,
            if(is_binary(value),
              do: value,
-             else: value |> Jido.AI.Turn.from_response() |> Jido.AI.Turn.result()
+             else: value |> Jido.AI.Model.Response.from_response() |> Jido.AI.Model.Response.result()
            )}
 
     with {:ok, answer} <- parsed do

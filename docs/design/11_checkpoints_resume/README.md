@@ -4,7 +4,7 @@
 
 ## Briefing
 
-Runtime.Checkpoint owns shared capture/restore, portable field selection, and deadlines. ReAct.Checkpoint owns adapter encoding and fingerprints. ReAct.State and Token retain the standalone format and run identity. Orchestration owns process recovery; restored pending work is not a live saved task. Canonical Session/Thread codecs are separate from runtime snapshots.
+Execution.Checkpoint owns shared capture/restore, portable field selection, and deadlines. ReAct.Checkpoint owns adapter encoding and fingerprints. ReAct.State and Token retain the standalone format and run identity. Orchestration owns process recovery; restored pending work is not a live saved task. Canonical Session/Thread codecs are separate from runtime snapshots.
 
 This seam retains the complete target, not only current functionality. Detailed
 current evidence and gaps are in [alignment](alignment.md); proposed contracts
@@ -12,7 +12,7 @@ and stable requirement IDs are in [design](design.md).
 
 ## Why this seam exists
 
-- Owner: Runtime.Checkpoint, standalone ReAct Checkpoint/State/Token, and Orchestration recovery integration.
+- Owner: Execution.Checkpoint, standalone ReAct Checkpoint/State/Token, and Orchestration recovery integration.
 - Owns: checkpoints and resume within [the package architecture](../ARCHITECTURE.md).
 - Does not own: contracts assigned to other seams or private lower-package internals.
 

@@ -8,8 +8,8 @@ defmodule JidoAI.Examples.ControlsTest do
     before = Server.agent(server).state
 
     for host_context <- [context, Map.put(context, :authorized, false), Map.put(context, :authorized, "true")] do
-      assert {:error, _} = Agent.answer(server, "Help", context: host_context)
-      assert Server.agent(server).state == before
+      assert {:error, _} = ask_and_await(Agent, server, "Help", context: host_context)
+      assert_domain_unchanged(server, before)
     end
 
     assert MockLLM.report(mock).requests == []
@@ -21,9 +21,9 @@ defmodule JidoAI.Examples.ControlsTest do
     context = Map.put(context, :authorized, true)
     server = start_agent(jido, Agent.new!(state: %{answer: "Previous", case_id: "existing"}))
     before = Server.agent(server).state
-    assert {:error, _} = Agent.answer(server, "Help", context: context)
-    assert Server.agent(server).state == before
-    assert {:ok, agent} = Agent.answer(server, "Try again", context: context)
+    assert {:error, _} = ask_and_await(Agent, server, "Help", context: context)
+    assert_domain_unchanged(server, before)
+    assert {:ok, agent} = ask_and_await(Agent, server, "Try again", context: context)
     assert %{answer: "Answer [evidence]", case_id: "existing"} = agent.state
     assert_script_done(mock)
   end
@@ -33,8 +33,8 @@ defmodule JidoAI.Examples.ControlsTest do
       {mock, context} = native_mock([%{reply: unquote(Macro.escape(reply))}])
       server = start_agent(jido, Agent.new!())
       before = Server.agent(server).state
-      assert {:error, _} = Agent.answer(server, "Help", context: Map.put(context, :authorized, true))
-      assert Server.agent(server).state == before
+      assert {:error, _} = ask_and_await(Agent, server, "Help", context: Map.put(context, :authorized, true))
+      assert_domain_unchanged(server, before)
       assert_script_done(mock)
     end
   end

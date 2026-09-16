@@ -5,7 +5,7 @@
 ## Architecture and contract status
 
 - Architecture category: [Checkpoints and resume](../ARCHITECTURE.md).
-- Owning subsystem: Runtime.Checkpoint, standalone ReAct Checkpoint/State/Token, and Orchestration recovery integration.
+- Owning subsystem: Execution.Checkpoint, standalone ReAct Checkpoint/State/Token, and Orchestration recovery integration.
 - Complete target: Preserve advanced atomic resource restoration, linked resume identity, no-repeat completed work, bounded codecs, and uncertain-effect decisions. Storage and durable deduplication services remain host concerns.
 - Decision boundary: Decide new-run lineage, effect identity, and atomic binding restoration without assuming exactly-once effects or extending resume to all methods automatically.
 - Current implementation, module links, example proof, and exact differences:
@@ -31,11 +31,11 @@ safe positions remains a proposal. Recovery lookup, duplicate handling,
 snapshot/batch consistency, and durability evidence need explicit contracts.
 Preserve standalone ReAct token behavior and retained advanced recovery work.
 
-## Recovery versus completed conversation
+## Recovery versus completed context
 
-Under the [selected commit policy](../07_request_sessions/design.md#selected-conversation-commit-policy),
+Under the [selected commit policy](../07_request_sessions/design.md#selected-context-commit-policy),
 active, failed, or cancelled work can remain recovery evidence without
-advancing the completed conversation. Resume evidence and default model input
+advancing the completed context. Resume evidence and default model input
 are different views of the same canonical log. Recovery does not imply
 successful settlement. Exact snapshot/promotion references remain open.
 

@@ -1,6 +1,7 @@
 defmodule JidoAI.Examples.FailurePositionTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Request, Orchestration}
+  alias Jido.AI.Request
+  alias Jido.AI.Orchestration
   alias Jido.AI.Reasoning.ReAct
   alias ReAct.{Config, Token}
   alias JidoAI.Examples.FailurePosition.Fault, as: Example

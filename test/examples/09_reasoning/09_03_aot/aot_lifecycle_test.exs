@@ -4,7 +4,9 @@ defmodule JidoAI.Examples.StableAoTLifecycleTest do
   @moduletag :example
   import JidoAI.Examples.Case
   alias JidoAI.Examples.AoT
-  alias Jido.AI.{Observe, Request, Orchestration}
+  alias Jido.AI.Observe
+  alias Jido.AI.Request
+  alias Jido.AI.Orchestration
 
   test "AoT emits request started/completed signals and request telemetry" do
     jido = :"aot_stable_#{System.unique_integer([:positive])}"
@@ -34,6 +36,7 @@ defmodule JidoAI.Examples.StableAoTLifecycleTest do
                request_id: "req_aot_lifecycle",
                signal_type: "ai.aot.query",
                source: "/aot",
+               stream: true,
                context: context
              )
 

@@ -18,11 +18,6 @@ defmodule JidoAI.Examples.CallCounts.Agent do
         model(JidoAI.Examples.CallCounts.Model)
       end
 
-      requests do
-        mode(:session)
-        streaming(false)
-      end
-
       observability do
         store_content true
         stream_content true

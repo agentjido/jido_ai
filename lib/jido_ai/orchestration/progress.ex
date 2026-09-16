@@ -1,7 +1,7 @@
 defmodule Jido.AI.Orchestration.Progress do
   @moduledoc false
   use Jido.Action,
-    name: "ai_session_progress",
+    name: "ai_request_progress",
     schema:
       Zoi.object(%{
         request_id: Zoi.string(),

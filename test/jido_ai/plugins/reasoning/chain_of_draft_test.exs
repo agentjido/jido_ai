@@ -57,7 +57,6 @@ defmodule Jido.AI.Plugins.Reasoning.ChainOfDraftTest do
     Jido.AI.Profile.new!(%{
       id: :review,
       reasoning: :chain_of_draft,
-      requests: %{mode: :session},
       result: %{into: :result}
     })
   end

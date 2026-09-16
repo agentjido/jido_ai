@@ -1,6 +1,8 @@
 defmodule JidoAI.Examples.TerminalStateTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Request, Orchestration, Usage}
+  alias Jido.AI.Request
+  alias Jido.AI.Orchestration
+  alias Jido.AI.Usage
   alias Jido.AI.Reasoning.ReAct
   alias JidoAI.Examples.TerminalState
 
@@ -8,12 +10,13 @@ defmodule JidoAI.Examples.TerminalStateTest do
     JidoAI.Examples.ToolEvents.attach_action(TerminalState.Echo)
   end
 
-  defp submit(server, context, query) do
+  defp submit(server, context, query, stream?) do
     Request.create_and_send(server, query,
       signal_type: "ai.ask",
       source: "/examples/terminal-state",
       context: context,
-      stream_to: self()
+      stream_to: self(),
+      stream: stream?
     )
   end
 
@@ -51,9 +54,11 @@ defmodule JidoAI.Examples.TerminalStateTest do
   defp terminal(nil), do: {{:ok, "Done"}, :completed, "Done", :request_completed, "Done"}
   defp terminal(raw), do: {{:error, raw}, :failed, nil, :request_failed, raw}
 
-  for {module, stream?} <- [{TerminalState.Buffered, false}, {TerminalState.Streamed, true}],
+  for stream? <- [false, true],
       outcome <- [:complete, :map, :tuple] do
-    test "#{module} keeps #{outcome} terminal state, usage and tool history after native restore", %{jido: jido} do
+    test "streaming #{stream?} keeps #{outcome} terminal state, usage and tool history after native restore", %{
+      jido: jido
+    } do
       usage = %{prompt_tokens: 3, completion_tokens: 1, total_tokens: 4}
       next_usage = %{prompt_tokens: 1, completion_tokens: 1, total_tokens: 2}
 
@@ -66,8 +71,8 @@ defmodule JidoAI.Examples.TerminalStateTest do
 
       raw = failure(unquote(outcome))
       {expected, status, result, phase, collected_result} = terminal(raw)
-      server = start_agent(jido, unquote(module).new!())
-      assert {:ok, request} = submit(server, Map.put(context, :failure, raw), "Use the tool")
+      server = start_agent(jido, TerminalState.Agent.new!())
+      assert {:ok, request} = submit(server, Map.put(context, :failure, raw), "Use the tool", unquote(stream?))
       assert Request.await(request) == expected
       assert_receive {:example_action_started, "terminal_echo"}, 2_000
       refute_received {:example_action_started, "terminal_echo"}
@@ -101,7 +106,7 @@ defmodule JidoAI.Examples.TerminalStateTest do
       assert :ok = Jido.Action.validate_static_data(checkpoint)
       copy = checkpoint |> :erlang.term_to_binary() |> :erlang.binary_to_term([:safe])
       assert :ok = Server.stop(server, :normal)
-      assert {:ok, agent} = Jido.Agent.restore(unquote(module), copy)
+      assert {:ok, agent} = Jido.Agent.restore(TerminalState.Agent, copy)
       restored = start_agent(jido, agent)
       assert {:ok, saved} = Orchestration.snapshot(restored, include_content: true, request_id: request.id)
       assert saved.request == view.request and saved.details.trace == view.details.trace
@@ -110,7 +115,7 @@ defmodule JidoAI.Examples.TerminalStateTest do
       assert length(MockLLM.report(mock).requests) == 2
       refute_received {:example_action_started, "terminal_echo"}
 
-      assert {:ok, next} = submit(restored, context, "Continue")
+      assert {:ok, next} = submit(restored, context, "Continue", unquote(stream?))
       assert {:ok, "Next"} = Request.await(next)
       assert {:ok, old} = Orchestration.snapshot(restored, include_content: true, request_id: request.id)
       assert old.request == view.request

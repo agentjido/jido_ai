@@ -16,10 +16,10 @@ defmodule JidoAI.Examples.AIExtensionTest do
     definition = apply(@desired, :definition, [])
     assert %Jido.Agent{id: nil, state: nil} = definition
 
-    assert [
-             %{path: "ai.ask", target: {target, %{profile_id: :assistant}}},
-             %{path: "jido.ai.configure", target: Jido.AI.Configuration.Apply}
-           ] = definition.routes
+    assert %{target: {target, %{profile_id: :assistant}}} = Enum.find(definition.routes, &(&1.path == "ai.ask"))
+    assert target == Jido.AI.Orchestration.Start
+    assert Enum.any?(definition.routes, &(&1.target == Jido.AI.Configuration.Apply))
+    assert Enum.any?(definition.routes, &(&1.target == Jido.AI.Orchestration.Settle))
 
     assert {:ok, _} = Jido.Executable.resolve(target)
     assert {:ok, document, registry} = Jido.Agent.Codec.encode(definition)

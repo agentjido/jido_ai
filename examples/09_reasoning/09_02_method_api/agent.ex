@@ -1,6 +1,8 @@
 defmodule JidoAI.Examples.MethodAPI do
   @moduledoc "Two linear methods selected through their public namespace APIs."
-  alias Jido.AI.{Authoring, Reasoning.ChainOfThought, Reasoning.ChainOfDraft}
+  alias Jido.AI.Authoring
+  alias Jido.AI.Reasoning.ChainOfThought
+  alias Jido.AI.Reasoning.ChainOfDraft
 
   def definition do
     profiles =
@@ -9,7 +11,6 @@ defmodule JidoAI.Examples.MethodAPI do
           id: id,
           models: %{answer: %{model: JidoAI.Examples.MockLLM.model()}},
           reasoning: %{method: namespace.method(), model: :answer},
-          requests: %{mode: :session, streaming: true},
           result: %{schema: nil, into: :reply}
         }
       end

@@ -1,6 +1,7 @@
 defmodule Jido.AI.Authoring.RegressionsTest do
   use ExUnit.Case, async: false
-  alias Jido.AI.{Authoring, Profile}
+  alias Jido.AI.Authoring
+  alias Jido.AI.Profile
   alias Jido.AI.Test.MockLLM
 
   defmodule TurnAgent do
@@ -35,10 +36,6 @@ defmodule Jido.AI.Authoring.RegressionsTest do
 
       ai :assistant do
         model MockLLM.model()
-
-        requests do
-          mode :session
-        end
 
         result into: :reply
       end
@@ -146,9 +143,15 @@ defmodule Jido.AI.Authoring.RegressionsTest do
     context = %{ai: %{assistant: %{options: MockLLM.options(mock)}}}
     {:ok, server} = Jido.start_agent(jido, TurnAgent)
 
-    assert {:ok, "First"} = TurnAgent.ask(server, "First query", context: context, timeout: 10_000)
+    assert {:ok, "First"} = TurnAgent.ask_sync(server, "First query", context: context, timeout: 10_000)
     assert {:ok, "Second"} = TurnAgent.ask_sync(server, "Second query", context: context, timeout: 10_000)
-    assert Jido.AgentServer.agent(server).state === %{reply: "Second", case_id: "case-17", jido_ai_config: %{}}
+
+    assert Map.delete(Jido.AgentServer.agent(server).state, :requests) === %{
+             reply: "Second",
+             case_id: "case-17",
+             jido_ai_config: %{}
+           }
+
     assert %{remaining: [], unexpected: [], requests: requests} = MockLLM.report(mock)
     assert length(requests) == 2
 

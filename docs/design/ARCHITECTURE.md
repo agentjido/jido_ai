@@ -1,13 +1,14 @@
 # Jido AI architecture
 
 > Start here for the package architecture.
-> Review status: Pending approval. Code baseline: `53d19f77` on `v3-spike`.
+> Review status: Pending approval. Code baseline: `4ed6402f` on `v3-spike`,
+> plus the uncommitted runtime refinement described below.
 > This overview consolidates the former `architecture-seams.md`.
 > Detailed requirements and evidence remain in the numbered seam folders.
 
 ## 1. The central distinction
 
-**Session and Thread hold interaction data. Runtime executes. Reasoning selects
+**Session and Thread hold interaction data. Execution runs Flows. Reasoning selects
 steps. Orchestration controls live requests. Core Jido validates and commits.**
 
 There is one main authoring model: `Jido.AI.Agent` + DSL + Profile.
@@ -52,11 +53,11 @@ See [boundary design](00_boundary_invariants/design.md) and
 | `Profile` | Validated model, tool, method, limits, output, and memory configuration | Live service container |
 | `Jido.Session` | Portable interaction value owning one Thread | Request process or worker |
 | `Jido.Thread` / `Entry` | Ordered canonical interaction log | Second execution engine |
-| `Query`, `Turn`, `Output`, `Usage` | AI input, normalized response, output contract, and usage | Request lifecycle |
-| `Thread.Projection` | Derive model-facing messages from canonical entries | Independent conversation store |
-| `Runtime.State` | Temporary execution data, including native ReqLLM context | Portable Session or checkpoint |
-| `Request.Handle` / `Stream` | Local access to admitted work and events | Durable identity or stored conversation |
-| `Orchestration.Record` | Request status and outcome retained in Agent state | Worker state |
+| `Query`, `Model.Response`, `Output`, `Usage` | AI input, one normalized model response, output contract, and usage | Core Turn or request lifecycle |
+| `Thread.Projection` | Derive model-facing messages from canonical entries | Independent context store |
+| `Execution.State` | Temporary execution data, including model Context | Portable Session or checkpoint |
+| `Request.Handle` / `Stream` | Local access to admitted work and events | Durable identity or stored context |
+| `Request.Record` | Request status and outcome retained in Agent state | Worker state |
 | `Orchestration.Coordinator` | Worker lifetime, ordered commits, cancellation, and completion | Core validation or a general scheduler |
 | ReAct `State` / `Token` | Standalone adapter state and resume encoding | The shared execution model for all methods |
 | AI resource owner — selected target | AgentServer-scoped catalogs/providers; Session-scoped activations | A global lazy registry or request-scoped activation store |
@@ -68,7 +69,7 @@ become portable data merely because a containing map has a schema.
 Source: [Session](../../lib/jido_session.ex),
 [Thread](../../lib/jido_thread.ex), [Entry](../../lib/jido_thread/entry.ex),
 [Profile](../../lib/jido_ai/profile.ex),
-[Runtime.State](../../lib/jido_ai/runtime/state.ex),
+[Execution.State](../../lib/jido_ai/execution/state.ex),
 [Projection](../../lib/jido_ai/thread/projection.ex).
 
 ## 4. Execution and commit boundaries
@@ -86,7 +87,7 @@ AgentServer admission through AI/core integration
 Orchestration: active request, input, lifetime, completion
         |
         v
-Runtime: bounded shared execution
+Execution: bounded shared Flow execution
         +--> Reasoning: method decisions and transitions
         +--> Model.Transport --> ReqLLM
         +--> Tools.Executor --> Jido.Exec --> Action / Flow
@@ -101,24 +102,106 @@ Core Jido: candidate validation and commit
 Delivery through the core contracts
 ```
 
-This is an ownership map, not an exact state machine. Session-mode work has
-admission and later settlement. Turn-mode work finishes within its owning core
-Turn. Standalone ReAct uses the shared runtime through its adapter.
+All AI Agent requests use one lifecycle: admission, Flow execution, settlement.
+There is no Profile request mode. A core Turn admits the request and returns
+before model work finishes. Further core Turns commit entries and the outcome.
+The request can outlive each Turn. Retained Session/Thread data is optional.
+Standalone ReAct uses the same execution through its adapter.
 
 Runtime produces execution results and evidence. Orchestration coordinates
 their commits. Core performs validation and commit. Receiving an event is not
 proof that its entries committed; acknowledging a checkpoint is not proof of
 durable storage. The proposed batch/receipt boundary makes these distinctions
-explicit without creating another conversation store.
+explicit without creating another context store.
 
 Coordinator lifetime and ordered commit work remain together. Extracting helper
 functions does not create new process owners.
 
 Source: [Authoring](../../lib/jido_ai/authoring.ex),
-[Runtime.Run](../../lib/jido_ai/runtime/run.ex),
+[Execution.Flow](../../lib/jido_ai/execution/flow.ex),
 [Coordinator](../../lib/jido_ai/orchestration/coordinator.ex),
 [settlement](../../lib/jido_ai/orchestration/settle.ex),
 [standalone runner](../../lib/jido_ai/reasoning/react/runner.ex).
+
+### One request: values and sequence
+
+`ask/3` returns a `Request.Handle`. `ask_sync/3` submits the same request and
+waits for its outcome. `ask_stream/3` selects provider streaming and adds an
+event sink to that lifecycle. The same Agent supports buffered and streamed
+calls. There is no `requests` block or field in Profile. Steering and activity
+timers belong to Profile `controls`; streaming belongs to the call.
+A core generated route helper returns the admission Agent revision, not the
+answer. The host application setting `:max_retained_requests` (default `100`)
+limits retained request records, not concurrency. Each Coordinator captures
+the setting at startup; callers and Profiles cannot override it.
+Pending records are kept; older terminal records are removed first.
+Each Agent accepts one active AI request. Further requests receive `:busy`.
+
+```mermaid
+sequenceDiagram
+    participant Caller
+    participant Server as Core AgentServer
+    participant Coordinator as AI Coordinator
+    participant Exec as Core Exec / Flow
+    participant Provider as ReqLLM / Tools
+    Caller->>Server: ask: query + request ID
+    Server->>Server: admission Turn validates and commits pending record
+    Server-->>Caller: Request.Handle
+    Server->>Coordinator: post-commit start directive
+    Coordinator->>Exec: run_async(Execution.Flow)
+    loop model and tool rounds
+      Exec->>Provider: model Context or validated tool call
+      Provider-->>Exec: Model.Response or tool result
+      Exec->>Coordinator: events / entry batch
+      Coordinator->>Server: commit entry batch through a core Turn
+      Server-->>Coordinator: commit result
+    end
+    Exec-->>Coordinator: execution result
+    Coordinator->>Server: settlement Turn
+    Server->>Server: validate result and commit terminal record
+    Server-->>Coordinator: committed outcome
+    Coordinator-->>Caller: terminal event, if requested
+    Caller->>Server: await reads committed record
+    Server-->>Caller: answer or error
+```
+
+Context means the selected model-facing messages. Session owns a Thread; Thread
+stores entries; Projection builds Context from those entries. An execution
+context is a separate service and metadata map passed to Actions. A model
+response is not a core Turn. A complete request can contain many responses and
+many short core Turns.
+
+### Process ownership
+
+The Coordinator is a core-managed Plugin runtime, not an Agent or subagent.
+There is one Coordinator per AgentServer, not one per request. It owns execution
+handles, cancellation, and settlement. `Execution` modules own no GenServer.
+
+```text
+Jido.AgentSupervisor (DynamicSupervisor)
+├── AgentServer
+└── PluginChild (lifecycle wrapper, linked to the AgentServer)
+    └── private Supervisor (linked to the wrapper)
+        └── Orchestration.Coordinator
+            ├── Delivery (linked; isolates Signal delivery)
+            └── optional pending-input queue (monitors its owner)
+
+Core Exec task supervisor
+└── Flow execution (Coordinator owns its async handle)
+```
+
+The wrapper and AgentServer are supervisor siblings. The wrapper's private
+supervisor is a linked process, not a child registered under the wrapper.
+Core owns this lifecycle. AI does not add a competing Agent supervisor.
+The Coordinator uses `Jido.Exec.handle_message/2` and `cancel/1`; it does not
+wrap blocking Exec in another work Task. Short settlement Tasks keep calls
+back to AgentServer out of Coordinator callbacks.
+
+Delivery and the optional input queue retain their existing isolation contracts.
+They are not subagents. Consolidating them requires separate queue and failure
+tests. No throughput or distributed recovery claim follows from this layout.
+Coordinator restart marks unfinished requests interrupted; it does not replay
+tool side effects.
 
 ### Flow mechanics versus AI meaning
 
@@ -158,14 +241,14 @@ guarantees. No new execution framework is selected.
 
 ### 01 — Canonical interaction and AI values
 
-**Modules:** `Jido.Session`, `Jido.Thread.*`, `Query`, `Turn.*`, `Output`,
+**Modules:** `Jido.Session`, `Jido.Thread.*`, `Query`, `Model.Response` / `Model.Content`, `Output`,
 `Usage.*`, `Error.*`, `Thread.Projection`.
 
-**Current:** one canonical Session/Thread replaces the old conversation store.
-Projection derives AI messages; Turn normalizes responses and does not execute tools.
+**Current:** one canonical Session/Thread replaces the old context store.
+Projection derives Context; Model.Response normalizes responses and does not execute tools.
 
 **Direction:** retain permitted admitted input, consumed steering, and committed
-intermediate work as evidence. Advance default model conversation only after
+intermediate work as evidence. Advance default model context only after
 successful settlement. Exclude failed/cancelled work and unresolved tool
 exchanges from that completed view. Retention remains subject to storage permissions.
 
@@ -211,7 +294,7 @@ External effects cannot be rolled back by a later failed Agent commit.
 
 ### 04 — Shared AI execution
 
-**Modules:** `Runtime.State`, `Prepare`, `Run`, `Flow`, `ReasonFlow`,
+**Modules:** `Execution.State`, `Prepare`, `Flow`, `ModelFlow`,
 model/tool steps, `Decide`, and output-state helpers.
 
 **Current:** shared validated execution state and Flows exist, but common paths
@@ -243,7 +326,7 @@ Business workflow execution remains outside this seam.
 
 ### 06 — Core runtime and Signal integration
 
-**Modules:** `Runtime.Plugin.*`, `Orchestration.Plugin.*`, `Signal.*`,
+**Modules:** `Configuration.Plugin.*`, `Orchestration.Plugin.*`, `Signal.*`,
 route and directive adapters.
 
 **Current:** Plugins connect AI execution to Agent and AgentServer contracts.
@@ -333,7 +416,7 @@ No blanket Plugin removal is implied.
 
 ### 11 — Checkpoints and resume
 
-**Modules:** `Runtime.Checkpoint`, ReAct `Checkpoint`, `State`, `Token`,
+**Modules:** `Execution.Checkpoint`, ReAct `Checkpoint`, `State`, `Token`,
 and Orchestration recovery integration.
 
 **Current:** shared checkpoint boundary with ReAct encoding. Adapter run identity
@@ -352,7 +435,7 @@ promise durable execution or exactly-once effects.
 
 ### 12 — Observation and diagnostics
 
-**Modules:** `Observe.*`, `Runtime.Event`, `Telemetry`, `Signal.*`,
+**Modules:** `Observe.*`, `Observe.Event`, `Telemetry`, `Signal.*`,
 `Orchestration.Inspection`.
 
 **Current:** sanitization, typed Signals, telemetry, and bounded inspection.
@@ -411,7 +494,10 @@ lib/
 ├── jido_ai/
 │   ├── agent/ + dsl/ + profile/ authoring and validation
 │   ├── orchestration/          live request ownership
-│   ├── runtime/                shared execution and integration adapters
+│   ├── execution/              shared Flow work; no GenServer
+│   ├── configuration/          portable overrides and state-only Plugin
+│   ├── request/                handles, retained records, streams
+│   ├── observe/                event values and projection policy
 │   ├── thread/                 AI projection and controls
 │   ├── model/                  provider integration
 │   ├── tools/                  shared tool executor
@@ -467,7 +553,7 @@ not override today's document review table.
 ## 9. Evidence and the next review
 
 Start with [values](01_ai_values/README.md) and
-[Orchestration](07_request_sessions/README.md) to settle conversation promotion,
+[Orchestration](07_request_sessions/README.md) to settle context promotion,
 request/attempt meaning, and commit acknowledgement. Then review explicit
 bindings and resource lifetime, followed by method-neutral execution and the
 optional policy layers. The full prerequisite graph stays in [the index](README.md).
@@ -479,19 +565,19 @@ An example proves its stated case, not the complete architecture.
 | Evidence entry point | What to inspect |
 | --- | --- |
 | [Authoring tests](../../test/authoring/agents/authoring_test.exs) | Public definitions and validation |
-| [Conversation tests](../../test/jido_ai/conversation_runtime_test.exs) | Canonical values across requests |
+| [Context tests](../../test/jido_ai/conversation_runtime_test.exs) | Canonical values across requests |
 | [Tool-round example](../../test/examples/01_authoring/01_02_tool_flow/multi_round_test.exs) | Dependent real tool results through MockLLM |
 | [Request lifecycle example](../../test/examples/02_requests/02_01_session/02_01_session_test.exs) | Admission, failure, cancellation, and runtime cleanup |
 | [Core Plugin tests](../../test/jido_ai/plugin_facets_test.exs) | Integration facets |
-| [Checkpoint tests](../../test/jido_ai/runtime/checkpoint_test.exs) | Shared recovery boundary |
+| [Checkpoint tests](../../test/jido_ai/execution/checkpoint_test.exs) | Shared recovery boundary |
 | [Observation tests](../../test/jido_ai/observe_test.exs) | Safe output projections |
 
-Current session-mode transcript commits can retain failed query/tool work for
+Current request transcript commits can retain failed query/tool work for
 the next model projection even when the last successful reply stays unchanged.
 That is a design gap, not an accepted failure policy. See
 [transcript integration](../../lib/jido_ai/orchestration/transcript.ex) and
 [projection](../../lib/jido_ai/thread/projection.ex); the owning value and
-Orchestration alignment files track success-only conversation promotion.
+Orchestration alignment files track success-only context promotion.
 
 Foundation verification at `53d19f77`: formatting, forced compilation with
 warnings as errors, API inventory validation, and the full unit, authoring,

@@ -158,11 +158,11 @@ defmodule Jido.AI.Thread.Projection do
               {true, kind} when kind in [:ai_message, "ai_message"] ->
                 {entries, metadata} = acc
 
-                if field(entry.refs, :conversation) in [:pending, "pending"] and
+                if field(entry.refs, :context) in [:pending, "pending"] and
                      not MapSet.member?(settled, {field(entry.refs, :request_id), field(entry.refs, :run_id)}) do
                   acc
                 else
-                  entry = %{entry | refs: Map.drop(entry.refs, [:conversation, "conversation"])}
+                  entry = %{entry | refs: Map.drop(entry.refs, [:context, "context"])}
                   {[entry | entries], metadata}
                 end
 
@@ -178,7 +178,7 @@ defmodule Jido.AI.Thread.Projection do
     end
   end
 
-  def select(_, _, _), do: {:error, :invalid_conversation}
+  def select(_, _, _), do: {:error, :invalid_context}
 
   # Keep an exchange only when all call IDs have matching results. Never invent
   # a tool response for an incomplete exchange in the retained evidence.
@@ -224,7 +224,7 @@ defmodule Jido.AI.Thread.Projection do
   def message(%Thread.Entry{kind: kind, payload: payload}) when kind in [:ai_message, "ai_message"],
     do: safely(fn -> decode(payload) end)
 
-  def message(_), do: {:error, :invalid_conversation}
+  def message(_), do: {:error, :invalid_context}
 
   @doc "Validates exchange ordering and returns pending calls for checkpoint use."
   def open_tool_calls(messages) do
@@ -346,6 +346,6 @@ defmodule Jido.AI.Thread.Projection do
   defp safely(fun) do
     {:ok, fun.()}
   rescue
-    _ -> {:error, :invalid_conversation}
+    _ -> {:error, :invalid_context}
   end
 end

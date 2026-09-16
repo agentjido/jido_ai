@@ -86,13 +86,13 @@ defmodule Jido.AI.ConversationTest do
     thread = Jido.Thread.new() |> Jido.Thread.append(%{kind: :application_note, payload: %{text: "private"}})
     assert {:ok, []} = Projection.messages(thread)
     invalid = Jido.Thread.append(thread, %{kind: :ai_message, payload: %{"version" => 99}})
-    assert {:error, :invalid_conversation} = Projection.messages(invalid)
-    assert {:error, :invalid_conversation} = Jido.AI.Thread.Projection.project(invalid)
+    assert {:error, :invalid_context} = Projection.messages(invalid)
+    assert {:error, :invalid_context} = Jido.AI.Thread.Projection.project(invalid)
   end
 
   test "closed sessions do not accept messages" do
     session = Jido.Session.new() |> Jido.Session.close()
-    assert {:error, :invalid_conversation} = Projection.append(session, [Context.user("hello")])
+    assert {:error, :invalid_context} = Projection.append(session, [Context.user("hello")])
   end
 
   test "malformed AI payloads are rejected rather than silently projected" do
@@ -104,7 +104,7 @@ defmodule Jido.AI.ConversationTest do
           Map.put(entry.payload, "role", "tool"),
           Map.put(entry.payload, "content", [%{"type" => "text", "text" => 42}])
         ] do
-      assert {:error, :invalid_conversation} = Projection.message(%{entry | payload: payload})
+      assert {:error, :invalid_context} = Projection.message(%{entry | payload: payload})
     end
   end
 

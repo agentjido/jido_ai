@@ -5,7 +5,7 @@ defmodule JidoAI.Examples.StructuredOutputTest do
   test "schema feedback reaches one repair before a valid object commits", %{jido: jido} do
     {mock, context} = native_mock([%{reply: {:object, %{answer: ""}}}, %{reply: {:object, %{answer: "Fixed"}}}])
     server = start_agent(jido, Agent.new!())
-    assert {:ok, agent} = Agent.answer(server, "Help", context: context)
+    assert {:ok, agent} = ask_and_await(Agent, server, "Help", context: context)
     assert %{answer: %{answer: "Fixed"}, case_id: "case-42"} = agent.state
     assert [first, second] = MockLLM.report(mock).requests
     assert first.body["text"]["format"]["type"] == "json_schema"
@@ -27,10 +27,10 @@ defmodule JidoAI.Examples.StructuredOutputTest do
 
     server = start_agent(jido, Agent.new!(state: %{answer: %{answer: "Previous"}, case_id: "existing"}))
     before = Server.agent(server).state
-    assert {:error, _} = Agent.answer(server, "Help", context: context)
-    assert Server.agent(server).state == before
+    assert {:error, _} = ask_and_await(Agent, server, "Help", context: context)
+    assert_domain_unchanged(server, before)
     assert length(MockLLM.report(mock).requests) == 2
-    assert {:ok, agent} = Agent.answer(server, "Next", context: context)
+    assert {:ok, agent} = ask_and_await(Agent, server, "Next", context: context)
     assert %{answer: %{answer: "Recovered"}, case_id: "existing"} = agent.state
     assert_script_done(mock)
   end
@@ -39,8 +39,8 @@ defmodule JidoAI.Examples.StructuredOutputTest do
     {mock, context} = native_mock([%{reply: {:error, 400, "Invalid request"}}])
     server = start_agent(jido, Agent.new!())
     before = Server.agent(server).state
-    assert {:error, _} = Agent.answer(server, "Help", context: context)
-    assert Server.agent(server).state == before
+    assert {:error, _} = ask_and_await(Agent, server, "Help", context: context)
+    assert_domain_unchanged(server, before)
     assert length(MockLLM.report(mock).requests) == 1
     assert_script_done(mock)
   end

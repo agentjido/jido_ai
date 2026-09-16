@@ -36,7 +36,7 @@ defmodule Jido.AI.Plugins.Chat do
   def name, do: "chat"
   def description, do: "Provides conversational AI with built-in tool calling"
   def category, do: "ai"
-  def tags, do: ["chat", "conversation", "tool-calling", "llm"]
+  def tags, do: ["chat", "context", "tool-calling", "llm"]
   def vsn, do: "2.0.0"
   def state_key, do: :chat
   def actions, do: Enum.map(@routes, &elem(&1, 1))

@@ -1,10 +1,106 @@
 {
-  "type": "jido.ai.profiles",
-  "version": 1,
   "profiles": [
     {
       "$type": "map",
       "entries": [
+        [
+          {
+            "$type": "atom",
+            "id": "atoms/controls"
+          },
+          {
+            "$type": "map",
+            "entries": [
+              [
+                {
+                  "$type": "atom",
+                  "id": "atoms/idle_timeout"
+                },
+                0
+              ],
+              [
+                {
+                  "$type": "atom",
+                  "id": "atoms/input"
+                },
+                []
+              ],
+              [
+                {
+                  "$type": "atom",
+                  "id": "atoms/max_iterations"
+                },
+                8
+              ],
+              [
+                {
+                  "$type": "atom",
+                  "id": "atoms/max_model_calls"
+                },
+                12
+              ],
+              [
+                {
+                  "$type": "atom",
+                  "id": "atoms/max_tool_calls"
+                },
+                16
+              ],
+              [
+                {
+                  "$type": "atom",
+                  "id": "atoms/model"
+                },
+                []
+              ],
+              [
+                {
+                  "$type": "atom",
+                  "id": "atoms/operation"
+                },
+                []
+              ],
+              [
+                {
+                  "$type": "atom",
+                  "id": "atoms/output"
+                },
+                []
+              ],
+              [
+                {
+                  "$type": "atom",
+                  "id": "atoms/steering"
+                },
+                false
+              ],
+              [
+                {
+                  "$type": "atom",
+                  "id": "atoms/timeout"
+                },
+                5000
+              ],
+              [
+                {
+                  "$type": "atom",
+                  "id": "atoms/tool_heartbeat"
+                },
+                0
+              ]
+            ]
+          }
+        ],
+        [
+          {
+            "$type": "atom",
+            "id": "atoms/effect_policy"
+          },
+          {
+            "$type": "map",
+            "entries": []
+          }
+        ],
         [
           {
             "$type": "atom",
@@ -14,6 +110,48 @@
             "$type": "atom",
             "id": "atoms/assistant"
           }
+        ],
+        [
+          {
+            "$type": "atom",
+            "id": "atoms/instructions"
+          },
+          "Use the case facts."
+        ],
+        [
+          {
+            "$type": "atom",
+            "id": "atoms/memory"
+          },
+          {
+            "$type": "map",
+            "entries": [
+              [
+                {
+                  "$type": "atom",
+                  "id": "atoms/history"
+                },
+                null
+              ]
+            ]
+          }
+        ],
+        [
+          {
+            "$type": "atom",
+            "id": "atoms/metadata"
+          },
+          {
+            "$type": "map",
+            "entries": []
+          }
+        ],
+        [
+          {
+            "$type": "atom",
+            "id": "atoms/model_router"
+          },
+          null
         ],
         [
           {
@@ -34,11 +172,38 @@
                     [
                       {
                         "$type": "atom",
+                        "id": "atoms/generation"
+                      },
+                      []
+                    ],
+                    [
+                      {
+                        "$type": "atom",
+                        "id": "atoms/metadata"
+                      },
+                      {
+                        "$type": "map",
+                        "entries": []
+                      }
+                    ],
+                    [
+                      {
+                        "$type": "atom",
                         "id": "atoms/model"
                       },
                       {
                         "$type": "value",
                         "id": "values/model"
+                      }
+                    ],
+                    [
+                      {
+                        "$type": "atom",
+                        "id": "atoms/provider_options"
+                      },
+                      {
+                        "$type": "map",
+                        "entries": []
                       }
                     ]
                   ]
@@ -50,14 +215,17 @@
         [
           {
             "$type": "atom",
-            "id": "atoms/instructions"
+            "id": "atoms/observability"
           },
-          "Use the case facts."
+          {
+            "$type": "map",
+            "entries": []
+          }
         ],
         [
           {
             "$type": "atom",
-            "id": "atoms/controls"
+            "id": "atoms/reasoning"
           },
           {
             "$type": "map",
@@ -65,9 +233,39 @@
               [
                 {
                   "$type": "atom",
-                  "id": "atoms/timeout"
+                  "id": "atoms/effect_policy"
                 },
-                5000
+                {
+                  "$type": "map",
+                  "entries": []
+                }
+              ],
+              [
+                {
+                  "$type": "atom",
+                  "id": "atoms/method"
+                },
+                {
+                  "$type": "atom",
+                  "id": "atoms/react"
+                }
+              ],
+              [
+                {
+                  "$type": "atom",
+                  "id": "atoms/model"
+                },
+                {
+                  "$type": "atom",
+                  "id": "atoms/default"
+                }
+              ],
+              [
+                {
+                  "$type": "atom",
+                  "id": "atoms/tool_concurrency"
+                },
+                4
               ]
             ]
           }
@@ -93,6 +291,13 @@
               [
                 {
                   "$type": "atom",
+                  "id": "atoms/max_repairs"
+                },
+                0
+              ],
+              [
+                {
+                  "$type": "atom",
                   "id": "atoms/schema"
                 },
                 {
@@ -102,8 +307,31 @@
               ]
             ]
           }
+        ],
+        [
+          {
+            "$type": "atom",
+            "id": "atoms/routes"
+          },
+          []
+        ],
+        [
+          {
+            "$type": "atom",
+            "id": "atoms/tool_sources"
+          },
+          []
+        ],
+        [
+          {
+            "$type": "atom",
+            "id": "atoms/tools"
+          },
+          []
         ]
       ]
     }
-  ]
+  ],
+  "type": "jido.ai.profiles",
+  "version": 1
 }

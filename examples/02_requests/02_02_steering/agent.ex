@@ -19,9 +19,9 @@ defmodule JidoAI.Examples.Steering.Agent do
         model(:answer)
       end
 
-      requests do
-        mode(:session)
-        steering(true)
+      controls do
+        steering true
+        timeout 10_000
       end
 
       memory do
@@ -33,10 +33,6 @@ defmodule JidoAI.Examples.Steering.Agent do
       end
 
       tools do
-      end
-
-      controls do
-        timeout(10_000)
       end
 
       result(nil, into: :reply)

@@ -20,7 +20,6 @@ profile = %{
   id: :assistant,
   models: %{answer: MockLLM.model()},
   reasoning: %{method: :react, model: :answer},
-  requests: %{mode: :session},
   tools: [%{name: "generated", target: JidoAI.Examples.UnloadedTool}],
   result: %{schema: nil, into: :reply}
 }

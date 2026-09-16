@@ -17,11 +17,6 @@ defmodule JidoAITest.Authoring.Agents.Fixtures.HelperEdges do
     ai :session do
       model Jido.AI.Test.MockLLM.model()
 
-      requests do
-        mode :session
-        streaming false
-      end
-
       result into: :reply
     end
   end

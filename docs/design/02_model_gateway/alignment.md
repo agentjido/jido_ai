@@ -5,14 +5,14 @@
 ## Status
 
 - Reviewed: 2026-09-15.
-- Code for the example audit: `v3-spike`, HEAD `7bb011e98349af8bf580e7b93afa60990972beae`, plus uncommitted example, test, formatter, and documentation changes. No `lib/` or dependency changes.
+- Code baseline: `v3-spike`, HEAD `4ed6402f`, plus uncommitted runtime, test, example, and documentation refinement. Dependency pins are unchanged.
 - Prerequisite alignments used: [01 Canonical interaction and AI values](../01_ai_values/alignment.md).
 - Alignment state: Draft. Current ownership is mapped; target decisions and full acceptance proof remain.
 - Verification: the example-driven review below adds fresh MockLLM runs to the earlier source review. Earlier statements that no tests ran refer to that prior review, not this follow-up.
 
 ## Current architecture
 
-Models uses native ReqLLM/LLMDB model inputs. Model.Transport owns provider requests, Model.Options merges trusted options, and Model.Messages adapts messages and reference metadata. Runtime.RequestTransform still exposes ReAct-specific callback views. Direct model contracts remain native; Agent results are adapted for their storage and request contracts.
+Models uses native ReqLLM/LLMDB model inputs. Model.Transport owns provider requests, Model.Options merges trusted options, and Model.Messages adapts messages and reference metadata. Execution.RequestTransform still exposes ReAct-specific callback views. Direct model contracts remain native; Agent results are adapted for their storage and request contracts.
 
 - Current owner: Models and Model.Transport, Model.Options, Model.Messages, Model.Generate; routing policy is in seam 08.
 - Cross-package ownership: core Jido owns Agent commit and topology; Flow/Exec and Signal internals remain in their respective packages.
@@ -29,7 +29,7 @@ Models uses native ReqLLM/LLMDB model inputs. Model.Transport owns provider requ
 | [lib/jido_ai/model/transport.ex](../../../lib/jido_ai/model/transport.ex) | Provider request boundary |
 | [lib/jido_ai/model/options.ex](../../../lib/jido_ai/model/options.ex) | Option normalization |
 | [lib/jido_ai/model/messages.ex](../../../lib/jido_ai/model/messages.ex) | Message/reference adaptation |
-| [lib/jido_ai/runtime/request_transform.ex](../../../lib/jido_ai/runtime/request_transform.ex) | Current transform adapter |
+| [lib/jido_ai/execution/request_transform.ex](../../../lib/jido_ai/execution/request_transform.ex) | Current transform adapter |
 
 ### Examples and tests
 
@@ -67,7 +67,7 @@ requirement associations are not carried forward as proof.
 
 ## Selected transformer direction
 
-The ReAct callback view in Runtime.RequestTransform remains an implementation
+The ReAct callback view in Execution.RequestTransform remains an implementation
 gap against [EXE-DEC-005](../04_ai_execution/design.md#selected-direction-complete-the-runtime-split).
 This seam owns the common-view and callback contract review. Compatibility
 for existing `transform_request/4` implementations is not decided. Evidence

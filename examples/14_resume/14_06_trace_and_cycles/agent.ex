@@ -18,11 +18,6 @@ defmodule JidoAI.Examples.TraceAndCycles.Agent do
         action JidoAI.Examples.TraceAndCycles.Check, as: :check
       end
 
-      requests do
-        mode(:session)
-        streaming(false)
-      end
-
       observability do
         store_content true
         stream_content true

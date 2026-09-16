@@ -34,7 +34,7 @@ defmodule JidoAI.Examples.Case do
     server
   end
 
-  def conversation_entries(%Jido.Thread{} = thread) do
+  def context_entries(%Jido.Thread{} = thread) do
     {:ok, selected} = Jido.AI.Thread.Projection.select(thread)
 
     Enum.map(selected.entries, fn entry ->
@@ -43,7 +43,7 @@ defmodule JidoAI.Examples.Case do
     end)
   end
 
-  def conversation(agent) do
+  def selected_context(agent) do
     {:ok, profile} = Jido.AI.Configuration.profile(agent)
     {:ok, entries} = Jido.AI.Orchestration.Transcript.read(agent.state, profile)
     entries
@@ -59,7 +59,25 @@ defmodule JidoAI.Examples.Case do
   def observe_tools, do: JidoAI.Examples.ToolEvents.attach()
 
   def ask(server, context) do
-    Jido.AgentServer.call(server, signal(), context: context, timeout: 10_000)
+    Jido.AI.Test.Requests.call_and_await(server, signal(), context: context, timeout: 10_000)
+  end
+
+  def ask_and_await(module, server, query, opts) do
+    with {:ok, _result} <- module.ask_sync(server, query, opts) do
+      {:ok, Jido.AgentServer.agent(server)}
+    end
+  end
+
+  def assert_domain_unchanged(server, before) do
+    before = if Map.has_key?(before, :agent), do: before.agent.state, else: before
+    agent = Jido.AgentServer.agent(server)
+    after_state = agent.state
+    # Request records, the append-only transcript, and audit counters can change
+    # on failed work. They are not the domain answer under this assertion.
+    {:ok, profile} = Jido.AI.Configuration.profile(agent)
+    fields = [:requests, profile.memory.history, :jido_ai_contexts, :commits]
+    assert Map.drop(after_state, fields) == Map.drop(before, fields)
+    assert Enum.all?(after_state.requests, fn {_, r} -> r.status in [:completed, :failed] end)
   end
 
   def signal,

@@ -7,7 +7,7 @@ defmodule Jido.AI.Request.Stream do
   """
 
   alias Jido.AI.Request.Handle
-  alias Jido.AI.Runtime.Event
+  alias Jido.AI.Observe.Event
 
   @message_tag :jido_ai_request_event
   @terminal_kinds [:request_completed, :request_failed, :request_cancelled]

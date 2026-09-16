@@ -7,15 +7,18 @@ format do not change. The value files now live at `lib/jido_session.ex`,
 Replace `Jido.AI.Session` calls and aliases with `Jido.AI.Orchestration`.
 Its child modules use the same new namespace, except `Session.Runtime`, which
 is now `Orchestration.Coordinator`. No compatibility wrapper is retained.
-Request handles and generated Agent helpers keep their existing contracts.
-Signal types, Action names, and stored data formats remain unchanged.
+The later runtime refinement uses one request lifecycle. `ask` always returns
+a handle; `ask_sync` waits for settlement. Core route helpers return admission.
+Internal routes now use `jido.ai.request.*`. Rebuild older stored Agent Codec
+documents. See [the current migration table](public-api-map.md#migration-from-the-previous-v3-draft).
 
 ## Boundaries
 
 - Session and Thread hold portable interaction data.
 - Request identifies one unit of work and provides result access.
 - Orchestration owns admission, cancellation, delivery, and ordered commits.
-- Runtime executes one prepared model/tool/reasoning run.
+- Execution runs one prepared model/tool/reasoning Flow through core Exec.
+- Configuration owns portable overrides; Observe owns event values.
 - Core Jido owns Agent instances, child lifecycle, routing, and topology.
 
 ## Delegation design constraints

@@ -5,7 +5,7 @@
 ## Status
 
 - Reviewed: 2026-09-15.
-- Code for the example audit: `v3-spike`, HEAD `7bb011e98349af8bf580e7b93afa60990972beae`, plus uncommitted example, test, formatter, and documentation changes. No `lib/` or dependency changes.
+- Code baseline: `v3-spike`, HEAD `4ed6402f`, plus uncommitted runtime, test, example, and documentation refinement. Dependency pins are unchanged.
 - Prerequisite alignments used: None.
 - Alignment state: Draft. Current ownership is mapped; target decisions and full acceptance proof remain.
 - Verification: the example-driven review below adds fresh MockLLM runs to the earlier source review. Earlier statements that no tests ran refer to that prior review, not this follow-up.
@@ -27,7 +27,7 @@ Jido AI lowers Profiles into core Agent routes and Plugins and uses Flow/Exec fo
 | --- | --- |
 | [lib/jido_ai.ex](../../../lib/jido_ai.ex) | Public package boundary |
 | [lib/jido_ai/authoring.ex](../../../lib/jido_ai/authoring.ex) | Lowering to Agent routes and Plugins |
-| [lib/jido_ai/runtime/tool_attempt.ex](../../../lib/jido_ai/runtime/tool_attempt.ex) | Bounded retry still sleeps inside the worker |
+| [lib/jido_ai/execution/tool_attempt.ex](../../../lib/jido_ai/execution/tool_attempt.ex) | Bounded retry still sleeps inside the worker |
 | [mix.exs](../../../mix.exs) | Actual version and dependency sources |
 
 ### Examples and tests
@@ -35,7 +35,7 @@ Jido AI lowers Profiles into core Agent routes and Plugins and uses Flow/Exec fo
 - [Example briefing](../../../examples/01_authoring/01_07_ai_runtime/README.md): public behavior and documented limits.
 - [Matching example tests](../../../test/examples/01_authoring/01_07_ai_runtime): deterministic example evidence.
 - [test/authoring/agents/boundaries_test.exs](../../../test/authoring/agents/boundaries_test.exs): detailed boundary evidence.
-- [test/jido_ai/runtime/checkpoint_test.exs](../../../test/jido_ai/runtime/checkpoint_test.exs): detailed boundary evidence.
+- [test/jido_ai/execution/checkpoint_test.exs](../../../test/jido_ai/execution/checkpoint_test.exs): detailed boundary evidence.
 
 These are evidence entry points, not blanket acceptance claims. The requirement
 matrix below separates target decisions from implemented behavior whose full

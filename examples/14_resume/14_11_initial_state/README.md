@@ -1,6 +1,6 @@
-# 14_11 — Initial conversation import
+# 14_11 — Initial context import
 
-Import portable conversation data before starting an Agent.
+Import portable context data before starting an Agent.
 
 ## Read the code
 
@@ -23,7 +23,7 @@ Shared setup and fault fixtures stay in [test support](../../../test/examples/su
 
 `Jido.AI.Agent.from_initial_state/3` restores complete historical exchanges and selected-profile prompts without model calls or tool replay. Invalid or ambiguous input is rejected.
 
-Put the saved `Jido.Session` in the Profile's declared conversation field, such
+Put the saved `Jido.Session` in the Profile's declared context field, such
 as `messages`. The import also accepts the map from `Jido.Session.encode/1` in
 that field. Session identity and Thread entries are preserved. The old special
 `:context` input is not supported. A saved `system_prompt` in Thread metadata
@@ -31,7 +31,7 @@ applies to the selected Profile; an empty string remains explicit.
 
 ## Limits
 
-The destination must declare history and domain fields. This imports conversation data, not active requests, workers, pending tools or Plugin state. Use explicit checkpoints for execution continuation.
+The destination must declare history and domain fields. This imports context data, not active requests, workers, pending tools or Plugin state. Use explicit checkpoints for execution continuation.
 
 ## Files
 

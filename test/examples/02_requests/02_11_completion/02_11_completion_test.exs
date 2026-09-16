@@ -100,7 +100,7 @@ defmodule JidoAI.Examples.CompletionTest do
       inserted_at: 1,
       completed_at: nil,
       streamed: false,
-      max_requests: 10
+      max_retained_requests: 10
     }
 
     instance =

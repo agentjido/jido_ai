@@ -5,7 +5,8 @@ Use an AI profile and a generated command to write one answer into Agent state.
 ## Read the code
 
 Read [the Agent](agent.ex), then the tests. The `ai` block owns the model,
-limits, and result destination. Call `Agent.answer/3` through AgentServer.
+limits, and result destination. Call `Agent.ask_sync/3` to wait for the answer.
+The core `Agent.answer/3` helper returns the admission Agent revision only.
 
 ## Run it
 
@@ -22,7 +23,8 @@ transport and AgentServer, with [test setup](../../../test/examples/support/exam
 ## Important behavior
 
 The answer is `Ready`; existing domain data remains unchanged. A provider
-failure leaves the previous state unchanged. A later request can succeed.
+failure preserves the previous answer and records a failed request. A later
+request can succeed. Retained request records do not enable Context retention.
 
 ## Limits
 

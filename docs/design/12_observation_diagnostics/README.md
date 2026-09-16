@@ -12,7 +12,7 @@ and stable requirement IDs are in [design](design.md).
 
 ## Why this seam exists
 
-- Owner: Observe, sanitization, Runtime.Event/Telemetry, typed Signal projections, Request metadata, and Orchestration.Inspection.
+- Owner: Observe, sanitization, Observe.Event/Telemetry, typed Signal projections, Request metadata, and Orchestration.Inspection.
 - Owns: observation and diagnostics within [the package architecture](../ARCHITECTURE.md).
 - Does not own: contracts assigned to other seams or private lower-package internals.
 
@@ -28,7 +28,7 @@ and stable requirement IDs are in [design](design.md).
 
 | Gap | Why it matters | Required outcome | Owner |
 | --- | --- | --- | --- |
-| [OBS-GAP-001](alignment.md#gap-register) | Runtime.Event and typed projections exist; there is no single public Event value matching all proposed fields. | Keep event semantics and versioning work. | 12; dependencies below |
+| [OBS-GAP-001](alignment.md#gap-register) | Observe.Event and typed projections exist; there is no single public Event value matching all proposed fields. | Keep event semantics and versioning work. | 12; dependencies below |
 | [OBS-GAP-002](alignment.md#gap-register) | Lifecycle IDs and measurements exist. A complete finite vocabulary and correlation matrix remains. | Retain per-event schema and measurement proof. | 12; dependencies below |
 | [OBS-GAP-003](alignment.md#gap-register) | ReAct run identity is retained across resume rather than replaced with linked identity. | Resolve with 11 before asserting OBS-REQ-006. | 12; dependencies below |
 | [OBS-GAP-004](alignment.md#gap-register) | observe_test explicitly preserves nested tool_result payload fields after sanitization. | Review the strict no-content default against current consumers. | 12; dependencies below |

@@ -18,7 +18,6 @@ defmodule Jido.AI.OutputTest do
       ai :assistant do
         model(:fast)
         reasoning(:react)
-        requests(mode: :session)
 
         result(
           Zoi.object(%{

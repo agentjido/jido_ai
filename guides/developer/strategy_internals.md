@@ -9,7 +9,7 @@ Jido.AI.Agent DSL
   -> Jido.AI.Authoring.lower/2
   -> core Jido.Agent routes and plugins
   -> Jido.AI.Orchestration request runtime
-  -> Jido.AI.Runtime.Flow
+  -> Jido.AI.Execution.Flow
   -> Jido.AI.Reasoning method functions
 ```
 
@@ -40,14 +40,14 @@ modules are implementation details. They do not define Agent routes or worker
 messages.
 
 ReAct also has a standalone runtime. It uses the same canonical
-`Jido.AI.Runtime.Event` values and supports checkpoint tokens. The standalone
+`Jido.AI.Observe.Event` values and supports checkpoint tokens. The standalone
 runtime is separate from Agent authoring.
 
 ## Extension Rules
 
 - Add public configuration to `Jido.AI.Profile` and the Spark DSL.
 - Keep profile construction free of model and tool calls.
-- Put shared request execution in `Jido.AI.Orchestration` and `Jido.AI.Runtime`.
+- Put shared request execution in `Jido.AI.Orchestration` and `Jido.AI.Execution`.
 - Put method-specific preparation, parsing, and advancement in
   `Jido.AI.Reasoning`.
 - Do not add a method-specific Agent macro or Strategy wrapper.

@@ -97,7 +97,7 @@ defmodule Jido.AI.Plugins.Retrieval do
 
     native? =
       (String.starts_with?(signal.type, "ai.") and String.ends_with?(signal.type, ".query")) or
-        Jido.AI.Runtime.Plugin.native_request?(admission)
+        Jido.AI.Configuration.Plugin.native_request?(admission)
 
     eligible? =
       native? or signal.type == "chat.message" or

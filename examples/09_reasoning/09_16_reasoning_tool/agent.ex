@@ -31,11 +31,6 @@ defmodule JidoAI.Examples.ReasoningTool.Agent do
         timeout(10_000)
       end
 
-      requests do
-        mode(:session)
-        streaming(false)
-      end
-
       result(nil, into: :reply)
     end
   end

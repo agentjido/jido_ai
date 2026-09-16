@@ -73,7 +73,7 @@ defmodule JidoAI.Examples.CheckpointResumeTest do
 
     assert {:ok, final, _} = Token.decode_state(result.final_token, config)
     refute Map.has_key?(final.checkpoint.domain, Jido.AI.Thread.Control.key())
-    assert Enum.count(conversation_entries(final.context), &(&1.role == :user)) == 1
+    assert Enum.count(context_entries(final.context), &(&1.role == :user)) == 1
     assert_script_done(mock)
   end
 

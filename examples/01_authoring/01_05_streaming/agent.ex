@@ -12,12 +12,6 @@ defmodule JidoAI.Examples.Streaming.Agent do
       model "openai:gpt-4o-mini"
       instructions "Give a short answer."
 
-      requests do
-        mode :session
-        streaming true
-        max_requests 4
-      end
-
       controls do
         timeout 5_000
         max_model_calls 1

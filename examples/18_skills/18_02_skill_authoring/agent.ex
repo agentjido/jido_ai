@@ -26,10 +26,6 @@ defmodule JidoAI.Examples.SkillAuthoring.Public do
         skill(JidoAI.Examples.SkillAuthoring.Review)
       end
 
-      requests do
-        mode(:session)
-      end
-
       memory do
         history(:messages)
       end

@@ -5,7 +5,7 @@ defmodule Jido.AI.Orchestration do
   `Jido.Session` is the portable interaction value. This module manages active
   work through core Agent and Plugin APIs; it does not define a Session value.
   `Jido.AI.Orchestration.Coordinator` keeps worker lifetime and ordered commits
-  together. `Jido.AI.Runtime` executes each prepared request.
+  together. `Jido.AI.Execution` executes each prepared request.
 
   Agent topology and child process ownership belong to core Jido. Future
   delegation must link requests without treating a peer as a supervised child
@@ -15,13 +15,13 @@ defmodule Jido.AI.Orchestration do
   alias Jido.AI.Request.{Handle, Stream}
   alias Jido.AI.Orchestration.Plugin
 
-  @settle "jido.ai.session.settle"
-  @cancel "jido.ai.session.cancel"
-  @control "jido.ai.session.control"
-  @history "jido.ai.session.history"
-  @publish "jido.ai.session.publish"
-  @ignore "jido.ai.session.ignore"
-  @progress "jido.ai.session.progress"
+  @settle "jido.ai.request.settle"
+  @cancel "jido.ai.request.cancel"
+  @control "jido.ai.request.control"
+  @history "jido.ai.request.history"
+  @publish "jido.ai.request.publish"
+  @ignore "jido.ai.request.ignore"
+  @progress "jido.ai.request.progress"
   @observations [
     "ai.request.started",
     "ai.request.completed",
@@ -45,7 +45,7 @@ defmodule Jido.AI.Orchestration do
   Both the Profile's `observability.diagnostics_content` permission and the
   caller option `include_content: true` are required to include it. This view
   is for inspection; use core AgentServer APIs to obtain a native checkpoint.
-  `details.conversation` contains completed conversation, not pending input.
+  `details.context` contains completed conversation, not pending input.
 
   `details.trace` is an observed event prefix. Its `seq` is the last sampled
   sequence, including events omitted by the 2,000-event cap. History commits
@@ -119,26 +119,12 @@ defmodule Jido.AI.Orchestration do
 
   @doc false
   def settle_signal(id),
-    do: Jido.Signal.new!(@settle, %{request_id: id}, source: "/jido/ai/session")
+    do: Jido.Signal.new!(@settle, %{request_id: id}, source: "/jido/ai/request")
 
   @doc false
   def routes([]), do: {:ok, []}
 
   def routes(_) do
-    Enum.each(
-      [
-        Jido.AI.Orchestration.Settle,
-        Jido.AI.Orchestration.Cancel,
-        Jido.AI.Orchestration.ControlAction,
-        Jido.AI.Orchestration.HistoryAction,
-        Jido.AI.Orchestration.Publish,
-        Jido.AI.Orchestration.IgnoreSignal,
-        Jido.AI.Orchestration.Progress,
-        Plugin
-      ],
-      &Code.ensure_compiled!/1
-    )
-
     with {:ok, settle} <- Jido.Agent.Authoring.route(@settle, Jido.AI.Orchestration.Settle, []),
          {:ok, cancel} <- Jido.Agent.Authoring.route(@cancel, Jido.AI.Orchestration.Cancel, []),
          {:ok, control} <- Jido.Agent.Authoring.route(@control, Jido.AI.Orchestration.ControlAction, []),
@@ -173,7 +159,7 @@ defmodule Jido.AI.Orchestration do
       ) do
     with {:ok, ticket} <- GenServer.call(runtime, {:stage_selection, id, run_id, selection}),
          signal =
-           Jido.Signal.new!(@progress, %{request_id: id, run_id: run_id, ticket: ticket}, source: "/jido/ai/session"),
+           Jido.Signal.new!(@progress, %{request_id: id, run_id: run_id, ticket: ticket}, source: "/jido/ai/request"),
          {:ok, _} <- commit_progress(server, signal, caller_context(context), deadline) do
       :ok
     end
@@ -265,7 +251,7 @@ defmodule Jido.AI.Orchestration do
   def publish_history(%{jido_ai_events: {runtime, id, run_id}, jido_ai_server: server}, entries) do
     with {:ok, batch_id} <- GenServer.call(runtime, {:stage_history, id, run_id, entries}),
          signal =
-           Jido.Signal.new!(@history, %{request_id: id, batch_id: batch_id}, source: "/jido/ai/session"),
+           Jido.Signal.new!(@history, %{request_id: id, batch_id: batch_id}, source: "/jido/ai/request"),
          {:ok, _} <- commit_history(server, signal, System.monotonic_time(:millisecond) + 5_000),
          do: :ok
   end
@@ -294,7 +280,6 @@ defmodule Jido.AI.Orchestration do
 
   @doc false
   def admission_target(profile) do
-    Code.ensure_compiled!(Jido.AI.Orchestration.Start)
     {:ok, {Jido.AI.Orchestration.Start, %{profile_id: profile.id}}}
   end
 
@@ -304,7 +289,7 @@ defmodule Jido.AI.Orchestration do
     timeout = Keyword.get(opts, :admission_timeout, 5_000)
     deadline = Keyword.get(opts, :admission_deadline)
     agent = Jido.AgentServer.agent(server, admission_remaining(deadline, timeout))
-    method = Jido.AI.Runtime.Binding.method(agent, signal)
+    method = Jido.AI.Orchestration.Binding.method(agent, signal)
     # These values can contain runtime resources. They do not enter Signal data.
     {portable, resources} = Map.split(signal.data, [:request_id, :query, :prompt, :extra_refs])
 
@@ -356,7 +341,7 @@ defmodule Jido.AI.Orchestration do
     do: :busy
 
   defp admission_error(reason) do
-    if Jido.AI.Runtime.StateSize.error?(reason) do
+    if Jido.AI.Execution.StateSize.error?(reason) do
       Jido.Error.validation_error("Agent state exceeds max_state_size", kind: :state_size)
     else
       reason
@@ -379,7 +364,7 @@ defmodule Jido.AI.Orchestration do
         do: %{request_id: id, reason: opts[:reason]},
         else: %{request_id: id}
 
-    signal = Jido.Signal.new!(@cancel, data, source: "/jido/ai/session")
+    signal = Jido.Signal.new!(@cancel, data, source: "/jido/ai/request")
 
     case Jido.AgentServer.call(server, signal, Keyword.get(opts, :timeout, 5_000)) do
       {:ok, _} -> :ok
@@ -502,7 +487,7 @@ defmodule Jido.AI.Orchestration do
       nil ->
         event = Map.merge(context.jido_ai_output_event, %{kind: kind, data: data})
 
-        Jido.AI.Runtime.Telemetry.emit(
+        Jido.AI.Observe.Telemetry.emit(
           event,
           event.observability,
           context[:jido_ai_agent_id],

@@ -64,7 +64,7 @@ defmodule Jido.AI.Request.Metadata do
     )
     |> normalize_non_empty_list()
     |> case do
-      nil -> extract_reasoning_details_from_conversation(get_field(details, :conversation))
+      nil -> extract_reasoning_details_from_context(get_field(details, :context))
       reasoning_details -> reasoning_details
     end
   end
@@ -85,7 +85,7 @@ defmodule Jido.AI.Request.Metadata do
     end
   end
 
-  defp extract_reasoning_details_from_conversation(conversation) when is_list(conversation) do
+  defp extract_reasoning_details_from_context(conversation) when is_list(conversation) do
     conversation
     |> Enum.reverse()
     |> Enum.find_value(fn message ->
@@ -101,7 +101,7 @@ defmodule Jido.AI.Request.Metadata do
     end)
   end
 
-  defp extract_reasoning_details_from_conversation(_), do: nil
+  defp extract_reasoning_details_from_context(_), do: nil
 
   defp maybe_put_meta(meta, _key, nil), do: meta
   defp maybe_put_meta(meta, key, value), do: Map.put(meta, key, value)

@@ -10,8 +10,7 @@ defmodule JidoAI.Examples.Session.DesignRequirementsTest do
 
     profile = %{
       profile
-      | requests: Map.put(profile.requests, :tool_heartbeat, 10),
-        controls: Map.put(profile.controls, :timeout, 500),
+      | controls: Map.merge(profile.controls, %{timeout: 500, tool_heartbeat: 10}),
         tools: [
           %{name: "hold", target: JidoAI.Examples.AIRuntime.WaitTool, forward_context: [:observer], timeout: 5_000}
         ]

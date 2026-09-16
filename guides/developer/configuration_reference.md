@@ -51,14 +51,9 @@ defmodule MyApp.Assistant do
         max_model_calls(12)
         max_tool_calls(16)
         timeout(60_000)
-      end
-
-      requests do
-        mode(:session)
-        on_busy(:reject)
-        max_requests(100)
-        streaming(true)
-        steering(true)
+        steering true
+        idle_timeout 0
+        tool_heartbeat 0
       end
 
       result(nil, into: :answer)
@@ -74,6 +69,31 @@ end
 Agent construction validates and lowers this data. It does not call a model or
 a tool.
 
+There is no `requests` block or Profile field. Steering and activity timers
+belong in `controls`. `steering` defaults to `false`. Timer values are
+nonnegative milliseconds: `idle_timeout: 0` selects the automatic inactivity
+limit, and `tool_heartbeat: 0` disables tool heartbeats.
+
+Streaming is selected for each call. `ask/3` and `ask_sync/3` default to
+buffered model calls. `ask_stream/3` selects provider streaming and returns an
+event enumerable. A `stream_to` sink also selects provider streaming unless
+the caller sets `stream: false` to receive lifecycle events only. Use
+`stream: true` to select provider streaming without an event sink.
+
+## Host Request Retention
+
+Configure retained request records on the host, not on each Profile:
+
+```elixir
+config :jido_ai, :max_retained_requests, 100
+```
+
+The limit must be a positive integer. Each Coordinator captures it at startup.
+Changing application configuration does not change an existing Coordinator.
+Pending records are kept; older terminal records are removed first. This limit
+does not control concurrency or retained Session/Thread Context. Each Agent
+accepts one active AI request and rejects a second request with `:busy`.
+
 ## Portable Models and Dynamic Tool Sources
 
 Public `Jido.AI.export/3` supports model IDs and aliases. For a rich model record,
@@ -84,8 +104,8 @@ actual record in its Registry. The document does not contain the model record.
 
 Dynamic tool-source declarations can be authored and transported, but native
 AI routes do not resolve them yet. Selecting a profile with these sources
-returns a `tool_sources` validation error before model work starts, in both
-turn and session modes. Supply resolved static tools for native execution.
+returns a `tool_sources` validation error before model work starts.
+Supply resolved static tools for native execution.
 The runtime does not silently omit optional or required sources.
 
 ## Reasoning Methods
@@ -117,9 +137,5 @@ Supported request options include `model`, `tools`, `allowed_tools`,
 
 `max_iterations` and `max_model_calls` are independent controls.
 
-## CLI Defaults
-
-- `--type`: `react`
-- supported values: `react | aot | cod | cot | tot | got | trm | adaptive`
-- `--timeout`: `60_000`
-- `--format`: `text`
+The standalone ReAct adapter retains its own `Config.streaming` option. That
+value configures an invocation of the adapter; it is not Profile policy.

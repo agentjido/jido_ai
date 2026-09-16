@@ -43,7 +43,11 @@ defmodule Jido.AI.Authoring.ProfileValidationTest do
     assert profile.reasoning.model == :default
     assert profile.tools == []
     assert profile.tool_sources == []
-    assert profile.requests.mode == :turn
+    refute Map.has_key?(profile, :requests)
+
+    assert Map.take(profile.controls, [:steering, :idle_timeout, :tool_heartbeat]) ==
+             %{steering: false, idle_timeout: 0, tool_heartbeat: 0}
+
     assert profile.memory == %{history: nil}
     assert profile.controls.timeout == 60_000
   end
@@ -91,7 +95,7 @@ defmodule Jido.AI.Authoring.ProfileValidationTest do
                    }
                  },
                  reasoning: %{"method" => "react", "model" => "answer"},
-                 requests: %{"mode" => "session", "on_busy" => "reject", "steering" => true}
+                 controls: %{"steering" => true}
                })
              )
 
@@ -99,7 +103,7 @@ defmodule Jido.AI.Authoring.ProfileValidationTest do
     assert profile.models.answer.generation[:temperature] == 0.3
     assert profile.models.answer.provider_options == %{seed: 3}
     assert profile.reasoning.method == :react
-    assert profile.requests.mode == :session
+    assert profile.controls.steering
   end
 
   test "method-default control limits resolve from reasoning and repair policy" do
@@ -193,9 +197,9 @@ defmodule Jido.AI.Authoring.ProfileValidationTest do
       attrs(%{controls: %{input: [InvalidControl]}}),
       attrs(%{controls: %{input: [42]}}),
       attrs(%{controls: %{operation: [%{module: Control, when: ["bad"]}]}}),
-      attrs(%{requests: %{mode: :turn, steering: true}}),
-      attrs(%{requests: %{mode: :turn, idle_timeout: 10}}),
-      attrs(%{requests: %{max_requests: 0}}),
+      attrs(%{controls: %{steering: :invalid}}),
+      attrs(%{controls: %{idle_timeout: -1}}),
+      attrs(%{requests: %{max_retained_requests: 0}}),
       attrs(%{memory: %{history: "unregistered_profile_field"}}),
       attrs(%{result: nil}),
       attrs(%{result: %{into: :answer, max_repairs: 4}}),
@@ -262,7 +266,7 @@ defmodule Jido.AI.Authoring.ProfileValidationTest do
              Profile.new(
                attrs(%{
                  reasoning: :adaptive,
-                 requests: %{mode: :session, steering: true}
+                 controls: %{steering: true}
                })
              )
   end

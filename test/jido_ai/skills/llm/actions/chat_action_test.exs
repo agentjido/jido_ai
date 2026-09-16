@@ -174,6 +174,6 @@ defmodule Jido.AI.Actions.LLM.ChatTest do
   end
 
   defp content_to_string(content) when is_binary(content), do: content
-  defp content_to_string(content) when is_list(content), do: Jido.AI.Turn.extract_from_content(content)
+  defp content_to_string(content) when is_list(content), do: Jido.AI.Model.Response.extract_from_content(content)
   defp content_to_string(_), do: ""
 end

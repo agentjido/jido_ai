@@ -17,11 +17,6 @@ defmodule JidoAI.Examples.TypedSignals.Chat do
         action JidoAI.Examples.TypedSignals.Echo, as: :echo
       end
 
-      requests do
-        mode(:session)
-        streaming(true)
-      end
-
       observability do
         store_content true
         stream_content true

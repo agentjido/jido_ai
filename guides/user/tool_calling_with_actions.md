@@ -81,7 +81,7 @@ context = %{
 {:ok, result} = Jido.Exec.run(CallWithTools, params, context)
 # result.type == :final_answer when loop completes
 # result.turns includes executed loop turns
-# result.messages includes assistant/tool conversation messages
+# result.messages includes assistant/tool context messages
 ```
 
 Deterministic terminal shapes:
@@ -198,7 +198,7 @@ Callbacks receive the configured tool context plus runtime data such as
 callbacks run in the agent strategy path, not in the action process.
 
 These callbacks apply to agent-managed ReAct and Tree-of-Thoughts tool
-execution. Direct `Jido.Exec`, `Jido.AI.Turn`, `CallWithTools`, and
+execution. Direct `Jido.Exec`, `Jido.AI.Model.Response`, `CallWithTools`, and
 `ExecuteTool` calls do not invoke them.
 
 ## Failure Mode: Tool Execution Returns `:not_found`

@@ -25,7 +25,9 @@ Tool results reach the next model call. The commit counter advances only on succ
 
 ## Limits
 
-This is one-Turn execution. Session steering, streaming and restore are separate lessons. Test observers and barriers are supplied only by the tests.
+This uses admission, Flow execution, and settlement. One AI request can span
+many core Turns. Steering, streaming, and restore are separate lessons.
+Test observers and barriers are supplied only by the tests.
 
 ## Files
 

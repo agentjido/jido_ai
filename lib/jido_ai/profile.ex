@@ -19,7 +19,7 @@ defmodule Jido.AI.Profile do
   are removed and content is bounded even with permission. Removed content is
   not kept in a second result store: `Request.await/2` reads the retained result.
   Continuing a conversation that needs omitted content returns
-  `:conversation_content_not_retained`; replace its context or opt in before execution.
+  `:context_content_not_retained`; replace its context or opt in before execution.
   """
   alias Jido.AI.Output
 
@@ -40,15 +40,6 @@ defmodule Jido.AI.Profile do
               observability: Zoi.map() |> Zoi.default(%{}),
               model_router: Zoi.any() |> Zoi.nullable() |> Zoi.default(nil),
               result: Zoi.map(),
-              requests:
-                Zoi.map()
-                |> Zoi.default(%{
-                  mode: :turn,
-                  on_busy: :reject,
-                  max_requests: 100,
-                  streaming: false,
-                  steering: false
-                }),
               memory: Zoi.map() |> Zoi.default(%{history: nil}),
               metadata: Zoi.map() |> Zoi.default(%{})
             },
@@ -73,7 +64,6 @@ defmodule Jido.AI.Profile do
     :tool_interceptor,
     :model_router,
     :result,
-    :requests,
     :memory,
     :metadata
   ]
@@ -107,9 +97,8 @@ defmodule Jido.AI.Profile do
          {:ok, skills} <- Jido.AI.Skill.Source.new(Map.get(attrs, :skills)),
          {:ok, result} <- result(attrs[:result]),
          {:ok, controls} <- controls(Map.get(attrs, :controls, %{})),
-         {:ok, requests} <- requests(Map.get(attrs, :requests, %{})),
-         :ok <- skill_mode(skills, requests, reasoning),
-         :ok <- method_features(reasoning.method, tools ++ tool_sources, requests),
+         :ok <- skill_method(skills, reasoning),
+         :ok <- method_features(reasoning.method, tools ++ tool_sources, controls),
          :ok <- method_output(reasoning.method, result),
          {:ok, memory} <- memory(Map.get(attrs, :memory, %{})),
          {:ok, observability} <- observability(Map.get(attrs, :observability, %{})),
@@ -124,7 +113,6 @@ defmodule Jido.AI.Profile do
                tool_sources: tool_sources,
                skills: skills,
                result: result,
-               requests: requests,
                memory: memory,
                observability: observability,
                effect_policy: effect_policy,
@@ -212,7 +200,6 @@ defmodule Jido.AI.Profile do
       |> Map.put_new(:tools, [])
       |> Map.put_new(:tool_sources, [])
       |> Map.put_new(:controls, %{})
-      |> Map.put_new(:requests, %{})
       |> Map.put_new(:memory, %{})
       |> Map.put_new(:observability, %{})
       |> Map.put_new(:metadata, %{})
@@ -268,11 +255,11 @@ defmodule Jido.AI.Profile do
          do: {:ok, {profile, routes}}
   end
 
-  defp skill_mode(nil, _, _), do: :ok
-  defp skill_mode(_, %{mode: :session}, %{method: :react}), do: :ok
+  defp skill_method(nil, _), do: :ok
+  defp skill_method(_, %{method: :react}), do: :ok
 
-  defp skill_mode(_, _, _),
-    do: error("skills", "Automatic skills require a ReAct Session profile")
+  defp skill_method(_, _),
+    do: error("skills", "Automatic skills require a ReAct profile")
 
   defp identifier(id, _) when is_atom(id) and id not in [nil, true, false], do: :ok
   defp identifier(_, path), do: error(path, "Expected a host-defined atom")
@@ -790,66 +777,16 @@ defmodule Jido.AI.Profile do
   defp method_features(_, _, _),
     do: error("reasoning", "This method does not execute tools or accept steering")
 
-  defp requests(value) do
-    with {:ok, value} <-
-           fields(
-             value,
-             [
-               :mode,
-               :on_busy,
-               :max_requests,
-               :streaming,
-               :steering,
-               :idle_timeout,
-               :tool_heartbeat
-             ],
-             "requests"
-           ),
-         value =
-           value
-           |> normalize_known(:mode, [:turn, :session])
-           |> normalize_known(:on_busy, [:reject]),
-         value =
-           Map.merge(
-             %{
-               mode: :turn,
-               on_busy: :reject,
-               max_requests: 100,
-               streaming: false,
-               steering: false
-             },
-             value
-           ),
-         true <-
-           value.mode in [:turn, :session] and value.on_busy == :reject and
-             is_boolean(value.streaming),
-         true <- is_boolean(value.steering) and (not value.steering or value.mode == :session),
-         true <- is_integer(value.max_requests) and value.max_requests > 0,
-         :ok <- activity_options(value) do
-      {:ok, value}
-    else
-      false ->
-        error(
-          "requests",
-          "Expected turn or session mode, reject on busy, and a positive retention limit"
-        )
-
-      error ->
-        error
-    end
-  end
-
   defp activity_options(value) do
     options = Map.take(value, [:idle_timeout, :tool_heartbeat])
 
-    if options == %{} or
-         (value.mode == :session and Enum.all?(options, fn {_, n} -> is_integer(n) and n >= 0 end)),
-       do: :ok,
-       else:
-         error(
-           "requests",
-           "Idle and heartbeat intervals require session mode and non-negative milliseconds"
-         )
+    if Enum.all?(options, fn {_, n} -> is_integer(n) and n >= 0 end),
+      do: :ok,
+      else:
+        error(
+          "controls",
+          "Idle and heartbeat intervals must be non-negative milliseconds"
+        )
   end
 
   defp memory(value) do
@@ -863,21 +800,29 @@ defmodule Jido.AI.Profile do
   end
 
   defp controls(value) do
-    with {:ok, value} <- fields(value, Map.keys(@limits) ++ @stages, "controls"),
+    with {:ok, value} <-
+           fields(value, Map.keys(@limits) ++ @stages ++ [:steering, :idle_timeout, :tool_heartbeat], "controls"),
          value = normalize_method_defaults(value),
          limits = Map.merge(@limits, Map.take(value, Map.keys(@limits))),
          true <- Enum.all?(limits, &valid_limit?/1),
+         activity =
+           Map.merge(
+             %{steering: false, idle_timeout: 0, tool_heartbeat: 0},
+             Map.take(value, [:steering, :idle_timeout, :tool_heartbeat])
+           ),
+         true <- is_boolean(activity.steering),
+         :ok <- activity_options(activity),
          {:ok, stages} <-
            traverse(@stages, fn stage ->
              with {:ok, checks} <- traverse(Map.get(value, stage, []), &control/1),
                   do: {:ok, {stage, checks}}
            end) do
-      {:ok, Map.merge(limits, Map.new(stages))}
+      {:ok, limits |> Map.merge(activity) |> Map.merge(Map.new(stages))}
     else
       false ->
         error(
           "controls",
-          "Limits must be positive; count limits can use :method_default; max_iterations cannot exceed 10000"
+          "Limits must be positive; count limits can use :method_default; max_iterations cannot exceed 10000; steering must be boolean"
         )
 
       error ->

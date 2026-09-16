@@ -5,7 +5,7 @@
 ## Status
 
 - Reviewed: 2026-09-15.
-- Code for the example audit: `v3-spike`, HEAD `7bb011e98349af8bf580e7b93afa60990972beae`, plus uncommitted example, test, formatter, and documentation changes. No `lib/` or dependency changes.
+- Code baseline: `v3-spike`, HEAD `4ed6402f`, plus uncommitted runtime, test, example, and documentation refinement. Dependency pins are unchanged.
 - Prerequisite alignments used: [10 Authoring and portable definitions](../10_authoring_definitions/alignment.md), [11 Checkpoints and resume](../11_checkpoints_resume/alignment.md).
 - Alignment state: Draft. Current ownership is mapped; target decisions and full acceptance proof remain.
 - Verification: the example-driven review below adds fresh MockLLM runs to the earlier source review. Earlier statements that no tests ran refer to that prior review, not this follow-up.
@@ -14,7 +14,7 @@
 
 Telemetry and transport sanitizers redact and bound values differently. Typed Signal and stream projections exist. Inspection separates committed records from live samples and bounds retained traces. Current observation tests deliberately preserve some nested tool_result content; the strict content-free telemetry target is therefore not fully met.
 
-- Current owner: Observe, sanitization, Runtime.Event/Telemetry, typed Signal projections, Request metadata, and Orchestration.Inspection.
+- Current owner: Observe, sanitization, Observe.Event/Telemetry, typed Signal projections, Request metadata, and Orchestration.Inspection.
 - Cross-package ownership: core Jido owns Agent commit and topology; Flow/Exec and Signal internals remain in their respective packages.
 - Overall placement: [architecture overview](../ARCHITECTURE.md).
 - Full target: [design](design.md). Preserve a complete versioned event contract, request/model/tool/delegation lineage, safe default projections, explicit rich-content policy, bounded diagnostics, and compatibility testing.
@@ -27,7 +27,7 @@ Telemetry and transport sanitizers redact and bound values differently. Typed Si
 | --- | --- |
 | [lib/jido_ai/observe.ex](../../../lib/jido_ai/observe.ex) | Telemetry boundary |
 | [lib/jido_ai/observe/sanitize.ex](../../../lib/jido_ai/observe/sanitize.ex) | Telemetry/transport profiles |
-| [lib/jido_ai/runtime/event.ex](../../../lib/jido_ai/runtime/event.ex) | Runtime event projection |
+| [lib/jido_ai/observe/event.ex](../../../lib/jido_ai/observe/event.ex) | Runtime event projection |
 | [lib/jido_ai/signal.ex](../../../lib/jido_ai/signal.ex) | Typed Signal facade |
 | [lib/jido_ai/orchestration/inspection.ex](../../../lib/jido_ai/orchestration/inspection.ex) | Committed/live inspection |
 
@@ -58,7 +58,7 @@ requirement associations are not carried forward as proof.
 
 | Gap | Requirement or proposal | Current evidence or difference | State | Required outcome and owner |
 | --- | --- | --- | --- | --- |
-| `OBS-GAP-001` | `OBS-REQ-001` | Runtime.Event and typed projections exist; there is no single public Event value matching all proposed fields. | Partially implemented | Keep event semantics and versioning work. |
+| `OBS-GAP-001` | `OBS-REQ-001` | Observe.Event and typed projections exist; there is no single public Event value matching all proposed fields. | Partially implemented | Keep event semantics and versioning work. |
 | `OBS-GAP-002` | `OBS-REQ-002`, `OBS-REQ-003`, `OBS-REQ-004`, `OBS-REQ-005`, `OBS-REQ-007`, `OBS-REQ-009` | Lifecycle IDs and measurements exist. A complete finite vocabulary and correlation matrix remains. | Implemented; evidence incomplete | Retain per-event schema and measurement proof. |
 | `OBS-GAP-003` | `OBS-REQ-006` | ReAct run identity is retained across resume rather than replaced with linked identity. | Decision required | Resolve with 11 before asserting OBS-REQ-006. |
 | `OBS-GAP-004` | `OBS-REQ-008`, `OBS-REQ-022` | observe_test explicitly preserves nested tool_result payload fields after sanitization. | Decision required | Review the strict no-content default against current consumers. |
@@ -177,7 +177,7 @@ and `stream_content: true` for public streams. These permissions are independent
 Known credential keys are removed even when content is permitted.
 
 Execution uses native data. Retained history uses omission markers when content
-is removed. Later model continuation returns `conversation_content_not_retained`
+is removed. Later model continuation returns `context_content_not_retained`
 instead of fabricating missing input. Standalone checkpoint export is withheld
 when the native payload cannot satisfy storage and stream permissions. The
 private standalone Agent is a live execution resource, not an exported store.

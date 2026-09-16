@@ -18,7 +18,6 @@ defmodule JidoAI.Examples.Planning.Agent do
             model: JidoAI.Examples.MockLLM.model(),
             reasoning: :chain_of_thought,
             controls: %{timeout: 5_000, max_model_calls: 2},
-            requests: %{mode: :session, streaming: true},
             result: %{into: :review}
           })
       ]

@@ -48,7 +48,7 @@ defmodule JidoAITest.Authoring.Agents.OutputLimitsTest do
         assert agent.state.reply == %{answer: "Repaired"}
       else
         assert {:error, _} = result
-        assert Jido.AgentServer.agent(server).state === spec.initial
+        assert Map.delete(Jido.AgentServer.agent(server).state, :requests) === Map.delete(spec.initial, :requests)
       end
 
       assert length(MockLLM.report(mock).requests) == 2
@@ -73,7 +73,7 @@ defmodule JidoAITest.Authoring.Agents.OutputLimitsTest do
       {:ok, server} = Jido.start_agent(jido, transport(source, form))
       assert {:error, _} = call(server, mock)
       assert_received {:authoring_tool, 3}
-      assert Jido.AgentServer.agent(server).state === spec.initial
+      assert Map.delete(Jido.AgentServer.agent(server).state, :requests) === Map.delete(spec.initial, :requests)
       assert %{remaining: [], unexpected: [], requests: [_]} = MockLLM.report(mock)
     end
   end
@@ -90,7 +90,7 @@ defmodule JidoAITest.Authoring.Agents.OutputLimitsTest do
       )
 
     {:ok, server} = Jido.start_agent(jido, source)
-    assert {:ok, _} = call(server, mock, "timed")
+    assert {:ok, _} = admit(server, mock, "timed")
     assert_receive {:mock_llm_waiting, ^mock, :deadline, provider}, 5_000
     monitor = Process.monitor(provider)
     assert {:ok, record} = Jido.AI.Orchestration.await(server, "timed", 5_000)
@@ -103,7 +103,12 @@ defmodule JidoAITest.Authoring.Agents.OutputLimitsTest do
     assert %{remaining: [], unexpected: [], requests: [_, _]} = MockLLM.report(mock)
   end
 
-  defp call(server, mock, id \\ "request"),
+  defp call(server, mock, id \\ Jido.Signal.ID.generate!()) do
+    with {:ok, agent} <- admit(server, mock, id),
+         do: Jido.AI.Test.Requests.await_agent(server, agent)
+  end
+
+  defp admit(server, mock, id),
     do:
       Jido.AgentServer.call(
         server,

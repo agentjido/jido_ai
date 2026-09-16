@@ -61,7 +61,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
     run_id = Keyword.get(opts, :run_id, "run_#{Jido.Signal.ID.generate!()}")
 
     context =
-      conversation([%{role: :user, content: query}], system_prompt)
+      context([%{role: :user, content: query}], system_prompt)
 
     attrs = %{
       run_id: run_id,
@@ -341,7 +341,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
   end
 
   @doc false
-  def conversation(entries, prompt) do
+  def context(entries, prompt) do
     Jido.AI.Thread.Projection.append_entries(Thread.new(metadata: %{system_prompt: prompt}), entries)
   end
 

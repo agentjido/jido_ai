@@ -27,7 +27,7 @@ defmodule JidoAITest.Authoring.Agents.AuthoringTest do
         assert profile.instructions == "Use the case facts."
         assert profile.controls.timeout == 5_000
         assert profile.result.into == source.result.into
-        assert profile.requests.mode == if(variant == :session, do: :session, else: :turn)
+        refute Map.has_key?(profile, :requests)
       end
 
       instance = Agent.instantiate!(definition, id: "instance")

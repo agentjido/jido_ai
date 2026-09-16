@@ -7,9 +7,10 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   Model and tool checkpoints resume through the shared Flow with fresh runtime
   resources.
   """
-  alias Jido.AI.{Request, Orchestration}
+  alias Jido.AI.Request
+  alias Jido.AI.Orchestration
   alias Jido.AI.Reasoning.ReAct.{Authoring, Checkpoint, Config, State, Token}
-  alias Jido.AI.Runtime.Event
+  alias Jido.AI.Observe.Event
   alias Jido.AgentServer, as: Server
 
   @terminal [:completed, :failed, :cancelled]
@@ -182,6 +183,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
                  request_id: state.request_id,
                  run_id: state.run_id,
                  stream_to: self(),
+                 stream: config.streaming,
                  context:
                    context
                    |> Orchestration.caller_context()
@@ -365,7 +367,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     # history. Keep the omission marker; token export must then be withheld.
     {:ok, entries} = Jido.AI.Thread.Projection.project(agent.state[profile.memory.history] || Jido.Session.new())
 
-    context = State.conversation(entries, config.system_prompt)
+    context = State.context(entries, config.system_prompt)
 
     status =
       case event.kind do
@@ -398,7 +400,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         checkpoint: checkpoint,
         iteration:
           if(checkpoint,
-            do: Jido.AI.Runtime.State.iteration(checkpoint.runtime, checkpoint.phase),
+            do: Jido.AI.Execution.State.iteration(checkpoint.runtime, checkpoint.phase),
             else: Map.get(record.meta, :reasoning_iteration, state.iteration)
           ),
         context: context,

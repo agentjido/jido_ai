@@ -4,7 +4,7 @@ defmodule Jido.AI.Observe.Content do
   alias ReqLLM.Message.ContentPart
   @reasoning ~w(reasoning_details thinking_content streaming_thinking thinking_trace last_thinking)
   @rich ~w(arguments prepared_arguments tool_context base_tool_context)
-  @diagnostic ~w(content text query prompt result value answer conversation streaming_text system_prompt instructions delta)
+  @diagnostic ~w(content text query prompt result value answer context conversation streaming_text system_prompt instructions delta)
   @media [:image, :image_url, :video_url, :file]
   @omitted "[Content not retained]"
 

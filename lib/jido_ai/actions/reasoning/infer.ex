@@ -54,7 +54,7 @@ defmodule Jido.AI.Actions.Reasoning.Infer do
   def vsn, do: "1.0.0"
 
   alias Jido.AI.Actions.Helpers
-  alias Jido.AI.Turn
+  alias Jido.AI.Model.Response
   alias Jido.AI.Validation
   alias ReqLLM.Context
 
@@ -161,7 +161,7 @@ defmodule Jido.AI.Actions.Reasoning.Infer do
   end
 
   defp format_result(response, model) do
-    text = Turn.extract_text(response)
+    text = Response.extract_text(response)
 
     %{
       result: text,

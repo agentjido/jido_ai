@@ -18,11 +18,6 @@ defmodule JidoAI.Examples.AoT.Agent do
         output(JidoAI.Examples.AoT.Check)
       end
 
-      requests do
-        mode(:session)
-        streaming(true)
-      end
-
       observability do
         store_content true
       end

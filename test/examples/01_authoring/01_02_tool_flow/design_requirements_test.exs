@@ -27,7 +27,7 @@ defmodule JidoAI.Examples.ToolFlow.DesignRequirementsTest do
       ])
 
     signal = Jido.Signal.new!("ai.ask", %{query: "Price"}, source: "/examples/receipt")
-    assert {:ok, agent} = Server.call(server, signal, context: context)
+    assert {:ok, agent} = Jido.AI.Test.Requests.call_and_await(server, signal, context: context)
     assert agent.state.answer == "Price is 6"
     assert_script_done(mock)
     [_, final] = MockLLM.report(mock).requests
@@ -45,7 +45,7 @@ defmodule JidoAI.Examples.ToolFlow.DesignRequirementsTest do
       ])
 
     server = start_agent(jido, Agent.new!())
-    outcome = Agent.calculate(server, "Use an unavailable tool", context: context)
+    outcome = ask_and_await(Agent, server, "Use an unavailable tool", context: context)
     assert {:ok, agent} = outcome
     assert agent.state.answer == "I cannot use that tool."
     [_, wire] = MockLLM.report(mock).requests
@@ -73,7 +73,7 @@ defmodule JidoAI.Examples.ToolFlow.DesignRequirementsTest do
       ])
 
     server = start_agent(jido, Agent.new!())
-    assert {:ok, agent} = Agent.calculate(server, "Use both tools", context: context)
+    assert {:ok, agent} = ask_and_await(Agent, server, "Use both tools", context: context)
     assert agent.state.answer == "The batch was rejected."
     refute_received {:example_tool_started, _}
     [_, wire] = MockLLM.report(mock).requests

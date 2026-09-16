@@ -1,6 +1,6 @@
 # Request Lifecycle And Concurrency
 
-You need concurrent requests without single-slot state overwrites.
+Each Agent accepts one active AI request. Use separate Agents for concurrent work.
 
 After this guide, you will use request handles (`ask/await`) and collect multiple results safely.
 
@@ -10,11 +10,23 @@ After this guide, you will use request handles (`ask/await`) and collect multipl
 
 ```elixir
 {:ok, req1} = MyApp.MathAgent.ask(pid, "2 + 2")
-{:ok, req2} = MyApp.MathAgent.ask(pid, "3 + 3")
-
 {:ok, r1} = MyApp.MathAgent.await(req1)
+
+{:ok, req2} = MyApp.MathAgent.ask(pid, "3 + 3")
 {:ok, r2} = MyApp.MathAgent.await(req2)
 ```
+
+All AI Agent requests use admission, Flow execution, and settlement. A request
+can last much longer than an individual core Turn. There is no request mode.
+`ask_sync/3` combines `ask/3` and `await/2`. Core generated route helpers return
+the admission Agent revision, not a completed answer.
+
+The host setting `config :jido_ai, :max_retained_requests, 100` bounds retained
+request records. Each Coordinator captures this limit at startup. Pending records
+are kept; older terminal records are removed first.
+It is not a concurrency limit. A second request while one is pending returns
+`:busy`. Retained Context requires a declared Session/Thread history field;
+the request lifecycle alone does not enable it.
 
 Per-request ReAct overrides travel with the request handle:
 
@@ -42,7 +54,12 @@ end
 {:ok, result} = MyApp.MathAgent.await(request)
 ```
 
-The enumerable yields `%Jido.AI.Runtime.Event{}` values and stops after
+`ask_stream/3` selects provider streaming for this call. No Profile flag is
+needed. `ask/3` and `ask_sync/3` use buffered model calls by default. All three
+helpers use the same Agent and request lifecycle. A provider that cannot stream
+returns its normal error; the runtime does not silently retry as a buffered call.
+
+The enumerable yields `%Jido.AI.Observe.Event{}` values and stops after
 `:request_completed`, `:request_failed`, or `:request_cancelled`.
 
 For mailbox-oriented integrations, pass a pid sink directly:
@@ -54,7 +71,7 @@ For mailbox-oriented integrations, pass a pid sink directly:
   )
 
 receive do
-  {:jido_ai_request_event, %Jido.AI.Runtime.Event{} = event} ->
+  {:jido_ai_request_event, %Jido.AI.Observe.Event{} = event} ->
     IO.inspect(event.kind)
 end
 ```
@@ -62,6 +79,11 @@ end
 Pid sinks are request-scoped and use the calling process mailbox. They do not
 provide backpressure; keep handlers lightweight and always consume terminal
 events so request streams close cleanly.
+
+A sink selects provider streaming by default. Add `stream: false` to collect
+lifecycle events without model deltas. Conversely, `stream: true` can select
+provider streaming without a sink. Inspection reports the selected request's
+provider mode as `details.streaming`, not as Profile configuration.
 
 ### Stream Sinks And Durable Checkpoints
 
@@ -95,6 +117,8 @@ a new stream.
 
 `ask/await` remains the request API. Mid-run steering is a separate control path:
 
+Enable it with `controls do; steering true; end` in the ReAct Profile.
+
 ```elixir
 {:ok, request} = MyApp.MathAgent.ask(pid, "Work on Q1")
 
@@ -118,8 +142,8 @@ Important:
 ## Runtime Contract Map
 
 - `Jido.AI.Request`: request handles, `await/2`, `await_many/2`, request state lifecycle.
-- `Jido.AI.Turn`: normalized response shape and assistant/tool message projection.
-- `Jido.Session` and `Jido.Thread`: canonical conversation values; `Jido.AI.Thread.Projection` projects model messages.
+- `Jido.AI.Model.Response`: normalized response shape and assistant/tool message projection.
+- `Jido.Session` and `Jido.Thread`: canonical context values; `Jido.AI.Thread.Projection` projects model messages.
 - `Jido.AI.steer/3` and `Jido.AI.inject/3`: explicit control path for active ReAct runs.
 - AI model and tool work runs through Actions and the Session runtime.
 
@@ -137,7 +161,8 @@ results = Jido.AI.Request.await_many(handles, timeout: 30_000)
 ## Runtime End-To-End Snippet
 
 ```elixir
-alias Jido.AI.{Context, Turn}
+alias Jido.AI.Context
+alias Jido.AI.Model.Response
 
 {:ok, request} = MyApp.MathAgent.ask(pid, "What is 2 + 2?")
 
@@ -147,7 +172,7 @@ context =
 
 case MyApp.MathAgent.await(request, timeout: 15_000) do
   {:ok, result_text} ->
-    turn = Turn.from_result_map(%{type: :final_answer, text: result_text})
+    turn = Response.from_result_map(%{type: :final_answer, text: result_text})
 
     updated_context =
       context

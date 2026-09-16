@@ -16,9 +16,9 @@ defmodule Jido.AI.Orchestration.Plugin do
     resources = admission.caller_context[:jido_ai_request] || %{}
     allowed = resources[:allowed_tools]
     agent = struct(Jido.Agent, %{routes: Keyword.fetch!(opts, :routes)})
-    binding = Jido.AI.Runtime.Binding.request(agent, admission.signal)
+    binding = Jido.AI.Orchestration.Binding.request(agent, admission.signal)
 
-    if match?(%{mode: :session}, binding) and not is_nil(allowed) and is_nil(opts[:skills]) do
+    if not is_nil(binding) and not is_nil(allowed) and is_nil(opts[:skills]) do
       with {:ok, profiles} <-
              Jido.AI.Configuration.profiles(
                Keyword.fetch!(opts, :profiles),
@@ -45,6 +45,11 @@ defmodule Jido.AI.Orchestration.Plugin do
     catalogs = if opts[:skills], do: GenServer.call(runtime, :skill_catalogs), else: %{}
     signal = admission.signal
     caller_context = admission.caller_context
+
+    retention_limit =
+      if Jido.AI.Orchestration.Binding.request(struct(Jido.Agent, %{routes: Keyword.fetch!(opts, :routes)}), signal),
+        do: GenServer.call(runtime, :retention_limit),
+        else: nil
 
     grant =
       if signal.type == Jido.AI.Orchestration.publish_type() do
@@ -96,13 +101,14 @@ defmodule Jido.AI.Orchestration.Plugin do
        jido_ai_request_inspection: metadata.inspection,
        jido_ai_progress: progress,
        jido_ai_history_batch: batch,
-       jido_ai_session_runtime: runtime
+       jido_ai_coordinator: runtime,
+       jido_ai_max_retained_requests: retention_limit
      }}
   end
 
   @doc false
   def context(context) do
-    with {:ok, context} <- Jido.AI.Runtime.Plugin.context(context) do
+    with {:ok, context} <- Jido.AI.Configuration.Plugin.context(context) do
       case get_in(context, [:plugin_inputs, __MODULE__]) do
         %Jido.Plugin.Input{runtime: input} when is_map(input) ->
           context = Map.merge(context, input)
@@ -123,8 +129,8 @@ defmodule Jido.AI.Orchestration.Plugin do
   def prepare_command(command) do
     # A work task gets the admission snapshot, never a caller-supplied snapshot.
     # Read the declared route binding, not profile_id supplied in Signal data.
-    binding = Jido.AI.Runtime.Binding.request(command.agent, command.signal)
-    profile_id = if match?(%{mode: :session}, binding), do: binding.id
+    binding = Jido.AI.Orchestration.Binding.request(command.agent, command.signal)
+    profile_id = if binding, do: binding.id
 
     context =
       command.context
@@ -134,6 +140,8 @@ defmodule Jido.AI.Orchestration.Plugin do
 
     if profile_id do
       resources = Map.get(context, :jido_ai_request, %{})
+      resources = Map.put_new(resources, :stream, not is_nil(resources[:stream_to]))
+      context = Map.put(context, :jido_ai_request, resources)
       catalogs = Map.get(context, :jido_ai_skill_catalogs, %{})
 
       with {:ok, profiles} <-
@@ -182,7 +190,7 @@ defmodule Jido.AI.Orchestration.Plugin do
 
         retained =
           Enum.sort_by(terminal, fn {id, r} -> {r.inserted_at, id} end, :desc)
-          |> Enum.take(max(record.max_requests - length(pending), 0))
+          |> Enum.take(max(record.max_retained_requests - length(pending), 0))
 
         {:cont, {:ok, Map.new(pending ++ retained)}}
       else
@@ -212,20 +220,20 @@ defmodule Jido.AI.Orchestration.Plugin do
 
     with {:ok, profile} <- Jido.AI.Configuration.profile(committed, record.profile_id),
          snapshot = %{committed | state: start_snapshot(committed.state, profile, record)},
-         {Jido.AI.Runtime.Plugin, opts} <-
-           Enum.find(snapshot.plugins, &(elem(&1, 0) == Jido.AI.Runtime.Plugin)),
+         {Jido.AI.Configuration.Plugin, opts} <-
+           Enum.find(snapshot.plugins, &(elem(&1, 0) == Jido.AI.Configuration.Plugin)),
          command = %Jido.Agent.Command{
            agent: snapshot,
            signal: context.effective_signal,
            context: context.turn_context
          },
-         {:ok, command} <- Jido.AI.Runtime.Plugin.prepare_command(command, opts),
+         {:ok, command} <- Jido.AI.Configuration.Plugin.prepare_command(command, opts),
          catalogs = GenServer.call(runtime, :skill_catalogs),
          command = %{command | context: Map.put(command.context, :jido_ai_skill_catalogs, catalogs)},
          {:ok, command} <- prepare_command(command) do
       turn_context =
         command.context
-        |> Map.put(:jido_ai_session_runtime, runtime)
+        |> Map.put(:jido_ai_coordinator, runtime)
 
       turn_context =
         case Jido.AI.Plugins.Quota.binding_for_agent(snapshot, context.effective_signal) do

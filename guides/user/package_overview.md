@@ -62,10 +62,6 @@ ai :assistant do
     options(branching_factor: 3, max_depth: 4, top_k: 3)
   end
 
-  requests do
-    mode(:session)
-  end
-
   result(nil, into: :answer)
 end
 ```
@@ -96,7 +92,7 @@ Plugins should represent product capabilities, not low-level runtime plumbing.
 Recommended plugin set (target production surface):
 
 1. `Jido.AI.Plugins.Chat` (anchor capability)
-   - Unified conversational interface with built-in tool calling.
+   - Unified contextal interface with built-in tool calling.
    - Replaces split end-user mental model of separate `LLM` + `ToolCalling` plugins.
    - Supports simple chat usage and tool-augmented chat under one contract.
 2. `Jido.AI.Plugins.Planning`
@@ -140,7 +136,7 @@ Standalone actions are the strategy-independent integration path for adding AI b
 Finalized standalone action set (recommended):
 
 1. Core generation primitives
-   - `Jido.AI.Actions.LLM.Chat` (single-turn conversational generation)
+   - `Jido.AI.Actions.LLM.Chat` (single-turn contextal generation)
    - `Jido.AI.Actions.LLM.GenerateObject` (schema-constrained structured output)
    - `Jido.AI.Actions.LLM.Embed` (embedding generation for retrieval/search)
 2. Tool orchestration primitives

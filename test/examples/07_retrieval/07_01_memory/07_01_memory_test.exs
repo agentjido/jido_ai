@@ -61,7 +61,9 @@ defmodule JidoAI.Examples.RetrievalTest do
     prompt = [ContentPart.text("Tokyo weather"), image]
 
     assert {:ok, _agent} =
-             Server.call(server, Example.signal("case.review", %{query: prompt}), context: context)
+             Jido.AI.Test.Requests.call_and_await(server, Example.signal("case.review", %{query: prompt}),
+               context: context
+             )
 
     assert [request] = MockLLM.report(mock).requests
     content = List.last(request.body["messages"])["content"]
@@ -78,7 +80,7 @@ defmodule JidoAI.Examples.RetrievalTest do
     server = start_agent(jido, definition)
 
     assert {:ok, agent} =
-             Server.call(
+             Jido.AI.Test.Requests.call_and_await(
                server,
                Example.signal(
                  "case.review",
@@ -329,13 +331,15 @@ defmodule JidoAI.Examples.RetrievalTest do
     before = Server.agent(server).state
 
     assert {:error, _} =
-             Server.call(server, Example.signal("case.review", %{query: "Tokyo"}), context: context)
+             Jido.AI.Test.Requests.call_and_await(server, Example.signal("case.review", %{query: "Tokyo"}),
+               context: context
+             )
 
     assert Server.agent(server).state == before
     assert MockLLM.report(mock).requests == []
 
     assert {:ok, _} =
-             Server.call(
+             Jido.AI.Test.Requests.call_and_await(
                server,
                Example.signal("case.review", %{query: "Tokyo", disable_retrieval: true}),
                context: context
@@ -355,7 +359,9 @@ defmodule JidoAI.Examples.RetrievalTest do
              )
 
     assert {:ok, agent} =
-             Server.call(server, Example.signal("case.review", %{query: "Tokyo weather"}), context: context)
+             Jido.AI.Test.Requests.call_and_await(server, Example.signal("case.review", %{query: "Tokyo weather"}),
+               context: context
+             )
 
     assert agent.state.result == "Take a coat"
     assert [request] = MockLLM.report(mock).requests
@@ -373,7 +379,7 @@ defmodule JidoAI.Examples.RetrievalTest do
 
     for id <- ["first", "second"] do
       assert {:ok, _} =
-               Server.call(
+               Jido.AI.Test.Requests.call_and_await(
                  server,
                  Example.signal("case.review", %{query: "Tokyo weather", request_id: id}),
                  context: context
@@ -461,7 +467,7 @@ defmodule JidoAI.Examples.RetrievalTest do
     server = start_agent(jido, Example.Agent.new!())
 
     assert {:ok, agent} =
-             Server.call(
+             Jido.AI.Test.Requests.call_and_await(
                server,
                Example.signal(
                  "case.review",

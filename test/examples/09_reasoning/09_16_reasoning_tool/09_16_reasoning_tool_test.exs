@@ -43,7 +43,9 @@ defmodule JidoAI.Examples.ReasoningToolTest do
 
     for {scope, max, expected} <- [{"raw_allowed", 3, :success}, {"raw_denied", 1, :failure}] do
       base =
-        Map.put(Example.base(), :plugins, [{Jido.AI.Plugins.Quota, [scope: scope, max_requests: max, into: :reply]}])
+        Map.put(Example.base(), :plugins, [
+          {Jido.AI.Plugins.Quota, [scope: scope, max_requests: max, into: :reply]}
+        ])
 
       assert {:ok, definition} = Jido.AI.Authoring.lower(base, [Example.source()])
       server = start_agent(jido, definition)
@@ -136,7 +138,6 @@ defmodule JidoAI.Examples.ReasoningToolTest do
         model: MockLLM.model(),
         reasoning: :chain_of_thought,
         controls: %{timeout: 5_000},
-        requests: %{mode: :session},
         result: %{into: :answer}
       })
 

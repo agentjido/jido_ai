@@ -79,10 +79,6 @@ defmodule Jido.AI.Test.StateMigration.Agent do
         action(Jido.AI.Test.StateMigration.Update, as: :state_update, forward_context: [:observer, :agent_state])
       end
 
-      requests do
-        mode(:session)
-      end
-
       memory do
         history(:messages)
       end

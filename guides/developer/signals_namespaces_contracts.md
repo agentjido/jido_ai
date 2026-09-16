@@ -32,7 +32,7 @@ Typed signal modules define payload contracts and canonical signal types:
 - `Jido.AI.Signal.ToolResult` -> `ai.tool.result`
 - `Jido.AI.Signal.EmbedResult` -> `ai.embed.result`
 - `Jido.AI.Signal.Usage` -> `ai.usage`
-- `Jido.AI.Runtime.Event` is the strategy-independent runtime event envelope.
+- `Jido.AI.Observe.Event` is the strategy-independent runtime event envelope.
 
 ## Lifecycle Notes
 
@@ -91,7 +91,7 @@ Fix:
 
 - canonical list lives in module type declarations (`Jido.AI.Signal.*`) and strategy/plugin route declarations (`signal_routes/1`, plugin `signal_types/0`)
 - V3 signal payload schemas are the only supported contract
-- runtime event envelopes are strategy-agnostic via `Jido.AI.Runtime.Event`
+- runtime event envelopes are strategy-agnostic via `Jido.AI.Observe.Event`
 
 ## When To Use / Not Use
 

@@ -1,6 +1,7 @@
 defmodule Jido.AI.Reasoning.Adaptive.Selection do
   @moduledoc false
-  alias Jido.AI.{Profile, Reasoning}
+  alias Jido.AI.Profile
+  alias Jido.AI.Reasoning
 
   @methods %{
     cod: :chain_of_draft,

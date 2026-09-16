@@ -1,6 +1,7 @@
 defmodule Jido.AI.Configuration do
   @moduledoc "Portable profile overrides. Active requests keep their admission snapshot."
-  alias Jido.AI.{Profile, ToolCatalog}
+  alias Jido.AI.Profile
+  alias Jido.AI.ToolCatalog
   alias Jido.AI.Configuration.Change
   @key :jido_ai_config
   @type_name "jido.ai.configure"
@@ -13,7 +14,7 @@ defmodule Jido.AI.Configuration do
   end
 
   def options(agent) do
-    case Enum.find(agent.plugins, &(elem(&1, 0) == Jido.AI.Runtime.Plugin)) do
+    case Enum.find(agent.plugins, &(elem(&1, 0) == Jido.AI.Configuration.Plugin)) do
       {_, opts} -> {:ok, opts}
       _ -> Profile.error("profile", "Agent has no AI profiles")
     end

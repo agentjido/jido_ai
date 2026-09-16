@@ -8,7 +8,7 @@ separate plugin stack or Strategy contract.
 - A `Jido.Action` is one executable operation.
 - A `Jido.Plugin` adds reusable state and command handling to an Agent.
 - A `Jido.AI.Profile` defines inert AI policy.
-- `Jido.AI.Orchestration` and `Jido.AI.Runtime` own live AI request execution.
+- `Jido.AI.Orchestration` and `Jido.AI.Execution` own live AI request execution.
 
 Declare ordinary plugins in the Agent block:
 
@@ -29,10 +29,6 @@ defmodule MyApp.Assistant do
 
       reasoning :react do
         model(:answer)
-      end
-
-      requests do
-        mode(:session)
       end
 
       result(nil, into: :answer)

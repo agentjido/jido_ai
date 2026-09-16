@@ -11,7 +11,7 @@ defmodule Jido.AI.Orchestration.Transcript do
   def refs(record, source) do
     record.extra_refs
     |> Map.drop([:request_id, :run_id, :signal_id, "request_id", "run_id", "signal_id"])
-    |> Map.merge(%{request_id: record.id, run_id: record.run_id, conversation: :pending})
+    |> Map.merge(%{request_id: record.id, run_id: record.run_id, context: :pending})
     |> Map.put(:source, source)
     |> Jido.AI.Skill.Runtime.untrusted_refs()
   end
@@ -26,7 +26,7 @@ defmodule Jido.AI.Orchestration.Transcript do
       %Jido.Session{} = session ->
         with {:ok, entries} <- Projection.project(session) do
           if Enum.any?(entries, &(get_in(&1, [:refs, :content_omitted]) == true)),
-            do: {:error, :conversation_content_not_retained},
+            do: {:error, :context_content_not_retained},
             else: {:ok, entries}
         end
 
@@ -96,13 +96,13 @@ defmodule Jido.AI.Orchestration.Transcript do
               refs
               |> Map.merge(existing || %{})
               |> Map.drop([:signal_id, "request_id", "run_id", "signal_id"])
-              |> Map.merge(%{request_id: record.id, run_id: record.run_id, conversation: :pending})
+              |> Map.merge(%{request_id: record.id, run_id: record.run_id, context: :pending})
             end)
           )
       end
 
     result =
-      if Map.get(context, :jido_ai_session, false) and state.profile.memory.history != nil,
+      if Map.get(context, :jido_ai_managed, false) and state.profile.memory.history != nil,
         do: Jido.AI.Orchestration.publish_history(context, entries),
         else: :ok
 

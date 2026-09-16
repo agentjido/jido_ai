@@ -57,7 +57,6 @@ defmodule Jido.AI.Plugins.Reasoning.GraphOfThoughtsTest do
     Jido.AI.Profile.new!(%{
       id: :review,
       reasoning: :graph_of_thoughts,
-      requests: %{mode: :session},
       result: %{into: :result}
     })
   end

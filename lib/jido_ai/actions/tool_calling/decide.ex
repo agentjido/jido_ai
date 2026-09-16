@@ -1,15 +1,15 @@
 defmodule Jido.AI.Actions.ToolCalling.Decide do
   @moduledoc false
   use Jido.Action, name: "tool_calling_decide"
-  alias Jido.AI.Turn
+  alias Jido.AI.Model.Response
 
   def run(%{failure: failure}, _) when not is_nil(failure), do: {:error, failure}
 
   def run(state, _) do
-    result = Turn.to_result_map(state.turn)
+    result = Response.to_result_map(state.turn)
 
     cond do
-      not state.auto_execute or not Turn.needs_tools?(state.turn) ->
+      not state.auto_execute or not Response.needs_tools?(state.turn) ->
         result =
           if state.round == 0,
             do: result,
@@ -37,7 +37,7 @@ defmodule Jido.AI.Actions.ToolCalling.Decide do
 
   defp serialize(messages) do
     Enum.map(messages, fn message ->
-      %{role: message.role, content: Turn.extract_from_content(message.content)}
+      %{role: message.role, content: Response.extract_from_content(message.content)}
       |> optional(:name, message.name)
       |> optional(:tool_call_id, message.tool_call_id)
       |> optional(:tool_calls, message.tool_calls)

@@ -12,7 +12,7 @@ defmodule Jido.AI.Reasoning.ChainOfDraft.StrategyTest do
     mock = mock([%{reply: {:wait, :held, {:text, "#### Done"}}}])
     server = start_reasoning(jido, :chain_of_draft)
     signal = Jido.Signal.new!("ai.cod.query", %{query: "Draft"}, source: "/test")
-    assert %{id: :assistant, mode: :session} = Jido.AI.Authoring.request_binding(Server.agent(server), signal)
+    assert %{id: :assistant} = Jido.AI.Authoring.request_binding(Server.agent(server), signal)
     assert {:ok, handle} = request(server, mock, :chain_of_draft)
     assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
     assert Process.alive?(owner(server))

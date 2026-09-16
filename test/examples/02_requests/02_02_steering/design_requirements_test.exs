@@ -1,6 +1,7 @@
 defmodule JidoAI.Examples.Steering.DesignRequirementsTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Orchestration, Request}
+  alias Jido.AI.Orchestration
+  alias Jido.AI.Request
   alias JidoAI.Examples.Steering.Agent
 
   # Target assertions, not characterization. Failures are catalogued in the

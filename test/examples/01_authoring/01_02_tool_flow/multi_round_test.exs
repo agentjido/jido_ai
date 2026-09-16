@@ -25,7 +25,7 @@ defmodule JidoAI.Examples.ToolFlow.MultiRoundTest do
   test "three dependent tool rounds precede the committed answer", %{jido: jido} do
     {mock, context} = native_mock(rounds() ++ [%{reply: {:text, "91, 546, and 2184 cents"}}])
     server = start_agent(jido, Agent.new!())
-    assert {:ok, agent} = Agent.calculate(server, Agent.prompt(), context: context)
+    assert {:ok, agent} = ask_and_await(Agent, server, Agent.prompt(), context: context)
     assert agent.state.answer == "91, 546, and 2184 cents"
     assert agent.state.case_id == "quote-42"
     assert Server.agent(server).state == agent.state
@@ -46,8 +46,8 @@ defmodule JidoAI.Examples.ToolFlow.MultiRoundTest do
     {mock, context} = native_mock(Enum.take(rounds(), 1) ++ [%{reply: {:error, 400, "Rejected"}}])
     server = start_agent(jido, Agent.new!())
     before = Server.agent(server).state
-    assert {:error, _} = Agent.calculate(server, Agent.prompt(), context: context)
-    assert Server.agent(server).state == before
+    assert {:error, _} = ask_and_await(Agent, server, Agent.prompt(), context: context)
+    assert_domain_unchanged(server, before)
     assert_script_done(mock)
   end
 end

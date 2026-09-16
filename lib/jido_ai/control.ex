@@ -15,7 +15,7 @@ defmodule Jido.AI.Control do
           if remaining > 0,
             do:
               Jido.Exec.run(
-                Jido.AI.Runtime.CheckControl,
+                Jido.AI.Execution.CheckControl,
                 %{module: module, stage: stage, value: value},
                 context,
                 timeout: remaining

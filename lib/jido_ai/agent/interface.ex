@@ -2,46 +2,26 @@ defmodule Jido.AI.Agent.Interface do
   @moduledoc false
 
   def ask(module, server, query, opts) do
-    with {:ok, profile, route} <- request_route(module, opts) do
-      case profile.requests.mode do
-        :session ->
-          Jido.AI.Request.create_and_send(
-            server,
-            query,
-            Keyword.merge(opts, signal_type: route.path, source: "/jido/ai/agent")
-          )
-
-        :turn ->
-          signal = Jido.Signal.new!(route.path, %{query: query}, source: "/jido/ai/agent")
-
-          with {:ok, agent} <-
-                 Jido.AgentServer.call(server, signal,
-                   timeout: opts[:timeout] || 30_000,
-                   context: Keyword.get(opts, :context, %{})
-                 ) do
-            {:ok, Map.fetch!(agent.state, profile.result.into)}
-          end
-      end
+    with {:ok, _profile, route} <- request_route(module, opts) do
+      Jido.AI.Request.create_and_send(
+        server,
+        query,
+        Keyword.merge(opts, signal_type: route.path, source: "/jido/ai/agent")
+      )
     end
   end
 
   def ask_sync(module, server, query, opts) do
-    with {:ok, profile, _route} <- request_route(module, opts),
-         {:ok, result} <- ask(module, server, query, opts) do
-      if profile.requests.mode == :session,
-        do: Jido.AI.Request.await(result, opts),
-        else: {:ok, result}
+    with {:ok, request} <- ask(module, server, query, opts) do
+      Jido.AI.Request.await(request, opts)
     end
   end
 
   def ask_stream(module, server, query, opts) do
-    with {:ok, profile, _route} <- request_route(module, opts),
-         true <- profile.requests.mode == :session and profile.requests.streaming,
-         {:ok, request} <- ask(module, server, query, Keyword.put(opts, :stream_to, {:pid, self()})) do
+    opts = opts |> Keyword.put(:stream, true) |> Keyword.put(:stream_to, {:pid, self()})
+
+    with {:ok, request} <- ask(module, server, query, opts) do
       {:ok, %{request: request, events: Jido.AI.Request.Stream.events(request, opts)}}
-    else
-      false -> Jido.AI.Profile.error("requests.streaming", "Select a streaming session profile")
-      error -> error
     end
   end
 
@@ -67,7 +47,7 @@ defmodule Jido.AI.Agent.Interface do
         Enum.find(module.routes(), fn route ->
           {target, defaults} = Jido.Agent.Authoring.split_target(route.target)
 
-          target in [Jido.AI.Runtime.Run, Jido.AI.Orchestration.Start] and
+          target == Jido.AI.Orchestration.Start and
             is_map(defaults) and defaults[:profile_id] == profile.id
         end)
       end

@@ -2,7 +2,7 @@ defmodule JidoAI.Examples.Retrieval do
   alias Jido.AI.Plugins.{Chat, Retrieval}
 
   def definition(opts \\ []) do
-    {mode, opts} = Keyword.pop(opts, :request_mode, :turn)
+    {_legacy_mode, opts} = Keyword.pop(opts, :request_mode, :turn)
 
     Jido.AI.Authoring.lower(
       %{
@@ -27,8 +27,7 @@ defmodule JidoAI.Examples.Retrieval do
           models: %{answer: %{model: JidoAI.Examples.MockLLM.model()}},
           reasoning: %{method: :react, model: :answer},
           controls: %{timeout: 5_000},
-          result: %{into: :result},
-          requests: %{mode: mode}
+          result: %{into: :result}
         }
       ]
     )

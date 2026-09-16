@@ -1837,7 +1837,7 @@ Turn API. Core raw/batch wrappers expose the value. Content parts remain
 separate from JSON. A supported Flow error uses the Flow package's public
 map adapter. Unsupported output kinds require an explicit consumer.
 
-The existing Turn formatter moved into `Jido.AI.Turn.Content`; the public Turn
+The existing Turn formatter moved into `Jido.AI.Model.Content`; the public Turn
 function delegates to it. A small core-output adapter reuses `PendingToolCall`
 and one ordered metadata reducer. Completed records contain IDs, arguments,
 status, native result tuples, attempts and duration. The same reducer runs in
@@ -2310,7 +2310,7 @@ the example checks the core rejection of non-JSON content-part data. Events
 without an existing typed AI Signal produce no new type. DSL, data, Builder
 and source JSON execute the same request and produce the same payloads.
 
-The shared `Jido.AI.Turn` module is now compiled on v3. Its response, content,
+The shared `Jido.AI.Model.Response` module is now compiled on v3. Its response, content,
 tool-message and direct execution APIs remain. Direct tools use core Exec,
 shared declared-key/enum input conversion and the shared ToolResult envelope.
 Real validation and timeout cleanup are checked. Core's no-retry timeout

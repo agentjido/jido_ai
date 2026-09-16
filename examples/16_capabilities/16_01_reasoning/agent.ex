@@ -21,7 +21,6 @@ defmodule JidoAI.Examples.ReasoningCapabilities.Agent do
               max_model_calls: :method_default,
               max_tool_calls: :method_default
             },
-            requests: %{mode: :session, streaming: true},
             result: %{into: :result}
           })
       ]
@@ -39,7 +38,6 @@ defmodule JidoAI.Examples.ReasoningCapabilities.Agent do
               max_model_calls: :method_default,
               max_tool_calls: :method_default
             },
-            requests: %{mode: :session, streaming: true},
             result: %{into: :review}
           })
       ]

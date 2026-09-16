@@ -55,7 +55,10 @@ defmodule Jido.AI.DSL do
       max_iterations: [type: {:or, [:pos_integer, {:in, [:method_default]}]}, default: 8],
       max_model_calls: [type: {:or, [:pos_integer, {:in, [:method_default]}]}, default: 12],
       max_tool_calls: [type: {:or, [:pos_integer, {:in, [:method_default]}]}, default: 16],
-      timeout: [type: :pos_integer, default: 60_000]
+      timeout: [type: :pos_integer, default: 60_000],
+      steering: [type: :boolean, default: false],
+      idle_timeout: [type: :non_neg_integer, default: 0],
+      tool_heartbeat: [type: :non_neg_integer, default: 0]
     ],
     entities:
       Enum.map([:input, :model, :operation, :output], fn stage ->
@@ -252,19 +255,6 @@ defmodule Jido.AI.DSL do
       max_repairs: [type: :non_neg_integer, default: 0]
     ]
   }
-  @requests %Spark.Dsl.Entity{
-    name: :requests,
-    target: E.Requests,
-    schema: [
-      mode: [type: :atom, default: :turn],
-      on_busy: [type: :atom, default: :reject],
-      max_requests: [type: :pos_integer, default: 100],
-      streaming: [type: :boolean, default: false],
-      steering: [type: :boolean, default: false],
-      idle_timeout: [type: :non_neg_integer],
-      tool_heartbeat: [type: :non_neg_integer]
-    ]
-  }
   @memory %Spark.Dsl.Entity{
     name: :memory,
     target: E.Memory,
@@ -306,7 +296,6 @@ defmodule Jido.AI.DSL do
       tools: [@tools],
       skills: [@skills],
       result: [@result],
-      requests: [@requests],
       memory: [@memory],
       observability: [@observability]
     ]
@@ -346,7 +335,6 @@ defmodule Jido.AI.DSL do
          {:ok, controls} <- optional(entity.controls, :controls, %E.Controls{}),
          {:ok, tools} <- optional(entity.tools, :tools, %E.Tools{}),
          {:ok, skills} <- skill_source(entity.skills),
-         {:ok, requests} <- optional(entity.requests, :requests, %E.Requests{}),
          {:ok, memory} <- optional(entity.memory, :memory, %E.Memory{}),
          {:ok, observability} <- optional(entity.observability, :observability, nil),
          roles = Enum.map(models.entries, & &1.role),
@@ -397,7 +385,6 @@ defmodule Jido.AI.DSL do
             result
             |> plain()
             |> omit_nil([:schema, :repair_fun, :repair_action, :on_validation_error]),
-          requests: requests |> plain() |> omit_nil([:idle_timeout, :tool_heartbeat]),
           memory: plain(memory),
           tools:
             tools.entries

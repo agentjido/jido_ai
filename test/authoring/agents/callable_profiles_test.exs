@@ -79,7 +79,6 @@ defmodule JidoAITest.Authoring.Agents.CallableProfilesTest do
       id: :review,
       model: MockLLM.model(),
       reasoning: :chain_of_thought,
-      requests: %{mode: :session},
       controls: %{timeout: 5_000},
       result: %{into: :answer}
     })

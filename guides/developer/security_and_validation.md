@@ -18,7 +18,9 @@ After this guide, you can apply the runtime security modules consistently.
 ## Example
 
 ```elixir
-alias Jido.AI.{Error.Sanitize, Observe, Validation}
+alias Jido.AI.Error.Sanitize
+alias Jido.AI.Observe
+alias Jido.AI.Validation
 
 with {:ok, prompt} <- Validation.validate_and_sanitize_prompt(user_input),
      {:ok, max_turns} <- Validation.validate_max_turns(requested_turns) do

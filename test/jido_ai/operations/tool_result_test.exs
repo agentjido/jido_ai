@@ -1,7 +1,8 @@
 defmodule Jido.AI.ToolResultBoundaryTest do
   use ExUnit.Case, async: true
   alias Jido.Action.Error, as: ActionError
-  alias Jido.AI.{Error, ToolResult}
+  alias Jido.AI.Error
+  alias Jido.AI.ToolResult
 
   @call %{id: "one", name: "search"}
 

@@ -16,6 +16,14 @@ Illustrative types are not evidence that a module or function exists. A
 requirement is not removed merely because the current implementation differs.
 Use the alignment matrix to distinguish current behavior from the full target.
 
+## Selected request configuration boundary
+
+The Profile `requests` block is removed. Each call selects provider streaming;
+`ask_stream/3` adds the event consumer. Profile `controls` owns steering and
+activity timers. The host owns request-record retention, captured when the
+Coordinator starts. These choices do not add another request mode or process.
+Content and reasoning permissions remain separate observability policy.
+
 ## Selected request and attempt meanings
 
 User-selected on 2026-09-15. Keep the logical request ID on retry/resume;
@@ -40,19 +48,19 @@ blocks automatic retry without evidence, supported deduplication, or explicit
 caller authority. These are meaning and policy decisions, not approval of
 this document or a new runtime framework.
 
-## Selected conversation commit policy
+## Selected context commit policy
 
 User-selected on 2026-09-15: retain execution evidence in the canonical log,
-but advance the default model conversation only after successful settlement.
+but advance the default model context only after successful settlement.
 This selects the Jidoka pattern, not its runtime or named-document approval.
 
 `SES-REQ-043`: The Orchestration Coordinator shall retain admitted input, consumed steering input, and committed intermediate work in the canonical Session/Thread log for evidence and recovery.
 
-`SES-REQ-044`: When request settlement succeeds, the Orchestration Coordinator shall advance the completed conversation used by the default model projection.
+`SES-REQ-044`: When request settlement succeeds, the Orchestration Coordinator shall advance the completed context used by the default model projection.
 
-`SES-REQ-045`: If a request fails or is cancelled, then the Orchestration Coordinator shall leave the completed conversation unchanged.
+`SES-REQ-045`: If a request fails or is cancelled, then the Orchestration Coordinator shall leave the completed context unchanged.
 
-`SES-REQ-046`: While steering input remains queued and unconsumed, the Orchestration Coordinator shall exclude it from conversation history.
+`SES-REQ-046`: While steering input remains queued and unconsumed, the Orchestration Coordinator shall exclude it from context history.
 
 `SES-REQ-047`: While a linked parent request is active, when a new delegated result is accepted, the parent Orchestration Coordinator shall append that result once to the parent Thread through core commit APIs.
 
@@ -88,7 +96,7 @@ process lifetime and ordered commit work together. Core validates and commits.
 
 [EntryBatch and CommitReceipt](../01_ai_values/design.md#proposed-entry-batch-and-receipt-values)
 supply proposed identity and order data. Safe execution positions belong to
-Runtime. Combining input and checkpoint control at those positions remains
+Execution. Combining input and checkpoint control at those positions remains
 open, as do exact tags, validation, reply compatibility, conflict handling,
 and durable recovery semantics. This is not a generic framework or event store.
 
@@ -105,7 +113,7 @@ execution data remains unchanged.
 ## Scope and owner
 
 - Owner: `Jido.AI.Request`, `Jido.AI.Orchestration`, request record Actions, Orchestration Plugin runtime, pending-input behavior, and public request convenience calls.
-- In scope: Request IDs, handles, committed records, admission, Turn and session modes, await, stream, sync, cancellation, steering, injection, settlement, retention, and inspection.
+- In scope: Request IDs, handles, committed records, admission, Asynchronous and synchronous request helpers, await, stream, sync, cancellation, steering, injection, settlement, retention, and inspection.
 - Out of scope: Generic job queues, private AgentServer protocols, durable workflows, model and tool semantics, provider transports, and durable event logs.
 
 ## V2 capability anchor
@@ -124,13 +132,9 @@ V2 supplied `ask`, `ask_sync`, request handles, await, streams, cancellation, st
 
 ## Model
 
-Profiles select one of two modes.
-
-### Turn mode
-
-One admitted query Signal resolves to the canonical AI Flow. Model and tool I/O complete before the Turn returns. Core Jido validates and commits one final candidate. Turn mode has no long-lived AI Orchestration Coordinator and does not provide live steering.
-
-### Session mode
+Profiles use one request lifecycle. Retained Session/Thread state is optional;
+it does not select a second runtime. `ask_sync` changes how the caller waits,
+not how the Agent executes the request.
 
 The request lifecycle is:
 
@@ -150,7 +154,7 @@ stateDiagram-v2
     Cancelled --> [*]
 ```
 
-The committed `Orchestration.Record` uses stable terminal status values. `Active` and `WaitingInput` are live inspection states unless the Agent commits a specific progress snapshot. The Orchestration Coordinator owns live tasks, Exec handles, stream sinks, control queues, and transient completions.
+The committed `Request.Record` uses stable terminal status values. `Active` and `WaitingInput` are live inspection states unless the Agent commits a specific progress snapshot. The Orchestration Coordinator owns live tasks, Exec handles, stream sinks, control queues, and transient completions.
 
 The public `Request.Handle` is local-only because it contains an AgentServer reference. It is not stored in Agent state or encoded. The portable request record contains IDs, query, profile and method IDs, status, terminal result or error, timestamps, bounded metadata, and retention policy.
 
@@ -170,15 +174,15 @@ The public `Request.Handle` is local-only because it contains an AgentServer ref
 
 `SES-REQ-006`: Untrusted request input shall not set a runtime stream sink, provider client, credential, or transport option.
 
-### Request modes
+### Shared request lifecycle
 
-`SES-REQ-007`: Turn mode shall execute the canonical AI Flow inside one core Turn and shall return only after the final candidate commits or the Turn fails.
+`SES-REQ-007`: Retired. The selected single request lifecycle replaces the former in-Turn mode requirement; see SES-REQ-008 through SES-REQ-010. This identifier is not reused.
 
-`SES-REQ-008`: Session mode shall commit admission before it starts model or tool work.
+`SES-REQ-008`: AI request admission shall commit before model or tool work starts.
 
-`SES-REQ-009`: Session mode shall start live work only from a validated post-commit Directive owned by the Orchestration Plugin.
+`SES-REQ-009`: The Orchestration Plugin shall start live work only from a validated post-commit Directive.
 
-`SES-REQ-010`: Turn and session modes shall use the same effective profile, model gateway, tool bridge, reasoning method, limits, output validation, and result contract.
+`SES-REQ-010`: Asynchronous and synchronous request helpers shall use the same effective profile, model gateway, tool bridge, reasoning method, limits, output validation, and result contract.
 
 ### Records and settlement
 
@@ -279,7 +283,7 @@ Recommended local handle:
 The handle is explicitly local-only. Recommended portable record:
 
 ```elixir
-%Jido.AI.Orchestration.Record{
+%Jido.AI.Request.Record{
   id: String.t(),
   run_id: String.t(),
   profile_id: atom(),

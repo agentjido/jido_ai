@@ -47,10 +47,6 @@ defmodule JidoAI.Examples.SkillRuntime.Agent do
         history(:messages)
       end
 
-      requests do
-        mode(:session)
-      end
-
       result(nil, into: :reply)
     end
   end

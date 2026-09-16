@@ -4,7 +4,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
 
   Bind a resolved `Jido.AI.Profile` in host context at
   `:jido_ai_callable_profile`. Input accepts only a nonempty string `prompt`.
-  The Profile must select session mode and a supported callable method.
+  The Profile must select a supported callable method.
   Completion, failure, and cancellation stop the private runtime.
   """
 
@@ -13,7 +13,10 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
     description: "Run a prompt with host-bound reasoning policy",
     schema: Zoi.object(%{prompt: Zoi.string() |> Zoi.min(1)}, coerce: true, unrecognized_keys: :error)
 
-  alias Jido.AI.{Authoring, Profile, Request, Orchestration}
+  alias Jido.AI.Authoring
+  alias Jido.AI.Profile
+  alias Jido.AI.Request
+  alias Jido.AI.Orchestration
   alias Jido.AgentServer, as: Server
 
   @methods %{
@@ -42,7 +45,6 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
   @doc false
   def validate_profile(%Profile{} = value) do
     with {:ok, profile} <- Profile.validate(value),
-         :ok <- callable_mode(profile),
          :ok <- callable_method(profile) do
       {:ok, profile}
     end
@@ -50,8 +52,6 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategy do
 
   def validate_profile(_), do: Profile.error("profile", "Expected a resolved Profile binding")
 
-  defp callable_mode(%{requests: %{mode: :session}}), do: :ok
-  defp callable_mode(_), do: Profile.error("requests.mode", "Callable reasoning requires session mode")
   defp callable_method(%{reasoning: %{method: method}}) when is_map_key(@methods, method), do: :ok
   defp callable_method(_), do: Profile.error("reasoning.method", "Unsupported callable method")
 

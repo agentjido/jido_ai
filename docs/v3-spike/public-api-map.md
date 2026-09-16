@@ -4,26 +4,26 @@ The live request API is `Jido.AI.Orchestration`. `Jido.Session` remains the
 portable value. See [ownership and migration](orchestration-layout.md) for the
 file layout, Coordinator boundary, and future delegation constraints.
 
-Conversation consolidation is complete. `Jido.AI.Thread.Projection` provides
+Context consolidation is complete. `Jido.AI.Thread.Projection` provides
 canonical Session/Thread message projection. Runtime history now stores Session
 values, with no second Session in Plugin lane state. Standalone ReAct and
-conversation controls use canonical Threads. The old Context value and
+context controls use canonical Threads. The old Context value and
 reverse-order history replacement API are removed. Verification is recorded in
 [the consolidation audit](conversation-consolidation.md).
 
-Checked against the source on 2026-09-15 after canonical conversation consolidation.
+Checked against the source on 2026-09-15 during runtime refinement.
 This map describes the current V3 branch, not a released V3 package.
 The [source inventory](api-inventory.json) records declarations; an exported
 function in that inventory is not, by itself, a supported application API.
 The [feature map](feature-map.md) groups the behavior and test evidence.
 The [old migration map](public-api-map-history.md) is historical evidence only.
 
-## Conversation ownership
+## Context ownership
 
 `Jido.Session`, `Jido.Thread`, and `Jido.Thread.Entry` are the retained values.
 `Jido.AI.Thread.Projection` interprets AI entries; it does not own state.
 Thread controls and operation encoding live under `Jido.AI.Thread`.
-The top-level `Conversation` and `History` modules are removed. Internal
+The top-level `Context` and `History` modules are removed. Internal
 `Orchestration.Transcript` owns Agent field access and commits. Internal
 `Model.Messages` owns provider-message normalization and private metadata.
 No forwarding compatibility modules remain.
@@ -42,20 +42,53 @@ contract; they are not separate authoring models.
 
 ## Requests and state
 
-`Runtime.State` defines the internal, temporary execution map. Its schema is
+All AI Agent requests use admission, Flow execution, and settlement. `ask`
+returns a handle; `ask_sync` waits on that handle; `ask_stream` adds events.
+Core generated route helpers return the admission Agent revision. They do not
+wait for the AI answer. Each Agent rejects concurrent requests with `:busy`.
+
+The Coordinator remains a core-managed Plugin runtime. It owns a core async
+Exec handle, not a wrapper Task around blocking Flow execution. Configuration
+has a separate state-only Plugin. Session/Thread retention remains optional.
+
+### Migration from the previous V3 draft
+
+| Previous name or option | Current contract |
+| --- | --- |
+| `Jido.AI.Runtime.*` | `Jido.AI.Execution.*` for Flow work only |
+| `Runtime.Plugin` | `Configuration.Plugin` |
+| `Runtime.Binding` | `Orchestration.Binding` |
+| `Runtime.Event`, `Runtime.Telemetry` | `Observe.Event`, `Observe.Telemetry` |
+| `Orchestration.Record` | `Request.Record` |
+| `Jido.AI.Turn`, `Turn.Content` | `Model.Response`, `Model.Content` |
+| `ReasonFlow`, blocking `Runtime.Run` | `Execution.ModelFlow`; blocking wrapper removed |
+| `requests.mode`, `requests.on_busy` | Removed; one lifecycle with busy rejection |
+| `requests` block and Profile field | Removed; regenerate portable definitions without this field |
+| `requests.streaming` | Per-call `ask_stream/3` or `stream: true`; buffered calls are the default |
+| `requests.steering`, `requests.idle_timeout`, `requests.tool_heartbeat` | Same keys under `controls` |
+| `requests.max_requests`, `requests.max_retained_requests` | Host setting `config :jido_ai, :max_retained_requests, 100`, captured at Coordinator startup |
+| `details.conversation` | `details.context` |
+| `jido.ai.session.*` internal routes | `jido.ai.request.*`; use public helpers |
+
+There are no forwarding modules for removed names. Rebuild stored Agent Codec
+documents with the current registry. Old Profile mode fields are rejected.
+Rebuild old resume tokens and snapshots rather than silently rewriting them.
+Failed requests retain status and evidence, but do not replace the domain answer.
+
+`Execution.State` defines the internal, temporary execution map. Its schema is
 checked at preparation and the model/decision/tool-batch boundaries. It holds
 working messages, counters, deadlines, and proposed effects; it is not a
 second Session or Thread. Optional method and phase fields remain absent until
 needed. This map is not an application import/export contract.
 
-`Runtime.Checkpoint` owns shared capture, restore, deadline and effect checks,
+`Execution.Checkpoint` owns shared capture, restore, deadline and effect checks,
 and pause delivery. The internal `Reasoning.ReAct.Checkpoint` adapter owns
 ReAct State projection, code/configuration fingerprints, and token encoding.
 This separation does not add resume support to other reasoning methods.
 
 | Surface | Current contract | Source and acceptance tests |
 | --- | --- | --- |
-| Generated `ask/2,3`, `ask_sync/2,3`, `ask_stream/2,3` | `ask` returns an answer for turn mode or a request handle for session mode. `ask_sync` waits for an answer; `ask_stream` starts a streaming session request. These are not aliases for core route helpers, which return the committed Agent. | [generated definitions](../../lib/jido_ai/agent/definition.ex), [interface](../../lib/jido_ai/agent/interface.ex), [interface tests](../../test/authoring/agents/interfaces_test.exs) |
+| Generated `ask/2,3`, `ask_sync/2,3`, `ask_stream/2,3` | `ask` always returns a request handle. `ask_sync` waits for the answer; `ask_stream` selects streaming and adds events for this call. No Profile flag is needed. Core route helpers return the admission Agent. | [generated definitions](../../lib/jido_ai/agent/definition.ex), [interface](../../lib/jido_ai/agent/interface.ex), [interface tests](../../test/authoring/agents/interfaces_test.exs) |
 | Generated `await/1,2`, `cancel/1,2`, `steer/2,3` | Retained convenience helpers. Generated cancellation targets the Agent server; `Orchestration.cancel` targets a handle. `inject` is not generated. | [definitions](../../lib/jido_ai/agent/definition.ex), [request tests](../../test/authoring/agents/execution_test.exs) |
 | `Jido.AI.Request.await/1,2`, `await_many/1,2` | Wait for admitted requests. `await_many` belongs to Request, not the generated Agent interface. | [Request](../../lib/jido_ai/request.ex), [Session tests](../../test/jido_ai/orchestration/orchestration_test.exs) |
 | `Jido.AI.Orchestration.snapshot/1,2`, `modify_context/2,3`, `cancel/1,2`, `steer/2,3`, `inject/2,3`, `skill_catalog/1,2` | Inspect or control AI requests. Inspection reads selected Profile and committed Session entries, not private strategy state. | [Orchestration](../../lib/jido_ai/orchestration.ex), [inspection tests](../../test/jido_ai/orchestration/inspection_test.exs), [recovery tests](../../test/authoring/agents/recovery_test.exs) |
@@ -69,7 +102,7 @@ call boundary and test-option binding; `Model.Generate` owns the bounded
 generation Action; `Model.Options` owns provider option normalization and
 HTTP option merging; `Model.Messages` owns message metadata and response
 alignment. `Models` resolves model identities. Runtime events remain in
-`Runtime.Event`. The old `Runtime.ModelCall`, `Runtime.Response`, and
+`Observe.Event`. The old `Execution.ModelCall`, `Execution.Response`, and
 `Operations.Generate` modules are removed without forwarding modules.
 
 ReAct Config no longer supplies generic model option helpers. Its standalone
@@ -78,7 +111,7 @@ Internal callers pass the selected model explicitly when merging options.
 
 `Jido.AI.Tools.Executor` owns direct tool execution (`execute`, `execute_module`,
 `run_tools`, and `run_tool_calls`). Profile tool attempts use its internal
-target boundary before applying Profile policy. `Jido.AI.Turn` only normalizes
+target boundary before applying Profile policy. `Jido.AI.Model.Response` only normalizes
 response values and projects messages. Its old execution functions are removed,
 not forwarded. Use `ToolAdapter.to_action_map/1` for module lookup maps and
 `SchemaInput.normalize_tool/2` (schema first) for argument normalization.
@@ -88,7 +121,7 @@ not forwarded. Use `ToolAdapter.to_action_map/1` for module lookup maps and
 | `Jido.AI.Models.aliases/0`, `resolve/1` | Resolve aliases and native ReqLLM model inputs. Use ReqLLM directly for provider calls; there is no second root generation facade. | [Models](../../lib/jido_ai/models.ex), [model example tests](../../test/examples/01_authoring/01_08_model_helpers/01_08_model_helpers_test.exs) |
 | Root tool and prompt helpers | `register_tool`, `unregister_tool`, `set_system_prompt`, `set_tool_context`, their direct variants, `list_tools`, and `has_tool?` remain. Server and direct Agent forms have different result shapes; use their documented contracts. | [root API](../../lib/jido_ai.ex), [tool API tests](../../test/jido_ai/tool_api_test.exs) |
 | `Jido.AI.Actions.*` | Reusable LLM, planning, reasoning, retrieval, quota, skill, and tool Actions run through core execution. Action schemas define input; source-level helper functions are not additional user inputs. | [Actions](../../lib/jido_ai/actions), [Action tests](../../test/jido_ai/skills) |
-| `Actions.Reasoning.RunStrategy` | Input is exactly one nonempty `prompt`. Host context binds a resolved Profile at `:jido_ai_callable_profile`. The Profile must use session mode and one of the seven callable methods. No flat strategy/model/options input remains. | [Action](../../lib/jido_ai/actions/reasoning/run_strategy.ex), [contract](callable-v3-contract.md), [binding tests](../../test/jido_ai/skills/reasoning/actions/run_strategy_profile_test.exs) |
+| `Actions.Reasoning.RunStrategy` | Input is exactly one nonempty `prompt`. Host context binds a resolved Profile at `:jido_ai_callable_profile`. The Profile must select one of the seven callable methods. No flat strategy/model/options input remains. | [Action](../../lib/jido_ai/actions/reasoning/run_strategy.ex), [contract](callable-v3-contract.md), [binding tests](../../test/jido_ai/skills/reasoning/actions/run_strategy_profile_test.exs) |
 | `Plugins.Reasoning.*` | Seven fixed-method Plugins accept `[profile: profile]`. Profile controls result destination and policy. A private Agent isolates callable execution. Direct callable ReAct is not provided; Adaptive can select ReAct. | [Plugins](../../lib/jido_ai/plugins/reasoning), [callable authoring tests](../../test/authoring/agents/callable_profiles_test.exs), [lifecycle tests](../../test/jido_ai/skills/reasoning/actions/run_strategy_lifecycle_test.exs) |
 | Other `Jido.AI.Plugins.*` | Chat, Planning, ModelRouting, Policy, Quota, and Retrieval compose through core Plugin contracts. Their individual schemas still apply; the reasoning Plugin migration does not make all Plugin schemas identical. | [Plugins](../../lib/jido_ai/plugins), [composition tests](../../test/jido_ai/plugin_facets_test.exs) |
 | `Jido.AI.Reasoning.ReAct` | Standalone `run`, `stream`, `stream_from_state`, `start`, `continue`, `collect`, and `cancel` remain, with Config, State, and Token contracts. Native Profile authoring supports all eight reasoning methods. | [ReAct](../../lib/jido_ai/reasoning/react.ex), [standalone tests](../../test/examples/14_resume/14_01_standalone_authoring/14_01_standalone_authoring_test.exs) |
@@ -96,7 +129,7 @@ not forwarded. Use `ToolAdapter.to_action_map/1` for module lookup maps and
 ## Compatibility, internal code, and removed APIs
 
 - `Agent.from_initial_state/2,3` accepts canonical Session values or encoded
-  Session maps in declared conversation fields. The special `:context` input
+  Session maps in declared context fields. The special `:context` input
   is removed, as is root `update_context_entries/2`.
   These do not restore private V2 strategy state. See [import](../../lib/jido_ai/agent/initial_state.ex)
   and [boundary tests](../../test/authoring/agents/boundaries_test.exs).

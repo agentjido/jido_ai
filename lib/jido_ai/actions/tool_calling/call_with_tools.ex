@@ -72,7 +72,9 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithTools do
   @impl Jido.Action
   def on_before_validate_params(params), do: Jido.AI.ActionInput.before_validate(schema(), params)
 
-  alias Jido.AI.{ActionInput, ToolAdapter, Validation}
+  alias Jido.AI.ActionInput
+  alias Jido.AI.ToolAdapter
+  alias Jido.AI.Validation
   alias Jido.AI.Actions.Helpers
 
   @defaults %{

@@ -25,7 +25,7 @@ The session prepares the skill index and loading tools at startup. Static constr
 
 ## Limits
 
-Automatic skills require ReAct session mode and a live owner. Declared paths are a trust decision. Restore rebuilds resources; it does not serialize provider handles. This is not dynamic tool-source support.
+Automatic skills require a ReAct request and a live owner. Declared paths are a trust decision. Restore rebuilds resources; it does not serialize provider handles. This is not dynamic tool-source support.
 
 ## Files
 

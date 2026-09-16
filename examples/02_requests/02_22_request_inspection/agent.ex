@@ -22,11 +22,6 @@ defmodule JidoAI.Examples.RequestInspection.Agent do
         model(:answer)
       end
 
-      requests do
-        mode(:session)
-        streaming(false)
-      end
-
       memory do
         history(:messages)
       end

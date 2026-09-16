@@ -76,7 +76,7 @@ must bind the local HTTP/SSE model server through supported runtime options;
 it must not call that remote provider. Run native AI requests through AgentServer.
 Direct native AI `Agent.cmd` execution is not the supported runtime path.
 
-Callable reasoning accepts only a prompt. Bind a resolved session-mode Profile
+Callable reasoning accepts only a prompt. Bind a resolved Profile
 in host context under `:jido_ai_callable_profile`, or in a reasoning Plugin's
 `profile` configuration. Do not teach flat method/model/timeout inputs or
 Plugin state defaults. A raw reasoning tool must explicitly forward the Profile
@@ -105,7 +105,9 @@ Follow these rules:
    of the lesson; do not replace it mechanically with an inline Action.
 9. Use Builder, JSON, or direct definition forms only when the example teaches
    those forms.
-10. Use `define` for the main commands that a reader will call.
+10. Use the generated `ask`, `ask_sync`, and `ask_stream` API for AI work.
+    Use core `define` for domain commands or an explicit admission lesson.
+    A core route helper returns the admission Agent, not the AI answer.
 11. Use static Zoi schemas at Agent, Action, and Flow boundaries.
 12. Use Action or Signal input for requested work. Use execution context for
     runtime services and execution metadata. Use Agent state for durable domain
@@ -133,7 +135,7 @@ unbounded wait.
 
 Use public ReqLLM calls when the lesson teaches model aliases or direct provider
 integration. That is an explicit exception to the AI Agent form. Do not use
-internal `Jido.AI.Runtime.*` or `Jido.AI.Operations.*` calls as a basic teaching API.
+internal `Jido.AI.Execution.*` or `Jido.AI.Operations.*` calls as a basic teaching API.
 Keep explicit Flow orchestration only when that composition is the lesson.
 
 ## Runtime inspection and control

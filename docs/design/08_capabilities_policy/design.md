@@ -125,7 +125,7 @@ This order is semantic policy order. Core Plugin callback order remains the core
 
 ### Chat, reasoning, and planning
 
-`CAP-REQ-007`: The Chat capability shall store conversation history only in the Agent domain field declared by the author.
+`CAP-REQ-007`: The Chat capability shall store context history only in the Agent domain field declared by the author.
 
 `CAP-REQ-008`: The Reasoning capability shall select and configure a registered seam 05 method and shall not implement a separate method runner.
 

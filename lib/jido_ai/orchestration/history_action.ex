@@ -1,7 +1,7 @@
 defmodule Jido.AI.Orchestration.HistoryAction do
   @moduledoc false
   use Jido.Action,
-    name: "ai_session_history",
+    name: "ai_request_history",
     schema: Zoi.object(%{request_id: Zoi.string(), batch_id: Zoi.string()})
 
   alias Jido.AI.Orchestration.Change

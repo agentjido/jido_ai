@@ -57,7 +57,6 @@ defmodule Jido.AI.Plugins.Reasoning.TreeOfThoughtsTest do
     Jido.AI.Profile.new!(%{
       id: :review,
       reasoning: :tree_of_thoughts,
-      requests: %{mode: :session},
       result: %{into: :result}
     })
   end

@@ -4,7 +4,8 @@ defmodule JidoAITest.Authoring.Agents.KnownBugsTest do
   use ExUnit.Case, async: false
   use Mimic
   @moduletag :authoring
-  alias Jido.AI.{Authoring, Profile}
+  alias Jido.AI.Authoring
+  alias Jido.AI.Profile
   alias JidoAITest.Authoring.{Compiler, Agents.Corpus}
 
   # Retain finding IDs so the resolved contracts stay linked to BUGS.md.
@@ -41,18 +42,19 @@ defmodule JidoAITest.Authoring.Agents.KnownBugsTest do
   end
 
   @tag bug: "AI-AUTH-004"
-  test "AI-AUTH-004: generated turn ask retains caller context" do
+  test "AI-AUTH-004: generated ask retains caller context" do
     spec = Corpus.load!(:simple)
     context = %{ai: %{assistant: %{options: [api_key: "local-only", base_url: "http://127.0.0.1:1"]}}}
     # Capture the public call boundary so this bug cannot trigger an external request.
-    expect(Jido.AgentServer, :call, fn :test_server, signal, options ->
-      assert signal.type == "case.assistant"
-      assert signal.data == %{query: "Help"}
-      assert options == [timeout: 1234, context: context]
-      {:ok, %{state: %{reply: "Ready"}}}
+    expect(Jido.AI.Request, :create_and_send, fn :test_server, "Help", options ->
+      assert options[:signal_type] == "case.assistant"
+      assert options[:timeout] == 1234
+      assert options[:context] == context
+      {:ok, Jido.AI.Request.Handle.new("retained", :test_server, "Help")}
     end)
 
-    assert {:ok, "Ready"} = spec.module.ask(:test_server, "Help", context: context, timeout: 1234)
+    assert {:ok, %Jido.AI.Request.Handle{id: "retained"}} =
+             spec.module.ask(:test_server, "Help", context: context, timeout: 1234)
   end
 
   @tag bug: "AI-AUTH-005"

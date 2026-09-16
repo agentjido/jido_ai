@@ -4,9 +4,8 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
   alias Jido.AI.Test.StateMigration.{Agent, Change, Double, Update}
 
   # See docs/v3-spike/state-test-transfer.md for all old case mappings.
-  defp start(jido, opts \\ []) do
+  defp start(jido) do
     {:ok, profile} = Configuration.profile(Agent.definition())
-    profile = %{profile | requests: %{profile.requests | streaming: Keyword.get(opts, :streaming, false)}}
     profile = %{profile | observability: %{diagnostics_content: true, stream_content: true, store_content: true}}
 
     base = %{
@@ -19,8 +18,8 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     start_agent(jido, Jido.Agent.instantiate!(definition))
   end
 
-  defp ask(server, mock, query \\ "Work"),
-    do: request(server, mock, :react, query, context: %{observer: self()})
+  defp ask(server, mock, query \\ "Work", opts \\ []),
+    do: request(server, mock, :react, query, Keyword.put(opts, :context, %{observer: self()}))
 
   defp call(id, kind, value \\ 1), do: %{id: id, name: "state_update", arguments: %{kind: kind, value: value}}
 
@@ -47,7 +46,7 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     assert view.details.model_calls == 1 and view.details.active_request_id == handle.id
     assert is_binary(view.details.current_llm_call_id)
     assert Process.alive?(view.live.worker_pid)
-    refute Enum.any?(view.details.conversation, &(&1.role == :user))
+    refute Enum.any?(view.details.context, &(&1.role == :user))
     refute Map.has_key?(view.agent.state, :__strategy__)
     assert :ok = MockLLM.release(mock, :model)
     assert {:ok, "Done"} = Request.await(handle)
@@ -90,8 +89,8 @@ defmodule Jido.AI.Strategy.StateOpsIntegrationTest do
     mock =
       mock([%{reply: {:stream, [%{content: "Hello"}, %{content: " "}, %{content: "world"}, {:wait, :text}], "stop"}}])
 
-    server = start(jido, streaming: true)
-    assert {:ok, handle} = ask(server, mock)
+    server = start(jido)
+    assert {:ok, handle} = ask(server, mock, "Work", stream: true)
     assert_receive {:mock_llm_waiting, ^mock, :text, _}, 2_000
 
     eventually(fn ->

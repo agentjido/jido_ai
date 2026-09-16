@@ -1,6 +1,8 @@
 defmodule Jido.AI.Reasoning.ReAct.Authoring do
   @moduledoc false
-  alias Jido.AI.{Authoring, Profile, ToolCatalog}
+  alias Jido.AI.Authoring
+  alias Jido.AI.Profile
+  alias Jido.AI.ToolCatalog
   alias Jido.AI.Reasoning.ReAct.Config
 
   def default_limits(config) do
@@ -31,8 +33,9 @@ defmodule Jido.AI.Reasoning.ReAct.Authoring do
 
       plugins =
         Enum.map(agent.plugins, fn
-          {Jido.AI.Runtime.Plugin, opts} ->
-            {Jido.AI.Runtime.Plugin, Keyword.merge(opts, iteration_limit_result?: true, standalone_checkpoints?: true)}
+          {Jido.AI.Configuration.Plugin, opts} ->
+            {Jido.AI.Configuration.Plugin,
+             Keyword.merge(opts, iteration_limit_result?: true, standalone_checkpoints?: true)}
 
           plugin ->
             plugin
@@ -63,7 +66,10 @@ defmodule Jido.AI.Reasoning.ReAct.Authoring do
       controls:
         Map.merge(limits, %{
           max_iterations: config.max_iterations,
-          max_model_calls: config.max_iterations + repairs
+          max_model_calls: config.max_iterations + repairs,
+          steering: true,
+          idle_timeout: Config.stream_timeout(config),
+          tool_heartbeat: config.tool_heartbeat_ms
         }),
       effect_policy: config.effect_policy,
       observability: %{
@@ -77,13 +83,6 @@ defmodule Jido.AI.Reasoning.ReAct.Authoring do
         store_content: true,
         store_reasoning: true,
         emit_llm_deltas?: config.trace.capture_deltas?
-      },
-      requests: %{
-        mode: :session,
-        streaming: config.streaming,
-        steering: true,
-        idle_timeout: Config.stream_timeout(config),
-        tool_heartbeat: config.tool_heartbeat_ms
       },
       memory: %{history: :messages},
       result: %{

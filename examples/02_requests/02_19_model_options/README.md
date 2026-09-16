@@ -7,8 +7,8 @@ Select another provider for a later model call in one request.
 Read [agent.ex](agent.ex), then [switch_probe.ex](switch_probe.ex), then [switch.ex](switch.ex).
 Then read the matching tests below.
 
-The source generates two AI Agents from one declaration to compare buffered
-and streamed transport. A normal application needs only its selected form.
+One AI Agent covers buffered and streamed transport. The tests select
+`stream: false` or `stream: true` on each request and verify both provider formats.
 
 ## Run it
 

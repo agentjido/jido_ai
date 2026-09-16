@@ -83,7 +83,6 @@ defmodule JidoAITest.Authoring.Agents.Cases do
   def profiles(:session),
     do: [
       Map.merge(base(), %{
-        requests: %{mode: :session, streaming: true, max_requests: 3},
         memory: %{history: :messages}
       })
     ]
@@ -106,7 +105,7 @@ defmodule JidoAITest.Authoring.Agents.Cases do
   defp plugins(_), do: []
 
   defp initial(id) do
-    state = %{reply: "", case_id: "case-17", jido_ai_config: %{}}
+    state = %{reply: "", case_id: "case-17", jido_ai_config: %{}, requests: %{}}
 
     case id do
       :structured ->

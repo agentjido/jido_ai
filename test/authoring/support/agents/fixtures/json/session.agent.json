@@ -216,7 +216,7 @@
       "defaults": null,
       "kind": "action",
       "match": null,
-      "path": "jido.ai.session.settle",
+      "path": "jido.ai.request.settle",
       "priority": 0,
       "target": "action/30"
     },
@@ -224,7 +224,7 @@
       "defaults": null,
       "kind": "action",
       "match": null,
-      "path": "jido.ai.session.cancel",
+      "path": "jido.ai.request.cancel",
       "priority": 0,
       "target": "action/31"
     },
@@ -232,7 +232,7 @@
       "defaults": null,
       "kind": "action",
       "match": null,
-      "path": "jido.ai.session.control",
+      "path": "jido.ai.request.control",
       "priority": 0,
       "target": "action/32"
     },
@@ -240,7 +240,7 @@
       "defaults": null,
       "kind": "action",
       "match": null,
-      "path": "jido.ai.session.history",
+      "path": "jido.ai.request.history",
       "priority": 0,
       "target": "action/33"
     },
@@ -248,7 +248,7 @@
       "defaults": null,
       "kind": "action",
       "match": null,
-      "path": "jido.ai.session.publish",
+      "path": "jido.ai.request.publish",
       "priority": 0,
       "target": "action/34"
     },
@@ -256,7 +256,7 @@
       "defaults": null,
       "kind": "action",
       "match": null,
-      "path": "jido.ai.session.ignore",
+      "path": "jido.ai.request.ignore",
       "priority": 0,
       "target": "action/35"
     },
@@ -264,7 +264,7 @@
       "defaults": null,
       "kind": "action",
       "match": null,
-      "path": "jido.ai.session.progress",
+      "path": "jido.ai.request.progress",
       "priority": 0,
       "target": "action/36"
     },

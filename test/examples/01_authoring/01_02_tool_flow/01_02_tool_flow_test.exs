@@ -11,7 +11,7 @@ defmodule JidoAI.Examples.ToolFlowTest do
     {mock, context} = native_mock([%{reply: {:tools, calls}}, %{reply: {:text, "The results are 6 and 20"}}])
     server = start_agent(jido, Agent.new!())
     observe_tools()
-    assert {:ok, agent} = Agent.calculate(server, "Calculate both prices", context: context)
+    assert {:ok, agent} = ask_and_await(Agent, server, "Calculate both prices", context: context)
     assert %{answer: "The results are 6 and 20", case_id: "case-42"} = agent.state
     assert_receive {:example_tool_started, "multiply"}
     assert_receive {:example_tool_started, "quote"}
@@ -37,13 +37,13 @@ defmodule JidoAI.Examples.ToolFlowTest do
       server = start_agent(jido, Agent.new!())
       observe_tools()
       before = Server.agent(server).state
-      outcome = Agent.calculate(server, "Calculate", context: context)
+      outcome = ask_and_await(Agent, server, "Calculate", context: context)
 
       if unquote(invalid.name == "unknown") do
         assert {:ok, %{state: %{answer: "Batch rejected"}}} = outcome
       else
         assert {:error, _} = outcome
-        assert Server.agent(server).state == before
+        assert_domain_unchanged(server, before)
       end
 
       refute_received {:example_tool_started, _}
@@ -56,8 +56,8 @@ defmodule JidoAI.Examples.ToolFlowTest do
     {mock, context} = native_mock([%{reply: {:tools, [call]}}, %{reply: {:tools, [%{call | id: "two"}]}}])
     server = start_agent(jido, Agent.new!())
     before = Server.agent(server).state
-    assert {:error, _} = Agent.calculate(server, "Calculate", context: context)
-    assert Server.agent(server).state == before
+    assert {:error, _} = ask_and_await(Agent, server, "Calculate", context: context)
+    assert_domain_unchanged(server, before)
     assert length(MockLLM.report(mock).requests) == 2
     assert_script_done(mock)
   end

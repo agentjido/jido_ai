@@ -27,11 +27,6 @@ defmodule JidoAI.Examples.Adaptive.Agent do
         output(JidoAI.Examples.Adaptive.Check)
       end
 
-      requests do
-        mode(:session)
-        streaming(true)
-      end
-
       observability do
         store_content true
         stream_content true

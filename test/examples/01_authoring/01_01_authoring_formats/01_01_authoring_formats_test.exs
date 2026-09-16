@@ -5,7 +5,7 @@ defmodule JidoAI.Examples.AuthoringFormatsTest do
   test "the generated command commits an answer and preserves domain data", %{jido: jido} do
     {mock, context} = native_mock([%{reply: {:text, "Ready"}}])
     server = start_agent(jido, Agent.new!())
-    assert {:ok, agent} = Agent.answer(server, "Help with this case", context: context)
+    assert {:ok, agent} = ask_and_await(Agent, server, "Help with this case", context: context)
     assert %{answer: "Ready", case_id: "case-42"} = agent.state
     assert Server.agent(server).state == agent.state
     assert [request] = MockLLM.report(mock).requests
@@ -23,9 +23,9 @@ defmodule JidoAI.Examples.AuthoringFormatsTest do
     {mock, context} = native_mock([%{reply: {:error, 400, "Invalid request"}}, %{reply: {:text, "Recovered"}}])
     server = start_agent(jido, Agent.new!(state: %{answer: "Previous", case_id: "existing"}))
     before = Server.agent(server).state
-    assert {:error, _} = Agent.answer(server, "Help", context: context)
-    assert Server.agent(server).state == before
-    assert {:ok, agent} = Agent.answer(server, "Try again", context: context)
+    assert {:error, _} = ask_and_await(Agent, server, "Help", context: context)
+    assert_domain_unchanged(server, before)
+    assert {:ok, agent} = ask_and_await(Agent, server, "Try again", context: context)
     assert %{answer: "Recovered", case_id: "existing"} = agent.state
     assert_script_done(mock)
   end

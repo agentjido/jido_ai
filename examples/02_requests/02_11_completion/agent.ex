@@ -29,10 +29,6 @@ defmodule JidoAI.Examples.Completion.Agent do
         max_tool_calls 1
       end
 
-      requests do
-        mode :session
-      end
-
       result into: :reply
     end
   end

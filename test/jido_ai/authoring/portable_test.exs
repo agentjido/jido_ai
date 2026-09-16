@@ -99,6 +99,20 @@ defmodule Jido.AI.Authoring.PortableTest do
     end
   end
 
+  test "portable profiles reject the removed requests field, including an empty map" do
+    profile = Jido.AI.Profile.new!(id: :support, model: :fast, result: %{into: :answer})
+    assert {:ok, encoded} = Jido.AI.export(profile, :json)
+    document = Jason.decode!(encoded)
+    refute Map.has_key?(document["profile"], "requests")
+
+    for value <- [%{}, %{"streaming" => true}, %{"max_retained_requests" => 2}] do
+      legacy = put_in(document, ["profile", "requests"], value)
+
+      assert {:error, %Jido.AI.Error.Validation.Invalid{field: "profile"}} =
+               Jido.AI.import(Jason.encode!(legacy))
+    end
+  end
+
   test "unknown references and future versions fail without creating atoms" do
     unknown = "unknown_profile_#{System.unique_integer([:positive])}"
     assert_raise ArgumentError, fn -> String.to_existing_atom(unknown) end

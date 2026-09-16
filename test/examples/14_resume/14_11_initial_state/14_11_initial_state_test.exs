@@ -1,6 +1,8 @@
 defmodule JidoAI.Examples.InitialStateTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Agent, Configuration, Request}
+  alias Jido.AI.Agent
+  alias Jido.AI.Configuration
+  alias Jido.AI.Request
   alias Jido.AI.Thread.Projection
   alias JidoAI.Examples.InitialState
 
@@ -31,25 +33,24 @@ defmodule JidoAI.Examples.InitialStateTest do
     session
   end
 
-  defp submit(server, context, query, route \\ "ai.react.query") do
+  defp submit(server, context, query, route, stream? \\ false) do
     Request.create_and_send(server, query,
       signal_type: route,
       source: "/examples/initial-state",
       model: MockLLM.model(),
-      context: context
+      context: context,
+      stream: stream?
     )
   end
 
-  for {module, streaming?} <- [
-        {InitialState.Buffered, false},
-        {InitialState.Streamed, true}
-      ] do
-    test "#{module} imports history before startup and restores later native state without tool replay", %{jido: jido} do
+  for streaming? <- [false, true] do
+    test "streaming #{streaming?} imports history before startup and restores later native state without tool replay",
+         %{jido: jido} do
       old = saved_context("Saved prompt")
 
       state = %{messages: old, count: 9, thread: %{id: "application-thread", rev: 2}}
 
-      assert {:ok, agent} = Agent.from_initial_state(unquote(module), state, id: "imported")
+      assert {:ok, agent} = Agent.from_initial_state(InitialState.Agent, state, id: "imported")
       assert {:ok, profile} = Configuration.profile(agent, :assistant)
       assert {:ok, messages} = Jido.AI.Orchestration.Transcript.read(agent.state, profile)
       assert Enum.map(messages, & &1.role) == [:user, :assistant, :tool, :assistant]
@@ -70,7 +71,7 @@ defmodule JidoAI.Examples.InitialStateTest do
       {mock, context} = mock([%{reply: {:text, "Continued"}}, %{reply: {:text, "Again"}}])
       assert MockLLM.report(mock).requests == []
       server = start_agent(jido, agent)
-      assert {:ok, first} = submit(server, context, "Continue")
+      assert {:ok, first} = submit(server, context, "Continue", "ai.react.query", unquote(streaming?))
       assert {:ok, "Continued"} = Request.await(first)
       [wire] = MockLLM.report(mock).requests
 
@@ -97,8 +98,8 @@ defmodule JidoAI.Examples.InitialStateTest do
       assert :ok = Jido.Action.validate_static_data(saved.state)
       copy = saved.state |> :erlang.term_to_binary() |> :erlang.binary_to_term([:safe])
       assert :ok = Server.stop(server, :normal)
-      restored = start_agent(jido, unquote(module).new!(id: saved.id, state: copy))
-      assert {:ok, next} = submit(restored, context, "Continue again")
+      restored = start_agent(jido, InitialState.Agent.new!(id: saved.id, state: copy))
+      assert {:ok, next} = submit(restored, context, "Continue again", "ai.react.query", unquote(streaming?))
       assert {:ok, "Again"} = Request.await(next)
       [_, wire] = MockLLM.report(mock).requests
       assert Enum.count(wire.body["messages"], &(&1["role"] == "tool")) == 1

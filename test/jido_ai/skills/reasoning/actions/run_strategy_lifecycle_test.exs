@@ -2,7 +2,8 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyLifecycleTest do
   use Jido.AI.Test.CallableReasoningCase, async: false
   use Mimic
   alias Jido.AI.Actions.Reasoning.RunStrategy
-  alias Jido.AI.{Configuration, Orchestration}
+  alias Jido.AI.Configuration
+  alias Jido.AI.Orchestration
   alias Jido.AgentServer, as: Server
 
   setup :set_mimic_from_context
@@ -248,7 +249,6 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyLifecycleTest do
           }
         ],
         controls: %{timeout: 8_000},
-        requests: %{mode: :session, streaming: true},
         result: %{into: :answer}
       })
 

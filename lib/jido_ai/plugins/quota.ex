@@ -107,10 +107,16 @@ defmodule Jido.AI.Plugins.Quota do
       prepared
       | enabled:
           admission.plugin_state.enabled and
-            (prepared.enabled or Jido.AI.Runtime.Plugin.native_request?(admission))
+            (prepared.enabled or Jido.AI.Configuration.Plugin.native_request?(admission))
     }
 
     cond do
+      admission.signal.type == "ai.usage" and runtime_observation?(admission.signal.data) ->
+        # Native model calls already account through generation-bound tickets.
+        # Mirrored Signals must not recreate a charge after reset or convert
+        # unknown provider usage into a known zero-token report.
+        {:ok, %{binding: binding}}
+
       admission.signal.type == "ai.usage" and is_map(admission.signal.data) ->
         data = admission.signal.data
 
@@ -138,6 +144,15 @@ defmodule Jido.AI.Plugins.Quota do
     end
   end
 
+  defp runtime_observation?(data) when is_map(data) do
+    metadata = Map.get(data, :metadata, Map.get(data, "metadata", %{}))
+
+    is_map(metadata) and
+      Map.get(metadata, :origin, Map.get(metadata, "origin")) in [:worker_runtime, "worker_runtime"]
+  end
+
+  defp runtime_observation?(_), do: false
+
   @doc false
   def binding_for_agent(%Jido.Agent{} = agent, signal) do
     case Enum.find(agent.plugins, &(elem(&1, 0) == __MODULE__)) do
@@ -149,7 +164,7 @@ defmodule Jido.AI.Plugins.Quota do
           prepared
           | enabled:
               state.enabled and
-                (prepared.enabled or not is_nil(Jido.AI.Runtime.Binding.request(agent, signal)))
+                (prepared.enabled or not is_nil(Jido.AI.Orchestration.Binding.request(agent, signal)))
         }
 
       nil ->

@@ -7,7 +7,7 @@ defmodule Jido.AI.Signal do
   not start a subscription, store events, or retry delivery.
   """
 
-  alias Jido.AI.Runtime.Event
+  alias Jido.AI.Observe.Event
   alias Jido.AI.Signal
 
   @doc "Builds zero or more typed Signals from one canonical request event."
@@ -58,7 +58,7 @@ defmodule Jido.AI.Signal do
     turn =
       data
       |> Map.put(:type, Map.get(data, :turn_type, :final_answer))
-      |> Jido.AI.Turn.from_result_map()
+      |> Jido.AI.Model.Response.from_result_map()
 
     response =
       {Signal.LLMResponse,

@@ -47,10 +47,6 @@ defmodule Jido.AI.ToolApiTest do
           action(Search)
         end
 
-        requests do
-          mode(:session)
-        end
-
         memory do
           history(:messages)
         end

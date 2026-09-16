@@ -97,7 +97,7 @@ defmodule JidoAI.Examples.TraceAndCyclesTest do
       assert paused.streaming_text == saved.streaming_text
       assert paused.streaming_thinking == saved.streaming_thinking
 
-      assistant = Enum.find(conversation_entries(saved.context), &(&1.role == :assistant))
+      assistant = Enum.find(context_entries(saved.context), &(&1.role == :assistant))
       assert Enum.filter(assistant.content, &(&1.type == :text)) |> Enum.map_join(& &1.text) == "First second"
       assert Enum.filter(assistant.content, &(&1.type == :thinking)) |> Enum.map_join(& &1.text) == "Synthetic thought"
 
@@ -183,7 +183,7 @@ defmodule JidoAI.Examples.TraceAndCyclesTest do
     assert Enum.count(result.trace, &(&1.kind == :tool_completed)) == 4
     assert {:ok, saved, _} = Token.decode_state(result.final_token, config)
     assert is_binary(saved.prev_tool_signature)
-    assert Enum.count(conversation_entries(saved.context), &warning?/1) == 1
+    assert Enum.count(context_entries(saved.context), &warning?/1) == 1
     assert_script_done(mock)
   end
 

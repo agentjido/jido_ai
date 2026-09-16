@@ -1,6 +1,7 @@
 defmodule Jido.AI.ToolResult do
   @moduledoc false
-  alias Jido.AI.{Error, Observe}
+  alias Jido.AI.Error
+  alias Jido.AI.Observe
   alias Jido.AI.Reasoning.ReAct.PendingToolCall
   require Logger
 
@@ -36,7 +37,7 @@ defmodule Jido.AI.ToolResult do
         call
       )
 
-  def content(result), do: Jido.AI.Turn.Content.format_tool_result_content(result)
+  def content(result), do: Jido.AI.Model.Content.format_tool_result_content(result)
 
   # Core wraps a returned non-exception Action error in these two fields.
   # Recover typed error maps at the tool boundary. Keep execution failures with

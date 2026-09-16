@@ -4,7 +4,7 @@
 
 ## Briefing
 
-Tools.Executor uses core Exec and normalizes tool results. Runtime.ToolAttempt adds Profile policy, retry, and interception. Effects remain proposals until their owner applies them through core contracts. ToolSource validates inert declarations, including subagent and handoff; this does not implement dynamic discovery or delegation.
+Tools.Executor uses core Exec and normalizes tool results. Execution.ToolAttempt adds Profile policy, retry, and interception. Effects remain proposals until their owner applies them through core contracts. ToolSource validates inert declarations, including subagent and handoff; this does not implement dynamic discovery or delegation.
 
 This seam retains the complete target, not only current functionality. Detailed
 current evidence and gaps are in [alignment](alignment.md); proposed contracts

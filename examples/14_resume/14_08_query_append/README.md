@@ -1,6 +1,6 @@
 # 14_08 — Query append on resume
 
-Append a new query while retaining saved conversation and execution limits.
+Append a new query while retaining saved context and execution limits.
 
 ## Read the code
 

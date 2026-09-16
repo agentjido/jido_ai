@@ -4,7 +4,8 @@ Code.require_file("cases.exs", __DIR__)
 defmodule JidoAITest.Authoring.Agents.Corpus do
   @moduledoc false
   alias Jido.Agent.{Builder, Codec}
-  alias Jido.AI.{Authoring, Profile}
+  alias Jido.AI.Authoring
+  alias Jido.AI.Profile
   alias Jido.Codec.Registry
   alias JidoAITest.Authoring.{Compiler, Agents.Cases}
   @fixtures Path.expand("fixtures", __DIR__)

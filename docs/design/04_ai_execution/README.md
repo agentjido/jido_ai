@@ -12,7 +12,7 @@ and stable requirement IDs are in [design](design.md).
 
 ## Why this seam exists
 
-- Owner: Runtime.State, Flow, ReasonFlow, Prepare, CallModel, Decide, ToolsFlow, ToolAttempt, and OutputState.
+- Owner: Execution.State, Flow, ModelFlow, Prepare, CallModel, Decide, ToolsFlow, ToolAttempt, and OutputState.
 - Owns: shared ai execution within [the package architecture](../ARCHITECTURE.md).
 - Does not own: contracts assigned to other seams or private lower-package internals.
 
@@ -20,7 +20,7 @@ and stable requirement IDs are in [design](design.md).
 
 | Area | Current | Target |
 | --- | --- | --- |
-| Architecture | The module and state ownership above is the code baseline | Keep one bounded execution path for all authoring forms and methods. Preserve advanced streaming, cancellation, retry, and effect contracts without making temporary execution state a portable conversation value. |
+| Architecture | The module and state ownership above is the code baseline | Keep one bounded execution path for all authoring forms and methods. Preserve advanced streaming, cancellation, retry, and effect contracts without making temporary execution state a portable context value. |
 | Evidence | Linked example and boundary tests cover specific cases | Direct requirement-level acceptance, including advanced paths |
 | Compatibility | Current APIs remain authoritative | Explicit migration for approved contract changes |
 
@@ -28,7 +28,7 @@ and stable requirement IDs are in [design](design.md).
 
 | Gap | Why it matters | Required outcome | Owner |
 | --- | --- | --- | --- |
-| [EXE-GAP-001](alignment.md#gap-register) | Runtime.State now exists as an internal map with provider values. It is not the proposed portable public Execution.Input/State. | Separate temporary state from portable snapshots; review the public abstraction before adding it. | 04; dependencies below |
+| [EXE-GAP-001](alignment.md#gap-register) | Execution.State now exists as an internal map with provider values. It is not the proposed portable public Execution.Input/State. | Separate temporary state from portable snapshots; review the public abstraction before adding it. | 04; dependencies below |
 | [EXE-GAP-002](alignment.md#gap-register) | Runtime events carry correlation, but one shared schema for all attempts and projections is not established. | Complete correlation evidence in 12. | 04; dependencies below |
 | [EXE-GAP-003](alignment.md#gap-register) | Retry uses a continuation with bounded worker sleep; output repair has its own bounded path. | Resolve EXE-REQ-015/017 without creating a generic retry engine. | 04; dependencies below |
 | [EXE-GAP-004](alignment.md#gap-register) | Coordinator owns cancellation and worker cleanup through the current integration. The target names a public Exec cancellation contract. | Verify the exact lower-level API and cancellation races before changing ownership. | 04; dependencies below |

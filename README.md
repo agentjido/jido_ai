@@ -51,11 +51,6 @@ defmodule MyApp.MathAgent do
         action(MyApp.Actions.AddNumbers, as: :add_numbers)
       end
 
-      requests do
-        mode(:session)
-        streaming(true)
-      end
-
       result(nil, into: :answer)
     end
   end
@@ -166,10 +161,6 @@ defmodule MyApp.Agent do
         action(MyApp.Actions.Multiply, as: :multiply)
       end
 
-      requests do
-        mode(:session)
-      end
-
       result(nil, into: :answer)
     end
   end
@@ -188,6 +179,10 @@ end
 {:ok, request} = MyApp.Agent.ask(pid, "What is 144 * 12?")
 {:ok, result2} = MyApp.Agent.await(request, timeout: 15_000)
 ```
+
+`ask/3` and `ask_sync/3` use buffered model calls by default. Use `ask_stream/3`
+for streamed model calls and request events. The same Agent supports both;
+there is no `requests` DSL block or Profile streaming setting.
 
 ## Request-Scoped ReAct Controls
 

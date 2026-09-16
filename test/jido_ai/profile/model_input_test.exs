@@ -24,7 +24,7 @@ defmodule Jido.AI.Profile.ModelInputTest do
 
   test "callable reasoning returns the same tagged model error" do
     profile =
-      Profile.new!(%{id: :review, reasoning: :chain_of_thought, requests: %{mode: :session}, result: %{into: :answer}})
+      Profile.new!(%{id: :review, reasoning: :chain_of_thought, result: %{into: :answer}})
 
     profile = put_in(profile.models.default.model, false)
 

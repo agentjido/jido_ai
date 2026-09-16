@@ -25,11 +25,6 @@ defmodule JidoAITest.Authoring.Agents.Fixtures.Mixed do
 
       controls do
         timeout 5_000
-      end
-
-      requests do
-        mode :session
-        streaming true
         steering true
       end
 

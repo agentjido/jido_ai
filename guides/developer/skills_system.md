@@ -57,10 +57,6 @@ defmodule MyApp.SupportAgent do
         resource_provider {MyApp.SkillResources, :handle}
       end
 
-      requests do
-        mode :session
-      end
-
       memory do
         history :messages
       end
@@ -184,14 +180,14 @@ processes:
 
 ```elixir
 {:ok, activation} =
-  Jido.AI.Skill.Activation.activate("code-review", session_id: conversation_id)
+  Jido.AI.Skill.Activation.activate("code-review", session_id: context_id)
 
 activation.skill_body
 activation.root_dir
 activation.resources
 
 # Release activation state when the session ends.
-:ok = Jido.AI.Skill.Activation.clear(session_id: conversation_id)
+:ok = Jido.AI.Skill.Activation.clear(session_id: context_id)
 ```
 
 To activate by name from a filesystem root, give the paths and the trust policy
@@ -202,7 +198,7 @@ in the same call:
   Jido.AI.Skill.Activation.activate("code-review",
     paths: ["priv/skills"],
     trust: true,
-    session_id: conversation_id
+    session_id: context_id
   )
 ```
 
@@ -258,7 +254,7 @@ views. The general filesystem list also includes root files and custom
 directories. It excludes the root `SKILL.md` and does not contain absolute
 paths.
 
-Skill tool results are marked durable in conversation refs. A ReAct context
+Skill tool results are marked durable in context refs. A ReAct context
 replacement with `reason: :compaction` retains the skill output and its matching
 assistant tool call.
 
@@ -271,7 +267,7 @@ one listed relative path:
 {:ok, resource} =
   Jido.AI.Actions.Skill.LoadResource.run(
     %{name: "code-review", relative_path: "references/checks.md"},
-    %{agent_id: conversation_id}
+    %{agent_id: context_id}
   )
 
 resource.content
@@ -286,7 +282,7 @@ For provider-backed runtime skills, use the listed opaque `resource_id` instead:
       name: "about-jaicool",
       resource_id: "b7754895-90f8-4594-b6be-c80fd0859545"
     },
-    %{agent_id: conversation_id, tenant_id: "acme"}
+    %{agent_id: context_id, tenant_id: "acme"}
   )
 ```
 

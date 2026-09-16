@@ -5,7 +5,7 @@
 ## Status
 
 - Reviewed: 2026-09-15.
-- Code for the example audit: `v3-spike`, HEAD `7bb011e98349af8bf580e7b93afa60990972beae`, plus uncommitted example, test, formatter, and documentation changes. No `lib/` or dependency changes.
+- Code baseline: `v3-spike`, HEAD `4ed6402f`, plus uncommitted runtime, test, example, and documentation refinement. Dependency pins are unchanged.
 - Prerequisite alignments used: [00 Package boundary and invariants](../00_boundary_invariants/alignment.md).
 - Alignment state: Draft. Current ownership is mapped; target decisions and full acceptance proof remain.
 - Verification: the example-driven review below adds fresh MockLLM runs to the earlier source review. Earlier statements that no tests ran refer to that prior review, not this follow-up.
@@ -17,7 +17,7 @@ Jido.Session owns a Thread of Entry values. These values are process-free and ha
 - Current owner: Jido.Session, Jido.Thread, Jido.Thread.Entry, Query, Turn, Output, Usage, Error, and Thread.Projection.
 - Cross-package ownership: core Jido owns Agent commit and topology; Flow/Exec and Signal internals remain in their respective packages.
 - Overall placement: [architecture overview](../ARCHITECTURE.md).
-- Full target: [design](design.md). Use canonical Session/Thread values for conversation data. Preserve multimodal content, correlation, output validation, safe errors, and explicit portable encodings. Broader constructor uniformity and strict provider-neutral content remain decisions.
+- Full target: [design](design.md). Use canonical Session/Thread values for context data. Preserve multimodal content, correlation, output validation, safe errors, and explicit portable encodings. Broader constructor uniformity and strict provider-neutral content remain decisions.
 
 ## Inputs and evidence
 
@@ -29,7 +29,7 @@ Jido.Session owns a Thread of Entry values. These values are process-free and ha
 | [lib/jido_thread.ex](../../../lib/jido_thread.ex) | Append-only Thread value |
 | [lib/jido_thread/entry.ex](../../../lib/jido_thread/entry.ex) | Entry schema |
 | [lib/jido_ai/thread/projection.ex](../../../lib/jido_ai/thread/projection.ex) | AI projection |
-| [lib/jido_ai/turn.ex](../../../lib/jido_ai/turn.ex) | Response value only |
+| [lib/jido_ai/model/response.ex](../../../lib/jido_ai/model/response.ex) | Response value only |
 | [lib/jido_ai/error.ex](../../../lib/jido_ai/error.ex) | Splode and runtime envelope |
 
 ### Examples and tests
@@ -45,7 +45,7 @@ proof is still incomplete. Inert declaration support is not runtime support.
 
 ## Retained baseline
 
-Use canonical Session/Thread values for conversation data. Preserve multimodal content, correlation, output validation, safe errors, and explicit portable encodings. Broader constructor uniformity and strict provider-neutral content remain decisions.
+Use canonical Session/Thread values for context data. Preserve multimodal content, correlation, output validation, safe errors, and explicit portable encodings. Broader constructor uniformity and strict provider-neutral content remain decisions.
 
 Preserve current public behavior unless an approved decision includes a
 migration. The initial audit changed examples and tests. The implementation follow-up also changes the runtime; see the current evidence below.
@@ -64,7 +64,7 @@ requirement associations are not carried forward as proof.
 | `VAL-GAP-003` | Resolved execution ownership; not VAL-REQ-012 | Tools.Executor owns execution; the old Turn execution helper is removed. | Superseded | Preserve the executor-boundary regression test. VAL-REQ-012 concerns content separation, not tool execution. |
 | `VAL-GAP-004` | `VAL-REQ-019` | Current errors use Splode and type/message/details/retryable? envelopes, not one category/code value. | Decision required | Decide taxonomy and compatibility in the target. |
 | `VAL-GAP-005` | `VAL-REQ-020` | Error and observation sanitizers exist; an old leak claim is not carried forward as a current defect without reproduction. | Implemented; evidence incomplete | Audit all projections and match tests to VAL-REQ-020. |
-| `VAL-GAP-006` | `VAL-REQ-021`, `VAL-REQ-022` | Canonical conversation codecs are versioned. A universal encoding contract for every public value is broader. | Partially implemented | Define which values are encoded and which remain runtime-only. |
+| `VAL-GAP-006` | `VAL-REQ-021`, `VAL-REQ-022` | Canonical context codecs are versioned. A universal encoding contract for every public value is broader. | Partially implemented | Define which values are encoded and which remain runtime-only. |
 
 ## Data-boundary review gap
 
@@ -92,7 +92,7 @@ default model context as required by VAL-REQ-023/024.
 The [acceptance matrix](#acceptance-matrix) now contains the evidence and
 remaining work for `VAL-REQ-023`, `VAL-REQ-024`.
 
-See the [scenario plan](../07_request_sessions/alignment.md#selected-conversation-policy-gaps-and-acceptance).
+See the [scenario plan](../07_request_sessions/alignment.md#selected-context-policy-gaps-and-acceptance).
 Promotion metadata and deferred replacement depend on seam 07 settlement.
 No new tests ran in this review.
 
@@ -161,7 +161,7 @@ gates are separate. No row grants document approval.
 | `VAL-REQ-020` | Implemented; evidence incomplete | Related example evidence (partial): [provider errors keep the native ReqLLM tagged result](../../../test/examples/01_authoring/01_08_model_helpers/01_08_model_helpers_test.exs). | Verify the target behavior: Error inspection and telemetry conversion shall redact credentials, request bodies, raw file content, and configured sensitive keys. |
 | `VAL-REQ-021` | Decision required | Related example evidence (partial): [versioned documents round-trip and reject runtime data](../../../test/examples/02_requests/02_27_thread_session_values/02_27_thread_session_values_test.exs). | Verify the target behavior: Every value that can enter a Signal, profile, Agent state, or checkpoint shall have a versioned portable encoding contract. |
 | `VAL-REQ-022` | Implemented; evidence incomplete | Target scenario passed: [VAL-REQ-022 target check](../../../test/examples/02_requests/02_27_thread_session_values/design_requirements_test.exs). Session rejects an unknown encoded key without creating an atom and rejects a future version. Other values and supported-version-range reporting remain unproved. Related example evidence (partial): [versioned documents round-trip and reject runtime data](../../../test/examples/02_requests/02_27_thread_session_values/02_27_thread_session_values_test.exs). | Verify the target behavior: A decoder shall reject an unsupported future version and shall identify the supported version range. |
-| `VAL-REQ-023` | Implemented; evidence incomplete | Target scenario repaired: [VAL-REQ-023 target check](../../../test/examples/02_requests/02_02_steering/design_requirements_test.exs). Pending request messages remain evidence until a matching successful-settlement entry promotes them. Full-clause and provider-matrix proof remains separate. | Verify the target behavior: The default Thread model projection shall include request work only after successful settlement promotes it into the completed conversation. |
+| `VAL-REQ-023` | Implemented; evidence incomplete | Target scenario repaired: [VAL-REQ-023 target check](../../../test/examples/02_requests/02_02_steering/design_requirements_test.exs). Pending request messages remain evidence until a matching successful-settlement entry promotes them. Full-clause and provider-matrix proof remains separate. | Verify the target behavior: The default Thread model projection shall include request work only after successful settlement promotes it into the completed context. |
 | `VAL-REQ-024` | Implemented; evidence incomplete | Target scenario repaired: [VAL-REQ-024 target check](../../../test/examples/02_requests/02_27_thread_session_values/design_requirements_test.exs). Default projection omits incomplete or mismatched tool exchanges without inventing results. Full-clause and provider-matrix proof remains separate. | Verify the target behavior: The default Thread model projection shall exclude unresolved tool exchanges without inventing tool results. |
 
 ## Migration and compatibility

@@ -26,14 +26,14 @@ Shared setup and fault fixtures stay in [test support](../../../test/examples/su
 ## Design target checks
 
 [The target checks](../../../test/examples/02_requests/02_02_steering/design_requirements_test.exs)
-separate queued steering from completed conversation. Queued input stays out
+separate queued steering from completed context. Queued input stays out
 until consumption (`SES-REQ-046`).
 
 Pending, failed, and cancelled request input stays
-out of the default completed-conversation projection (`VAL-REQ-023`,
+out of the default completed-context projection (`VAL-REQ-023`,
 `SES-REQ-045`). The failed-request case inspects the next actual model request.
 Request records and raw Thread entries retain execution evidence. Successful
-settlement promotes the request's messages into completed conversation. See
+settlement promotes the request's messages into completed context. See
 [request alignment](../../../docs/design/07_request_sessions/alignment.md#acceptance-matrix).
 
 ## Limits

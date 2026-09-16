@@ -3,7 +3,7 @@ defmodule Jido.AI.Orchestration.Activity do
   # The session event owner owns these timers. References never enter Agent state.
 
   def new(job, profile, defaults) do
-    idle = Map.get(profile.requests, :idle_timeout, 0)
+    idle = profile.controls.idle_timeout
 
     tool_timeout =
       Enum.reduce(profile.tools, Map.get(defaults, :timeout, 0), &max(&1.timeout, &2))
@@ -12,7 +12,7 @@ defmodule Jido.AI.Orchestration.Activity do
 
     Map.put(job, :activity, %{
       idle_ms: if(idle == 0, do: automatic, else: idle),
-      heartbeat_ms: Map.get(profile.requests, :tool_heartbeat, 0),
+      heartbeat_ms: profile.controls.tool_heartbeat,
       tools: MapSet.new(),
       idle: nil,
       heartbeat: nil

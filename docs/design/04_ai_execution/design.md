@@ -5,8 +5,8 @@
 ## Architecture and contract status
 
 - Architecture category: [Shared AI execution](../ARCHITECTURE.md).
-- Owning subsystem: Runtime.State, Flow, ReasonFlow, Prepare, CallModel, Decide, ToolsFlow, ToolAttempt, and OutputState.
-- Complete target: Keep one bounded execution path for all authoring forms and methods. Preserve advanced streaming, cancellation, retry, and effect contracts without making temporary execution state a portable conversation value.
+- Owning subsystem: Execution.State, Flow, ModelFlow, Prepare, CallModel, Decide, ToolsFlow, ToolAttempt, and OutputState.
+- Complete target: Keep one bounded execution path for all authoring forms and methods. Preserve advanced streaming, cancellation, retry, and effect contracts without making temporary execution state a portable context value.
 - Decision boundary: Resolve portable public Execution types, explicit Map concurrency, and the exact public cancellation contract against current core APIs.
 - Current implementation, module links, example proof, and exact differences:
   [alignment](alignment.md). This design is a target, not an API reference.
@@ -52,14 +52,14 @@ owned by seam 05 under EXE-DEC-005.
 Orchestration owns pending-input order and queue access. A shared control point
 for pending input and checkpoints is a proposal, not a settled contract.
 Preserve wait-for-entry-commit behavior unless explicitly changed. This
-boundary does not require a public execution model or a second conversation
+boundary does not require a public execution model or a second context
 store.
 
-## Conversation evidence and completion
+## Context evidence and completion
 
-The [selected commit policy](../07_request_sessions/design.md#selected-conversation-commit-policy)
+The [selected commit policy](../07_request_sessions/design.md#selected-context-commit-policy)
 keeps committed intermediate work as evidence without promoting failed or
-cancelled work into the next default model conversation. Runtime reports
+cancelled work into the next default model context. Runtime reports
 completed tool results and unresolved calls accurately; it does not invent
 results to make a tool exchange complete. Orchestration owns promotion.
 
@@ -197,9 +197,9 @@ The Flow module DSL is the primary surface for developer-authored custom Flows. 
 
 ### Turn and session parity
 
-`EXE-REQ-027`: Turn mode and session mode shall use the same canonical AI Flow, model gateway, tool bridge, limits, and terminal result contract.
+`EXE-REQ-027`: Asynchronous and synchronous request helpers shall use the same canonical AI Flow, model gateway, tool bridge, limits, and terminal result contract.
 
-`EXE-REQ-028`: Differences between Turn mode and session mode shall be limited to admission, process lifetime, streaming transport, and commit timing.
+`EXE-REQ-028`: Retired. The selected single lifecycle removes the mode distinction. EXE-REQ-027 covers the shared execution contract; this identifier is not reused.
 
 ### Stored and direct Flow forms
 
@@ -214,7 +214,7 @@ Recommended values:
 ```elixir
 Jido.AI.Execution.Input.t()
 Jido.AI.Execution.Limits.t()
-Jido.AI.Execution.Event.t()
+Jido.AI.Observe.Event.t()
 Jido.AI.Execution.Result.t()
 ```
 
@@ -241,7 +241,7 @@ Flow component contracts consume only standard Action outputs and errors. Jido A
 - `EXE-INV-003`: Jido AI does not execute Runic or any private Flow runtime directly.
 - `EXE-INV-004`: Tool batch output order follows model call order.
 - `EXE-INV-005`: One execution stream has one terminal item.
-- `EXE-INV-006`: Turn and session modes share AI semantics.
+- `EXE-INV-006`: Asynchronous and synchronous request helpers share AI semantics.
 - `EXE-INV-007`: An execution result is a proposal until core Jido commits it.
 - `EXE-INV-008`: Live Exec state is never portable or durable.
 - `EXE-INV-009`: Every authoring form produces the same canonical Flow contract.

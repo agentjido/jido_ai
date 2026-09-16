@@ -1,6 +1,6 @@
 defmodule Jido.AI.Orchestration.Publish do
   @moduledoc false
-  use Jido.Action, name: "ai_session_publish", schema: Zoi.object(%{batch_id: Zoi.string()})
+  use Jido.Action, name: "ai_request_publish", schema: Zoi.object(%{batch_id: Zoi.string()})
 
   def run(params, context) do
     with {:ok, context} <- Jido.AI.Orchestration.Plugin.context(context),

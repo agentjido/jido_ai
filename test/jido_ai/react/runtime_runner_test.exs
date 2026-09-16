@@ -401,7 +401,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       |> Enum.to_list()
 
     assert length(events) >= 6
-    assert Enum.all?(events, &match?(%Jido.AI.Runtime.Event{}, &1))
+    assert Enum.all?(events, &match?(%Jido.AI.Observe.Event{}, &1))
     assert Enum.all?(events, &(&1.request_id == "req_evt" and &1.run_id == "run_evt"))
     assert Enum.map(events, & &1.seq) == Enum.to_list(1..length(events))
     assert hd(events).kind == :request_started
@@ -1818,6 +1818,6 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   defp message_content(message) when is_map(message) do
     message
     |> Map.get(:content, Map.get(message, "content"))
-    |> Jido.AI.Turn.extract_text()
+    |> Jido.AI.Model.Response.extract_text()
   end
 end

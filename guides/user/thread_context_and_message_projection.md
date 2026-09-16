@@ -1,21 +1,21 @@
-# Conversations, Sessions, and Threads
+# Contexts, Sessions, and Threads
 
-Use `Jido.Session` and `Jido.Thread` as portable conversation values. Both belong
+Use `Jido.Session` and `Jido.Thread` as portable context values. Both belong
 to the `jido_ai` package. They do not start processes or execute requests.
 
-## One conversation store
+## One context store
 
 The Profile's `memory.history` setting names an Agent field. That field holds
 one `Jido.Session`, or `nil` before the first request. Declare it with
 `Jido.AI.Thread.Projection.schema()`. A Session owns one append-only Thread. The
 Thread holds ordered `Jido.Thread.Entry` values, including AI messages,
-conversation operations, and application entries.
+context operations, and application entries.
 
 The context-control Plugin holds lane and pending-operation state. It does not
 hold a second Session or copy of the messages. `Jido.AI.Orchestration` is the separate
 live API for request control and inspection; it is not the portable value.
 
-## Build and project a conversation
+## Build and project a context
 
 ```elixir
 alias Jido.AI.Thread.Projection
@@ -29,7 +29,7 @@ thread = Jido.Thread.new(metadata: %{system_prompt: "Be concise."})
 {:ok, messages} = Projection.messages(session)
 ```
 
-`messages/1` returns ReqLLM messages in order for the selected conversation.
+`messages/1` returns ReqLLM messages in order for the selected context.
 It applies saved replacements and lane switches. It ignores application entry
 kinds. Invalid AI payloads return an error. Entry references stay outside the
 provider message metadata. Text, tool correlation, binary content, and required
@@ -67,7 +67,7 @@ special `:context` import input is removed.
 
 ```elixir
 {:ok, summary} = Projection.append(Jido.Thread.new(), [
-  %{role: :user, content: "Summary of the earlier conversation"}
+  %{role: :user, content: "Summary of the earlier context"}
 ])
 
 {:ok, _} = Jido.AI.Orchestration.modify_context(server, %{

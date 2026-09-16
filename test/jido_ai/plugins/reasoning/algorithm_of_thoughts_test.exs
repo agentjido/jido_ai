@@ -57,7 +57,6 @@ defmodule Jido.AI.Plugins.Reasoning.AlgorithmOfThoughtsTest do
     Jido.AI.Profile.new!(%{
       id: :review,
       reasoning: :algorithm_of_thoughts,
-      requests: %{mode: :session},
       result: %{into: :result}
     })
   end

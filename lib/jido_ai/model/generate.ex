@@ -31,7 +31,7 @@ defmodule Jido.AI.Model.Generate do
             progress.(Map.get(chunk.metadata, :usage, %{}))
             Jido.AI.Orchestration.activity(context)
 
-            case Jido.AI.Turn.stream_content_part(chunk) do
+            case Jido.AI.Model.Response.stream_content_part(chunk) do
               {:ok, part} -> delta(context, model, :content_part, part)
               :error -> :ok
             end

@@ -1,6 +1,8 @@
 defmodule JidoAI.Examples.AdaptiveTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Authoring, Request, Orchestration}
+  alias Jido.AI.Authoring
+  alias Jido.AI.Request
+  alias Jido.AI.Orchestration
   alias Jido.AI.Reasoning.Adaptive.Selection
   alias JidoAI.Examples.Adaptive
 
@@ -454,7 +456,7 @@ defmodule JidoAI.Examples.AdaptiveTest do
 
   test "rich queries and steering retain explicit native limits before model work", %{jido: jido} do
     {mock, context} = mock([])
-    assert {:error, _} = Adaptive.definition(%{requests: %{mode: :session, steering: true}})
+    assert {:error, _} = Adaptive.definition(%{controls: %{steering: true}})
     server = start(jido)
     assert {:ok, handle} = request(server, context, [ReqLLM.Message.ContentPart.text("Rich")])
     assert {:error, reason} = Request.await(handle)
@@ -509,12 +511,12 @@ defmodule JidoAI.Examples.AdaptiveTest do
              Jido.Exec.run(flow, %{query: "Improve the answer"}, direct_context)
 
     assert meta.reasoning.trm.supervision_step == 1 and meta.adaptive.strategy == :trm
-    server = start(jido, %{requests: %{mode: :turn}})
+    server = start(jido)
 
     signal =
       Jido.Signal.new!("ai.adaptive.query", %{query: "Improve the answer"}, source: "/examples/adaptive")
 
-    assert {:ok, agent} = Server.call(server, signal, context: context, timeout: 5_000)
+    assert {:ok, agent} = Jido.AI.Test.Requests.call_and_await(server, signal, context: context, timeout: 5_000)
     assert agent.state.reply == "Unreviewed improvement"
     assert_script_done(mock)
   end

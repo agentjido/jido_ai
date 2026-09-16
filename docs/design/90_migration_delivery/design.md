@@ -116,12 +116,12 @@ explicit no-replacement reason.
 
 ### Documentation and examples
 
-`DEL-REQ-019`: The package overview shall describe the package boundary, V3 Agent and Flow model, request modes, effect timing, durability limits, and host responsibilities.
+`DEL-REQ-019`: The package overview shall describe the package boundary, V3 Agent and Flow model, the single AI request lifecycle, effect timing, durability limits, and host responsibilities.
 
 `DEL-REQ-020`: Public guides shall use `Jido.AI.Agent` and its Spark DSL as the
 primary authoring form. Direct core Agents shall use `Jido.AI.DSL` explicitly.
 
-`DEL-REQ-021`: Examples shall include direct generation, Turn mode, session mode, streaming, tools, structured output, reasoning, retrieval, quota, skills, checkpoints, and observation.
+`DEL-REQ-021`: Examples shall include direct generation, request handles, synchronous waiting, streaming, tools, structured output, reasoning, retrieval, quota, skills, checkpoints, and observation.
 
 `DEL-REQ-022`: Each example shall state whether it uses a real provider, test provider, external service, in-memory store, or durable host resource.
 

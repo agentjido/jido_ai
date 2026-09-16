@@ -36,10 +36,8 @@ defmodule MyApp.Assistant do
         action(MyApp.Multiply, as: :multiply)
       end
 
-      requests do
-        mode(:session)
-        streaming(true)
-        steering(true)
+      controls do
+        steering true
       end
 
       result(nil, into: :answer)

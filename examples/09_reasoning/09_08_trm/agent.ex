@@ -19,11 +19,6 @@ defmodule JidoAI.Examples.TRM.Agent do
         output(JidoAI.Examples.TRM.Check)
       end
 
-      requests do
-        mode(:session)
-        streaming(true)
-      end
-
       result(nil, into: :reply)
     end
   end

@@ -276,7 +276,7 @@ defmodule Jido.AI.Orchestration.Delivery do
 
     if remaining > 0 do
       signal =
-        Jido.Signal.new!(Orchestration.publish_type(), %{batch_id: id}, source: "/jido/ai/session")
+        Jido.Signal.new!(Orchestration.publish_type(), %{batch_id: id}, source: "/jido/ai/request")
 
       case Jido.AgentServer.call(server, signal,
              timeout: remaining,

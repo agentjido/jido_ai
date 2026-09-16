@@ -1,6 +1,6 @@
 defmodule Jido.AI.Orchestration.Settle do
   @moduledoc false
-  use Jido.Action, name: "ai_session_settle", schema: Zoi.object(%{request_id: Zoi.string()})
+  use Jido.Action, name: "ai_request_settle", schema: Zoi.object(%{request_id: Zoi.string()})
   alias Jido.AI.Orchestration.Change
 
   def run(params, context) do
@@ -17,7 +17,7 @@ defmodule Jido.AI.Orchestration.Settle do
       {candidate, update, directives} =
         case outcome do
           {:ok, %{result: result, meta: meta, effect_plan: plan} = outcome} ->
-            content = Map.get(outcome, :content, Jido.AI.Runtime.OutputState.content(result))
+            content = Map.get(outcome, :content, Jido.AI.Execution.OutputState.content(result))
             value = Map.get(outcome, :value, if(profile.result.schema, do: result, else: nil))
 
             with {:ok, candidate} <-
@@ -79,7 +79,7 @@ defmodule Jido.AI.Orchestration.Settle do
         result
 
       {:error, errors} ->
-        if Jido.AI.Runtime.StateSize.error?(errors),
+        if Jido.AI.Execution.StateSize.error?(errors),
           do: {:error, :state_size},
           else: {:error, :invalid_domain_result}
     end

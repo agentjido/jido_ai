@@ -1,6 +1,6 @@
 # 02_27 — Thread and Session values
 
-Keep an application-owned conversation as portable immutable data.
+Keep an application-owned context as portable immutable data.
 
 ## Read the code
 

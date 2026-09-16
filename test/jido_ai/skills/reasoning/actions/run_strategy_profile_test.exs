@@ -6,7 +6,9 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyProfileTest do
 
   alias Jido.AI.Actions.Reasoning.{RunCapability, RunStrategy}
   alias Jido.AI.Error.Validation.Invalid
-  alias Jido.AI.{Agent, Profile, Reasoning}
+  alias Jido.AI.Agent
+  alias Jido.AI.Profile
+  alias Jido.AI.Reasoning
   alias Jido.AgentServer
   alias Jido.AI.Plugins.ModelRouting
   alias Jido.AI.Plugins.Reasoning.ChainOfThought
@@ -37,8 +39,8 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyProfileTest do
                max_tool_calls: 16
              }
 
-      refute profile.requests.streaming
-      assert profile.requests.on_busy == :reject
+      refute Map.has_key?(profile, :requests)
+      refute Map.has_key?(profile.controls, :on_busy)
       assert profile.result.into == :answer
       assert profile.result.schema == nil
 
@@ -138,7 +140,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyProfileTest do
           {put_in(profile().models.default.model, false), "models"},
           {put_in(profile().models.default.model, nil), "models"},
           {put_in(profile().controls.timeout, 0), "controls"},
-          {put_in(profile().requests.mode, :turn), "requests.mode"},
+          {Map.put(profile(), :requests, %{mode: :turn}), "profile"},
           {put_in(profile().reasoning.method, :react), "reasoning.method"},
           {put_in(profile().result.into, nil), "result"},
           {put_in(profile().memory.history, :answer), "memory.history"}
@@ -244,7 +246,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyProfileTest do
   defp profile(attrs \\ %{}) do
     Profile.new!(
       Map.merge(
-        %{id: :review, reasoning: :chain_of_thought, requests: %{mode: :session}, result: %{into: :answer}},
+        %{id: :review, reasoning: :chain_of_thought, result: %{into: :answer}},
         attrs
       )
     )

@@ -17,7 +17,6 @@ defmodule Jido.AI.DSL.Entities do
       tools: [],
       skills: [],
       result: [],
-      requests: [],
       memory: []
     ]
   end
@@ -65,6 +64,9 @@ defmodule Jido.AI.DSL.Entities do
       max_model_calls: 12,
       max_tool_calls: 16,
       timeout: 60_000,
+      steering: false,
+      idle_timeout: 0,
+      tool_heartbeat: 0,
       input: [],
       model: [],
       operation: [],
@@ -222,19 +224,6 @@ defmodule Jido.AI.DSL.Entities do
       :on_validation_error,
       :__spark_metadata__,
       max_repairs: 0
-    ]
-  end
-
-  defmodule Requests do
-    defstruct [
-      :idle_timeout,
-      :tool_heartbeat,
-      :__spark_metadata__,
-      mode: :turn,
-      on_busy: :reject,
-      max_requests: 100,
-      streaming: false,
-      steering: false
     ]
   end
 

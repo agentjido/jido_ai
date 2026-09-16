@@ -3,7 +3,8 @@ Code.require_file("../support/agents/corpus.exs", __DIR__)
 defmodule JidoAITest.Authoring.Agents.SourceVariationsTest do
   use ExUnit.Case, async: false
   @moduletag :authoring
-  alias Jido.AI.{Authoring, Profile}
+  alias Jido.AI.Authoring
+  alias Jido.AI.Profile
   alias JidoAITest.Authoring.Agents.Corpus
 
   for variant <- Corpus.variants() do

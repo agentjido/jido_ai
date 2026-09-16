@@ -4,7 +4,7 @@
 
 ## Briefing
 
-Models uses native ReqLLM/LLMDB model inputs. Model.Transport owns provider requests, Model.Options merges trusted options, and Model.Messages adapts messages and reference metadata. Runtime.RequestTransform still exposes ReAct-specific callback views. Direct model contracts remain native; Agent results are adapted for their storage and request contracts.
+Models uses native ReqLLM/LLMDB model inputs. Model.Transport owns provider requests, Model.Options merges trusted options, and Model.Messages adapts messages and reference metadata. Execution.RequestTransform still exposes ReAct-specific callback views. Direct model contracts remain native; Agent results are adapted for their storage and request contracts.
 
 This seam retains the complete target, not only current functionality. Detailed
 current evidence and gaps are in [alignment](alignment.md); proposed contracts

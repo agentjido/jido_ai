@@ -16,12 +16,6 @@ defmodule JidoAITest.Authoring.Agents.Fixtures.Session do
         timeout 5_000
       end
 
-      requests do
-        mode :session
-        streaming true
-        max_requests 3
-      end
-
       memory do
         history(:messages)
       end

@@ -227,13 +227,13 @@ result = ReAct.run("What is 19 + 23?", config)
 #   termination_reason: :final_answer,
 #   usage: %{input_tokens: 120, output_tokens: 45},
 #   final_token: "rt2.eyJhbGci...",
-#   trace: [%Jido.AI.Runtime.Event{...}, ...]
+#   trace: [%Jido.AI.Observe.Event{...}, ...]
 # }
 ```
 
 ## Streaming
 
-`stream/3` returns a lazy `Enumerable` of `Jido.AI.Runtime.Event` structs. Process events as they arrive, then reduce the stream with `collect_stream/1` if you need the terminal result.
+`stream/3` returns a lazy `Enumerable` of `Jido.AI.Observe.Event` structs. Process events as they arrive, then reduce the stream with `collect_stream/1` if you need the terminal result.
 
 ```elixir
 alias Jido.AI.Reasoning.ReAct
@@ -325,10 +325,10 @@ Attempting to `continue/3` a cancelled token will restore a state with `status: 
 
 ## Event Stream Item Shapes
 
-Every event is a `Jido.AI.Runtime.Event` struct:
+Every event is a `Jido.AI.Observe.Event` struct:
 
 ```elixir
-%Jido.AI.Runtime.Event{
+%Jido.AI.Observe.Event{
   id: "evt_abc123",
   seq: 1,
   at_ms: 1740268800000,
@@ -414,7 +414,7 @@ for limits, closure, failure and resume checks.
 
 Pass `query: "Follow-up question"` to `continue/3`, or to `stream_from_state/3`
 with an initial State or native checkpoint. Content-part lists are also accepted.
-New native terminal tokens retain conversation and committed domain state.
+New native terminal tokens retain context and committed domain state.
 The appended work keeps request/run identity, usage and remaining limits.
 Pending tools finish before the model receives the appended query.
 

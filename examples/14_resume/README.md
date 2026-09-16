@@ -17,7 +17,7 @@ matching `test/examples/14_resume` folder.
 | `14_07_standalone_input` | [14_07: Caller-supplied input queues](14_07_standalone_input/README.md) | [14_07_standalone_input_test.exs](../../test/examples/14_resume/14_07_standalone_input/14_07_standalone_input_test.exs) |
 | `14_08_query_append` | [14_08: Native query append and State counters](14_08_query_append/README.md) | [14_08_query_append_test.exs](../../test/examples/14_resume/14_08_query_append/14_08_query_append_test.exs) |
 | `14_10_failure_position` | [14_10: Reasoning position on failure and cancellation](14_10_failure_position/README.md) | [14_10_failure_position_test.exs](../../test/examples/14_resume/14_10_failure_position/14_10_failure_position_test.exs) |
-| `14_11_initial_state` | [14_11: Initial conversation state import](14_11_initial_state/README.md) | [14_11_initial_state_test.exs](../../test/examples/14_resume/14_11_initial_state/14_11_initial_state_test.exs) |
+| `14_11_initial_state` | [14_11: Initial context state import](14_11_initial_state/README.md) | [14_11_initial_state_test.exs](../../test/examples/14_resume/14_11_initial_state/14_11_initial_state_test.exs) |
 | `14_12_terminal_state` | [14_12: Native terminal state restore](14_12_terminal_state/README.md) | [14_12_terminal_state_test.exs](../../test/examples/14_resume/14_12_terminal_state/14_12_terminal_state_test.exs) |
 
 Run this group from the repository root:

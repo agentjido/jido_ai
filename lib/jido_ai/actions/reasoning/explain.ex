@@ -65,7 +65,7 @@ defmodule Jido.AI.Actions.Reasoning.Explain do
   def vsn, do: "1.0.0"
 
   alias Jido.AI.Actions.Helpers
-  alias Jido.AI.Turn
+  alias Jido.AI.Model.Response
   alias Jido.AI.Validation
   alias ReqLLM.Context
 
@@ -226,7 +226,7 @@ defmodule Jido.AI.Actions.Reasoning.Explain do
 
   defp format_result(response, model, detail_level) do
     %{
-      result: Turn.extract_text(response),
+      result: Response.extract_text(response),
       detail_level: detail_level,
       model: model,
       usage: Helpers.extract_usage(response)

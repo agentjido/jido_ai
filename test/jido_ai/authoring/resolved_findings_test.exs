@@ -1,6 +1,7 @@
 defmodule Jido.AI.Authoring.ResolvedFindingsTest do
   use ExUnit.Case, async: false
-  alias Jido.AI.{Authoring, Profile}
+  alias Jido.AI.Authoring
+  alias Jido.AI.Profile
   alias Jido.AI.Test.MockLLM
 
   defmodule SizedBlock do
@@ -73,14 +74,16 @@ defmodule Jido.AI.Authoring.ResolvedFindingsTest do
     {:ok, server} = Jido.start_agent(jido, SizedBlock)
     before = Jido.AgentServer.snapshot(server)
     context = %{ai: %{assistant: %{options: MockLLM.options(mock)}}}
-    assert {:error, _} = SizedBlock.ask(server, "Large", context: context)
-    assert Jido.AgentServer.snapshot(server) === before
-    assert {:ok, "Next"} = SizedBlock.ask(server, "Small", context: context)
+    assert {:error, _} = SizedBlock.ask_sync(server, "Large", context: context)
+    state = Jido.AgentServer.agent(server).state
+    assert Map.delete(state, :requests) === Map.delete(before.agent.state, :requests)
+    assert [{_, %{status: :failed}}] = Map.to_list(state.requests)
+    assert {:ok, "Next"} = SizedBlock.ask_sync(server, "Small", context: context)
     assert %{remaining: [], unexpected: [], requests: [_, _]} = MockLLM.report(mock)
   end
 
   test "stored schemas using the old validate MFA enforce the limit too" do
-    schema = Zoi.object(%{reply: Zoi.string()}) |> Zoi.refine({Jido.AI.Runtime.StateSize, :validate, [100]})
+    schema = Zoi.object(%{reply: Zoi.string()}) |> Zoi.refine({Jido.AI.Execution.StateSize, :validate, [100]})
     assert {:ok, _} = Zoi.parse(schema, %{reply: "Small"})
     assert {:error, errors} = Zoi.parse(schema, %{reply: String.duplicate("x", 200)})
     assert Authoring.state_size_error?(errors)
@@ -123,7 +126,9 @@ defmodule Jido.AI.Authoring.ResolvedFindingsTest do
     signal = Jido.Signal.new!("ask", %{query: "Help"}, source: "/test")
 
     assert {:ok, agent} =
-             Jido.AgentServer.call(server, signal, context: %{ai: %{assistant: %{options: MockLLM.options(mock)}}})
+             Jido.AI.Test.Requests.call_and_await(server, signal,
+               context: %{ai: %{assistant: %{options: MockLLM.options(mock)}}}
+             )
 
     assert agent.state.reply == "Allowed"
     assert %{remaining: [], unexpected: [], requests: [_]} = MockLLM.report(mock)
@@ -153,7 +158,6 @@ defmodule Jido.AI.Authoring.ResolvedFindingsTest do
           id: :assistant,
           model: MockLLM.model(),
           result: %{into: :reply},
-          requests: %{mode: ctx.mode},
           tool_sources: [%{kind: :mcp_tools, endpoint: :missing_regression_endpoint, required: ctx.required}]
         )
 
@@ -172,7 +176,9 @@ defmodule Jido.AI.Authoring.ResolvedFindingsTest do
       signal = Jido.Signal.new!("ask", %{query: "No", request_id: "rejected"}, source: "/test")
 
       assert {:error, %Jido.AI.Error.Validation.Invalid{field: "tool_sources"}} =
-               Jido.AgentServer.call(server, signal, context: %{ai: %{assistant: %{options: MockLLM.options(mock)}}})
+               Jido.AI.Test.Requests.call_and_await(server, signal,
+                 context: %{ai: %{assistant: %{options: MockLLM.options(mock)}}}
+               )
 
       assert Jido.AgentServer.snapshot(server) === before
       assert %{remaining: [], unexpected: [], requests: []} = MockLLM.report(mock)

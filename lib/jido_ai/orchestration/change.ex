@@ -6,7 +6,7 @@ defmodule Jido.AI.Orchestration.Change do
             __MODULE__,
             %{
               operation: Zoi.enum([:start, :finish, :control, :history, :progress]),
-              record: Jido.AI.Orchestration.Record.schema(),
+              record: Jido.AI.Request.Record.schema(),
               batch_id: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil)
             },
             coerce: true

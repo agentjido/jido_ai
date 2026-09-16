@@ -1,8 +1,8 @@
-defmodule Jido.AI.TurnEdgeCoverageTest do
+defmodule Jido.AI.Model.ResponseEdgeCoverageTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Turn
-  alias Jido.AI.Turn.Content
+  alias Jido.AI.Model.Response
+  alias Jido.AI.Model.Content
   alias ReqLLM.Message.ContentPart
   alias ReqLLM.ToolResult
 
@@ -22,15 +22,15 @@ defmodule Jido.AI.TurnEdgeCoverageTest do
   end
 
   test "preserves existing turns and can override their model" do
-    turn = %Turn{text: "done", model: "old"}
-    assert Turn.from_response(turn) == turn
-    assert Turn.from_response(turn, model: "new").model == "new"
-    assert Turn.from_result_map(turn) == turn
+    turn = %Response{text: "done", model: "old"}
+    assert Response.from_response(turn) == turn
+    assert Response.from_response(turn, model: "new").model == "new"
+    assert Response.from_result_map(turn) == turn
   end
 
   test "normalizes result-map types and finish reasons" do
-    assert Turn.from_result_map(%{type: "tool_calls"}).type == :tool_calls
-    assert Turn.from_result_map(%{type: "unknown"}).type == :final_answer
+    assert Response.from_result_map(%{type: "tool_calls"}).type == :tool_calls
+    assert Response.from_result_map(%{type: "unknown"}).type == :final_answer
 
     expected = %{
       "stop" => :stop,
@@ -50,34 +50,34 @@ defmodule Jido.AI.TurnEdgeCoverageTest do
     }
 
     for {input, output} <- expected do
-      assert Turn.from_result_map(%{finish_reason: input}).finish_reason == output
+      assert Response.from_result_map(%{finish_reason: input}).finish_reason == output
     end
   end
 
   test "handles malformed content and extraction fallbacks" do
-    assert Turn.extract_text(%{message: %{content: false}}) == ""
-    assert Turn.extract_text(%{choices: [%{message: %{content: false}}]}) == ""
-    assert Turn.extract_text(%{content: [%{type: :text, text: "direct"}]}) == "direct"
-    assert Turn.extract_text(%{other: true}) == ""
-    assert Turn.extract_text(["io", ["data"]]) == "iodata"
-    assert Turn.extract_text([%{type: :image, url: "x"}]) == ""
-    assert Turn.extract_text(17) == ""
+    assert Response.extract_text(%{message: %{content: false}}) == ""
+    assert Response.extract_text(%{choices: [%{message: %{content: false}}]}) == ""
+    assert Response.extract_text(%{content: [%{type: :text, text: "direct"}]}) == "direct"
+    assert Response.extract_text(%{other: true}) == ""
+    assert Response.extract_text(["io", ["data"]]) == "iodata"
+    assert Response.extract_text([%{type: :image, url: "x"}]) == ""
+    assert Response.extract_text(17) == ""
 
-    assert Turn.extract_from_content([%{type: :text, text: "one"}, %{type: "text", text: "two"}, :bad]) ==
+    assert Response.extract_from_content([%{type: :text, text: "one"}, %{type: "text", text: "two"}, :bad]) ==
              "one\ntwo"
 
-    assert Turn.extract_from_content(:bad) == ""
+    assert Response.extract_from_content(:bad) == ""
 
-    assert Turn.extract_from_content([%{type: :text, text: 17}]) == ""
+    assert Response.extract_from_content([%{type: :text, text: 17}]) == ""
   end
 
   test "handles stream chunks that do not contain content parts" do
-    assert Turn.stream_content_part(:bad) == :error
-    assert Turn.content_parts_from_chunks([:bad]) == []
+    assert Response.stream_content_part(:bad) == :error
+    assert Response.content_parts_from_chunks([:bad]) == []
 
-    turn = %Turn{content_parts: :invalid, text: "fallback"}
-    assert Turn.assistant_content(turn) == "fallback"
-    assert Turn.result(turn) == "fallback"
+    turn = %Response{content_parts: :invalid, text: "fallback"}
+    assert Response.assistant_content(turn) == "fallback"
+    assert Response.result(turn) == "fallback"
   end
 
   test "builds a map from one Action module" do
@@ -85,7 +85,7 @@ defmodule Jido.AI.TurnEdgeCoverageTest do
   end
 
   test "runs calls even when the response type was not classified as tool calls" do
-    turn = %Turn{
+    turn = %Response{
       type: :final_answer,
       tool_calls: [%{id: "call", name: Echo.name(), arguments: %{}}]
     }
@@ -95,16 +95,16 @@ defmodule Jido.AI.TurnEdgeCoverageTest do
   end
 
   test "normalizes malformed tool calls and result content shapes" do
-    turn = Turn.from_result_map(%{tool_calls: :invalid, tool_results: :invalid})
+    turn = Response.from_result_map(%{tool_calls: :invalid, tool_results: :invalid})
     assert turn.tool_calls == []
     assert turn.tool_results == []
 
-    assert %{tool_calls: [:invalid]} = Turn.from_result_map(%{tool_calls: [:invalid]})
+    assert %{tool_calls: [:invalid]} = Response.from_result_map(%{tool_calls: [:invalid]})
 
     canonical = Jason.encode!(%{ok: true, result: 1})
 
     turn =
-      Turn.with_tool_results(%Turn{}, [
+      Response.with_tool_results(%Response{}, [
         %{id: "canonical", name: "tool", content: canonical},
         %{id: "plain", name: "tool", content: "plain", raw_result: {:ok, :value}},
         %{id: "parts", name: "tool", content: [ContentPart.text("part")]},
@@ -120,19 +120,19 @@ defmodule Jido.AI.TurnEdgeCoverageTest do
     assert [%ContentPart{type: :text}] = Enum.at(turn.tool_results, 2).content
     assert Enum.all?(turn.tool_results, &match?(%{raw_result: {_, _, _}}, &1))
 
-    assert length(Turn.tool_messages(turn)) == 9
+    assert length(Response.tool_messages(turn)) == 9
   end
 
   test "normalizes string thinking blocks and tool argument variants" do
     thinking_turn =
-      Turn.from_response(%{
+      Response.from_response(%{
         message: %{content: [%{type: "thinking", thinking: "private"}]}
       })
 
     assert thinking_turn.thinking_content == "private"
 
     turn =
-      Turn.from_result_map(%{
+      Response.from_result_map(%{
         text: 17,
         tool_calls: [
           %{id: "valid", name: "echo", arguments: ~s({"value":1})},
@@ -144,7 +144,7 @@ defmodule Jido.AI.TurnEdgeCoverageTest do
     assert turn.text == ""
     assert Enum.map(turn.tool_calls, & &1.arguments) == [%{"value" => 1}, %{}, %{}]
 
-    message = Turn.assistant_message(%{turn | type: :final_answer})
+    message = Response.assistant_message(%{turn | type: :final_answer})
     assert length(message.tool_calls) == 3
   end
 

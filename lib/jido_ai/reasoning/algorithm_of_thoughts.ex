@@ -1,6 +1,8 @@
 defmodule Jido.AI.Reasoning.AlgorithmOfThoughts do
   @moduledoc "AoT prompt, parser and structured result rules over the shared Agent/Flow runtime."
-  alias Jido.AI.{Output, Profile, Reasoning}
+  alias Jido.AI.Output
+  alias Jido.AI.Profile
+  alias Jido.AI.Reasoning
   alias Jido.AI.Reasoning.AlgorithmOfThoughts.{Machine, Result}
 
   def method, do: :algorithm_of_thoughts

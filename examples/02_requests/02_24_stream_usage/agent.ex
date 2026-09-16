@@ -23,11 +23,6 @@ for {module, capture?} <- [
           action(JidoAI.Examples.StreamUsage.Echo, as: :usage_echo)
         end
 
-        requests do
-          mode(:session)
-          streaming(true)
-        end
-
         observability do
           store_content true
           emit_llm_deltas(@capture)

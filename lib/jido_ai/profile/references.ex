@@ -4,7 +4,15 @@ defmodule Jido.AI.Profile.References do
   import Jido.AI.Profile, only: [error: 2, fields: 3, traverse: 2]
 
   @stages [:input, :model, :operation, :output]
-  @control_fields [:max_iterations, :max_model_calls, :max_tool_calls, :timeout] ++ @stages
+  @control_fields [
+                    :max_iterations,
+                    :max_model_calls,
+                    :max_tool_calls,
+                    :timeout,
+                    :steering,
+                    :idle_timeout,
+                    :tool_heartbeat
+                  ] ++ @stages
 
   # Resolve only explicit references. Profile retains defaults and policy validation.
   def resolve(attrs, registries) do

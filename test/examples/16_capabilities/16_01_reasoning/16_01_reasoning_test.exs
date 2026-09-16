@@ -214,7 +214,7 @@ defmodule JidoAI.Examples.ReasoningCapabilitiesTest do
     server = start_agent(jido, ReasoningCapabilities.MixedAgent.new!())
 
     assert {:ok, first} =
-             Server.call(server, signal("ai.ask", %{query: "Question"}), context: context)
+             Jido.AI.Test.Requests.call_and_await(server, signal("ai.ask", %{query: "Question"}), context: context)
 
     assert first.state.result == "Native answer"
     assert {:ok, second} = Server.call(server, signal("reasoning.cot.run"), context: context)
@@ -237,7 +237,6 @@ defmodule JidoAI.Examples.ReasoningCapabilitiesTest do
             max_model_calls: :method_default,
             max_tool_calls: :method_default
           },
-          requests: %{mode: :session, streaming: true},
           result: %{into: :result}
         },
         attrs

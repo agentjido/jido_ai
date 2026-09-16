@@ -1,6 +1,7 @@
 defmodule JidoAI.Examples.SkillRuntimeTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Request, Orchestration}
+  alias Jido.AI.Request
+  alias Jido.AI.Orchestration
   alias Jido.AI.Thread.Projection
   alias Jido.AI.Actions.Skill.{LoadSkill, RuntimeContext}
   alias Jido.Thread

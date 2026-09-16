@@ -17,11 +17,6 @@ defmodule JidoAI.Examples.GoT.Agent do
         output(JidoAI.Examples.GoT.Check)
       end
 
-      requests do
-        mode(:session)
-        streaming(true)
-      end
-
       result(nil, into: :reply)
     end
   end

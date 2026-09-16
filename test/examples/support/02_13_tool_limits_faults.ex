@@ -107,10 +107,6 @@ defmodule JidoAI.Examples.ToolLimits.FixtureAgent do
         )
       end
 
-      requests do
-        mode(:session)
-      end
-
       result(nil, into: :reply)
     end
   end

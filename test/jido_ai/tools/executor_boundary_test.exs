@@ -30,10 +30,10 @@ defmodule Jido.AI.Tools.ExecutorBoundaryTest do
   end
 
   test "Turn exposes values and projections, not execution" do
-    Code.ensure_loaded!(Jido.AI.Turn)
+    Code.ensure_loaded!(Jido.AI.Model.Response)
 
     for {name, arity} <- [execute: 4, execute_module: 4, run_tools: 3, run_tool_calls: 3] do
-      refute function_exported?(Jido.AI.Turn, name, arity)
+      refute function_exported?(Jido.AI.Model.Response, name, arity)
     end
   end
 end

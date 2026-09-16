@@ -1,11 +1,12 @@
 defmodule JidoAI.Examples.SteeringTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Request, Orchestration}
+  alias Jido.AI.Request
+  alias Jido.AI.Orchestration
   alias JidoAI.Examples.Steering.Agent
   alias JidoAI.Examples.Session.Agent, as: API
 
   defp texts(server) do
-    conversation(Server.agent(server))
+    selected_context(Server.agent(server))
     |> Enum.filter(&(&1.role == :user))
     |> Enum.map(&Jido.AI.Query.summarize(&1.content))
   end
@@ -22,7 +23,8 @@ defmodule JidoAI.Examples.SteeringTest do
         ]
     }
 
-    profile = Map.merge(profile, changes)
+    controls = Map.merge(profile.controls, Map.get(changes, :controls, %{}))
+    profile = profile |> Map.merge(changes) |> Map.put(:controls, controls)
 
     {:ok, definition} =
       Jido.AI.Authoring.lower(
@@ -71,7 +73,7 @@ defmodule JidoAI.Examples.SteeringTest do
     assert Enum.all?(consumed, &(&1.request_id == id))
     assert Enum.count(events, &(&1.kind == :request_completed)) == 1
     assert texts(server) == ["Review the code", "Focus on auth.", "Include expired tokens."]
-    entries = conversation(Server.agent(server))
+    entries = selected_context(Server.agent(server))
 
     assert Enum.find(entries, &(Jido.AI.Query.summarize(&1.content) == "Focus on auth.")).refs == %{
              request_id: id,
@@ -250,12 +252,12 @@ defmodule JidoAI.Examples.SteeringTest do
     assert_script_done(mock)
   end
 
-  test "one-Turn history commits with the result and rolls back on rejection", %{jido: jido} do
+  test "all requests settle independently and retain the failed query without replacing the answer", %{jido: jido} do
     {mock, context} = mock([%{reply: {:text, "One Turn"}}, %{reply: {:text, "Rejected"}}])
-    changes = %{requests: %{mode: :turn}, controls: %{input: [], timeout: 10_000}}
+    changes = %{controls: %{steering: false, input: [], timeout: 10_000}}
     server = start(jido, changes)
     assert {:ok, agent} = ask(server, context)
-    assert Enum.map(conversation(agent), & &1.role) == [:user, :assistant]
+    assert Enum.map(selected_context(agent), & &1.role) == [:user, :assistant]
     assert agent.state.reply == "One Turn"
 
     denied =
@@ -266,7 +268,9 @@ defmodule JidoAI.Examples.SteeringTest do
 
     before = Server.snapshot(denied)
     assert {:error, _} = ask(denied, context)
-    assert Server.snapshot(denied) == before
+    assert_domain_unchanged(denied, before)
+    assert [] = selected_context(Server.agent(denied))
+    assert Jido.Thread.entry_count(Server.agent(denied).state.messages.thread) > 0
     assert_script_done(mock)
   end
 
@@ -290,7 +294,7 @@ defmodule JidoAI.Examples.SteeringTest do
       end
 
     assert {:error, _} = result
-    assert_receive {:example_action_started, "ai_session_control"}, 2_000
+    assert_receive {:example_action_started, "ai_request_control"}, 2_000
     # The caller timed out, but the admitted control Turn still runs. Wait for
     # its queue write before allowing the model to finish and seal the queue.
     assert pending_before?(queue, System.monotonic_time(:millisecond) + 2_000)
@@ -307,7 +311,7 @@ defmodule JidoAI.Examples.SteeringTest do
         %{reply: {:wait, :repair, {:object, %{answer: "Repaired"}}}}
       ])
 
-    {_, options} = Enum.find(Agent.definition().plugins, &(elem(&1, 0) == Jido.AI.Runtime.Plugin))
+    {_, options} = Enum.find(Agent.definition().plugins, &(elem(&1, 0) == Jido.AI.Configuration.Plugin))
 
     profile =
       options[:profiles].assistant
@@ -351,7 +355,7 @@ defmodule JidoAI.Examples.SteeringTest do
   end
 
   test "history fields and steering policy fail at the authoring boundary" do
-    {_, options} = Enum.find(Agent.definition().plugins, &(elem(&1, 0) == Jido.AI.Runtime.Plugin))
+    {_, options} = Enum.find(Agent.definition().plugins, &(elem(&1, 0) == Jido.AI.Configuration.Plugin))
     profile = Map.from_struct(options[:profiles].assistant)
     base = %{name: "invalid_memory", schema: Agent.domain_schema(), routes: []}
 
@@ -360,7 +364,7 @@ defmodule JidoAI.Examples.SteeringTest do
                Jido.AI.Authoring.lower(base, [%{profile | memory: %{history: field}}])
     end
 
-    assert {:error, %{field: "requests"}} =
-             Jido.AI.Profile.new(%{profile | requests: %{mode: :turn, steering: true}})
+    assert {:ok, %{controls: %{steering: true}}} =
+             Jido.AI.Profile.new(%{profile | controls: %{steering: true}})
   end
 end

@@ -1,6 +1,7 @@
 defmodule JidoAI.Examples.ToolLimitsTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Authoring, Request}
+  alias Jido.AI.Authoring
+  alias Jido.AI.Request
   alias JidoAI.Examples.ToolLimits.FixtureAgent, as: Agent
   alias JidoAI.Examples.ToolLimits.{Probe}
 
@@ -21,7 +22,7 @@ defmodule JidoAI.Examples.ToolLimitsTest do
   defp record(server, request), do: Server.agent(server).state.requests[request.id]
 
   defp source do
-    {_, options} = Enum.find(Agent.definition().plugins, &(elem(&1, 0) == Jido.AI.Runtime.Plugin))
+    {_, options} = Enum.find(Agent.definition().plugins, &(elem(&1, 0) == Jido.AI.Configuration.Plugin))
     Map.from_struct(options[:profiles].assistant)
   end
 

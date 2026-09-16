@@ -2,7 +2,8 @@ defmodule Jido.AI.Portable do
   @moduledoc false
   import Kernel, except: [inspect: 1]
 
-  alias Jido.AI.{Agent, Profile}
+  alias Jido.AI.Agent
+  alias Jido.AI.Profile
 
   @version 1
 
@@ -31,7 +32,6 @@ defmodule Jido.AI.Portable do
          tool_sources: Enum.map(profile.tool_sources, &safe_tool_source/1),
          controls: profile.controls,
          result: profile.result,
-         requests: profile.requests,
          memory: profile.memory,
          observability: profile.observability
        }}
@@ -184,7 +184,6 @@ defmodule Jido.AI.Portable do
          "tools" => tools ++ tool_sources,
          "controls" => controls,
          "result" => result,
-         "requests" => stringify(profile.requests),
          "memory" => stringify(profile.memory),
          "observability" => public_observability(profile.observability),
          "metadata" => profile.metadata
@@ -302,7 +301,7 @@ defmodule Jido.AI.Portable do
                {:ok, {Atom.to_string(stage), values}}
              end
            end) do
-      limits = controls |> Map.take([:max_iterations, :max_model_calls, :max_tool_calls, :timeout]) |> stringify()
+      limits = controls |> Map.drop([:input, :model, :operation, :output]) |> stringify()
       {:ok, Map.merge(limits, Map.new(pairs))}
     end
   end
@@ -334,7 +333,7 @@ defmodule Jido.AI.Portable do
   end
 
   defp portable_route(%{path: path, target: {target, %{profile_id: id}}})
-       when target in [Jido.AI.Runtime.Run, Jido.AI.Orchestration.Start],
+       when target == Jido.AI.Orchestration.Start,
        do: [%{"type" => path, "target" => %{"ai" => Atom.to_string(id)}}]
 
   defp portable_route(_route), do: []

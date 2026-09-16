@@ -27,7 +27,7 @@ Session/Thread/Entry in this package, Agent + DSL + Profile, native ReqLLM
 contracts, and core Jido topology, validation, and commit ownership.
 The [request boundary proposal](../07_request_sessions/design.md#proposed-data-boundary)
 applies this direction without a new generic framework, public execution
-model, duplicate conversation store, or event store.
+model, duplicate context store, or event store.
 
 ## Scope and owner
 
@@ -66,7 +66,7 @@ The boundary uses these terms:
 - **Definition:** Portable static data that describes an Agent, AI profile, Action, Flow, Plugin options, or route.
 - **Runtime binding:** A process-local resource, such as a provider client, store handle, or supervised runtime reference.
 - **Turn request:** One Signal that resolves to one Action or Flow and produces one candidate Agent plus Directives.
-- **AI request:** Correlated model and tool work with one terminal AI result. It can run in Turn mode or session mode.
+- **AI request:** Correlated model and tool work with one terminal AI result. It uses admission, Flow execution, and settlement; it can outlive a core Turn.
 - **Effect:** A declared change or external operation caused by AI work.
 - **Checkpoint:** Portable state that can be validated without a live process.
 

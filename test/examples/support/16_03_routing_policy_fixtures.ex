@@ -14,7 +14,6 @@ defmodule JidoAI.Examples.RoutingPolicy do
              model: JidoAI.Examples.MockLLM.model(),
              reasoning: :chain_of_thought,
              controls: %{timeout: 5_000},
-             requests: %{mode: :session},
              result: %{into: :result}
            })
        ]}
@@ -32,7 +31,7 @@ defmodule JidoAI.Examples.RoutingPolicy do
     })
   end
 
-  def native(mode, opts \\ []) do
+  def native(_legacy_mode, opts \\ []) do
     Jido.AI.Authoring.lower(
       %{
         name: "native_policy",
@@ -49,7 +48,6 @@ defmodule JidoAI.Examples.RoutingPolicy do
           models: %{answer: %{model: JidoAI.Examples.MockLLM.model()}},
           reasoning: %{method: :react, model: :answer},
           result: %{into: :result},
-          requests: %{mode: mode},
           controls: %{timeout: 5_000}
         }
       ]

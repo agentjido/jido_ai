@@ -1,5 +1,12 @@
 # Milestone 1: Jido AI authoring and lowering
 
+This document retains the staged migration record. Its old request-mode and
+`requests` examples are superseded. For the current contract, use the
+[configuration reference](../../guides/developer/configuration_reference.md)
+and [architecture map](../design/ARCHITECTURE.md). Profiles have no `requests`
+field: streaming is per call, steering and timers are controls, and request
+retention is host configuration.
+
 Status: first production authoring slice implemented. The complete design remains the migration target. See [implementation progress](implementation.md).
 Updated: 2026-09-06. This is the single plan that replaces the earlier
 `agent-dsl` and `jidoka-dsl` brainstorms. See the [full migration plan](migration-plan.md)

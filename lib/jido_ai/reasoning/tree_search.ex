@@ -1,6 +1,7 @@
 defmodule Jido.AI.Reasoning.TreeSearch do
   @moduledoc false
-  alias Jido.AI.{Profile, Reasoning}
+  alias Jido.AI.Profile
+  alias Jido.AI.Reasoning
   alias Jido.AI.Reasoning.TreeOfThoughts.{Machine, Result}
 
   @defaults %{

@@ -40,7 +40,7 @@ For direct app integration (`Jido.Exec`-driven), this is the primary standalone 
 ## LLM Actions
 
 - `Jido.AI.Actions.LLM.Chat`
-  - Use when you need single-turn conversational output with optional system prompt and chat/plugin defaults.
+  - Use when you need single-turn contextal output with optional system prompt and chat/plugin defaults.
 - `Jido.AI.Actions.LLM.Complete`
   - Use when you want prompt completion without object constraints.
 - `Jido.AI.Actions.LLM.Embed`

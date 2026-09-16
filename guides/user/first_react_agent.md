@@ -153,14 +153,14 @@ This pattern is the clean way to implement "show only the IDs the model has seen
 
 `ask_sync/3` and `snapshot.result` return the final assistant answer. Tool
 Actions may also return structured data that you want to inspect directly. For
-that, read `snapshot.details[:tool_results]` instead of parsing conversation
+that, read `snapshot.details[:tool_results]` instead of parsing context
 messages or internal request traces.
 
 | Surface | Contains | Use for |
 |---|---|---|
 | `snapshot.result` | Final assistant answer | What to show the user |
 | `snapshot.details[:tool_results]` | Completed tool outputs for the current or most recent ReAct run | URLs, IDs, records, and other structured tool data |
-| `snapshot.details[:conversation]` | Projected LLM messages, including serialized tool messages | Restoring conversation context |
+| `snapshot.details[:context]` | Projected LLM messages, including serialized tool messages | Restoring context context |
 
 ```elixir
 {:ok, status} = Jido.AgentServer.status(pid)
@@ -176,18 +176,18 @@ Use this for run inspection. If a tool produces domain data that must survive
 process restarts or serve as the system of record, persist it from the tool or
 return an allowed state effect.
 
-## Optional: Restore Conversation Context
+## Optional: Restore Context Context
 
-If you persist the conversation history (e.g. from `snapshot.details.conversation`),
+If you persist the context history (e.g. from `snapshot.details.context`),
 you can restore it on restart so the agent resumes where it left off.
 
 ```elixir
 {:ok, snapshot} = Jido.AI.Orchestration.snapshot(server)
-saved_messages = snapshot.details.conversation
+saved_messages = snapshot.details.context
 
 # Split out one leading system message (if present) so it does not become
 # a duplicate context entry.
-{saved_system_prompt, conversation_messages} =
+{saved_system_prompt, context_messages} =
   case saved_messages do
     [%{role: role, content: content} | rest]
     when role in [:system, "system"] and is_binary(content) ->
@@ -197,10 +197,10 @@ saved_messages = snapshot.details.conversation
       {nil, saved_messages}
   end
 
-# Import the saved conversation before Server startup:
+# Import the saved context before Server startup:
 thread = Jido.Thread.new(metadata: %{system_prompt: saved_system_prompt})
 {:ok, session} =
-  Jido.AI.Thread.Projection.append(Jido.Session.new(thread: thread), conversation_messages)
+  Jido.AI.Thread.Projection.append(Jido.Session.new(thread: thread), context_messages)
 
 {:ok, agent} = Jido.AI.Agent.from_initial_state(MyAgent, %{messages: session})
 {:ok, server} = Jido.start_agent(MyJido, agent)
@@ -208,7 +208,7 @@ thread = Jido.Thread.new(metadata: %{system_prompt: saved_system_prompt})
 
 A nil `system_prompt` in Thread metadata uses the Agent's configured prompt. A saved prompt
 overrides it. Use `profile: :review` to select another AI profile. This imports
-conversation data; it does not resume execution. Use native checkpoint restore
+context data; it does not resume execution. Use native checkpoint restore
 for current V3 state.
 See the [initial-state examples](../../examples/14_resume/14_11_initial_state/README.md).
 

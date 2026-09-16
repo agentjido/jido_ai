@@ -52,6 +52,130 @@
       ],
       "type": "jido.plugin",
       "version": 1
+    },
+    {
+      "module": "plugin/8",
+      "options": [
+        {
+          "$type": "tuple",
+          "items": [
+            {
+              "$type": "atom",
+              "id": "atom/3"
+            },
+            {
+              "$type": "map",
+              "entries": [
+                [
+                  {
+                    "$type": "atom",
+                    "id": "atom/4"
+                  },
+                  {
+                    "$type": "value",
+                    "id": "value/5"
+                  }
+                ],
+                [
+                  {
+                    "$type": "atom",
+                    "id": "atom/6"
+                  },
+                  {
+                    "$type": "value",
+                    "id": "value/7"
+                  }
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "$type": "tuple",
+          "items": [
+            {
+              "$type": "atom",
+              "id": "atom/9"
+            },
+            [
+              {
+                "$type": "value",
+                "id": "value/10"
+              },
+              {
+                "$type": "value",
+                "id": "value/11"
+              },
+              {
+                "$type": "value",
+                "id": "value/12"
+              },
+              {
+                "$type": "value",
+                "id": "value/13"
+              },
+              {
+                "$type": "value",
+                "id": "value/14"
+              },
+              {
+                "$type": "value",
+                "id": "value/15"
+              },
+              {
+                "$type": "value",
+                "id": "value/16"
+              },
+              {
+                "$type": "value",
+                "id": "value/17"
+              },
+              {
+                "$type": "value",
+                "id": "value/18"
+              },
+              {
+                "$type": "value",
+                "id": "value/19"
+              },
+              {
+                "$type": "value",
+                "id": "value/20"
+              },
+              {
+                "$type": "value",
+                "id": "value/21"
+              },
+              {
+                "$type": "value",
+                "id": "value/22"
+              },
+              {
+                "$type": "value",
+                "id": "value/23"
+              },
+              {
+                "$type": "value",
+                "id": "value/24"
+              },
+              {
+                "$type": "value",
+                "id": "value/25"
+              },
+              {
+                "$type": "value",
+                "id": "value/26"
+              },
+              {
+                "$type": "value",
+                "id": "value/27"
+              }
+            ]
+          ]
+        }
+      ],
+      "type": "jido.plugin",
+      "version": 1
     }
   ],
   "routes": [
@@ -62,7 +186,7 @@
           [
             {
               "$type": "atom",
-              "id": "atom/9"
+              "id": "atom/29"
             },
             {
               "$type": "atom",
@@ -75,7 +199,7 @@
       "match": null,
       "path": "case.assistant",
       "priority": 0,
-      "target": "action/8"
+      "target": "action/28"
     },
     {
       "defaults": {
@@ -84,7 +208,7 @@
           [
             {
               "$type": "atom",
-              "id": "atom/9"
+              "id": "atom/29"
             },
             {
               "$type": "atom",
@@ -97,7 +221,127 @@
       "match": null,
       "path": "case.reviewer",
       "priority": 0,
-      "target": "action/8"
+      "target": "action/28"
+    },
+    {
+      "defaults": null,
+      "kind": "action",
+      "match": null,
+      "path": "jido.ai.request.settle",
+      "priority": 0,
+      "target": "action/30"
+    },
+    {
+      "defaults": null,
+      "kind": "action",
+      "match": null,
+      "path": "jido.ai.request.cancel",
+      "priority": 0,
+      "target": "action/31"
+    },
+    {
+      "defaults": null,
+      "kind": "action",
+      "match": null,
+      "path": "jido.ai.request.control",
+      "priority": 0,
+      "target": "action/32"
+    },
+    {
+      "defaults": null,
+      "kind": "action",
+      "match": null,
+      "path": "jido.ai.request.history",
+      "priority": 0,
+      "target": "action/33"
+    },
+    {
+      "defaults": null,
+      "kind": "action",
+      "match": null,
+      "path": "jido.ai.request.publish",
+      "priority": 0,
+      "target": "action/34"
+    },
+    {
+      "defaults": null,
+      "kind": "action",
+      "match": null,
+      "path": "jido.ai.request.ignore",
+      "priority": 0,
+      "target": "action/35"
+    },
+    {
+      "defaults": null,
+      "kind": "action",
+      "match": null,
+      "path": "jido.ai.request.progress",
+      "priority": 0,
+      "target": "action/36"
+    },
+    {
+      "defaults": null,
+      "kind": "action",
+      "match": null,
+      "path": "ai.request.started",
+      "priority": 0,
+      "target": "action/35"
+    },
+    {
+      "defaults": null,
+      "kind": "action",
+      "match": null,
+      "path": "ai.request.completed",
+      "priority": 0,
+      "target": "action/35"
+    },
+    {
+      "defaults": null,
+      "kind": "action",
+      "match": null,
+      "path": "ai.request.failed",
+      "priority": 0,
+      "target": "action/35"
+    },
+    {
+      "defaults": null,
+      "kind": "action",
+      "match": null,
+      "path": "ai.llm.delta",
+      "priority": 0,
+      "target": "action/35"
+    },
+    {
+      "defaults": null,
+      "kind": "action",
+      "match": null,
+      "path": "ai.llm.response",
+      "priority": 0,
+      "target": "action/35"
+    },
+    {
+      "defaults": null,
+      "kind": "action",
+      "match": null,
+      "path": "ai.usage",
+      "priority": 0,
+      "target": "action/35"
+    },
+    {
+      "defaults": null,
+      "kind": "action",
+      "match": null,
+      "path": "ai.tool.started",
+      "priority": 0,
+      "target": "action/35"
+    },
+    {
+      "defaults": null,
+      "kind": "action",
+      "match": null,
+      "path": "ai.tool.result",
+      "priority": 0,
+      "target": "action/35"
     },
     {
       "defaults": null,
@@ -105,7 +349,7 @@
       "match": null,
       "path": "jido.ai.configure",
       "priority": 0,
-      "target": "action/10"
+      "target": "action/37"
     }
   ],
   "schema": "schema/1",

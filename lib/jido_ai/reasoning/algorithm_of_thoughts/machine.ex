@@ -7,7 +7,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.Machine do
   """
 
   alias Jido.AI.Reasoning.AlgorithmOfThoughts.Result
-  alias Jido.AI.Turn
+  alias Jido.AI.Model.Response
 
   @typedoc "Internal machine status"
   @type internal_status :: String.t()
@@ -381,7 +381,7 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.Machine do
         {content, normalize_usage(Map.get(map, "usage"))}
 
       %{} ->
-        turn = Turn.from_response(result)
+        turn = Response.from_response(result)
 
         text =
           case turn.text do

@@ -24,7 +24,7 @@ defmodule Jido.AI.ToolInterceptor do
   structured interceptor error.
 
   These hooks apply to agent-managed tool execution. Direct calls through
-  `Jido.AI.Turn`, `Jido.Exec`, or the standalone tool-calling actions do not
+  `Jido.AI.Model.Response`, `Jido.Exec`, or the standalone tool-calling actions do not
   invoke agent callbacks.
   """
 

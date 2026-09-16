@@ -2,7 +2,9 @@ defmodule Jido.AI.Test.CallableReasoningCase do
   @moduledoc false
   use ExUnit.CaseTemplate
 
-  alias Jido.AI.{Configuration, Reasoning, Orchestration}
+  alias Jido.AI.Configuration
+  alias Jido.AI.Reasoning
+  alias Jido.AI.Orchestration
   alias Jido.AI.Actions.Reasoning.RunStrategy
   alias Jido.AI.Test.MockLLM
   alias Jido.AgentServer
@@ -77,7 +79,6 @@ defmodule Jido.AI.Test.CallableReasoningCase do
         max_model_calls: :method_default,
         max_tool_calls: :method_default
       },
-      requests: %{mode: :session, streaming: true},
       result: %{into: :answer}
     }
 

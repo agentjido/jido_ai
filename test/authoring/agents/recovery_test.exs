@@ -26,14 +26,9 @@ defmodule JidoAITest.Authoring.Agents.RecoveryTest do
       {:ok, server} = Jido.start_agent(ctx.jido, Corpus.definition(spec, ctx.form))
       first = call(server, "failed", context)
 
-      if ctx.variant == :session do
-        assert {:ok, _} = first
-        assert {:ok, %{status: :failed, error: error}} = Jido.AI.Orchestration.await(server, "failed", 5_000)
-        assert is_exception(error)
-        assert Jido.AgentServer.agent(server).state.requests["failed"].status == :failed
-      else
-        assert {:error, _} = first
-      end
+      assert {:error, error} = first
+      assert is_exception(error) or (is_map(error) and is_binary(error.message))
+      assert Jido.AgentServer.agent(server).state.requests["failed"].status == :failed
 
       state = Jido.AgentServer.agent(server).state
       assert state.reply == ""
@@ -41,9 +36,7 @@ defmodule JidoAITest.Authoring.Agents.RecoveryTest do
       assert length(MockLLM.report(mock).requests) == 1
       assert {:ok, _} = call(server, "next", context)
 
-      if ctx.variant == :session,
-        do:
-          assert({:ok, %{status: :completed, result: "Recovered"}} = Jido.AI.Orchestration.await(server, "next", 5_000))
+      assert {:ok, %{status: :completed, result: "Recovered"}} = Jido.AI.Orchestration.await(server, "next", 5_000)
 
       assert Jido.AgentServer.agent(server).state.reply == "Recovered"
       assert %{remaining: [], unexpected: [], requests: [_, _]} = MockLLM.report(mock)
@@ -67,11 +60,14 @@ defmodule JidoAITest.Authoring.Agents.RecoveryTest do
       context = %{observer: self(), ai: %{assistant: %{options: MockLLM.options(mock)}}}
       {:ok, server} = Jido.start_agent(jido, Corpus.definition(spec, form))
       assert {:error, error} = call(server, "bad-tool", context)
-      assert %Jido.Action.Error.InvalidInputError{} = error.details.jido_ai_cause
-      assert Jido.AgentServer.agent(server).state === spec.initial
+      assert [%{path: [:value], code: :invalid_type}] = error.details.errors
+      assert Map.delete(Jido.AgentServer.agent(server).state, :requests) === Map.delete(spec.initial, :requests)
       assert length(MockLLM.report(mock).requests) == 1
       assert {:ok, agent} = call(server, "next", context)
-      assert agent.state === %{spec.initial | reply: "Please supply an integer"}
+
+      assert Map.delete(agent.state, :requests) ===
+               Map.delete(%{spec.initial | reply: "Please supply an integer"}, :requests)
+
       refute_received {:authoring_tool, _}
       assert %{remaining: [], unexpected: [], requests: [_, last]} = MockLLM.report(mock)
       refute Enum.any?(last.body["messages"], &(&1["role"] == "tool"))
@@ -80,6 +76,6 @@ defmodule JidoAITest.Authoring.Agents.RecoveryTest do
 
   defp call(server, id, context) do
     signal = Jido.Signal.new!("case.assistant", %{query: "Help", request_id: id}, source: "/authoring")
-    Jido.AgentServer.call(server, signal, context: context, timeout: 10_000)
+    Jido.AI.Test.Requests.call_and_await(server, signal, context: context, timeout: 10_000)
   end
 end

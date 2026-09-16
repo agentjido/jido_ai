@@ -54,7 +54,7 @@ defmodule Jido.AI.Plugins.Reasoning.TRMTest do
   end
 
   defp profile do
-    Jido.AI.Profile.new!(%{id: :review, reasoning: :trm, requests: %{mode: :session}, result: %{into: :result}})
+    Jido.AI.Profile.new!(%{id: :review, reasoning: :trm, result: %{into: :result}})
   end
 
   defp definition(config) do

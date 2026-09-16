@@ -5,7 +5,7 @@ defmodule Jido.AI.Orchestration.Plugin.Agent do
   alias Jido.AI.Orchestration.{Change, Plugin}
 
   @impl Jido.Agent.Plugin
-  def state_spec(_opts), do: {:requests, Jido.AI.Orchestration.Record.records_schema()}
+  def state_spec(_opts), do: {:requests, Jido.AI.Request.Record.records_schema()}
 
   @impl Jido.Agent.Plugin
   def directives(_opts), do: [Change, Jido.AI.Orchestration.DeliveryReceipt]

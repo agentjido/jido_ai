@@ -57,7 +57,6 @@ defmodule Jido.AI.Plugins.Reasoning.ChainOfThoughtTest do
     Jido.AI.Profile.new!(%{
       id: :review,
       reasoning: :chain_of_thought,
-      requests: %{mode: :session},
       result: %{into: :result}
     })
   end

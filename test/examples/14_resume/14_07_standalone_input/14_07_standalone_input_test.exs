@@ -1,6 +1,7 @@
 defmodule JidoAI.Examples.StandaloneInputTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{PendingInputServer, Orchestration}
+  alias Jido.AI.PendingInputServer
+  alias Jido.AI.Orchestration
   alias Jido.AI.Reasoning.ReAct
   alias ReAct.{Config, Token}
   alias JidoAI.Examples.CheckpointResume
@@ -32,7 +33,7 @@ defmodule JidoAI.Examples.StandaloneInputTest do
     assert hd(consumed).data.refs == %{case_id: 1} and hd(consumed).data.source == "/caller"
     assert List.last(consumed).seq < Enum.find(result.trace, &(&1.kind == :llm_started)).seq
     assert {:ok, saved, _} = Token.decode_state(result.final_token, config)
-    entry = Enum.find(conversation_entries(saved.context), &(Jido.AI.Query.summarize(&1.content) == "First input"))
+    entry = Enum.find(context_entries(saved.context), &(Jido.AI.Query.summarize(&1.content) == "First input"))
     assert entry.refs.case_id == 1 and entry.refs.source == "/caller"
     assert sealed?(queue)
     assert_script_done(mock)
@@ -296,7 +297,7 @@ defmodule JidoAI.Examples.StandaloneInputTest do
     assert {:ok, saved, _} = Token.decode_state(result.final_token, config)
 
     assert Enum.any?(
-             conversation_entries(saved.context),
+             context_entries(saved.context),
              &(Jido.AI.Query.summarize(&1.content) == "Needs another call")
            )
 

@@ -12,7 +12,8 @@ defmodule Jido.AI.Plugins.Policy do
     agent: Jido.AI.Plugins.Policy.Agent,
     agent_server: Jido.AI.Plugins.Policy.AgentServer
 
-  alias Jido.AI.{Error, Validation}
+  alias Jido.AI.Error
+  alias Jido.AI.Validation
   alias Jido.AI.Signal.Helpers, as: SignalHelpers
   alias Jido.Signal, as: BaseSignal
 
@@ -66,7 +67,7 @@ defmodule Jido.AI.Plugins.Policy do
   @doc false
   def admit_input(admission) do
     state = admission.plugin_state
-    binding = Jido.AI.Runtime.Plugin.native_binding(admission)
+    binding = Jido.AI.Configuration.Plugin.native_binding(admission)
 
     signal =
       if binding, do: %{admission.signal | data: binding.input}, else: admission.signal

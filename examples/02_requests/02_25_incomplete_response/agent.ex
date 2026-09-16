@@ -19,11 +19,6 @@ defmodule JidoAI.Examples.IncompleteResponse.Agent do
         model(:answer)
       end
 
-      requests do
-        mode(:session)
-        streaming(true)
-      end
-
       memory do
         history(:messages)
       end

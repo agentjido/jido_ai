@@ -131,13 +131,13 @@ formatter, and documentation changes. No `lib/` or dependency changes. This
 is not a stable-release pass. The implementation follow-up now also changes
 `lib/`, tests, examples, and API inventory. Dependencies remain unchanged.
 
-### Repairs in the current worktree
+### Prior repair checkpoint
 
 - [Values and projection](01_ai_values/alignment.md#acceptance-matrix):
-  successful settlement promotes conversation; incomplete tool exchanges and
+  successful settlement promotes context; incomplete tool exchanges and
   hidden-thinking summaries are excluded from default projection.
 - [Request settlement](07_request_sessions/alignment.md#acceptance-matrix):
-  failed and cancelled input stays in execution evidence, not completed conversation.
+  failed and cancelled input stays in execution evidence, not completed context.
 - [Model completion](02_model_gateway/alignment.md#acceptance-matrix):
   nonempty truncated output fails without an answer commit.
 - [Tool recovery](03_tool_bridge/alignment.md#acceptance-matrix):
@@ -151,7 +151,7 @@ is not a stable-release pass. The implementation follow-up now also changes
 These repairs do not close the advanced API gates below. They preserve all eight
 reasoning methods and use the existing Agent, Flow, Session, and Thread owners.
 
-Repair verification on 2026-09-15, against the uncommitted worktree above:
+Repair verification on 2026-09-15, before checkpoint `4ed6402f`:
 
 - `mix compile --force --warnings-as-errors`: passed.
 - `mix test --include authoring --include example --warnings-as-errors --seed 0`:
@@ -161,7 +161,72 @@ Repair verification on 2026-09-15, against the uncommitted worktree above:
 - Local links in the changed Markdown files are valid.
 
 This run used deterministic model responses. No live provider call was made.
-These are verification results for this worktree, not a release certification.
+These are historical verification results, not a release certification.
+
+### Runtime refinement verification
+
+The current implementation uses `v3-spike`, checkpoint `4ed6402f`, plus
+uncommitted source, test, example, and documentation changes. Dependencies and
+package versions are unchanged.
+
+- `Execution` owns shared AI Flow execution. `Orchestration` keeps the
+  core-managed Coordinator and request settlement.
+- All AI Agent requests use one admission, execution, and settlement lifecycle.
+  Profile request modes and configurable busy handling are removed.
+- `ask/3` returns a request handle. `ask_sync/3` waits for settlement.
+  Core route helpers return admission state, not a completed answer.
+- Context is the model input view. `Model.Response` names a model response,
+  distinct from a core Jido Turn.
+- Direct model-call tickets own quota accounting. Mirrored worker usage Signals
+  do not charge the quota again or change unknown usage to zero.
+
+See the [architecture overview](ARCHITECTURE.md) for the execution sequence and
+process owners. The [API migration map](../v3-spike/public-api-map.md#migration-from-the-previous-v3-draft)
+lists changed names and removed configuration fields.
+
+Verification on 2026-09-15:
+
+- Force compile with warnings as errors: passed.
+- Full unit, authoring, and example suite with seed 0: **2,856 passed**, zero
+  failures, one existing flaky exclusion. No new skips.
+- Format check and generated API inventory check: passed.
+- All 408 design requirement IDs remain present. Superseded mode requirements
+  keep their IDs and state the replacement decision.
+
+Tests used deterministic model responses, including MockLLM examples. No live
+provider call was made. This run does not prove production load capacity or
+complete conformance to the advanced target design. Document approval remains
+pending.
+
+### Request configuration refinement verification
+
+The follow-up removes `requests` from the DSL, Profile, codecs, and examples.
+Streaming is selected per call: `ask_stream/3` enables it, while `ask/3` and
+`ask_sync/3` default to buffered calls. An event sink enables streaming unless
+the caller sets `stream: false` for lifecycle events only.
+
+Steering and activity timers now belong to `controls`. Request-record retention
+is a positive host setting, captured at Coordinator startup. It is not Profile
+policy, Context retention, or a concurrency limit. The core-managed Coordinator
+and process tree are unchanged. Separate buffered/streamed example Agents are
+consolidated into one Agent per example.
+
+The refactor also fixes buffered model failures losing method diagnostics:
+provider errors are converted to portable values before reasoning methods
+attach tree, phase, and completed-usage details.
+
+Verification on 2026-09-15:
+
+- Force compile with warnings as errors: passed.
+- Full unit, authoring, and example suite with seed 0: **2,863 passed**, zero
+  failures, one existing flaky exclusion. No new skips.
+- Format, generated API inventory, and diff whitespace checks: passed.
+- All 408 design requirement IDs remain present. Changed documentation links
+  outside example templates are valid.
+
+Tests used deterministic model responses, including MockLLM HTTP/SSE examples.
+No live provider call was made. Dependency pins and package versions are
+unchanged. These checks do not certify the advanced target design or a release.
 
 ### Later decisions and remaining work
 

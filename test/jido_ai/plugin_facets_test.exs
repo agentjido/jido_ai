@@ -2,7 +2,7 @@ defmodule Jido.AI.PluginFacetsTest do
   use ExUnit.Case, async: true
 
   @packages [
-    Jido.AI.Runtime.Plugin,
+    Jido.AI.Configuration.Plugin,
     Jido.AI.Orchestration.Plugin,
     Jido.AI.Thread.Control.Plugin,
     Jido.AI.Plugins.Chat,
@@ -39,7 +39,6 @@ defmodule Jido.AI.PluginFacetsTest do
               Jido.AI.Profile.new!(%{
                 id: :review,
                 reasoning: method,
-                requests: %{mode: :session},
                 result: %{into: :answer}
               })
           ]

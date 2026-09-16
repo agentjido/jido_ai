@@ -9,7 +9,7 @@ successful history and model events, but did not record the retained
 `error_type: :llm_response`. It also checked only text, tool calls and objects.
 An image-only response with a truncated finish reason therefore failed despite
 having usable content. The terminal check now uses the existing
-`Jido.AI.Turn.result/1` projection and records the failure type through Session.
+`Jido.AI.Model.Response.result/1` projection and records the failure type through Session.
 There is no second provider parser or broader default content rejection.
 
 The retained runner case `blank truncated terminal responses fail before

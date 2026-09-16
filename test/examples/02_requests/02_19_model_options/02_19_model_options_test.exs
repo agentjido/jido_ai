@@ -76,19 +76,15 @@ defmodule JidoAI.Examples.ModelOptionsTest do
     do: Keyword.update!(options, :req_http_options, &Keyword.put(&1, :headers, [{"x-provider-case", marker}]))
 
   defp run_provider_switch(:native, streaming?, jido, context, _base) do
-    module =
-      if streaming?,
-        do: JidoAI.Examples.ModelOptions.StreamSwitchAgent,
-        else: JidoAI.Examples.ModelOptions.BufferedSwitchAgent
-
-    server = start_agent(jido, module.new!())
+    server = start_agent(jido, JidoAI.Examples.ModelOptions.Agent.new!())
 
     assert {:ok, request} =
              Request.create_and_send(server, "Work",
                signal_type: "ai.ask",
                source: "/examples/provider_switch",
                context: context,
-               stream_to: self()
+               stream_to: self(),
+               stream: streaming?
              )
 
     assert {:ok, "Done"} = Request.await(request)

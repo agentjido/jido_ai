@@ -5,14 +5,14 @@
 ## Status
 
 - Reviewed: 2026-09-15.
-- Code for the example audit: `v3-spike`, HEAD `7bb011e98349af8bf580e7b93afa60990972beae`, plus uncommitted example, test, formatter, and documentation changes. No `lib/` or dependency changes.
+- Code baseline: `v3-spike`, HEAD `4ed6402f`, plus uncommitted runtime, test, example, and documentation refinement. Dependency pins are unchanged.
 - Prerequisite alignments used: [01 Canonical interaction and AI values](../01_ai_values/alignment.md).
 - Alignment state: Draft. Current ownership is mapped; target decisions and full acceptance proof remain.
 - Verification: the example-driven review below adds fresh MockLLM runs to the earlier source review. Earlier statements that no tests ran refer to that prior review, not this follow-up.
 
 ## Current architecture
 
-Tools.Executor uses core Exec and normalizes tool results. Runtime.ToolAttempt adds Profile policy, retry, and interception. Effects remain proposals until their owner applies them through core contracts. ToolSource validates inert declarations, including subagent and handoff; this does not implement dynamic discovery or delegation.
+Tools.Executor uses core Exec and normalizes tool results. Execution.ToolAttempt adds Profile policy, retry, and interception. Effects remain proposals until their owner applies them through core contracts. ToolSource validates inert declarations, including subagent and handoff; this does not implement dynamic discovery or delegation.
 
 - Current owner: ToolCatalog, ToolAdapter, ToolSource, ToolContext, ToolInterceptor, ToolResult, Tools.Executor, and Effects.
 - Cross-package ownership: core Jido owns Agent commit and topology; Flow/Exec and Signal internals remain in their respective packages.
@@ -30,7 +30,7 @@ Tools.Executor uses core Exec and normalizes tool results. Runtime.ToolAttempt a
 | [lib/jido_ai/tool_source.ex](../../../lib/jido_ai/tool_source.ex) | Inert source kinds |
 | [lib/jido_ai/tool_result.ex](../../../lib/jido_ai/tool_result.ex) | Normalized tool output |
 | [lib/jido_ai/effects.ex](../../../lib/jido_ai/effects.ex) | Effect policy entry point |
-| [lib/jido_ai/runtime/tool_attempt.ex](../../../lib/jido_ai/runtime/tool_attempt.ex) | Bounded attempts |
+| [lib/jido_ai/execution/tool_attempt.ex](../../../lib/jido_ai/execution/tool_attempt.ex) | Bounded attempts |
 
 ### Examples and tests
 

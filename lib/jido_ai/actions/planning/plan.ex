@@ -62,7 +62,7 @@ defmodule Jido.AI.Actions.Planning.Plan do
   @impl Jido.Action
   def on_before_validate_params(params), do: Request.before_validate(schema(), params)
 
-  alias Jido.AI.Turn
+  alias Jido.AI.Model.Response
   alias ReqLLM.Context
 
   @planning_prompt """
@@ -169,7 +169,7 @@ defmodule Jido.AI.Actions.Planning.Plan do
   end
 
   defp format_result(response, model, goal) do
-    plan_text = Turn.extract_text(response)
+    plan_text = Response.extract_text(response)
 
     %{
       plan: plan_text,

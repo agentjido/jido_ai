@@ -1,6 +1,8 @@
 defmodule Jido.AI.Actions.LLM.Request do
   @moduledoc false
-  alias Jido.AI.{ActionInput, Observe, Validation}
+  alias Jido.AI.ActionInput
+  alias Jido.AI.Observe
+  alias Jido.AI.Validation
   alias Jido.AI.Actions.Helpers
 
   @defaults %{

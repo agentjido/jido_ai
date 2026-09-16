@@ -30,7 +30,6 @@ defmodule Jido.AI.TestHelpersTest do
           action(ReadTool)
         end
 
-        requests(mode: :session, streaming: true)
         memory(history: :messages)
         result(into: :last_result)
       end

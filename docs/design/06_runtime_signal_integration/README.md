@@ -12,7 +12,7 @@ and stable requirement IDs are in [design](design.md).
 
 ## Why this seam exists
 
-- Owner: Runtime.Plugin and Orchestration.Plugin Agent/AgentServer facets, route/directive adapters, and typed Signal data.
+- Owner: Configuration.Plugin and Orchestration.Plugin Agent/AgentServer facets, route/directive adapters, and typed Signal data.
 - Owns: core runtime and signal integration within [the package architecture](../ARCHITECTURE.md).
 - Does not own: contracts assigned to other seams or private lower-package internals.
 

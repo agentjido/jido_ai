@@ -5,7 +5,7 @@
 ## Status
 
 - Reviewed: 2026-09-15.
-- Code for the example audit: `v3-spike`, HEAD `7bb011e98349af8bf580e7b93afa60990972beae`, plus uncommitted example, test, formatter, and documentation changes. No `lib/` or dependency changes.
+- Code baseline: `v3-spike`, HEAD `4ed6402f`, plus uncommitted runtime, test, example, and documentation refinement. Dependency pins are unchanged.
 - Prerequisite alignments used: [02 Model integration and request preparation](../02_model_gateway/alignment.md), [03 Tools, sources, and effect policy](../03_tool_bridge/alignment.md).
 - Alignment state: Draft. Current ownership is mapped; target decisions and full acceptance proof remain.
 - Verification: the example-driven review below adds fresh MockLLM runs to the earlier source review. Earlier statements that no tests ran refer to that prior review, not this follow-up.
@@ -14,10 +14,10 @@
 
 One internal validated execution map carries Profile, ReqLLM context, counters, deadlines, and optional method state. Shared Actions and Flows run the model/tool cycle. ToolAttempt uses a bounded continuation plus sleep; output repair is separate runtime logic. Orchestration owns live request lifetime and settlement, not these step modules.
 
-- Current owner: Runtime.State, Flow, ReasonFlow, Prepare, CallModel, Decide, ToolsFlow, ToolAttempt, and OutputState.
+- Current owner: Execution.State, Flow, ModelFlow, Prepare, CallModel, Decide, ToolsFlow, ToolAttempt, and OutputState.
 - Cross-package ownership: core Jido owns Agent commit and topology; Flow/Exec and Signal internals remain in their respective packages.
 - Overall placement: [architecture overview](../ARCHITECTURE.md).
-- Full target: [design](design.md). Keep one bounded execution path for all authoring forms and methods. Preserve advanced streaming, cancellation, retry, and effect contracts without making temporary execution state a portable conversation value.
+- Full target: [design](design.md). Keep one bounded execution path for all authoring forms and methods. Preserve advanced streaming, cancellation, retry, and effect contracts without making temporary execution state a portable context value.
 
 ## Inputs and evidence
 
@@ -25,18 +25,18 @@ One internal validated execution map carries Profile, ReqLLM context, counters, 
 
 | Source | Evidence scope |
 | --- | --- |
-| [lib/jido_ai/runtime/state.ex](../../../lib/jido_ai/runtime/state.ex) | Validated temporary execution map |
-| [lib/jido_ai/runtime/flow.ex](../../../lib/jido_ai/runtime/flow.ex) | Canonical Flow |
-| [lib/jido_ai/runtime/tools_flow.ex](../../../lib/jido_ai/runtime/tools_flow.ex) | Tool Map and continuation |
-| [lib/jido_ai/runtime/next_batch.ex](../../../lib/jido_ai/runtime/next_batch.ex) | Batch partitioning |
-| [lib/jido_ai/runtime/tool_attempt.ex](../../../lib/jido_ai/runtime/tool_attempt.ex) | Retry policy |
-| [lib/jido_ai/runtime/output_state.ex](../../../lib/jido_ai/runtime/output_state.ex) | Output validation and repair |
+| [lib/jido_ai/execution/state.ex](../../../lib/jido_ai/execution/state.ex) | Validated temporary execution map |
+| [lib/jido_ai/execution/flow.ex](../../../lib/jido_ai/execution/flow.ex) | Canonical Flow |
+| [lib/jido_ai/execution/tools_flow.ex](../../../lib/jido_ai/execution/tools_flow.ex) | Tool Map and continuation |
+| [lib/jido_ai/execution/next_batch.ex](../../../lib/jido_ai/execution/next_batch.ex) | Batch partitioning |
+| [lib/jido_ai/execution/tool_attempt.ex](../../../lib/jido_ai/execution/tool_attempt.ex) | Retry policy |
+| [lib/jido_ai/execution/output_state.ex](../../../lib/jido_ai/execution/output_state.ex) | Output validation and repair |
 
 ### Examples and tests
 
 - [Example briefing](../../../examples/01_authoring/01_02_tool_flow/README.md): public behavior and documented limits.
 - [Matching example tests](../../../test/examples/01_authoring/01_02_tool_flow): deterministic example evidence.
-- [test/jido_ai/runtime/state_test.exs](../../../test/jido_ai/runtime/state_test.exs): detailed boundary evidence.
+- [test/jido_ai/execution/state_test.exs](../../../test/jido_ai/execution/state_test.exs): detailed boundary evidence.
 - [test/examples/01_authoring/01_02_tool_flow/multi_round_test.exs](../../../test/examples/01_authoring/01_02_tool_flow/multi_round_test.exs): detailed boundary evidence.
 
 These are evidence entry points, not blanket acceptance claims. The requirement
@@ -45,7 +45,7 @@ proof is still incomplete. Inert declaration support is not runtime support.
 
 ## Retained baseline
 
-Keep one bounded execution path for all authoring forms and methods. Preserve advanced streaming, cancellation, retry, and effect contracts without making temporary execution state a portable conversation value.
+Keep one bounded execution path for all authoring forms and methods. Preserve advanced streaming, cancellation, retry, and effect contracts without making temporary execution state a portable context value.
 
 Preserve current public behavior unless an approved decision includes a
 migration. This follow-up changes examples and their tests, not runtime implementation.
@@ -59,7 +59,7 @@ requirement associations are not carried forward as proof.
 
 | Gap | Requirement or proposal | Current evidence or difference | State | Required outcome and owner |
 | --- | --- | --- | --- | --- |
-| `EXE-GAP-001` | `EXE-REQ-004`, `EXE-REQ-005`, `EXE-REQ-006` | Runtime.State now exists as an internal map with provider values. It is not the proposed portable public Execution.Input/State. | Decision required | Separate temporary state from portable snapshots; review the public abstraction before adding it. |
+| `EXE-GAP-001` | `EXE-REQ-004`, `EXE-REQ-005`, `EXE-REQ-006` | Execution.State now exists as an internal map with provider values. It is not the proposed portable public Execution.Input/State. | Decision required | Separate temporary state from portable snapshots; review the public abstraction before adding it. |
 | `EXE-GAP-002` | `EXE-REQ-018`, `EXE-REQ-019`, `EXE-REQ-020` | Runtime events carry correlation, but one shared schema for all attempts and projections is not established. | Implemented; evidence incomplete | Complete correlation evidence in 12. |
 | `EXE-GAP-003` | `EXE-REQ-015`, `EXE-REQ-016`, `EXE-REQ-017` | Retry uses a continuation with bounded worker sleep; output repair has its own bounded path. | Decision required | Resolve EXE-REQ-015/017 without creating a generic retry engine. |
 | `EXE-GAP-004` | `EXE-REQ-023`, `EXE-REQ-024` | Coordinator owns cancellation and worker cleanup through the current integration. The target names a public Exec cancellation contract. | Decision required | Verify the exact lower-level API and cancellation races before changing ownership. |
@@ -69,9 +69,9 @@ requirement associations are not carried forward as proof.
 ## Selected-direction gap
 
 `EXE-GAP-007` — [EXE-DEC-005](design.md#selected-direction-complete-the-runtime-split)
-is selected but not implemented. [RequestTransform](../../../lib/jido_ai/runtime/request_transform.ex)
-constructs ReAct Config/State views. [Decide](../../../lib/jido_ai/runtime/decide.ex)
-uses that view to obtain the repair query. Runtime.State names GoT/TRM machine
+is selected but not implemented. [RequestTransform](../../../lib/jido_ai/execution/request_transform.ex)
+constructs ReAct Config/State views. [Decide](../../../lib/jido_ai/execution/decide.ex)
+uses that view to obtain the repair query. Execution.State names GoT/TRM machine
 types. These are remaining dependencies on method-specific state.
 
 Required evidence for the later change: all eight methods keep their current
@@ -84,9 +84,9 @@ Seams 02, 05, 06, and 11 depend on this boundary. Callback migration is open.
 
 The [boundary proposal](design.md#proposed-execution-to-orchestration-boundary)
 is not implemented. Runtime uses multiple Orchestration helpers and direct
-Coordinator messages. [PendingInput](../../../lib/jido_ai/runtime/pending_input.ex)
+Coordinator messages. [PendingInput](../../../lib/jido_ai/execution/pending_input.ex)
 reads the queue from context and calls it directly.
-[Checkpoint](../../../lib/jido_ai/runtime/checkpoint.ex) calls Coordinator.
+[Checkpoint](../../../lib/jido_ai/execution/checkpoint.ex) calls Coordinator.
 
 Future evidence covers tagged request/run identity, stale messages, safe
 boundary positions, input order, commit waits, and unknown commit results.
@@ -162,8 +162,8 @@ gates are separate. No row grants document approval.
 | `EXE-REQ-024` | Implemented; evidence incomplete | Related example evidence (partial): [live cancellation stops owned tool work and preserves the commit](../../../test/examples/01_authoring/01_07_ai_runtime/01_07_ai_runtime_test.exs); [cancellation stops a held real tool and cannot stop the next request](../../../test/examples/02_requests/02_01_session/02_01_session_test.exs). | Verify the target behavior: Cancellation shall stop pending continuations and child tool work according to Exec cleanup rules. |
 | `EXE-REQ-025` | Implemented; evidence incomplete | Related example evidence (partial): [three dependent tool rounds precede the committed answer](../../../test/examples/01_authoring/01_02_tool_flow/multi_round_test.exs); [provider failure after tool work leaves state unchanged](../../../test/examples/01_authoring/01_02_tool_flow/multi_round_test.exs). | Verify the target behavior: A terminal success shall contain the final typed value, final context update, usage, safe metadata, and proposed effects. |
 | `EXE-REQ-026` | Implemented; evidence incomplete | Related example evidence (partial): [three dependent tool rounds precede the committed answer](../../../test/examples/01_authoring/01_02_tool_flow/multi_round_test.exs); [provider failure after tool work leaves state unchanged](../../../test/examples/01_authoring/01_02_tool_flow/multi_round_test.exs). | Verify the target behavior: The execution result shall not commit Agent state or dispatch post-commit Directives. |
-| `EXE-REQ-027` | Implemented; evidence incomplete | Related example evidence (partial): [DSL data Builder source JSON direct Flow and ordinary turns use the same recursive contract](../../../test/examples/09_reasoning/09_08_trm/09_08_trm_test.exs). | Verify the target behavior: Turn mode and session mode shall use the same canonical AI Flow, model gateway, tool bridge, limits, and terminal result contract. |
-| `EXE-REQ-028` | Implemented; evidence incomplete | Related example evidence (partial): [DSL data Builder source JSON direct Flow and ordinary turns use the same recursive contract](../../../test/examples/09_reasoning/09_08_trm/09_08_trm_test.exs). | Verify the target behavior: Differences between Turn mode and session mode shall be limited to admission, process lifetime, streaming transport, and commit timing. |
+| `EXE-REQ-027` | Implemented; evidence incomplete | Related example evidence (partial): [DSL data Builder source JSON direct Flow and ordinary turns use the same recursive contract](../../../test/examples/09_reasoning/09_08_trm/09_08_trm_test.exs). | Verify the target behavior: Asynchronous and synchronous request helpers shall use the same canonical AI Flow, model gateway, tool bridge, limits, and terminal result contract. |
+| `EXE-REQ-028` | Superseded | Retired in the owning design after selection of one AI request lifecycle. | Keep the identifier; use the admission/execution/settlement requirements. |
 | `EXE-REQ-029` | Implemented; evidence incomplete | Related example evidence (partial): [common AI lowering composes with core data, Builder and JSON](../../../test/examples/01_authoring/01_06_ai_extension/01_06_ai_extension_test.exs). | Verify the target behavior: When a host stores or transports a custom AI Flow, it shall use `Jido.Flow.Codec` with a trusted Flow registry and shall not use a Jido AI-specific graph format. |
 | `EXE-REQ-030` | Implemented; evidence incomplete | Related example evidence (partial): [common AI lowering composes with core data, Builder and JSON](../../../test/examples/01_authoring/01_06_ai_extension/01_06_ai_extension_test.exs). | Verify the target behavior: When Jido AI constructs a Flow directly, it shall use public canonical Flow component constructors and the same validation as DSL, Builder, and Codec forms. |
 

@@ -103,7 +103,7 @@ Activation has two phases:
 1. **Catalog preparation:** A session runtime discovers and validates trusted skill specs. It builds a bounded index, but it does not run a model or Action.
 2. **Request activation:** The request selects approved skills. Their prompt, Actions, Plugins, and resource context enter the normal Profile, tool, Plugin, and Flow paths.
 
-Automatic filesystem discovery requires session mode because a live host runtime owns paths, change detection, and resource access. Static module or inline runtime specs can be used in Turn mode when they need no live resource.
+Automatic filesystem discovery uses the Coordinator as the live owner of paths, change detection, and resource access. Static module and inline runtime specs use the same request lifecycle.
 
 ## Requirements
 
@@ -145,7 +145,7 @@ Automatic filesystem discovery requires session mode because a live host runtime
 
 `SKL-REQ-016`: A skill shall not start a process or execute an Action during discovery or activation.
 
-`SKL-REQ-017`: If a skill requires a live resource that is not available in Turn mode, profile validation or request admission shall return an explicit unsupported-mode error.
+`SKL-REQ-017`: If a skill requires a live resource and no live owner is available, request admission shall return an explicit resource-owner error.
 
 ### Resources
 
@@ -223,5 +223,5 @@ The module macro remains a trusted compile-time authoring surface. Runtime regis
 | --- | --- | --- | --- |
 | `SKL-DEC-001` | Do skills remain in `jido_ai` for V3? | Yes; defer extraction until the contract is stable | Avoids a package split during migration |
 | `SKL-DEC-002` | Can encoded profiles name skill modules? | Only through a trusted registry | Prevents atom and code injection |
-| `SKL-DEC-003` | Is automatic filesystem discovery allowed in Turn mode? | No | Gives discovery a clear live owner |
+| `SKL-DEC-003` | Does automatic filesystem discovery require a live owner? | Yes | The Coordinator owns discovery for the single request lifecycle |
 | `SKL-DEC-004` | Are binaries allowed by default? | No | Keeps model input and resource use safe |

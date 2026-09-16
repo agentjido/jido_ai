@@ -1,7 +1,8 @@
 defmodule Jido.AI.Actions.ToolCalling.RequestModel do
   @moduledoc false
   use Jido.Action, name: "tool_calling_request_model"
-  alias Jido.AI.{Turn, Usage}
+  alias Jido.AI.Model.Response
+  alias Jido.AI.Usage
 
   def run(state, context) do
     case Jido.AI.Model.Transport.request(
@@ -13,7 +14,7 @@ defmodule Jido.AI.Actions.ToolCalling.RequestModel do
            context
          ) do
       {:ok, response} ->
-        turn = Turn.from_response(response, model: state.model)
+        turn = Response.from_response(response, model: state.model)
 
         turn_usage =
           case Usage.normalize(turn.usage) do
@@ -28,7 +29,7 @@ defmodule Jido.AI.Actions.ToolCalling.RequestModel do
            state
            | turn: turn,
              usage: usage,
-             messages: state.messages ++ [Turn.assistant_message(turn)]
+             messages: state.messages ++ [Response.assistant_message(turn)]
          }}
 
       {:error, error} ->

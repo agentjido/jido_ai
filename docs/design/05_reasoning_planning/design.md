@@ -64,7 +64,11 @@ Earlier extension proposal, not the selected implementation contract:
   {:ok, Jido.AI.Reasoning.Result.t()} | {:error, Jido.AI.Error.t()}
 ```
 
-`capabilities/0` declares whether the method supports tools, streaming, structured output, steering, and parallel candidates. Profile validation rejects unsupported combinations before a request starts.
+The target `capabilities/0` contract declares support for tools, streaming,
+structured output, steering, and parallel candidates. Current Profile validation
+rejects unsupported authored tool, output, and steering combinations. Streaming
+is selected per call, not in Profile. Provider streaming errors remain request
+errors; a static Profile does not certify provider transport support.
 
 The complete retained method set is:
 

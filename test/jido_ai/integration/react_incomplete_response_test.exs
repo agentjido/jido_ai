@@ -17,7 +17,7 @@ defmodule Jido.AI.Integration.ReActIncompleteResponseTest do
       ai :assistant do
         model("openai:gpt-4o-mini")
         reasoning(:react)
-        requests(mode: :session, streaming: true)
+
         memory(history: :messages)
         result(into: :last_result)
       end
@@ -65,7 +65,7 @@ defmodule Jido.AI.Integration.ReActIncompleteResponseTest do
       stub_blank_stream_response(:incomplete)
 
       pid = start_basic_agent()
-      result = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000)
+      result = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000, stream: true)
 
       assert {:error, {:incomplete_response, :incomplete}} = result
     end
@@ -74,7 +74,7 @@ defmodule Jido.AI.Integration.ReActIncompleteResponseTest do
       stub_blank_stream_response(:incomplete)
 
       pid = start_basic_agent()
-      result = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000)
+      result = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000, stream: true)
 
       refute result == {:ok, ""}
     end
@@ -83,7 +83,7 @@ defmodule Jido.AI.Integration.ReActIncompleteResponseTest do
       stub_blank_stream_response(:error)
 
       pid = start_basic_agent()
-      result = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000)
+      result = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000, stream: true)
 
       assert {:error, {:incomplete_response, :error}} = result
     end
@@ -92,7 +92,7 @@ defmodule Jido.AI.Integration.ReActIncompleteResponseTest do
       stub_blank_stream_response(:cancelled)
 
       pid = start_basic_agent()
-      result = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000)
+      result = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000, stream: true)
 
       assert {:error, {:incomplete_response, :cancelled}} = result
     end
@@ -101,7 +101,7 @@ defmodule Jido.AI.Integration.ReActIncompleteResponseTest do
       stub_blank_stream_response(:length)
 
       pid = start_basic_agent()
-      result = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000)
+      result = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000, stream: true)
 
       assert {:error, {:incomplete_response, :length}} = result
     end
@@ -110,7 +110,7 @@ defmodule Jido.AI.Integration.ReActIncompleteResponseTest do
       stub_blank_stream_response(:content_filter)
 
       pid = start_basic_agent()
-      result = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000)
+      result = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000, stream: true)
 
       assert {:error, {:incomplete_response, :content_filter}} = result
     end
@@ -127,7 +127,7 @@ defmodule Jido.AI.Integration.ReActIncompleteResponseTest do
 
       pid = start_basic_agent()
 
-      assert {:ok, "Hello, World!"} = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000)
+      assert {:ok, "Hello, World!"} = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000, stream: true)
     end
 
     test "incomplete finish_reason rejects actual text content as a final answer" do
@@ -142,7 +142,8 @@ defmodule Jido.AI.Integration.ReActIncompleteResponseTest do
 
       pid = start_basic_agent()
 
-      assert {:error, {:incomplete_response, :incomplete}} = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000)
+      assert {:error, {:incomplete_response, :incomplete}} =
+               BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000, stream: true)
     end
   end
 end

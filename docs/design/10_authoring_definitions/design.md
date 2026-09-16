@@ -56,7 +56,6 @@ The canonical authoring value is `Jido.AI.Profile`:
   effect_policy: Jido.AI.EffectPolicy.t(),
   tool_interceptor: module_ref() | nil,
   result: Jido.AI.ResultConfig.t(),
-  requests: Jido.AI.RequestConfig.t(),
   memory: Jido.AI.MemoryConfig.t(),
   observability: Jido.AI.ObservabilityConfig.t(),
   metadata: map()
@@ -71,6 +70,11 @@ The three primary authoring forms are:
 
 `use Jido.AI.Agent` is the canonical convenience form. It uses `Jido.Agent` with
 the `Jido.AI.DSL` Spark extension. It has no separate schema or runtime.
+
+Profiles do not contain request transport or retention configuration. Streaming
+is a per-call choice. `controls` owns steering, inactivity limits, and tool
+heartbeats. The host owns request-record retention. Old `requests` blocks and
+fields are rejected in module, direct, and codec authoring.
 
 The lowering pipeline is:
 
@@ -99,7 +103,7 @@ The module DSL can define inline instructions and inline Action tools through th
 
 `AUT-REQ-004`: Profile validation shall enforce portable static data for every field that can enter Agent definitions, routes, Plugin options, or Flow data.
 
-`AUT-REQ-005`: Profile validation shall reject an unknown model role, method, control, tool, skill source, output field, history field, or request mode before lowering completes.
+`AUT-REQ-005`: Profile validation shall reject an unknown model role, method, control, tool, skill source, output field, history field, or request policy field before lowering completes.
 
 `AUT-REQ-006`: Model aliases shall remain portable and shall resolve at request start through seam 02.
 
@@ -156,7 +160,7 @@ reject unsupported top-level AI options.
 
 ### Generated API
 
-`AUT-REQ-028`: An authored AI Agent shall expose Profile inspection and the request functions supported by its request mode.
+`AUT-REQ-028`: An authored AI Agent shall expose Profile inspection and the standard ask, ask_sync, await, and ask_stream functions. The caller shall select streaming per call; no Profile streaming flag is required.
 
 `AUT-REQ-029`: Generated request functions shall be thin calls to seam 07 and shall not contain a second admission or execution path.
 
@@ -191,10 +195,9 @@ defmodule SupportAgent do
         action MyApp.Search, as: :search, timeout: 5_000
       end
 
-      controls max_iterations: 8, max_model_calls: 12, max_tool_calls: 16
+      controls max_iterations: 8, max_model_calls: 12, max_tool_calls: 16, steering: true
       result into: :answer
       memory history: :messages
-      requests mode: :session, streaming: true, steering: true
     end
 
     route "support.ask", ai: :support

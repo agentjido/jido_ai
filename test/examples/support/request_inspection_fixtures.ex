@@ -31,62 +31,51 @@ defmodule JidoAI.Examples.RequestInspection.Fail do
   def run(_, _), do: {:error, %{type: :timeout, message: "search timed out"}}
 end
 
-for {module, streaming?} <- [
-      {JidoAI.Examples.RequestInspection.ReplayBuffered, false},
-      {JidoAI.Examples.RequestInspection.ReplayStream, true}
-    ] do
-  defmodule module do
-    use Jido.Agent, name: "inspection_replay", extensions: [Jido.AI.DSL]
-    @streaming streaming?
+defmodule JidoAI.Examples.RequestInspection.Replay do
+  use Jido.Agent, name: "inspection_replay", extensions: [Jido.AI.DSL]
 
-    agent do
-      schema(
-        Zoi.object(%{
-          reply: Zoi.any() |> Zoi.default(nil),
-          messages: Jido.AI.Thread.Projection.schema()
-        })
-      )
+  agent do
+    schema(
+      Zoi.object(%{
+        reply: Zoi.any() |> Zoi.default(nil),
+        messages: Jido.AI.Thread.Projection.schema()
+      })
+    )
 
-      ai :assistant do
-        models do
-          model(:answer, JidoAI.Examples.MockLLM.model())
-        end
-
-        tools do
-          action(JidoAI.Examples.RequestInspection.Hold,
-            as: :inspect_hold,
-            forward_context: [:observer],
-            timeout: 8_000
-          )
-
-          action(JidoAI.Examples.RequestInspection.Fail, as: :inspect_fail)
-        end
-
-        reasoning :react do
-          model(:answer)
-        end
-
-        requests do
-          mode(:session)
-          streaming(@streaming)
-        end
-
-        memory do
-          history(:messages)
-        end
-
-        observability do
-          store_content true
-          diagnostics_content true
-          stream_content true
-        end
-
-        result(nil, into: :reply)
+    ai :assistant do
+      models do
+        model(:answer, JidoAI.Examples.MockLLM.model())
       end
-    end
 
-    routes do
-      route("case.ask", ai(:assistant))
+      tools do
+        action(JidoAI.Examples.RequestInspection.Hold,
+          as: :inspect_hold,
+          forward_context: [:observer],
+          timeout: 8_000
+        )
+
+        action(JidoAI.Examples.RequestInspection.Fail, as: :inspect_fail)
+      end
+
+      reasoning :react do
+        model(:answer)
+      end
+
+      memory do
+        history(:messages)
+      end
+
+      observability do
+        store_content true
+        diagnostics_content true
+        stream_content true
+      end
+
+      result(nil, into: :reply)
     end
+  end
+
+  routes do
+    route("case.ask", ai(:assistant))
   end
 end

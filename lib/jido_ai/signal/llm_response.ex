@@ -6,7 +6,7 @@ defmodule Jido.AI.Signal.LLMResponse do
   or a final answer.
   """
 
-  alias Jido.AI.Turn
+  alias Jido.AI.Model.Response
 
   use Jido.Signal,
     type: "ai.llm.response",
@@ -45,14 +45,14 @@ defmodule Jido.AI.Signal.LLMResponse do
   def extract_tool_calls(%{type: "ai.llm.response", data: %{result: {:ok, result}}})
       when is_map(result) do
     result
-    |> Turn.from_result_map()
+    |> Response.from_result_map()
     |> Map.get(:tool_calls, [])
   end
 
   def extract_tool_calls(%{type: "ai.llm.response", data: %{result: {:ok, result, _effects}}})
       when is_map(result) do
     result
-    |> Turn.from_result_map()
+    |> Response.from_result_map()
     |> Map.get(:tool_calls, [])
   end
 
@@ -65,15 +65,15 @@ defmodule Jido.AI.Signal.LLMResponse do
   def tool_call?(%{type: "ai.llm.response", data: %{result: {:ok, result}}})
       when is_map(result) do
     result
-    |> Turn.from_result_map()
-    |> Turn.needs_tools?()
+    |> Response.from_result_map()
+    |> Response.needs_tools?()
   end
 
   def tool_call?(%{type: "ai.llm.response", data: %{result: {:ok, result, _effects}}})
       when is_map(result) do
     result
-    |> Turn.from_result_map()
-    |> Turn.needs_tools?()
+    |> Response.from_result_map()
+    |> Response.needs_tools?()
   end
 
   def tool_call?(_signal), do: false
@@ -89,7 +89,7 @@ defmodule Jido.AI.Signal.LLMResponse do
     metadata = Keyword.get(opts, :metadata, %{})
     turn_opts = if is_binary(model_override), do: [model: model_override], else: []
 
-    turn = Turn.from_response(response, turn_opts)
+    turn = Response.from_response(response, turn_opts)
 
     signal_data = %{
       call_id: call_id,

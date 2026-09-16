@@ -1,7 +1,7 @@
 defmodule Jido.AI.Orchestration.Coordinator do
   @moduledoc false
   use GenServer
-  alias Jido.AI.{Authoring, Orchestration}
+  alias Jido.AI.Orchestration
   alias Jido.AI.PendingInputServer, as: InputQueue
   alias Jido.AI.Request.Stream
   alias Jido.AI.Orchestration.Change
@@ -13,10 +13,13 @@ defmodule Jido.AI.Orchestration.Coordinator do
   def init(init) do
     Process.flag(:trap_exit, true)
 
-    with {:ok, skills} <-
+    with {:ok, retention_limit} <- retention_limit(),
+         {:ok, skills} <-
            Jido.AI.Skill.Source.prepare_all(Keyword.get(init.options, :skills, %{})),
          {:ok, delivery} <- Jido.AI.Orchestration.Delivery.start_link(self(), init.agent_server) do
-      {:ok, %{init: init, jobs: %{}, settlements: %{}, delivery: delivery, skills: skills}, {:continue, :recover}}
+      {:ok,
+       %{init: init, jobs: %{}, settlements: %{}, delivery: delivery, skills: skills, retention_limit: retention_limit},
+       {:continue, :recover}}
     else
       {:error, reason} ->
         {:stop, reason}
@@ -58,6 +61,7 @@ defmodule Jido.AI.Orchestration.Coordinator do
   def handle_call(:ready, _, state), do: {:reply, :ok, state}
   def handle_call(:agent_server, _, state), do: {:reply, state.init.agent_server, state}
   def handle_call(:skill_catalogs, _, state), do: {:reply, state.skills, state}
+  def handle_call(:retention_limit, _, state), do: {:reply, state.retention_limit, state}
 
   def handle_call({:delivery_status, id}, _, state),
     do: {:reply, Jido.AI.Orchestration.Delivery.status(state.delivery, id), state}
@@ -183,7 +187,7 @@ defmodule Jido.AI.Orchestration.Coordinator do
     enabled = Map.get(profile.observability, :emit_signals?, true)
     :ok = Jido.AI.Orchestration.Delivery.register(state.delivery, record, enabled)
     saved = if checkpoint, do: checkpoint.state
-    resumed? = Jido.AI.Runtime.Checkpoint.resumed?(context)
+    resumed? = Jido.AI.Execution.Checkpoint.resumed?(context)
 
     job =
       %{
@@ -217,8 +221,15 @@ defmodule Jido.AI.Orchestration.Coordinator do
       end
 
     server = state.init.agent_server
-    task = Task.async(fn -> execute(record, context, resources, runtime, queue, server) end)
-    {:reply, :ok, put_in(state.jobs[record.id], %{job | task: task})}
+
+    case start_execution(record, context, resources, runtime, queue, server) do
+      {:ok, execution} ->
+        {:reply, :ok, put_in(state.jobs[record.id], %{job | task: execution})}
+
+      {:error, reason} ->
+        job = Activity.stop(%{job | outcome: {:error, Jido.AI.Error.for_storage(reason)}})
+        {:reply, :ok, settle(put_in(state.jobs[record.id], job), record.id, :result)}
+    end
   end
 
   def handle_call({:dispatch, %Change{operation: :control}, _}, _, state),
@@ -548,14 +559,14 @@ defmodule Jido.AI.Orchestration.Coordinator do
     task_result(ref, result, state)
   end
 
-  def handle_info({:DOWN, ref, :process, _, reason}, state) do
+  def handle_info({:jido_exec_async_result, _, _, _} = message, state),
+    do: execution_message(message, state)
+
+  def handle_info({:DOWN, ref, :process, _, reason} = message, state) do
     if Map.has_key?(state.settlements, ref) do
       task_result(ref, {:uncertain, {:settlement_worker_exit, reason}}, state)
     else
-      finish(ref, {:error, :worker_crash}, state, %{
-        error_type: :worker_task,
-        worker_exit_reason: Jido.AI.Error.for_storage(reason)
-      })
+      execution_message(message, state)
     end
   end
 
@@ -563,6 +574,29 @@ defmodule Jido.AI.Orchestration.Coordinator do
     do: {:stop, {:signal_delivery_exit, reason}, state}
 
   def handle_info({:EXIT, _, _}, state), do: {:noreply, state}
+
+  defp execution_message(message, state) do
+    Enum.find_value(state.jobs, {:noreply, state}, fn {_, job} ->
+      if job.task do
+        case Jido.Exec.handle_message(job.task, message) do
+          {:done, result} ->
+            case message do
+              {:DOWN, _, :process, _, reason} ->
+                finish(job.task.ref, {:error, :worker_crash}, state, %{
+                  error_type: :worker_task,
+                  worker_exit_reason: Jido.AI.Error.for_storage(reason)
+                })
+
+              _ ->
+                finish(job.task.ref, result, state)
+            end
+
+          :ignore ->
+            nil
+        end
+      end
+    end)
+  end
 
   defp task_result(ref, result, state) do
     case Map.pop(state.settlements, ref) do
@@ -751,7 +785,7 @@ defmodule Jido.AI.Orchestration.Coordinator do
     end
   end
 
-  defp execute(record, context, resources, runtime, queue, server) do
+  defp start_execution(record, context, resources, runtime, queue, server) do
     profile = context.jido_ai_profiles[record.profile_id]
     options = get_in(context, [:ai, record.profile_id, :options]) || []
     model = profile.models[profile.reasoning.model].model
@@ -777,15 +811,18 @@ defmodule Jido.AI.Orchestration.Coordinator do
       |> Map.put(:agent_state, context.jido_ai_snapshot)
       |> Map.put(:state, context.jido_ai_snapshot)
       |> Map.put(:jido_ai_profiles, context.jido_ai_profiles)
-      |> Map.put(:jido_ai_session, true)
+      |> Map.put(:jido_ai_managed, true)
       |> Map.put(:jido_ai_events, {runtime, record.id, record.run_id})
       |> Map.put(:jido_ai_server, server)
       |> Map.put(:jido_ai_input_queue, queue)
       |> Map.put(:jido_ai_request_record, record)
 
     with {:ok, context} <- Jido.AI.Skill.Runtime.bind(context, profile, runtime),
-         {:ok, flow} <- Authoring.reasoning_flow(profile),
-         do: Jido.Exec.run(flow, %{query: record.query}, context, timeout: profile.controls.timeout)
+         {:ok, flow} <- Jido.AI.Execution.Flow.build(profile) do
+      {:ok, Jido.Exec.run_async(flow, %{query: record.query}, context, timeout: profile.controls.timeout)}
+    end
+  rescue
+    error -> {:error, error}
   end
 
   defp tool_context(resources) do
@@ -872,7 +909,7 @@ defmodule Jido.AI.Orchestration.Coordinator do
     }
 
     attrs = if event_id, do: Map.put(attrs, :id, event_id), else: attrs
-    event = Jido.AI.Runtime.Event.new(attrs)
+    event = Jido.AI.Observe.Event.new(attrs)
 
     job = Map.merge(job, %{seq: seq, iteration: iteration, llm_call_id: call_id})
     deliver(job, event)
@@ -911,7 +948,7 @@ defmodule Jido.AI.Orchestration.Coordinator do
         job
       end
 
-    Jido.AI.Runtime.Telemetry.emit(
+    Jido.AI.Observe.Telemetry.emit(
       event,
       Map.get(job, :observability, %{}),
       Map.get(job, :agent_id),
@@ -922,8 +959,9 @@ defmodule Jido.AI.Orchestration.Coordinator do
   end
 
   defp stop_task(nil), do: :ok
+  defp stop_task(%{owner: _, monitor_ref: _} = execution), do: Jido.Exec.cancel(execution)
   defp stop_task(task), do: Task.shutdown(task, :brutal_kill)
-  defp input_queue(%{requests: %{steering: false}}, _, _), do: {nil, false}
+  defp input_queue(%{controls: %{steering: false}}, _, _), do: {nil, false}
 
   defp input_queue(_, %{config: %{pending_input_server: queue}}, _) when not is_nil(queue),
     do: {queue, false}
@@ -939,6 +977,13 @@ defmodule Jido.AI.Orchestration.Coordinator do
   defp close_queue(%{queue: queue, owns_queue?: false}), do: InputQueue.seal(queue)
   defp close_queue(%{queue: queue}), do: InputQueue.stop(queue)
   defp close_queue(_), do: :ok
+
+  defp retention_limit do
+    case Application.get_env(:jido_ai, :max_retained_requests, 100) do
+      n when is_integer(n) and n > 0 -> {:ok, n}
+      _ -> Jido.AI.Profile.error("max_retained_requests", "Expected a positive host retention limit")
+    end
+  end
 
   @impl true
   def terminate(_, state) do

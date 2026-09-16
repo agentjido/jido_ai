@@ -6,7 +6,9 @@ defmodule Jido.AI.Test.ReasoningCase do
     quote do
       import Jido.AI.Test.ReasoningCase
       alias Jido.AgentServer, as: Server
-      alias Jido.AI.{Configuration, Request, Orchestration}
+      alias Jido.AI.Configuration
+      alias Jido.AI.Request
+      alias Jido.AI.Orchestration
       alias Jido.AI.Test.MockLLM
     end
   end
@@ -18,7 +20,7 @@ defmodule Jido.AI.Test.ReasoningCase do
   end
 
   def definition(method, opts \\ []) do
-    opts = Keyword.merge([name: "root_reasoning", streaming: false], opts)
+    opts = Keyword.merge([name: "root_reasoning"], opts)
     model = Keyword.get(opts, :model, :fast)
     output = Jido.AI.Output.new!(opts[:output])
 
@@ -71,18 +73,6 @@ defmodule Jido.AI.Test.ReasoningCase do
         %{schema: nil, into: :last_result}
       end
 
-    requests = %{
-      mode: :session,
-      streaming: Keyword.get(opts, :streaming, false),
-      steering: method == :react,
-      on_busy: Keyword.get(opts, :request_policy, :reject)
-    }
-
-    requests =
-      if timeout = opts[:stream_timeout_ms],
-        do: Map.put(requests, :idle_timeout, timeout),
-        else: requests
-
     profile =
       Jido.AI.profile!(%{
         id: :assistant,
@@ -99,9 +89,10 @@ defmodule Jido.AI.Test.ReasoningCase do
           max_iterations: Keyword.get(opts, :max_iterations, 10),
           max_model_calls: Keyword.get(opts, :max_model_calls, Keyword.get(opts, :max_iterations, 10)),
           max_tool_calls: Keyword.get(opts, :max_tool_calls, 16),
-          timeout: Keyword.get(opts, :request_timeout_ms, 60_000)
+          timeout: Keyword.get(opts, :request_timeout_ms, 60_000),
+          steering: method == :react,
+          idle_timeout: Keyword.get(opts, :stream_timeout_ms, 0)
         },
-        requests: requests,
         observability: Keyword.get(opts, :observability, %{}),
         effect_policy: Keyword.get(opts, :effect_policy, %{}),
         tool_context: Keyword.get(opts, :tool_context, %{}),
@@ -168,7 +159,8 @@ defmodule Jido.AI.Test.ReasoningCase do
           source: "/test/reasoning",
           model: Jido.AI.Test.MockLLM.model(),
           llm_opts: Jido.AI.Test.MockLLM.options(mock),
-          stream_to: self()
+          stream_to: self(),
+          stream: false
         ],
         opts
       )

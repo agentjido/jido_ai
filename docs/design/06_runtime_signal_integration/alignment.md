@@ -5,16 +5,16 @@
 ## Status
 
 - Reviewed: 2026-09-15.
-- Code for the example audit: `v3-spike`, HEAD `7bb011e98349af8bf580e7b93afa60990972beae`, plus uncommitted example, test, formatter, and documentation changes. No `lib/` or dependency changes.
+- Code baseline: `v3-spike`, HEAD `4ed6402f`, plus uncommitted runtime, test, example, and documentation refinement. Dependency pins are unchanged.
 - Prerequisite alignments used: [00 Package boundary and invariants](../00_boundary_invariants/alignment.md), [01 Canonical interaction and AI values](../01_ai_values/alignment.md), [04 Shared AI execution](../04_ai_execution/alignment.md).
 - Alignment state: Draft. Current ownership is mapped; target decisions and full acceptance proof remain.
 - Verification: the example-driven review below adds fresh MockLLM runs to the earlier source review. Earlier statements that no tests ran refer to that prior review, not this follow-up.
 
 ## Current architecture
 
-Runtime and Orchestration Plugins use separate core Agent and AgentServer facets. Orchestration owns AI request coordination above core commit. Canonical Session/Thread values are local to jido_ai. Signal types and existing internal wire names were preserved during the module rename.
+Configuration and Orchestration Plugins use separate core Agent and AgentServer facets. Orchestration owns AI request coordination above core commit. Canonical Session/Thread values are local to jido_ai. Public typed Signal names remain stable. Internal orchestration routes use jido.ai.request.*.
 
-- Current owner: Runtime.Plugin and Orchestration.Plugin Agent/AgentServer facets, route/directive adapters, and typed Signal data.
+- Current owner: Configuration.Plugin and Orchestration.Plugin Agent/AgentServer facets, route/directive adapters, and typed Signal data.
 - Cross-package ownership: core Jido owns Agent commit and topology; Flow/Exec and Signal internals remain in their respective packages.
 - Overall placement: [architecture overview](../ARCHITECTURE.md).
 - Full target: [design](design.md). Use only public core Plugin, Agent, Flow, and Signal contracts. Preserve route validation, trusted runtime binding, post-commit work, event transport, and topology integration.
@@ -25,8 +25,8 @@ Runtime and Orchestration Plugins use separate core Agent and AgentServer facets
 
 | Source | Evidence scope |
 | --- | --- |
-| [lib/jido_ai/runtime/plugin.ex](../../../lib/jido_ai/runtime/plugin.ex) | Runtime integration |
-| [lib/jido_ai/runtime/plugin/agent.ex](../../../lib/jido_ai/runtime/plugin/agent.ex) | Agent facet |
+| [lib/jido_ai/configuration/plugin.ex](../../../lib/jido_ai/configuration/plugin.ex) | Runtime integration |
+| [lib/jido_ai/configuration/plugin/agent.ex](../../../lib/jido_ai/configuration/plugin/agent.ex) | Agent facet |
 | [lib/jido_ai/orchestration/plugin/agent_server.ex](../../../lib/jido_ai/orchestration/plugin/agent_server.ex) | Coordinator child and admission |
 | [lib/jido_ai/orchestration/plugin/agent.ex](../../../lib/jido_ai/orchestration/plugin/agent.ex) | Record and directive ownership |
 | [lib/jido_ai/signal.ex](../../../lib/jido_ai/signal.ex) | Signal facade |
@@ -121,8 +121,8 @@ gates are separate. No row grants document approval.
 | `INT-REQ-001` | Implemented; evidence incomplete | Related example evidence (partial): [nested AI syntax lowers to an ordinary Agent and Flow](../../../test/examples/01_authoring/01_06_ai_extension/01_06_ai_extension_test.exs). | Verify the target behavior: The AI Agent DSL shall implement the public `Jido.Agent.Extension` contract and shall lower static AI declarations to an ordinary neutral Agent definition. |
 | `INT-REQ-002` | Implemented; evidence incomplete | Related example evidence (partial): [nested AI syntax lowers to an ordinary Agent and Flow](../../../test/examples/01_authoring/01_06_ai_extension/01_06_ai_extension_test.exs). | Verify the target behavior: Lowering shall perform no model call, tool call, process start, store access, or other runtime side effect. |
 | `INT-REQ-003` | Implemented; evidence incomplete | Related example evidence (partial): [nested AI syntax lowers to an ordinary Agent and Flow](../../../test/examples/01_authoring/01_06_ai_extension/01_06_ai_extension_test.exs). | Verify the target behavior: Each AI route target shall resolve to a validated core Action or Flow before the Agent definition is accepted. |
-| `INT-REQ-004` | Implemented; evidence incomplete | Related example evidence (partial): [three dependent tool rounds precede the committed answer](../../../test/examples/01_authoring/01_02_tool_flow/multi_round_test.exs). | Verify the target behavior: Turn-mode AI routes shall target the canonical AI Flow without a second graph runner. |
-| `INT-REQ-005` | Implemented; evidence incomplete | Related example evidence (partial): [admission commits before work and the final Turn preserves intervening domain changes](../../../test/examples/02_requests/02_01_session/02_01_session_test.exs). | Verify the target behavior: Session-mode AI routes shall target one admission Action that returns a candidate and a post-commit start-work Directive. |
+| `INT-REQ-004` | Superseded | Retired in the owning design after selection of one AI request lifecycle. | Keep the identifier; use the admission/execution/settlement requirements. |
+| `INT-REQ-005` | Implemented; evidence incomplete | Related example evidence (partial): [admission commits before work and the final Turn preserves intervening domain changes](../../../test/examples/02_requests/02_01_session/02_01_session_test.exs). | Verify the target behavior: AI Agent routes shall target one admission Action that returns a candidate and a post-commit start-work Directive. |
 | `INT-REQ-006` | Implemented; evidence incomplete | Related example evidence (partial): [route defaults survive lowering and conflict with duplicate bindings](../../../test/examples/01_authoring/01_07_ai_runtime/01_07_ai_runtime_test.exs). | Verify the target behavior: AI-generated routes shall use core route conflict validation and shall not override an explicit host route silently. |
 | `INT-REQ-007` | Implemented; evidence incomplete | Related example evidence (partial): [route defaults survive lowering and conflict with duplicate bindings](../../../test/examples/01_authoring/01_07_ai_runtime/01_07_ai_runtime_test.exs). | Verify the target behavior: Route-target options shall be owned and validated by the AI extension and shall reject unknown options. |
 | `INT-REQ-008` | Implemented; evidence incomplete | Related example evidence (partial): [DSL helper executes Action and Flow tools and preserves Plugin ownership](../../../test/examples/01_authoring/01_07_ai_runtime/01_07_ai_runtime_test.exs). | Verify the target behavior: Each AI Plugin shall declare at most one portable Agent state key through `state_spec/1`. |

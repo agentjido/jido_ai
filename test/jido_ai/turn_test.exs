@@ -1,7 +1,7 @@
-defmodule Jido.AI.TurnTest do
+defmodule Jido.AI.Model.ResponseTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.Turn
+  alias Jido.AI.Model.Response
   alias Jido.Action.Error, as: ActionError
   alias ReqLLM.Message.ContentPart
   alias ReqLLM.ToolResult
@@ -57,12 +57,12 @@ defmodule Jido.AI.TurnTest do
         usage: %{input_tokens: 10, output_tokens: 5}
       }
 
-      turn = Turn.from_response(response, model: "anthropic:claude-haiku-4-5")
+      turn = Response.from_response(response, model: "anthropic:claude-haiku-4-5")
 
       assert turn.type == :final_answer
       assert turn.text == "hello\nworld"
-      assert Turn.assistant_content(turn) == "hello\nworld"
-      assert Turn.result(turn) == "hello\nworld"
+      assert Response.assistant_content(turn) == "hello\nworld"
+      assert Response.result(turn) == "hello\nworld"
       assert turn.thinking_content == "let me think"
       assert turn.tool_calls == []
       assert turn.usage == %{input_tokens: 10, output_tokens: 5}
@@ -82,12 +82,12 @@ defmodule Jido.AI.TurnTest do
         usage: %{"input_tokens" => "2", "output_tokens" => "3"}
       }
 
-      turn = Turn.from_response(response)
+      turn = Response.from_response(response)
 
       assert turn.type == :tool_calls
       assert length(turn.tool_calls) == 1
       assert turn.usage == %{input_tokens: 2, output_tokens: 3}
-      assert Turn.needs_tools?(turn)
+      assert Response.needs_tools?(turn)
     end
 
     test "preserves nested provider usage metadata" do
@@ -106,7 +106,7 @@ defmodule Jido.AI.TurnTest do
         }
       }
 
-      turn = Turn.from_response(response)
+      turn = Response.from_response(response)
 
       assert turn.usage == %{
                input_tokens: 10,
@@ -151,7 +151,7 @@ defmodule Jido.AI.TurnTest do
         error: nil
       }
 
-      turn = Turn.from_response(response)
+      turn = Response.from_response(response)
 
       assert turn.type == :tool_calls
       assert turn.text == ""
@@ -180,17 +180,17 @@ defmodule Jido.AI.TurnTest do
         error: nil
       }
 
-      turn = Turn.from_response(response)
+      turn = Response.from_response(response)
 
       assert turn.text == "Generated:"
       assert turn.content_parts == [ContentPart.text("Generated:"), image, image_url]
-      assert Turn.images(turn) == [image, image_url]
-      assert Turn.result(turn) == turn.content_parts
-      assert Turn.assistant_message(turn).content == turn.content_parts
-      assert Turn.to_result_map(turn).content_parts == turn.content_parts
+      assert Response.images(turn) == [image, image_url]
+      assert Response.result(turn) == turn.content_parts
+      assert Response.assistant_message(turn).content == turn.content_parts
+      assert Response.to_result_map(turn).content_parts == turn.content_parts
 
       map_turn =
-        Turn.from_response(%{
+        Response.from_response(%{
           message: %{
             content: [
               %{"type" => "image_url", "url" => "https://example.com/generated.png"},
@@ -201,7 +201,7 @@ defmodule Jido.AI.TurnTest do
         })
 
       assert map_turn.content_parts == [image_url, ContentPart.text("Caption")]
-      assert Turn.result(map_turn) == map_turn.content_parts
+      assert Response.result(map_turn) == map_turn.content_parts
     end
 
     test "retains ordered complete content parts from stream chunks" do
@@ -214,7 +214,7 @@ defmodule Jido.AI.TurnTest do
         ReqLLM.StreamChunk.text("After")
       ]
 
-      assert Turn.content_parts_from_chunks(chunks) == [
+      assert Response.content_parts_from_chunks(chunks) == [
                ContentPart.text("Before image"),
                image,
                ContentPart.text("After")
@@ -235,7 +235,7 @@ defmodule Jido.AI.TurnTest do
         error: nil
       }
 
-      turn = Turn.from_response(response)
+      turn = Response.from_response(response)
 
       assert turn.type == :final_answer
       assert turn.text == ""
@@ -249,7 +249,7 @@ defmodule Jido.AI.TurnTest do
         usage: %{input_tokens: 5, output_tokens: 0}
       }
 
-      turn = Turn.from_response(response)
+      turn = Response.from_response(response)
 
       assert turn.type == :final_answer
       assert turn.text == ""
@@ -263,7 +263,7 @@ defmodule Jido.AI.TurnTest do
         usage: %{input_tokens: 5, output_tokens: 0}
       }
 
-      turn = Turn.from_response(response)
+      turn = Response.from_response(response)
 
       assert turn.type == :final_answer
       assert turn.text == ""
@@ -272,7 +272,7 @@ defmodule Jido.AI.TurnTest do
 
     test "normalizes finish_reason in result maps" do
       turn =
-        Turn.from_result_map(%{
+        Response.from_result_map(%{
           type: :final_answer,
           text: "",
           finish_reason: "content_filter",
@@ -289,7 +289,7 @@ defmodule Jido.AI.TurnTest do
         usage: %{input_tokens: 5, output_tokens: 3}
       }
 
-      turn = Turn.from_response(response)
+      turn = Response.from_response(response)
 
       assert turn.type == :final_answer
       assert turn.text == "Hello!"
@@ -302,7 +302,7 @@ defmodule Jido.AI.TurnTest do
         usage: %{input_tokens: 5, output_tokens: 3}
       }
 
-      turn = Turn.from_response(response)
+      turn = Response.from_response(response)
 
       assert turn.type == :final_answer
       assert turn.finish_reason == nil
@@ -314,19 +314,19 @@ defmodule Jido.AI.TurnTest do
       reasoning_details = [%{signature: "sig_123"}]
 
       turn =
-        %Turn{
+        %Response{
           type: :tool_calls,
           text: "",
           tool_calls: [%{id: "tc_1", name: "calculator", arguments: %{a: 5, b: 3}}],
           message_metadata: %{response_id: "resp_tool_round_1"},
           reasoning_details: reasoning_details
         }
-        |> Turn.with_tool_results([
+        |> Response.with_tool_results([
           %{id: "tc_1", name: "calculator", content: "{\"result\":8}", raw_result: {:ok, %{result: 8}, []}}
         ])
 
-      assistant_message = Turn.assistant_message(turn)
-      [tool_message] = Turn.tool_messages(turn)
+      assistant_message = Response.assistant_message(turn)
+      [tool_message] = Response.tool_messages(turn)
 
       assert %ReqLLM.Message{} = assistant_message
       assert assistant_message.role == :assistant
@@ -342,7 +342,7 @@ defmodule Jido.AI.TurnTest do
       assert tool_message.tool_call_id == "tc_1"
       assert tool_message.name == "calculator"
 
-      assert decode_tool_content(Turn.extract_from_content(tool_message.content)) == %{
+      assert decode_tool_content(Response.extract_from_content(tool_message.content)) == %{
                "ok" => true,
                "result" => %{"result" => 8}
              }
@@ -351,12 +351,12 @@ defmodule Jido.AI.TurnTest do
 
   describe "format_tool_result_content/1" do
     test "formats common success and error shapes" do
-      assert decode_tool_content(Turn.format_tool_result_content({:ok, %{value: 1}})) == %{
+      assert decode_tool_content(Response.format_tool_result_content({:ok, %{value: 1}})) == %{
                "ok" => true,
                "result" => %{"value" => 1}
              }
 
-      assert decode_tool_content(Turn.format_tool_result_content({:error, %{message: "boom"}})) == %{
+      assert decode_tool_content(Response.format_tool_result_content({:error, %{message: "boom"}})) == %{
                "ok" => false,
                "error" => %{
                  "message" => "boom",
@@ -366,7 +366,7 @@ defmodule Jido.AI.TurnTest do
                }
              }
 
-      assert decode_tool_content(Turn.format_tool_result_content({:error, :badarg})) == %{
+      assert decode_tool_content(Response.format_tool_result_content({:error, :badarg})) == %{
                "ok" => false,
                "error" => %{
                  "message" => "badarg",
@@ -380,7 +380,7 @@ defmodule Jido.AI.TurnTest do
     test "formats Jido.Action error structs without leaking struct metadata into details" do
       error = ActionError.execution_error("boom", %{step: :list, retry: false})
 
-      assert decode_tool_content(Turn.format_tool_result_content({:error, error})) == %{
+      assert decode_tool_content(Response.format_tool_result_content({:error, error})) == %{
                "ok" => false,
                "error" => %{
                  "message" => "boom",
@@ -398,7 +398,7 @@ defmodule Jido.AI.TurnTest do
                %ContentPart{type: :text, text: encoded_payload},
                %ContentPart{type: :image_url, url: "https://example.com/chart.png"}
              ] =
-               Turn.format_tool_result_content(
+               Response.format_tool_result_content(
                  {:ok,
                   %{
                     "__content_parts__" => [image],
@@ -423,7 +423,7 @@ defmodule Jido.AI.TurnTest do
                %ContentPart{type: :text, text: encoded_payload},
                %ContentPart{type: :file}
              ] =
-               Turn.format_tool_result_content(
+               Response.format_tool_result_content(
                  {:ok,
                   %{
                     "__content_parts__" => [file_part],
@@ -444,7 +444,7 @@ defmodule Jido.AI.TurnTest do
                %ContentPart{type: :text, text: encoded_payload},
                %ContentPart{type: :file}
              ] =
-               Turn.format_tool_result_content(
+               Response.format_tool_result_content(
                  {:ok, %ToolResult{output: %{summary: "test result"}, content: [file_part], metadata: %{}}}
                )
 
@@ -461,7 +461,7 @@ defmodule Jido.AI.TurnTest do
       assert [
                %ContentPart{type: :text, text: encoded_payload},
                %ContentPart{type: :file}
-             ] = Turn.format_tool_result_content({:ok, [file_part]})
+             ] = Response.format_tool_result_content({:ok, [file_part]})
 
       assert Jason.decode!(encoded_payload) == %{
                "ok" => true,
@@ -487,7 +487,7 @@ defmodule Jido.AI.TurnTest do
                  filename: "notes.txt",
                  metadata: %{purpose: "fixture"}
                }
-             ] = Turn.format_tool_result_content({:ok, [file_part]})
+             ] = Response.format_tool_result_content({:ok, [file_part]})
 
       assert Jason.decode!(encoded_payload) == %{
                "ok" => true,
@@ -498,7 +498,7 @@ defmodule Jido.AI.TurnTest do
 
   describe "run_tools/3" do
     test "executes tool calls and appends normalized tool results" do
-      turn = %Turn{
+      turn = %Response{
         type: :tool_calls,
         text: "",
         tool_calls: [
@@ -524,12 +524,12 @@ defmodule Jido.AI.TurnTest do
     end
 
     test "returns original turn when no tool calls are requested" do
-      turn = %Turn{type: :final_answer, text: "done", tool_calls: []}
+      turn = %Response{type: :final_answer, text: "done", tool_calls: []}
       assert {:ok, ^turn} = Jido.AI.Tools.Executor.run_tools(turn, %{})
     end
 
     test "returns a validation result for malformed tool-call items" do
-      turn = %Turn{type: :tool_calls, text: "", tool_calls: [:malformed]}
+      turn = %Response{type: :tool_calls, text: "", tool_calls: [:malformed]}
 
       assert {:ok, updated_turn} = Jido.AI.Tools.Executor.run_tools(turn, %{})
 
@@ -558,7 +558,7 @@ defmodule Jido.AI.TurnTest do
 
       on_exit(fn -> :telemetry.detach(handler_id) end)
 
-      turn = %Turn{
+      turn = %Response{
         type: :tool_calls,
         text: "",
         tool_calls: [

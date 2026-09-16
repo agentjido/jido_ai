@@ -1,7 +1,7 @@
 defmodule Jido.AI.Orchestration.Cancel do
   @moduledoc false
   use Jido.Action,
-    name: "ai_session_cancel",
+    name: "ai_request_cancel",
     schema:
       Zoi.object(%{
         request_id: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),

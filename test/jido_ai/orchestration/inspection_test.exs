@@ -1,7 +1,9 @@
 defmodule Jido.AI.Orchestration.InspectionTest do
   use Jido.AI.Test.ReasoningCase, async: false
 
-  alias Jido.AI.{Agent, Authoring, Profile}
+  alias Jido.AI.Agent
+  alias Jido.AI.Authoring
+  alias Jido.AI.Profile
   alias ReqLLM.Message.ContentPart
 
   defp profile(id, history, attrs \\ %{}) do
@@ -12,7 +14,6 @@ defmodule Jido.AI.Orchestration.InspectionTest do
           model: MockLLM.model(),
           instructions: "#{id} prompt",
           observability: %{diagnostics_content: true},
-          requests: %{mode: :session},
           memory: %{history: history},
           result: %{into: id}
         },
@@ -59,7 +60,7 @@ defmodule Jido.AI.Orchestration.InspectionTest do
       assert view.details.phase == :idle
       assert view.details.config.system_prompt == unquote(prompt)
       expected = if is_nil(unquote(prompt)), do: [], else: [%{role: :system, content: unquote(prompt)}]
-      assert view.details.conversation == expected
+      assert view.details.context == expected
       assert view.details.active_context_ref == "default"
       assert view.details.pending_context_op == nil
       assert view.details.trace == %{events: [], truncated?: false, seq: 0, scope: :observed_prefix}
@@ -75,7 +76,7 @@ defmodule Jido.AI.Orchestration.InspectionTest do
     server = start_agent(jido, Jido.Agent.instantiate!(source([profile])))
     assert {:ok, view} = Orchestration.snapshot(server, include_content: true)
     assert view.details.config.system_prompt == "assistant prompt"
-    assert view.details.conversation == []
+    assert view.details.context == []
     assert view.details.active_context_ref == nil
     assert view.details.phase == :idle
   end
@@ -85,7 +86,7 @@ defmodule Jido.AI.Orchestration.InspectionTest do
     assert Agent.profiles(source) == %{}
     server = start_agent(jido, Jido.Agent.instantiate!(source))
     assert {:ok, view} = Orchestration.snapshot(server, include_content: true)
-    assert view.details.config == %{} and view.details.conversation == []
+    assert view.details.config == %{} and view.details.context == []
     assert view.details.active_context_ref == nil
     assert view.details.phase == :idle and view.request == nil and view.live == nil
   end
@@ -99,8 +100,7 @@ defmodule Jido.AI.Orchestration.InspectionTest do
         },
         reasoning: %{method: :tree_of_thoughts, model: :answer, options: %{max_depth: 3}},
         controls: %{max_iterations: 7, max_tool_calls: 9},
-        tool_context: %{tenant: "one"},
-        requests: %{mode: :session, on_busy: :reject, streaming: true}
+        tool_context: %{tenant: "one"}
       })
 
     server = start_agent(jido, Jido.Agent.instantiate!(source([profile])))
@@ -118,12 +118,12 @@ defmodule Jido.AI.Orchestration.InspectionTest do
                reqllm_tools: [],
                max_iterations: 7,
                max_tool_calls: 9,
-               request_policy: :reject,
-               streaming: true
+               request_policy: :reject
              })
 
     assert view.details.config.max_depth == 3
-    assert view.details.conversation == []
+    refute view.details.streaming
+    assert view.details.context == []
   end
 
   test "an idle Agent selects assistant from multiple profiles", %{jido: jido} do
@@ -131,7 +131,7 @@ defmodule Jido.AI.Orchestration.InspectionTest do
     server = start_agent(jido, Jido.Agent.instantiate!(source(profiles)))
     assert {:ok, view} = Orchestration.snapshot(server, include_content: true)
     assert view.details.config.system_prompt == "assistant prompt"
-    assert view.details.conversation == [%{role: :system, content: "assistant prompt"}]
+    assert view.details.context == [%{role: :system, content: "assistant prompt"}]
     assert view.details.active_context_ref == "default"
   end
 
@@ -142,7 +142,7 @@ defmodule Jido.AI.Orchestration.InspectionTest do
     assert Map.keys(Agent.profiles(source)) |> Enum.sort() == [:primary, :review]
     server = start_agent(jido, Jido.Agent.instantiate!(source))
     assert {:ok, idle} = Orchestration.snapshot(server, include_content: true)
-    assert idle.details.config == %{} and idle.details.conversation == []
+    assert idle.details.config == %{} and idle.details.context == []
     assert idle.details.active_context_ref == nil
     mock = mock([%{reply: {:text, "Reviewed"}}, %{reply: {:wait, :primary, {:text, "Primary answer"}}}])
     assert {:ok, first} = ask(server, mock, :review, "Review query")
@@ -153,7 +153,7 @@ defmodule Jido.AI.Orchestration.InspectionTest do
     assert active.request.id == next.id and active.request.profile_id == :primary
     assert active.details.config.system_prompt == "primary prompt"
 
-    assert Enum.map(active.details.conversation, &Jido.AI.Query.summarize(&1.content)) == [
+    assert Enum.map(active.details.context, &Jido.AI.Query.summarize(&1.content)) == [
              "primary prompt"
            ]
 
@@ -162,7 +162,7 @@ defmodule Jido.AI.Orchestration.InspectionTest do
     assert retained.details.phase == :request_completed
     assert retained.details.config.system_prompt == "review prompt"
 
-    assert Enum.map(retained.details.conversation, &Jido.AI.Query.summarize(&1.content)) == [
+    assert Enum.map(retained.details.context, &Jido.AI.Query.summarize(&1.content)) == [
              "review prompt",
              "Review query",
              "Reviewed"
@@ -170,13 +170,13 @@ defmodule Jido.AI.Orchestration.InspectionTest do
 
     assert {:ok, [query, answer]} = Jido.AI.Orchestration.Transcript.read(retained.agent.state, review)
     assert query.refs.request_id == first.id and answer.refs.request_id == first.id
-    assert List.last(retained.details.conversation).refs == answer.refs
+    assert List.last(retained.details.context).refs == answer.refs
     assert :ok = MockLLM.release(mock, :primary)
     assert {:ok, "Primary answer"} = Request.await(next)
     assert {:ok, done} = Orchestration.snapshot(server, include_content: true)
     assert done.live == nil and done.details.active_request_id == nil
 
-    assert Enum.map(done.details.conversation, &Jido.AI.Query.summarize(&1.content)) == [
+    assert Enum.map(done.details.context, &Jido.AI.Query.summarize(&1.content)) == [
              "primary prompt",
              "Primary query",
              "Primary answer"
@@ -198,7 +198,7 @@ defmodule Jido.AI.Orchestration.InspectionTest do
     assert active.details.config.system_prompt == "Changed prompt"
     assert active.details.config.base_tool_context == %{tenant: "two"}
 
-    assert Enum.map(active.details.conversation, &Jido.AI.Query.summarize(&1.content)) == [
+    assert Enum.map(active.details.context, &Jido.AI.Query.summarize(&1.content)) == [
              "Changed prompt"
            ]
 
@@ -214,7 +214,7 @@ defmodule Jido.AI.Orchestration.InspectionTest do
     assert hd(next_wire.body["messages"])["content"] == "Changed prompt"
     assert {:ok, retained} = Orchestration.snapshot(server, include_content: true, request_id: first.id)
     assert retained.details.config.system_prompt == "Changed prompt"
-    assert Jido.AI.Query.summarize(List.last(retained.details.conversation).content) == "Next answer"
+    assert Jido.AI.Query.summarize(List.last(retained.details.context).content) == "Next answer"
     assert_script_done(mock)
   end
 
@@ -244,7 +244,7 @@ defmodule Jido.AI.Orchestration.InspectionTest do
     assert {:ok, agent} = Agent.from_initial_state(source, %{messages: session})
     server = start_agent(jido, agent)
     assert {:ok, view} = Orchestration.snapshot(server, include_content: true)
-    assert [system, user, call, tool, answer] = view.details.conversation
+    assert [system, user, call, tool, answer] = view.details.context
     assert system == %{role: :system, content: "Saved prompt"}
     assert user.role == :user and user.content == parts
     assert Map.take(user.refs, [:case_id]) == refs
@@ -256,10 +256,10 @@ defmodule Jido.AI.Orchestration.InspectionTest do
     assert {:ok, _} = Orchestration.modify_context(server, %{type: :switch}, context_ref: "fresh", op_id: "fresh")
     assert {:ok, fresh} = Orchestration.snapshot(server, include_content: true)
     assert fresh.details.active_context_ref == "fresh"
-    assert fresh.details.conversation == [%{role: :system, content: "Saved prompt"}]
+    assert fresh.details.context == [%{role: :system, content: "Saved prompt"}]
     assert {:ok, _} = Orchestration.modify_context(server, %{type: :switch}, context_ref: "default", op_id: "return")
     assert {:ok, restored} = Orchestration.snapshot(server, include_content: true)
     assert restored.details.active_context_ref == "default"
-    assert restored.details.conversation == view.details.conversation
+    assert restored.details.context == view.details.context
   end
 end

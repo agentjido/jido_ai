@@ -87,10 +87,6 @@ defmodule JidoAI.Examples.Completion.FixtureAgent do
         action JidoAI.Examples.Completion.Tool, as: :ledger_tool, forward_context: [:observer]
       end
 
-      requests do
-        mode(:session)
-      end
-
       result(nil, into: :reply)
     end
   end

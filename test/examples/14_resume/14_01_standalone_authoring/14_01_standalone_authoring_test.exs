@@ -1,6 +1,8 @@
 defmodule JidoAI.Examples.StandaloneAuthoringTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Configuration, Request, Orchestration}
+  alias Jido.AI.Configuration
+  alias Jido.AI.Request
+  alias Jido.AI.Orchestration
   alias Jido.AI.Reasoning.ReAct.{Config, State, Token}
   alias JidoAI.Examples.StandaloneAuthoring.{Agent, Add, Change, Transform, Repair}
 
@@ -188,7 +190,7 @@ defmodule JidoAI.Examples.StandaloneAuthoringTest do
              Agent.build(config(mock, streaming: true, tool_heartbeat_ms: 10))
 
     assert {:ok, profile} = Configuration.profile(definition)
-    assert profile.requests.tool_heartbeat == 10
+    assert profile.controls.tool_heartbeat == 10
     server = start_agent(jido, Jido.Agent.instantiate!(definition))
     assert {:ok, request} = submit(server, context, "Stream", stream_to: self())
     assert_receive {:mock_llm_waiting, ^mock, :standalone_stream, provider}, 2_000

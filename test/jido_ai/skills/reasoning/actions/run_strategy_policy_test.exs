@@ -146,7 +146,6 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyPolicyTest do
                Profile.new(%{
                  id: :review,
                  reasoning: :adaptive,
-                 requests: %{mode: :session},
                  result: %{into: :answer},
                  tool_context: %{key => %{}}
                })
@@ -161,7 +160,6 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyPolicyTest do
           model: :host_alias,
           reasoning: :chain_of_thought,
           controls: %{input: [%{ref: "guard"}]},
-          requests: %{mode: :session},
           result: %{into: :answer}
         },
         registries: %{controls: %{"guard" => InertControl}}

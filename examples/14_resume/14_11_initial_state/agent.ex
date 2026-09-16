@@ -1,58 +1,47 @@
-for {module, stream} <- [
-      {JidoAI.Examples.InitialState.Buffered, false},
-      {JidoAI.Examples.InitialState.Streamed, true}
-    ] do
-  defmodule module do
-    use Jido.AI.Agent, name: "initial_state"
-    @stream stream
+defmodule JidoAI.Examples.InitialState.Agent do
+  use Jido.AI.Agent, name: "initial_state"
 
-    agent do
-      schema(
-        Zoi.object(%{
-          reply: Zoi.string() |> Zoi.default(""),
-          count: Zoi.integer(),
-          thread: Zoi.map() |> Zoi.default(%{}),
-          messages: Jido.Session.schema()
-        })
-      )
+  agent do
+    schema(
+      Zoi.object(%{
+        reply: Zoi.string() |> Zoi.default(""),
+        count: Zoi.integer(),
+        thread: Zoi.map() |> Zoi.default(%{}),
+        messages: Jido.Session.schema()
+      })
+    )
 
-      ai :assistant do
-        instructions("Configured")
+    ai :assistant do
+      instructions("Configured")
 
-        models do
-          model(:answer, JidoAI.Examples.MockLLM.model())
-        end
-
-        observability do
-          store_content true
-        end
-
-        tools do
-          action(JidoAI.Examples.InitialState.Echo,
-            as: :import_echo
-          )
-        end
-
-        reasoning :react do
-          model(:answer)
-        end
-
-        requests do
-          mode(:session)
-          streaming(@stream)
-        end
-
-        memory do
-          history(:messages)
-        end
-
-        result(nil, into: :reply)
+      models do
+        model(:answer, JidoAI.Examples.MockLLM.model())
       end
-    end
 
-    routes do
-      route("ai.react.query", ai(:assistant))
+      observability do
+        store_content true
+      end
+
+      tools do
+        action(JidoAI.Examples.InitialState.Echo,
+          as: :import_echo
+        )
+      end
+
+      reasoning :react do
+        model(:answer)
+      end
+
+      memory do
+        history(:messages)
+      end
+
+      result(nil, into: :reply)
     end
+  end
+
+  routes do
+    route("ai.react.query", ai(:assistant))
   end
 end
 
@@ -79,10 +68,6 @@ defmodule JidoAI.Examples.InitialState.Profiles do
         model(:answer)
       end
 
-      requests do
-        mode(:session)
-      end
-
       memory do
         history(:primary_messages)
       end
@@ -99,10 +84,6 @@ defmodule JidoAI.Examples.InitialState.Profiles do
 
       reasoning :react do
         model(:answer)
-      end
-
-      requests do
-        mode(:session)
       end
 
       memory do

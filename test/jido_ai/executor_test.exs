@@ -1,7 +1,7 @@
-defmodule Jido.AI.TurnExecutionTest do
+defmodule Jido.AI.Model.ResponseExecutionTest do
   use ExUnit.Case, async: false
 
-  alias Jido.AI.Turn
+  alias Jido.AI.Model.Response
   alias ReqLLM.Message.ContentPart
 
   defp decode_tool_content(content) when is_binary(content), do: Jason.decode!(content)
@@ -345,22 +345,22 @@ defmodule Jido.AI.TurnExecutionTest do
 
   describe "format_tool_result_content/1" do
     test "formats common success and error payloads" do
-      assert decode_tool_content(Turn.format_tool_result_content({:ok, "hello"})) == %{
+      assert decode_tool_content(Response.format_tool_result_content({:ok, "hello"})) == %{
                "ok" => true,
                "result" => "hello"
              }
 
-      assert decode_tool_content(Turn.format_tool_result_content({:ok, %{value: 1}})) == %{
+      assert decode_tool_content(Response.format_tool_result_content({:ok, %{value: 1}})) == %{
                "ok" => true,
                "result" => %{"value" => 1}
              }
 
-      assert decode_tool_content(Turn.format_tool_result_content({:ok, 42})) == %{
+      assert decode_tool_content(Response.format_tool_result_content({:ok, 42})) == %{
                "ok" => true,
                "result" => 42
              }
 
-      assert decode_tool_content(Turn.format_tool_result_content({:error, %{message: "boom"}})) == %{
+      assert decode_tool_content(Response.format_tool_result_content({:error, %{message: "boom"}})) == %{
                "ok" => false,
                "error" => %{
                  "message" => "boom",
@@ -370,7 +370,7 @@ defmodule Jido.AI.TurnExecutionTest do
                }
              }
 
-      assert decode_tool_content(Turn.format_tool_result_content({:error, :badarg})) == %{
+      assert decode_tool_content(Response.format_tool_result_content({:error, :badarg})) == %{
                "ok" => false,
                "error" => %{
                  "message" => "badarg",
@@ -383,7 +383,7 @@ defmodule Jido.AI.TurnExecutionTest do
 
     test "transport-sanitizes non-json-safe tool payloads" do
       decoded =
-        Turn.format_tool_result_content(
+        Response.format_tool_result_content(
           {:ok,
            %{
              password: "secret",
@@ -405,7 +405,7 @@ defmodule Jido.AI.TurnExecutionTest do
                %ContentPart{type: :text, text: encoded_payload},
                %ContentPart{type: :image_url, url: "https://example.com/chart.png"}
              ] =
-               Turn.format_tool_result_content(
+               Response.format_tool_result_content(
                  {:ok,
                   %{
                     "value" => 1,

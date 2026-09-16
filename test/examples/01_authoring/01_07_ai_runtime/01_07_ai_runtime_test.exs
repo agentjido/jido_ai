@@ -1,7 +1,8 @@
 defmodule JidoAI.Examples.AIRuntimeTest do
   use JidoAI.Examples.Case
   alias JidoAI.Examples.AIRuntime
-  alias Jido.AI.{Authoring, Profile}
+  alias Jido.AI.Authoring
+  alias Jido.AI.Profile
 
   defp base do
     Jido.Agent.new!(
@@ -45,14 +46,18 @@ defmodule JidoAI.Examples.AIRuntimeTest do
     server = start_agent(jido, AIRuntime.Agent.new!())
     observe_tools()
 
-    assert {:ok, %{state: %{reply: %{answer: "6 and 20"}, case_id: "case-42", commits: 1}}} =
-             AIRuntime.Agent.answer(server, "Calculate", context: context)
+    assert {:ok, %{state: %{reply: %{answer: "6 and 20"}, case_id: "case-42", commits: commits}}} =
+             ask_and_await(AIRuntime.Agent, server, "Calculate", context: context)
+
+    assert commits >= 2
 
     assert_receive {:example_tool_started, "multiply"}
     assert_receive {:example_tool_started, "quote"}
 
-    assert {:ok, %{state: %{case_id: "closed", commits: 2}}} =
+    assert {:ok, %{state: %{case_id: "closed", commits: next_commits}}} =
              AIRuntime.Agent.close(server, "closed")
+
+    assert next_commits > commits
 
     assert [first, second] = MockLLM.report(mock).requests
     assert first.body["temperature"] == 0.2
@@ -78,7 +83,8 @@ defmodule JidoAI.Examples.AIRuntimeTest do
     {mock, context} = mock([%{reply: {:object, %{answer: "Imported"}}}])
     {:ok, imported} = Authoring.Codec.decode(base(), source, registry)
     server = start_agent(jido, Jido.Agent.instantiate!(imported))
-    assert {:ok, %{state: %{reply: %{answer: "Imported"}, commits: 1}}} = ask(server, context)
+    assert {:ok, %{state: %{reply: %{answer: "Imported"}, commits: commits}}} = ask(server, context)
+    assert commits >= 2
     assert {:error, _} = Authoring.Codec.decode(base(), Map.put(source, "extra", true), registry)
     assert {:error, _} = Authoring.Codec.decode(base(), source, %{})
     assert_script_done(mock)
@@ -92,9 +98,9 @@ defmodule JidoAI.Examples.AIRuntimeTest do
     {target, %{profile_id: :assistant}} =
       Enum.find(definition.routes, &(&1.path == "ai.ask")).target
 
-    {Jido.AI.Runtime.Plugin, options} =
+    {Jido.AI.Configuration.Plugin, options} =
       Enum.find(definition.plugins, fn {module, _options} ->
-        module == Jido.AI.Runtime.Plugin
+        module == Jido.AI.Configuration.Plugin
       end)
 
     registry =
@@ -102,7 +108,7 @@ defmodule JidoAI.Examples.AIRuntimeTest do
         "agents/core" => {:agent, Jido.Agent},
         "schemas/domain" => {:schema, definition.schema},
         "plugins/audit" => {:plugin, JidoAI.Examples.Support.CommitCounter},
-        "plugins/ai" => {:plugin, Jido.AI.Runtime.Plugin},
+        "plugins/ai" => {:plugin, Jido.AI.Configuration.Plugin},
         "plugins/session" => {:plugin, Jido.AI.Orchestration.Plugin},
         "actions/assistant-v1" => {:action, target},
         "actions/close" => {:action, JidoAI.Examples.Support.CloseCase},
@@ -118,6 +124,9 @@ defmodule JidoAI.Examples.AIRuntimeTest do
         "profiles/assistant-v1" => {:value, options[:profiles].assistant}
       })
 
+    {:ok, _, discovered} = Jido.Agent.Codec.encode(definition)
+    additional = Map.reject(discovered.entries, fn {_, value} -> value in Map.values(registry.entries) end)
+    registry = Jido.Codec.Registry.new!(Map.merge(additional, registry.entries))
     assert {:ok, document} = Jido.Agent.Codec.encode(definition, registry)
     assert Enum.any?(document["routes"], &(&1["target"] == "actions/assistant-v1"))
 
@@ -137,7 +146,8 @@ defmodule JidoAI.Examples.AIRuntimeTest do
 
     profile = %{profile() | tools: []}
     server = start(jido, profile)
-    assert {:ok, %{state: %{reply: %{answer: "Fixed"}, commits: 1}}} = ask(server, context)
+    assert {:ok, %{state: %{reply: %{answer: "Fixed"}, commits: commits}}} = ask(server, context)
+    assert commits >= 2
     assert [_, repair] = MockLLM.report(mock).requests
     feedback = List.last(repair.body["messages"])["content"]
     assert feedback =~ "Validation error:"
@@ -156,7 +166,7 @@ defmodule JidoAI.Examples.AIRuntimeTest do
     server = start(jido, profile)
     before = Server.snapshot(server)
     assert {:error, _} = ask(server, context)
-    assert Server.snapshot(server) == before
+    assert_domain_unchanged(server, before)
     assert_script_done(mock)
   end
 
@@ -172,7 +182,8 @@ defmodule JidoAI.Examples.AIRuntimeTest do
       ])
 
     server = start(jido, profile())
-    assert {:ok, %{state: %{reply: %{answer: "30"}, commits: 1}}} = ask(server, context)
+    assert {:ok, %{state: %{reply: %{answer: "30"}, commits: commits}}} = ask(server, context)
+    assert commits >= 2
     assert [_, _, final] = MockLLM.report(mock).requests
 
     assert Enum.map(final.body["messages"], & &1["role"]) == [
@@ -238,7 +249,7 @@ defmodule JidoAI.Examples.AIRuntimeTest do
       server = start(jido, profile)
       before = Server.snapshot(server)
       assert {:error, _} = ask(server, context)
-      assert Server.snapshot(server) == before
+      assert_domain_unchanged(server, before)
       assert_script_done(mock)
     end
   end
@@ -270,7 +281,7 @@ defmodule JidoAI.Examples.AIRuntimeTest do
         assert {:ok, _} = outcome
       else
         assert {:error, _} = outcome
-        assert Server.snapshot(server) == before
+        assert_domain_unchanged(server, before)
       end
 
       refute_received {:example_tool_started, _}
@@ -319,7 +330,7 @@ defmodule JidoAI.Examples.AIRuntimeTest do
       )
 
     assert {:ok, _} =
-             Server.call(server, signal, context: Map.put(context, :jido_ai_profiles, %{}))
+             Jido.AI.Test.Requests.call_and_await(server, signal, context: Map.put(context, :jido_ai_profiles, %{}))
 
     assert_receive {:control_checked, %{query: "Help"}}
     assert_script_done(mock)
@@ -339,10 +350,10 @@ defmodule JidoAI.Examples.AIRuntimeTest do
     task = Task.async(fn -> ask(server, context) end)
     assert_receive {:tool_waiting, worker, 1}, 2_000
     monitor = Process.monitor(worker)
-    assert :ok = Server.cancel(server)
+    assert {:ok, _} = Server.call(server, Jido.Signal.new!(Jido.AI.Orchestration.cancel_type(), %{}, source: "/test"))
     assert {:error, _} = Task.await(task)
     assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 2_000
-    assert Server.snapshot(server) == before
+    assert_domain_unchanged(server, before)
     assert_script_done(mock)
   end
 
@@ -361,7 +372,7 @@ defmodule JidoAI.Examples.AIRuntimeTest do
     monitor = Process.monitor(worker)
     assert {:error, _} = Task.await(task, 2_000)
     assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 2_000
-    assert Server.snapshot(server) == before
+    assert_domain_unchanged(server, before)
     assert_script_done(mock)
   end
 
@@ -372,7 +383,7 @@ defmodule JidoAI.Examples.AIRuntimeTest do
     before = Server.snapshot(server)
     assert {:error, _} = ask(server, context)
     assert_receive {:example_tool_started, "multiply"}
-    assert Server.snapshot(server) == before
+    assert_domain_unchanged(server, before)
     assert_script_done(mock)
   end
 
@@ -381,7 +392,7 @@ defmodule JidoAI.Examples.AIRuntimeTest do
     server = start(jido, %{profile() | tools: []})
     before = Server.snapshot(server)
     assert {:error, _} = ask(server, context)
-    assert Server.snapshot(server) == before
+    assert_domain_unchanged(server, before)
     assert_script_done(mock)
   end
 
@@ -396,10 +407,10 @@ defmodule JidoAI.Examples.AIRuntimeTest do
     # AI source attributes lower references before core executable validation.
     assert {:ok, lowered} = Authoring.lower(agent, [profile])
 
-    assert %{target: {Jido.AI.Runtime.Run, %{query: "Default", profile_id: :assistant}}} =
+    assert %{target: {Jido.AI.Orchestration.Start, %{query: "Default", profile_id: :assistant}}} =
              Enum.find(lowered.routes, &(&1.path == "ai.ask"))
 
-    assert length(lowered.routes) == 2
+    assert Enum.any?(lowered.routes, &(&1.path == Jido.AI.Orchestration.settle_type()))
 
     assert %{target: Jido.AI.Configuration.Apply} =
              Enum.find(lowered.routes, &(&1.path == "jido.ai.configure"))
@@ -469,7 +480,7 @@ defmodule JidoAI.Examples.AIRuntimeTest do
       :turn,
       :on_busy,
       :reject,
-      :max_requests,
+      :max_retained_requests,
       :streaming,
       :steering,
       :memory,

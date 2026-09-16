@@ -1,6 +1,7 @@
 defmodule Jido.AI.Reasoning.GraphSearch do
   @moduledoc false
-  alias Jido.AI.{Profile, Reasoning}
+  alias Jido.AI.Profile
+  alias Jido.AI.Reasoning
   alias Jido.AI.Reasoning.GraphOfThoughts.Machine
 
   @defaults %{

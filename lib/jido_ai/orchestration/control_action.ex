@@ -1,7 +1,7 @@
 defmodule Jido.AI.Orchestration.ControlAction do
   @moduledoc false
   use Jido.Action,
-    name: "ai_session_control",
+    name: "ai_request_control",
     schema:
       Zoi.object(%{
         control_id: Zoi.string(),
@@ -16,7 +16,7 @@ defmodule Jido.AI.Orchestration.ControlAction do
     with {:ok, context} <- Jido.AI.Orchestration.Plugin.context(context),
          :ok <- Jido.Action.validate_static_data(input),
          %{status: :queued, request_id: id} = result <-
-           GenServer.call(context.jido_ai_session_runtime, {:control, input}) do
+           GenServer.call(context.jido_ai_coordinator, {:control, input}) do
       record = Map.put(context.agent_state.requests[id], :last_control, result)
       {:ok, context.agent_state, [%Jido.AI.Orchestration.Change{operation: :control, record: record}]}
     else

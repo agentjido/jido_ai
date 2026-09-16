@@ -1,12 +1,15 @@
 # 01_05 — Streaming and cancellation
 
-Observe text while an AI request runs, and cancel it through the public session API.
+Observe text while an AI request runs, and cancel it through the public orchestration API.
 
 ## Read the code
 
 Read [the Agent](agent.ex), then the tests. `Agent.ask_stream/3` returns the
 request handle and event stream. Use `Jido.AI.Request.await/2` for the final
 result and `Jido.AI.Orchestration.cancel/2` to cancel owned work.
+
+`ask_stream/3` selects streaming for this call. The Agent needs no streaming
+declaration. The same Agent uses buffered calls through `ask/3` or `ask_sync/3`.
 
 ## Run it
 

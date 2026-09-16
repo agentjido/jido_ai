@@ -25,10 +25,6 @@ defmodule JidoAI.Examples.NumericInputs.Agent do
         flow(JidoAI.Examples.NumericInputs.Flow, as: :numeric_flow)
       end
 
-      requests do
-        mode(:session)
-      end
-
       result(nil, into: :reply)
     end
   end

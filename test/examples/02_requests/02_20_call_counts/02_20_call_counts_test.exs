@@ -1,6 +1,7 @@
 defmodule JidoAI.Examples.CallCountsTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Request, Orchestration}
+  alias Jido.AI.Request
+  alias Jido.AI.Orchestration
   alias JidoAI.Examples.CallCounts.Agent
 
   setup do
@@ -128,7 +129,7 @@ defmodule JidoAI.Examples.CallCountsTest do
     {mock, context} =
       mock([%{reply: {:tools, [%{id: "echo", name: "scope_echo", arguments: %{value: 1}}]}}])
 
-    {_, opts} = Enum.find(Agent.definition().plugins, &(elem(&1, 0) == Jido.AI.Runtime.Plugin))
+    {_, opts} = Enum.find(Agent.definition().plugins, &(elem(&1, 0) == Jido.AI.Configuration.Plugin))
     profile = opts[:profiles].assistant |> Map.from_struct()
     profile = put_in(profile.controls.max_model_calls, 1)
 

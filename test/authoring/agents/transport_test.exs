@@ -23,12 +23,12 @@ defmodule JidoAITest.Authoring.Agents.TransportTest do
       signal = Jido.Signal.new!("case.assistant", %{query: "Help"}, source: "/authoring")
 
       assert {:ok, agent} =
-               Jido.AgentServer.call(server, signal,
+               Jido.AI.Test.Requests.call_and_await(server, signal,
                  context: %{ai: %{assistant: %{options: MockLLM.options(mock)}}},
                  timeout: 10_000
                )
 
-      assert agent.state === %{spec.initial | reply: "Imported"}
+      assert Map.delete(agent.state, :requests) === Map.delete(%{spec.initial | reply: "Imported"}, :requests)
       assert %{remaining: [], unexpected: [], requests: [request]} = MockLLM.report(mock)
       assert request.body["model"] == "gpt-4o-mini"
 

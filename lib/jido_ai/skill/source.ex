@@ -1,6 +1,7 @@
 defmodule Jido.AI.Skill.Source do
   @moduledoc "Static skill sources and runtime catalogue preparation for AI profiles."
-  alias Jido.AI.{Profile, ToolCatalog}
+  alias Jido.AI.Profile
+  alias Jido.AI.ToolCatalog
   alias Jido.AI.Skill.{AgentIntegration, ResourcePolicy, ResourceProvider, Spec}
 
   @fields [

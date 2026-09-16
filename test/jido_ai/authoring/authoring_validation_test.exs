@@ -1,7 +1,8 @@
 defmodule Jido.AI.Authoring.AuthoringValidationTest do
   use ExUnit.Case, async: true
 
-  alias Jido.AI.{Authoring, Profile}
+  alias Jido.AI.Authoring
+  alias Jido.AI.Profile
 
   defmodule RoutedAgent do
     use Jido.AI.Agent, name: "authoring_routed_agent"
@@ -11,10 +12,6 @@ defmodule Jido.AI.Authoring.AuthoringValidationTest do
 
       ai :support do
         model :capable
-
-        requests do
-          mode :session
-        end
 
         result into: :answer
       end
@@ -48,7 +45,6 @@ defmodule Jido.AI.Authoring.AuthoringValidationTest do
 
     assert Authoring.request_binding(agent, signal) == %{
              id: :support,
-             mode: :session,
              input: %{channel: "web", profile_id: :support, query: "help"}
            }
 

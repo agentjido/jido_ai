@@ -1,18 +1,18 @@
-# Turn And Tool Results
+# Response And Tool Results
 
-You want to normalize raw LLM responses, classify them, execute tool calls, and project messages for follow-up LLM turns.
+You want to normalize raw LLM responses, classify them, execute tool calls, and project messages for follow-up LLM responses.
 
-`Jido.AI.Turn` is a response value and message projection. It does not execute
+`Jido.AI.Model.Response` is a response value and message projection. It does not execute
 tools. `Jido.AI.Tools.Executor` owns direct tool execution. Native Profile
 requests use the same target execution boundary with their own limits,
 interception, and effect policy. Use Agent + DSL + Profile for ordinary agents;
 the direct APIs below are for explicit lower-level composition.
 
 After this guide, you can:
-- Build a `Jido.AI.Turn` from any provider response
-- Check whether a turn requests tool execution
+- Build a `Jido.AI.Model.Response` from any provider response
+- Check whether a response requests tool execution
 - Execute all requested tools and collect results
-- Project assistant + tool messages for multi-turn LLM loops
+- Project assistant + tool messages for multi-response LLM loops
 - Execute tools directly without an LLM response
 - Extract text from diverse provider response shapes
 - Subscribe to tool execution telemetry events
@@ -30,23 +30,23 @@ defmodule MyApp.Actions.Multiply do
 end
 ```
 
-## Build A Turn From A Raw LLM Response
+## Build A Response From A Raw LLM Response
 
-`from_response/2` normalizes any `ReqLLM.Response`, raw provider map, or existing turn into a canonical `%Jido.AI.Turn{}`.
+`from_response/2` normalizes any `ReqLLM.Response`, raw provider map, or existing response into a canonical `%Jido.AI.Model.Response{}`.
 
 ```elixir
-alias Jido.AI.Turn
+alias Jido.AI.Model.Response
 
 # From a native ReqLLM response
 {:ok, response} =
   ReqLLM.generate_text("anthropic:claude-sonnet-4-20250514", messages)
-turn = Turn.from_response(response)
+response = Response.from_response(response)
 
 # Override the model field
-turn = Turn.from_response(response, model: "my-custom-tag")
+response = Response.from_response(response, model: "my-custom-tag")
 ```
 
-The turn struct contains:
+The response struct contains:
 - `type` — `:tool_calls` or `:final_answer`
 - `text` — extracted text content
 - `content_parts` — ordered ReqLLM content parts, including generated images
@@ -56,12 +56,12 @@ The turn struct contains:
 - `model` — model identifier
 - `tool_results` — populated after tool execution
 
-For a text-only turn, `Turn.result/1` returns the text string. For a
-multimodal turn, it returns the ordered visible content parts:
+For a text-only response, `Response.result/1` returns the text string. For a
+multimodal response, it returns the ordered visible content parts:
 
 ```elixir
-result = Turn.result(turn)
-images = Turn.images(turn)
+result = Response.result(response)
+images = Response.images(response)
 ```
 
 Generated images also use `:content_part` `ai.llm.delta` signals while a
@@ -71,30 +71,30 @@ response streams. The signal `delta` is the complete
 You can also build from an already-classified map:
 
 ```elixir
-turn = Turn.from_result_map(%{type: :final_answer, text: "42", usage: %{input_tokens: 10}})
+response = Response.from_result_map(%{type: :final_answer, text: "42", usage: %{input_tokens: 10}})
 ```
 
 ## Check If Tools Are Needed
 
 ```elixir
-if Turn.needs_tools?(turn) do
-  # turn.type == :tool_calls or turn.tool_calls is non-empty
-  IO.puts("LLM wants to call #{length(turn.tool_calls)} tool(s)")
+if Response.needs_tools?(response) do
+  # response.type == :tool_calls or response.tool_calls is non-empty
+  IO.puts("LLM wants to call #{length(response.tool_calls)} tool(s)")
 else
-  IO.puts("Final answer: #{turn.text}")
+  IO.puts("Final answer: #{response.text}")
 end
 ```
 
 ## Run All Requested Tools
 
-`run_tools/3` executes every tool call in the turn and returns an updated turn with `tool_results` attached.
+`run_tools/3` executes every tool call in the response and returns an updated response with `tool_results` attached.
 
 ```elixir
 tools = Jido.AI.ToolAdapter.to_action_map([MyApp.Actions.Multiply])
 
 context = %{tools: tools}
 
-{:ok, updated_turn} = Jido.AI.Tools.Executor.run_tools(turn, context)
+{:ok, updated_response} = Jido.AI.Tools.Executor.run_tools(response, context)
 
 # Each tool result has this shape:
 # %{
@@ -108,18 +108,18 @@ context = %{tools: tools}
 You can also pass tools via opts:
 
 ```elixir
-{:ok, updated_turn} = Jido.AI.Tools.Executor.run_tools(turn, %{}, tools: tools, timeout: 10_000)
+{:ok, updated_response} = Jido.AI.Tools.Executor.run_tools(response, %{}, tools: tools, timeout: 10_000)
 ```
 
 ## Project Messages For Follow-Up LLM Calls
 
-After running tools, project the assistant message and tool result messages back into the conversation:
+After running tools, project the assistant message and tool result messages back into the context:
 
 ```elixir
-assistant_msg = Turn.assistant_message(updated_turn)
+assistant_msg = Response.assistant_message(updated_response)
 # %{role: :assistant, content: "...", tool_calls: [...]}
 
-tool_msgs = Turn.tool_messages(updated_turn)
+tool_msgs = Response.tool_messages(updated_response)
 # [%{role: :tool, tool_call_id: "call_abc", name: "multiply", content: "{\"product\":42}"}]
 ```
 
@@ -127,10 +127,10 @@ Append both to your message history for the next LLM call.
 
 ## Complete Custom Tool-Calling Loop
 
-This loop calls the LLM, normalizes to a Turn, executes tools, projects messages, and calls the LLM again until a final answer is reached.
+This loop calls the LLM, normalizes to a Response, executes tools, projects messages, and calls the LLM again until a final answer is reached.
 
 ```elixir
-alias Jido.AI.Turn
+alias Jido.AI.Model.Response
 
 defmodule MyApp.ToolLoop do
   @max_iterations 5
@@ -152,24 +152,24 @@ defmodule MyApp.ToolLoop do
         tools: Map.keys(tools_map)
       )
 
-    # 2. Normalize to a Turn
-    turn = Turn.from_response(response)
+    # 2. Normalize to a Response
+    response = Response.from_response(response)
 
     # 3. Check if the LLM wants tools
-    if Turn.needs_tools?(turn) do
+    if Response.needs_tools?(response) do
       # 4. Execute all requested tools
-      {:ok, executed_turn} = Jido.AI.Tools.Executor.run_tools(turn, %{tools: tools_map})
+      {:ok, executed_turn} = Jido.AI.Tools.Executor.run_tools(response, %{tools: tools_map})
 
       # 5. Project assistant + tool messages
-      assistant_msg = Turn.assistant_message(executed_turn)
-      tool_msgs = Turn.tool_messages(executed_turn)
+      assistant_msg = Response.assistant_message(executed_turn)
+      tool_msgs = Response.tool_messages(executed_turn)
 
       # 6. Append to history and loop
       updated_messages = messages ++ [assistant_msg | tool_msgs]
       loop(updated_messages, tools_map, iteration + 1)
     else
-      # Final answer — return the turn
-      {:ok, turn}
+      # Final answer — return the response
+      {:ok, response}
     end
   end
 end
@@ -220,7 +220,7 @@ Use triple pattern-matching in new code.
 
 ## ReAct Agent Tool Results
 
-`Jido.AI.Turn.tool_results` is the low-level surface used when you build a
+`Jido.AI.Model.Response.tool_results` is the low-level surface used when you build a
 custom tool loop yourself. When `Jido.AI.Agent` manages the ReAct loop for you,
 inspect completed tool outputs through the agent snapshot:
 
@@ -242,14 +242,14 @@ entries keep the normalized action envelope under `:result`:
 }
 ```
 
-Use `snapshot.details[:conversation]` for restoring message history, not for
+Use `snapshot.details[:context]` for restoring message history, not for
 recovering structured tool payloads.
 
 ## Effect Policy And Ordering
 
 - `Jido.AI.Tools.Executor.execute/4` and `Jido.AI.Tools.Executor.execute_module/4` filter tool-emitted effects through `context[:effect_policy]` when provided.
 - Disallowed effects are dropped; allowed effects remain in the returned `effects` list.
-- Tool call execution order in `run_tools/3` follows the order of `turn.tool_calls`.
+- Tool call execution order in `run_tools/3` follows the order of `response.tool_calls`.
 - Tool actions may read runtime state snapshots from `context[:state]` (canonical, core-aligned).
 - ReAct/ToT strategy orchestration injects this snapshot key automatically; user-provided values for this key are overridden.
 
@@ -258,23 +258,23 @@ recovering structured tool payloads.
 `extract_text/1` normalizes diverse provider response shapes into a plain string:
 
 ```elixir
-Turn.extract_text("hello")
+Response.extract_text("hello")
 # "hello"
 
-Turn.extract_text(%{message: %{content: "hello"}})
+Response.extract_text(%{message: %{content: "hello"}})
 # "hello"
 
-Turn.extract_text(%{choices: [%{message: %{content: "hello"}}]})
+Response.extract_text(%{choices: [%{message: %{content: "hello"}}]})
 # "hello"
 
-Turn.extract_text(nil)
+Response.extract_text(nil)
 # ""
 ```
 
 Use `extract_from_content/1` when you already have the content value (not wrapped in a response envelope):
 
 ```elixir
-Turn.extract_from_content([%{type: :text, text: "part 1"}, %{type: :text, text: "part 2"}])
+Response.extract_from_content([%{type: :text, text: "part 1"}, %{type: :text, text: "part 2"}])
 # "part 1\npart 2"
 ```
 
@@ -319,7 +319,7 @@ Symptom:
 - tool result contains `type: :timeout` error
 
 Fix:
-- increase timeout: `Jido.AI.Tools.Executor.run_tools(turn, context, timeout: 60_000)`
+- increase timeout: `Jido.AI.Tools.Executor.run_tools(response, context, timeout: 60_000)`
 - check that the action's `run/2` completes within the configured timeout
 
 ## Defaults You Should Know
@@ -328,18 +328,18 @@ Fix:
 - `from_response/2` defaults `type` to `:final_answer` when no tool calls are present
 - `from_response/2` defaults `text` to `""` when content is nil
 - `tool_results` starts as `[]` — populated only after `run_tools/3` or `with_tool_results/2`
-- `run_tools/3` on a turn with no tool calls returns `{:ok, turn}` unchanged
+- `run_tools/3` on a response with no tool calls returns `{:ok, response}` unchanged
 - `needs_tools?/1` checks both `type == :tool_calls` and non-empty `tool_calls` list
 - tool execution result envelopes always include an effects list (`{:ok|:error, payload, effects}`)
 
 ## When To Use / Not Use
 
-Use `Jido.AI.Turn` when:
+Use `Jido.AI.Model.Response` when:
 - you need a custom tool-calling loop with full control over iteration
 - you are building a strategy or directive that processes LLM responses
-- you need to project assistant + tool messages into conversation history
+- you need to project assistant + tool messages into context history
 
-Do not use `Jido.AI.Turn` when:
+Do not use `Jido.AI.Model.Response` when:
 - `CallWithTools` with `auto_execute: true` already handles your loop — use that instead
 - you only need text from a response — use `ReqLLM.Response.text/1`
 

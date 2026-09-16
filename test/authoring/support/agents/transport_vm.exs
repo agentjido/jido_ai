@@ -13,7 +13,10 @@ for form <- [:source_json, :agent_json] do
   signal = Jido.Signal.new!("case.assistant", %{query: "Double four"}, source: "/authoring/vm")
 
   {:ok, agent} =
-    Jido.AgentServer.call(server, signal, context: %{ai: %{assistant: %{options: options}}}, timeout: 10_000)
+    Jido.AI.Test.Requests.call_and_await(server, signal,
+      context: %{ai: %{assistant: %{options: options}}},
+      timeout: 10_000
+    )
 
   true = agent.state.reply == "Eight"
 end

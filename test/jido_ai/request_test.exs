@@ -3,7 +3,7 @@ defmodule JidoTest.AI.RequestTest do
 
   alias Jido.AI.Request
   alias Jido.AI.Request.Handle
-  alias Jido.AI.Runtime.Event
+  alias Jido.AI.Observe.Event
   alias ReqLLM.Message.ContentPart
 
   defmodule TestRequestTransformer do

@@ -61,9 +61,7 @@ defmodule JidoAITest.Authoring.Agents.ExecutionTest do
                    timeout: 10_000
                  )
 
-        if variant == :session do
-          assert {:ok, _} = Jido.AI.Orchestration.await(server, id, 10_000)
-        end
+        assert {:ok, %{status: :completed}} = Jido.AI.Orchestration.await(server, id, 10_000)
 
         state = Server.agent(server).state
         expected = Map.put(expected, step.field, step.result)
@@ -78,7 +76,8 @@ defmodule JidoAITest.Authoring.Agents.ExecutionTest do
           assert Jido.Thread.entry_count(state.messages.thread) == 3 * (index + 1)
           assert :ok = Jido.Action.validate_static_data(state)
         else
-          assert state === expected
+          assert Map.delete(state, :requests) === Map.delete(expected, :requests)
+          assert state.requests[id].status == :completed
         end
 
         expected

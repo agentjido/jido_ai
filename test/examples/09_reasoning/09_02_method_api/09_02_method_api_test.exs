@@ -1,6 +1,7 @@
 defmodule JidoAI.Examples.MethodAPITest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Request, Orchestration}
+  alias Jido.AI.Request
+  alias Jido.AI.Orchestration
   alias Jido.AI.Reasoning.{ChainOfDraft, ChainOfThought}
 
   defp start(jido) do
@@ -15,7 +16,8 @@ defmodule JidoAI.Examples.MethodAPITest do
     Request.create_and_send(server, "Solve",
       signal_type: "ai.#{method}.query",
       source: "/examples/method-api",
-      context: context(mock)
+      context: context(mock),
+      stream: true
     )
   end
 

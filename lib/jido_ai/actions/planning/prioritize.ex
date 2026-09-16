@@ -68,7 +68,7 @@ defmodule Jido.AI.Actions.Planning.Prioritize do
   @impl Jido.Action
   def on_before_validate_params(params), do: Request.before_validate(schema(), params)
 
-  alias Jido.AI.Turn
+  alias Jido.AI.Model.Response
   alias ReqLLM.Context
 
   @prioritization_prompt """
@@ -187,7 +187,7 @@ defmodule Jido.AI.Actions.Planning.Prioritize do
   end
 
   defp format_result(response, model) do
-    prioritization_text = Turn.extract_text(response)
+    prioritization_text = Response.extract_text(response)
 
     %{
       prioritization: prioritization_text,

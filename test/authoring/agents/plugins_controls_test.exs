@@ -56,7 +56,7 @@ defmodule JidoAITest.Authoring.Agents.PluginsControlsTest do
       assert {:error, _} = call(server, mock)
       assert_received :authoring_tool_denied
       refute_received {:authoring_tool, _}
-      assert Jido.AgentServer.agent(server).state === spec.initial
+      assert Map.delete(Jido.AgentServer.agent(server).state, :requests) === Map.delete(spec.initial, :requests)
       assert %{remaining: [], unexpected: [], requests: [_]} = MockLLM.report(mock)
     end
   end
@@ -84,7 +84,7 @@ defmodule JidoAITest.Authoring.Agents.PluginsControlsTest do
     {:ok, server} = Jido.start_agent(jido, definition)
     assert {:ok, agent} = call(server, mock)
     assert_received :authoring_tool_failed
-    assert agent.state === %{spec.initial | reply: "Next"}
+    assert Map.delete(agent.state, :requests) === Map.delete(%{spec.initial | reply: "Next"}, :requests)
     assert %{remaining: [], unexpected: [], requests: [_, last]} = MockLLM.report(mock)
 
     assert Enum.any?(
@@ -96,7 +96,9 @@ defmodule JidoAITest.Authoring.Agents.PluginsControlsTest do
 
   defp call(server, mock),
     do:
-      Jido.AgentServer.call(server, Jido.Signal.new!("case.assistant", %{query: "Help"}, source: "/authoring"),
+      Jido.AI.Test.Requests.call_and_await(
+        server,
+        Jido.Signal.new!("case.assistant", %{query: "Help"}, source: "/authoring"),
         context: %{observer: self(), ai: %{assistant: %{options: MockLLM.options(mock)}}},
         timeout: 10_000
       )

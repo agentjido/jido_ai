@@ -5,7 +5,7 @@
 ## Status
 
 - Reviewed: 2026-09-15.
-- Code for the example audit: `v3-spike`, HEAD `7bb011e98349af8bf580e7b93afa60990972beae`, plus uncommitted example, test, formatter, and documentation changes. No `lib/` or dependency changes.
+- Code baseline: `v3-spike`, HEAD `4ed6402f`, plus uncommitted runtime, test, example, and documentation refinement. Dependency pins are unchanged.
 - Prerequisite alignments used: [05 Reasoning and planning methods](../05_reasoning_planning/alignment.md), [06 Core runtime and Signal integration](../06_runtime_signal_integration/alignment.md).
 - Alignment state: Draft. Current ownership is mapped; target decisions and full acceptance proof remain.
 - Verification: the example-driven review below adds fresh MockLLM runs to the earlier source review. Earlier statements that no tests ran refer to that prior review, not this follow-up.
@@ -13,6 +13,17 @@
 ## Current architecture
 
 Orchestration owns the live API; Jido.Session is a separate portable value. Record is a validated internal map with pending/completed/failed statuses. Cancellation and interruption are failure outcomes rather than distinct record status atoms. Coordinator owns active workers, completion, recovery, and ordered commit coordination. Request streams are best-effort views, not durable logs.
+
+`ask_stream/3` selects provider streaming for one request. `ask/3` and
+`ask_sync/3` use buffered calls unless the caller selects streaming or supplies
+an event sink. `stream: false` with a sink retains lifecycle events without
+provider deltas. The request record separates provider streaming (`streaming`)
+from event subscription (`streamed`). Neither is Profile configuration.
+
+Steering and activity timers belong to Profile `controls`. The host setting
+`:max_retained_requests` is captured at Coordinator startup. It bounds request
+records, not concurrency or Session/Thread Context. The Coordinator remains
+core-managed; this split introduces no additional process owner.
 
 - Current owner: Request, Orchestration and Coordinator, PendingInputServer, Thread.Control, and core Plugin integration.
 - Cross-package ownership: core Jido owns Agent commit and topology; Flow/Exec and Signal internals remain in their respective packages.
@@ -27,7 +38,7 @@ Orchestration owns the live API; Jido.Session is a separate portable value. Reco
 | --- | --- |
 | [lib/jido_ai/orchestration.ex](../../../lib/jido_ai/orchestration.ex) | Live public API |
 | [lib/jido_ai/orchestration/coordinator.ex](../../../lib/jido_ai/orchestration/coordinator.ex) | Process and settlement owner |
-| [lib/jido_ai/orchestration/record.ex](../../../lib/jido_ai/orchestration/record.ex) | Actual record schema |
+| [lib/jido_ai/request/record.ex](../../../lib/jido_ai/request/record.ex) | Actual record schema |
 | [lib/jido_ai/orchestration/cancel.ex](../../../lib/jido_ai/orchestration/cancel.ex) | Cancellation transition |
 | [lib/jido_ai/request.ex](../../../lib/jido_ai/request.ex) | Handles and waiting |
 | [lib/jido_ai/tool_source.ex](../../../lib/jido_ai/tool_source.ex) | Inert delegation declarations |
@@ -82,15 +93,10 @@ commit-unknown without retry, ordered input, caller loss, and checkpoint
 acknowledgment without a durability claim. Exact adapter tags and combined
 input/checkpoint control remain decisions, not implemented contracts.
 
-## Selected conversation policy: gaps and acceptance
+## Selected context policy: gaps and acceptance
 
-The [selected policy](design.md#selected-conversation-commit-policy) is not
-fully implemented. Session mode publishes history as work proceeds through
-[Transcript](../../../lib/jido_ai/orchestration/transcript.ex). Turn mode
-appends history_delta only on success in
-[Runtime.Run](../../../lib/jido_ai/runtime/run.ex). Failed turn-mode evidence
-and success-only projection need alignment. Delegation declarations do not
-implement parent-owned result acceptance.
+The [selected policy](design.md#selected-context-commit-policy) is not
+fully implemented. All requests publish evidence through Transcript as work proceeds. Successful settlement promotes that evidence into the next Context. Failed work is retained in the Thread but excluded from default projection. Delegation declarations do not implement parent-owned result acceptance.
 
 Use one complete support-agent example with deterministic MockLLM scenarios,
 a command runner, README, manifest, and executable tests. Add Livebook where
@@ -98,7 +104,7 @@ useful. This is acceptance design, not authorization to build it now.
 
 | Scenario | Acceptance evidence | Requirements |
 | --- | --- | --- |
-| Two successful requests | Second request continues the first completed conversation | SES-REQ-044, VAL-REQ-023 |
+| Two successful requests | Second request continues the first completed context | SES-REQ-044, VAL-REQ-023 |
 | Failure after a completed tool round | Log retains work; next context excludes failed work | SES-REQ-043, SES-REQ-045 |
 | Cancellation during parallel tools | Completed results retained; unresolved calls excluded from next context | SES-REQ-043, SES-REQ-045, VAL-REQ-024 |
 | Queued versus consumed steering | Only consumed input enters history | SES-REQ-043, SES-REQ-046 |
@@ -180,10 +186,10 @@ gates are separate. No row grants document approval.
 | `SES-REQ-004` | Implemented; evidence incomplete | Related example evidence (partial): [busy and duplicate IDs reject before work and preserve the first stream](../../../test/examples/02_requests/02_01_session/02_01_session_test.exs). | Verify the target behavior: For the first V3 release, session admission shall reject a new request while another request record is pending for the same Agent. |
 | `SES-REQ-005` | Decision required | Related example evidence (partial): [admission commits before work and the final Turn preserves intervening domain changes](../../../test/examples/02_requests/02_01_session/02_01_session_test.exs). | Verify the target behavior: `ask/3` shall return a handle only after the admission candidate and request record commit successfully. |
 | `SES-REQ-006` | Implemented; evidence incomplete | Related example evidence (partial): [Signal data cannot replace a host profile](../../../test/examples/01_authoring/01_07_ai_runtime/01_07_ai_runtime_test.exs). | Verify the target behavior: Untrusted request input shall not set a runtime stream sink, provider client, credential, or transport option. |
-| `SES-REQ-007` | Implemented; evidence incomplete | Related example evidence (partial): [three dependent tool rounds precede the committed answer](../../../test/examples/01_authoring/01_02_tool_flow/multi_round_test.exs). | Verify the target behavior: Turn mode shall execute the canonical AI Flow inside one core Turn and shall return only after the final candidate commits or the Turn fails. |
+| `SES-REQ-007` | Superseded | Retired in the owning design after selection of one AI request lifecycle. | Keep the identifier; use the admission/execution/settlement requirements. |
 | `SES-REQ-008` | Implemented; evidence incomplete | Related example evidence (partial): [admission commits before work and the final Turn preserves intervening domain changes](../../../test/examples/02_requests/02_01_session/02_01_session_test.exs). | Verify the target behavior: Session mode shall commit admission before it starts model or tool work. |
 | `SES-REQ-009` | Implemented; evidence incomplete | Related example evidence (partial): [admission commits before work and the final Turn preserves intervening domain changes](../../../test/examples/02_requests/02_01_session/02_01_session_test.exs). | Verify the target behavior: Session mode shall start live work only from a validated post-commit Directive owned by the Orchestration Plugin. |
-| `SES-REQ-010` | Implemented; evidence incomplete | Related example evidence (partial): [DSL data Builder source JSON direct Flow and ordinary turns use the same recursive contract](../../../test/examples/09_reasoning/09_08_trm/09_08_trm_test.exs). | Verify the target behavior: Turn and session modes shall use the same effective profile, model gateway, tool bridge, reasoning method, limits, output validation, and result contract. |
+| `SES-REQ-010` | Implemented; evidence incomplete | Related example evidence (partial): [DSL data Builder source JSON direct Flow and ordinary turns use the same recursive contract](../../../test/examples/09_reasoning/09_08_trm/09_08_trm_test.exs). | Verify the target behavior: Asynchronous and synchronous request helpers shall use the same effective profile, model gateway, tool bridge, reasoning method, limits, output validation, and result contract. |
 | `SES-REQ-011` | Decision required | Related example evidence (partial): [restored request records reject runtime resources and mismatched IDs](../../../test/examples/02_requests/02_01_session/02_01_session_test.exs). | Verify the target behavior: A committed request record shall be portable and shall not contain a server reference, PID, task, monitor, stream sink, provider object, or Exec handle. |
 | `SES-REQ-012` | Implemented; evidence incomplete | Related example evidence (partial): [restored request records reject runtime resources and mismatched IDs](../../../test/examples/02_requests/02_01_session/02_01_session_test.exs). | Verify the target behavior: The Orchestration Plugin shall own request records under one declared Agent state key. |
 | `SES-REQ-013` | Partially implemented | Related example evidence (partial): [untrusted completion input cannot publish a result](../../../test/examples/02_requests/02_01_session/02_01_session_test.exs). | Verify logical request and active attempt matching, with stale and duplicate settlement rejection. |
@@ -217,9 +223,9 @@ gates are separate. No row grants document approval.
 | `SES-REQ-041` | Proposed; not implemented | To be implemented: linked delegation example for explicit handoff of completion and cancellation ownership. Current inert subagent/handoff declarations are not an executable delegation API. | Verify the target behavior: When a host authorizes a handoff, Orchestration shall record which request owner is responsible for subsequent completion and cancellation. |
 | `SES-REQ-042` | Proposed; not implemented | To be implemented: linked delegation example for parent/delegated identity in lifecycle events. Current inert subagent/handoff declarations are not an executable delegation API. | Verify the target behavior: When Orchestration emits a delegation lifecycle event, it shall include the parent and delegated request identities through seam 12's observation contract. |
 | `SES-REQ-043` | Decision required | Related example evidence (partial): [a later request projects committed history with one system instruction](../../../test/examples/02_requests/02_02_steering/02_02_steering_test.exs). | Verify the target behavior: The Orchestration Coordinator shall retain admitted input, consumed steering input, and committed intermediate work in the canonical Session/Thread log for evidence and recovery. |
-| `SES-REQ-044` | Decision required | Target scenario incomplete: [SES-REQ-044 target check](../../../test/examples/02_requests/02_02_steering/design_requirements_test.exs). The success-promotion assertion passes inside the pending-input scenario, but the complete scenario fails. No full requirement proof. Related example evidence (partial): [a later request projects committed history with one system instruction](../../../test/examples/02_requests/02_02_steering/02_02_steering_test.exs). | Verify the target behavior: When request settlement succeeds, the Orchestration Coordinator shall advance the completed conversation used by the default model projection. |
-| `SES-REQ-045` | Implemented; evidence incomplete | Target scenario repaired: [SES-REQ-045 target check](../../../test/examples/02_requests/02_02_steering/design_requirements_test.exs). Failed and cancelled input remains outside completed conversation and the next model request. Full-clause and provider-matrix proof remains separate. | Verify the target behavior: If a request fails or is cancelled, then the Orchestration Coordinator shall leave the completed conversation unchanged. |
-| `SES-REQ-046` | Decision required | Target scenario passed: [SES-REQ-046 target check](../../../test/examples/02_requests/02_02_steering/design_requirements_test.exs). Queued steering is absent before consumption and appears after it is consumed. Related example evidence (partial): [cancellation discards undrained input and stops its queue](../../../test/examples/02_requests/02_02_steering/02_02_steering_test.exs). | Verify the target behavior: While steering input remains queued and unconsumed, the Orchestration Coordinator shall exclude it from conversation history. |
+| `SES-REQ-044` | Decision required | Target scenario incomplete: [SES-REQ-044 target check](../../../test/examples/02_requests/02_02_steering/design_requirements_test.exs). The success-promotion assertion passes inside the pending-input scenario, but the complete scenario fails. No full requirement proof. Related example evidence (partial): [a later request projects committed history with one system instruction](../../../test/examples/02_requests/02_02_steering/02_02_steering_test.exs). | Verify the target behavior: When request settlement succeeds, the Orchestration Coordinator shall advance the completed context used by the default model projection. |
+| `SES-REQ-045` | Implemented; evidence incomplete | Target scenario repaired: [SES-REQ-045 target check](../../../test/examples/02_requests/02_02_steering/design_requirements_test.exs). Failed and cancelled input remains outside completed context and the next model request. Full-clause and provider-matrix proof remains separate. | Verify the target behavior: If a request fails or is cancelled, then the Orchestration Coordinator shall leave the completed context unchanged. |
+| `SES-REQ-046` | Decision required | Target scenario passed: [SES-REQ-046 target check](../../../test/examples/02_requests/02_02_steering/design_requirements_test.exs). Queued steering is absent before consumption and appears after it is consumed. Related example evidence (partial): [cancellation discards undrained input and stops its queue](../../../test/examples/02_requests/02_02_steering/02_02_steering_test.exs). | Verify the target behavior: While steering input remains queued and unconsumed, the Orchestration Coordinator shall exclude it from context history. |
 | `SES-REQ-047` | Decision required | To be implemented: linked delegation example for one parent-owned append for an accepted result. Current inert subagent/handoff declarations are not an executable delegation API. | Verify the target behavior: While a linked parent request is active, when a new delegated result is accepted, the parent Orchestration Coordinator shall append that result once to the parent Thread through core commit APIs. |
 | `SES-REQ-048` | Decision required | To be implemented: linked delegation example for duplicate and late-result rejection. Current inert subagent/handoff declarations are not an executable delegation API. | Verify the target behavior: If a delegated result is duplicate or arrives after parent settlement, then the parent Orchestration Coordinator shall reject it. |
 

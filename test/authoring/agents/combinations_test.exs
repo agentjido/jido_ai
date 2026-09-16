@@ -35,13 +35,13 @@ defmodule JidoAITest.Authoring.Agents.CombinationsTest do
       {:ok, first} = Jido.start_agent(jido, definition)
       {:ok, second} = Jido.start_agent(jido, definition)
       assert {:ok, _} = Jido.AI.set_system_prompt(first, "Changed", profile: :assistant)
-      assert {:ok, "Turn"} = Mixed.ask(first, "Turn query", profile: :assistant, context: context(first_mock))
+      assert {:ok, "Turn"} = Mixed.ask_sync(first, "Turn query", profile: :assistant, context: context(first_mock))
       assert {:ok, "Review"} = Mixed.ask_sync(first, "Review query", profile: :reviewer, context: context(first_mock))
       assert Server.agent(first).state.reply == "Turn"
       assert Server.agent(first).state.review == "Review"
       assert {:ok, _} = Jido.AI.set_system_prompt(first, "", profile: :assistant)
-      assert {:ok, "Cleared"} = Mixed.ask(first, "Clear query", profile: :assistant, context: context(first_mock))
-      assert {:ok, "Other"} = Mixed.ask(second, "Other query", profile: :assistant, context: context(second_mock))
+      assert {:ok, "Cleared"} = Mixed.ask_sync(first, "Clear query", profile: :assistant, context: context(first_mock))
+      assert {:ok, "Other"} = Mixed.ask_sync(second, "Other query", profile: :assistant, context: context(second_mock))
       assert Server.agent(second).state.review == ""
       assert is_nil(Server.agent(second).state.messages)
       assert Server.agent(second).state.jido_ai_config == %{}
@@ -97,16 +97,18 @@ defmodule JidoAITest.Authoring.Agents.CombinationsTest do
     assert texts == ["First query", "Revised query"]
   end
 
-  test "turn profiles reject streaming before starting work", %{jido: jido} do
-    mock = start_supervised!({MockLLM, script: []})
+  test "a profile without retained history can stream without extra configuration", %{jido: jido} do
+    mock = start_supervised!({MockLLM, script: [%{reply: {:text, "Streamed"}}]})
     {:ok, server} = Jido.start_agent(jido, Mixed)
-    before = Server.snapshot(server)
 
-    assert {:error, %Jido.AI.Error.Validation.Invalid{field: "requests.streaming"}} =
-             Mixed.ask_stream(server, "No", profile: :assistant, context: context(mock))
+    assert {:ok, %{request: request, events: events}} =
+             Mixed.ask_stream(server, "Work", profile: :assistant, context: context(mock))
 
-    assert Server.snapshot(server) === before
-    assert MockLLM.report(mock).requests == []
+    assert Enum.any?(Enum.to_list(events), &(&1.kind == :llm_delta))
+    assert {:ok, "Streamed"} = Mixed.await(request)
+    assert Server.agent(server).state.messages == nil
+    assert [%{body: %{"stream" => true}}] = MockLLM.report(mock).requests
+    assert %{remaining: [], unexpected: []} = MockLLM.report(mock)
   end
 
   defp context(mock), do: %{ai: Map.new([:assistant, :reviewer], &{&1, %{options: MockLLM.options(mock)}})}

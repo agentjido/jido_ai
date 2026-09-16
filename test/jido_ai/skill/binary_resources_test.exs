@@ -2,7 +2,7 @@ defmodule Jido.AI.Skill.BinaryResourcesTest do
   use ExUnit.Case, async: false
 
   alias Jido.AI.Actions.Skill.{LoadResource, LoadSkill}
-  alias Jido.AI.Turn
+  alias Jido.AI.Model.Response
   alias Jido.AI.Thread.Projection
   alias Jido.AI.Skill.{Activation, AgentIntegration, Registry, ResourcePolicy, ResourceProvider, Resources, Spec}
   alias ReqLLM.Message.ContentPart
@@ -134,7 +134,7 @@ defmodule Jido.AI.Skill.BinaryResourcesTest do
       assert [%ContentPart{type: ^kind, data: ^bytes}] = output.__content_parts__
 
       assert [%ContentPart{type: :text, text: json}, %ContentPart{type: ^kind, data: ^bytes}] =
-               parts = Turn.format_tool_result_content({:ok, output})
+               parts = Response.format_tool_result_content({:ok, output})
 
       assert {:ok, _} = Jason.decode(json)
       refute String.contains?(json, bytes)

@@ -2,7 +2,9 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
   use ExUnit.Case, async: false
   use Mimic
 
-  alias Jido.AI.{Configuration, Profile, Orchestration}
+  alias Jido.AI.Configuration
+  alias Jido.AI.Profile
+  alias Jido.AI.Orchestration
   alias Jido.Thread
   alias Jido.AI.TestSupport.StreamResponseFactory
 
@@ -30,7 +32,6 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
           action(EchoTool)
         end
 
-        requests(mode: :session, streaming: true)
         memory(history: :messages)
         observability(diagnostics_content: true)
         result(into: :last_result)
@@ -87,21 +88,21 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
     on_exit(fn -> if Process.alive?(pid), do: Process.exit(pid, :kill) end)
 
     # Turn 1: first question, no prior assistant history.
-    assert {:ok, "A1"} = ContextLifecycleAgent.ask_sync(pid, "Q1", timeout: 5_000)
+    assert {:ok, "A1"} = ContextLifecycleAgent.ask_sync(pid, "Q1", timeout: 5_000, stream: true)
 
     assert_receive {:llm_messages, first_messages}, 1_000
     assert user_contents(first_messages) == ["Q1"]
     assert assistant_contents(first_messages) == []
 
     # Turn 2: prior user/assistant messages should now be included.
-    assert {:ok, "A2"} = ContextLifecycleAgent.ask_sync(pid, "Q2", timeout: 5_000)
+    assert {:ok, "A2"} = ContextLifecycleAgent.ask_sync(pid, "Q2", timeout: 5_000, stream: true)
 
     assert_receive {:llm_messages, second_messages}, 1_000
     assert user_contents(second_messages) == ["Q1", "Q2"]
     assert assistant_contents(second_messages) == ["A1"]
 
     # Inspect the committed conversation before reset.
-    state_before_reset = conversation(pid)
+    state_before_reset = context(pid)
 
     assert non_system_messages(state_before_reset) == [
              %{role: :user, content: "Q1"},
@@ -135,7 +136,7 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
     assert {:ok, _agent} = Jido.AgentServer.call(pid, reset_signal, 5_000)
 
     # After reset, committed conversation is replaced immediately.
-    state_after_reset = conversation(pid)
+    state_after_reset = context(pid)
     assert hd(state_after_reset) == %{role: :system, content: "Reset prompt"}
     assert {:ok, %Profile{instructions: "Reset prompt"} = profile} = Configuration.profile(fetch_agent(pid))
 
@@ -146,7 +147,7 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
     assert non_system_messages(state_after_reset) == [%{role: :user, content: "Reset seed"}]
 
     # Turn 3 should project only from reset context, not from pre-reset turns.
-    assert {:ok, "A3"} = ContextLifecycleAgent.ask_sync(pid, "Q3", timeout: 5_000)
+    assert {:ok, "A3"} = ContextLifecycleAgent.ask_sync(pid, "Q3", timeout: 5_000, stream: true)
 
     assert_receive {:llm_messages, third_messages}, 1_000
     assert user_contents(third_messages) == ["Reset seed", "Q3"]
@@ -154,7 +155,7 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
     refute "Q2" in user_contents(third_messages)
 
     # Committed conversation now reflects post-reset conversation only.
-    state_final = conversation(pid)
+    state_final = context(pid)
 
     assert non_system_messages(state_final) == [
              %{role: :user, content: "Reset seed"},
@@ -183,9 +184,9 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
     refute Enum.any?(ai_messages, &(entry_content(&1) == "Reset seed"))
   end
 
-  defp conversation(pid) do
+  defp context(pid) do
     assert {:ok, view} = Orchestration.snapshot(pid, include_content: true)
-    view.details.conversation
+    view.details.context
   end
 
   defp session_thread(pid) do

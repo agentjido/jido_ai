@@ -6,7 +6,7 @@ defmodule Jido.AI.Test.ReActScript do
   requests or `Jido.AI.Test.react_llm_opts/1` for standalone ReAct configs.
   """
 
-  alias Jido.AI.Turn
+  alias Jido.AI.Model.Response
 
   @registry_key {__MODULE__, :scripts}
   @option_key :jido_ai_react_script
@@ -488,7 +488,7 @@ defmodule Jido.AI.Test.ReActScript do
   defp non_empty_list?(_), do: false
 
   defp normalize_content(content) when is_binary(content), do: content
-  defp normalize_content(content) when is_list(content), do: Turn.extract_from_content(content)
+  defp normalize_content(content) when is_list(content), do: Response.extract_from_content(content)
   defp normalize_content(nil), do: ""
   defp normalize_content(content), do: to_string(content)
 end

@@ -27,7 +27,10 @@ defmodule JidoAITest.Authoring.Agents.InterfacesTest do
   test "generated core route helper runs the AI route with caller context", %{jido: jido} do
     {spec, server, mock, context} = start_case(jido, :simple, [{:text, "Ready"}])
     assert {:ok, agent} = spec.module.submit(server, "Help", context: context)
-    assert agent.state === %{spec.initial | reply: "Ready"}
+    assert agent.state.reply == ""
+    assert [{_, %{status: :pending}}] = Map.to_list(agent.state.requests)
+    assert {:ok, completed} = Jido.AI.Test.Requests.await_agent(server, agent)
+    assert Map.delete(completed.state, :requests) === Map.delete(%{spec.initial | reply: "Ready"}, :requests)
     assert_done(mock)
   end
 
@@ -115,8 +118,8 @@ defmodule JidoAITest.Authoring.Agents.InterfacesTest do
     for agent <- [definition, built, decoded] do
       {:ok, server} = Jido.start_agent(jido, agent)
       signal = Jido.Signal.new!("case.inline", %{query: "Help"}, source: "/authoring")
-      assert {:ok, result} = Server.call(server, signal, context: context, timeout: 10_000)
-      assert result.state === %{reply: "Echoed", case_id: "case-17", jido_ai_config: %{}}
+      assert {:ok, result} = Jido.AI.Test.Requests.call_and_await(server, signal, context: context, timeout: 10_000)
+      assert Map.delete(result.state, :requests) === %{reply: "Echoed", case_id: "case-17", jido_ai_config: %{}}
     end
 
     assert_done(mock)
@@ -132,7 +135,7 @@ defmodule JidoAITest.Authoring.Agents.InterfacesTest do
            end) == 3
   end
 
-  test "unrouted profiles and disabled session streaming reject before provider work", %{jido: jido} do
+  test "unrouted profiles reject both request helpers before provider work", %{jido: jido} do
     JidoAITest.Authoring.Compiler.require_file!(Corpus.fixture("helper_edges.exs"))
     module = JidoAITest.Authoring.Agents.Fixtures.HelperEdges
     mock = start_supervised!({MockLLM, script: []})
@@ -143,8 +146,8 @@ defmodule JidoAITest.Authoring.Agents.InterfacesTest do
     assert {:error, %Jido.AI.Error.Validation.Invalid{field: "profile"}} =
              apply(module, :ask, [server, "No", [profile: :unrouted]])
 
-    assert {:error, %Jido.AI.Error.Validation.Invalid{field: "requests.streaming"}} =
-             apply(module, :ask_stream, [server, "No", [profile: :session, context: context]])
+    assert {:error, %Jido.AI.Error.Validation.Invalid{field: "profile"}} =
+             apply(module, :ask_stream, [server, "No", [profile: :unrouted, context: context]])
 
     assert Server.snapshot(server) === before
     assert_done(mock)
@@ -154,12 +157,13 @@ defmodule JidoAITest.Authoring.Agents.InterfacesTest do
     JidoAITest.Authoring.Compiler.require_file!(Corpus.fixture("helper_edges.exs"))
     module = JidoAITest.Authoring.Agents.Fixtures.HelperEdges
     # Selection itself has no I/O; compare the helper call boundary explicitly.
-    Mimic.expect(Jido.AgentServer, :call, fn :route_probe, signal, _opts ->
-      assert signal.type == "case.first"
-      {:ok, %{state: %{reply: "First"}}}
+    Mimic.expect(Jido.AI.Request, :create_and_send, fn :route_probe, "Help", opts ->
+      assert opts[:signal_type] == "case.first"
+      {:ok, Jido.AI.Request.Handle.new("first", :route_probe, "Help")}
     end)
 
-    assert {:ok, "First"} = apply(module, :ask, [:route_probe, "Help", [profile: :assistant]])
+    assert {:ok, %Jido.AI.Request.Handle{id: "first"}} =
+             apply(module, :ask, [:route_probe, "Help", [profile: :assistant]])
   end
 
   test "invalid query through generated ask leaves state unchanged", %{jido: jido} do

@@ -62,11 +62,11 @@ defmodule Jido.AI.Reasoning.StateOpsHelpersTest do
     test "candidate lists keep #{label} order without a hidden merge" do
       before = unquote(Macro.escape(before))
       expected = unquote(Macro.escape(after_value))
-      agent = TestAgent.new!(state: %{data: %{conversation: before, keep: true}})
-      next = put_in(agent.state, [:data, :conversation], expected)
+      agent = TestAgent.new!(state: %{data: %{context: before, keep: true}})
+      next = put_in(agent.state, [:data, :context], expected)
       assert {changed, [], _, {:ok, :changed, _}} = apply_state(agent, next)
-      assert changed.state.data == %{conversation: expected, keep: true}
-      assert agent.state.data.conversation == before
+      assert changed.state.data == %{context: expected, keep: true}
+      assert agent.state.data.context == before
     end
   end
 
@@ -92,7 +92,7 @@ defmodule Jido.AI.Reasoning.StateOpsHelpersTest do
     reset = %{
       status: :idle,
       iteration: 0,
-      conversation: [],
+      context: [],
       pending_tool_calls: [],
       final_answer: nil,
       current_llm_call_id: nil,

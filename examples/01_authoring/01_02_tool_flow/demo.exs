@@ -15,11 +15,12 @@ try do
   try do
     started = System.monotonic_time(:millisecond)
 
-    case Agent.calculate(server, Agent.prompt(),
+    case Agent.ask_sync(server, Agent.prompt(),
            context: %{ai: %{assistant: %{options: [req_http_options: [retry: false]]}}},
            timeout: 65_000
          ) do
-      {:ok, agent} ->
+      {:ok, answer} ->
+        agent = Jido.AgentServer.agent(server)
         {:ok, profile} = Jido.AI.Configuration.profile(agent)
         {:ok, history} = Jido.AI.Thread.Projection.messages(agent.state[profile.memory.history])
         tools = Enum.filter(history, &(&1.role == :tool))
@@ -29,7 +30,7 @@ try do
           IO.puts("Tool #{tool.name} (#{tool.tool_call_id}): #{text}")
         end)
 
-        IO.puts("Answer: #{agent.state.answer}")
+        IO.puts("Answer: #{answer}")
 
         IO.inspect(
           %{

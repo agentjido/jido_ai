@@ -104,7 +104,7 @@ defmodule Jido.AI.Authoring.AgentDSLTest do
 
     assert Enum.any?(CanonicalAgent.routes(), fn route ->
              route.path == "support.ask" and
-               route.target == {Jido.AI.Runtime.Run, %{profile_id: :support}}
+               route.target == {Jido.AI.Orchestration.Start, %{profile_id: :support}}
            end)
   end
 
@@ -132,6 +132,31 @@ defmodule Jido.AI.Authoring.AgentDSLTest do
       end
       """)
     end
+  end
+
+  test "the removed requests block is rejected during authoring" do
+    module = Module.concat(__MODULE__, "LegacyRequests#{System.unique_integer([:positive])}")
+
+    output =
+      ExUnit.CaptureIO.capture_io(:stderr, fn ->
+        assert_raise CompileError, fn ->
+          Code.compile_string("""
+          defmodule #{inspect(module)} do
+            use Jido.AI.Agent, name: "legacy_requests"
+
+            agent do
+              ai :assistant do
+                model :fast
+                requests do
+                end
+              end
+            end
+          end
+          """)
+        end
+      end)
+
+    assert output =~ "undefined function requests/1"
   end
 
   test "the builder and dynamic instruction Action use the canonical constructor" do

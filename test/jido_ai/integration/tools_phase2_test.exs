@@ -14,7 +14,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
   use ExUnit.Case, async: false
 
   alias Jido.AI.ToolAdapter
-  alias Jido.AI.Turn
+  alias Jido.AI.Model.Response
 
   # ============================================================================
   # Test Actions
@@ -392,7 +392,7 @@ defmodule Jido.AI.Integration.ToolsPhase2Test do
       assert {:ok, %{result: 56}, []} = result
 
       # 4. Format result for tool message content (would be added back to conversation)
-      formatted = Turn.format_tool_result_content(result)
+      formatted = Response.format_tool_result_content(result)
       assert Jason.decode!(formatted) == %{"ok" => true, "result" => %{"result" => 56}}
     end
 

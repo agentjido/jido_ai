@@ -1,6 +1,6 @@
 defmodule Jido.AI.Authoring do
   @moduledoc "Lowers validated AI profiles into an ordinary Jido Agent definition."
-  alias Jido.AI.{Profile, Runtime}
+  alias Jido.AI.Profile
 
   defmodule Ref do
     @moduledoc "A static route reference to one declared AI profile."
@@ -11,10 +11,10 @@ defmodule Jido.AI.Authoring do
   def ai(id), do: %Ref{id: id}
 
   @doc false
-  def state_size_key, do: Jido.AI.Runtime.StateSize.metadata_key()
+  def state_size_key, do: Jido.AI.Execution.StateSize.metadata_key()
 
   @doc false
-  def state_size_limit(source), do: Jido.AI.Runtime.StateSize.limit(source)
+  def state_size_limit(source), do: Jido.AI.Execution.StateSize.limit(source)
 
   @doc false
   def with_state_size_limit(config, nil), do: {:ok, config}
@@ -25,7 +25,7 @@ defmodule Jido.AI.Authoring do
      %{
        config
        | metadata: Map.put(metadata, state_size_key(), limit),
-         schema: Zoi.refine(schema, {Jido.AI.Runtime.StateSize, :check, [limit]})
+         schema: Zoi.refine(schema, {Jido.AI.Execution.StateSize, :check, [limit]})
      }}
   end
 
@@ -34,16 +34,16 @@ defmodule Jido.AI.Authoring do
 
   @doc false
   def validate_state_size(state, limit, context),
-    do: Jido.AI.Runtime.StateSize.validate(state, limit, context)
+    do: Jido.AI.Execution.StateSize.validate(state, limit, context)
 
   @doc false
-  def state_size_error?(error), do: Jido.AI.Runtime.StateSize.error?(error)
+  def state_size_error?(error), do: Jido.AI.Execution.StateSize.error?(error)
 
   @doc false
-  def request_binding(agent, signal), do: Jido.AI.Runtime.Binding.request(agent, signal)
+  def request_binding(agent, signal), do: Jido.AI.Orchestration.Binding.request(agent, signal)
 
   @doc false
-  def request_method(agent, signal), do: Jido.AI.Runtime.Binding.method(agent, signal)
+  def request_method(agent, signal), do: Jido.AI.Orchestration.Binding.method(agent, signal)
 
   @doc """
   Lowers profiles on a neutral Agent or static attributes, then applies core validation.
@@ -76,11 +76,27 @@ defmodule Jido.AI.Authoring do
 
   @doc false
   def lower_config(config, values) do
-    ensure_plugin_compiled!(Runtime.Plugin)
+    ensure_plugin_compiled!(Jido.AI.Configuration.Plugin)
     Code.ensure_compiled!(Jido.AI.Configuration.Apply)
     Code.ensure_compiled!(Jido.AI.Thread.Control.Apply)
     ensure_plugin_compiled!(Jido.AI.Thread.Control.Plugin)
     ensure_plugin_compiled!(Jido.AI.Orchestration.Plugin)
+
+    # Generated routes need loaded executable contracts during DSL expansion.
+    # Keep that compile-time work here, outside live orchestration.
+    Enum.each(
+      [
+        Jido.AI.Orchestration.Start,
+        Jido.AI.Orchestration.Settle,
+        Jido.AI.Orchestration.Cancel,
+        Jido.AI.Orchestration.ControlAction,
+        Jido.AI.Orchestration.HistoryAction,
+        Jido.AI.Orchestration.Publish,
+        Jido.AI.Orchestration.IgnoreSignal,
+        Jido.AI.Orchestration.Progress
+      ],
+      &Code.ensure_compiled!/1
+    )
 
     with {:ok, config} <- configured_state_size(config),
          {:ok, pairs} <- Profile.traverse(values, &Profile.source/1),
@@ -91,7 +107,7 @@ defmodule Jido.AI.Authoring do
            Enum.any?(
              config.plugins,
              &(plugin_module(&1) in [
-                 Runtime.Plugin,
+                 Jido.AI.Configuration.Plugin,
                  Jido.AI.Orchestration.Plugin,
                  Jido.AI.Thread.Control.Plugin
                ])
@@ -103,13 +119,12 @@ defmodule Jido.AI.Authoring do
          {:ok, extra} <- Profile.traverse(pairs, &routes/1),
          {:ok, routes} <-
            Profile.traverse(config.routes ++ List.flatten(extra), &route(&1, Map.new(flows))),
-         sessions = Enum.filter(profiles, &(&1.requests.mode == :session)),
          histories =
            Map.new(
              Enum.filter(profiles, &(&1.memory.history != nil)),
              &{&1.id, &1.memory.history}
            ),
-         {:ok, internal_routes} <- Jido.AI.Orchestration.routes(sessions),
+         {:ok, internal_routes} <- Jido.AI.Orchestration.routes(profiles),
          internal_routes = prefer_explicit_observation_routes(internal_routes, routes),
          {:ok, config_routes} <-
            Jido.Agent.Authoring.routes(
@@ -128,22 +143,22 @@ defmodule Jido.AI.Authoring do
           else:
             config.plugins ++
               [
-                {Runtime.Plugin, [profiles: Map.new(profiles, &{&1.id, &1})]}
+                {Jido.AI.Configuration.Plugin, [profiles: Map.new(profiles, &{&1.id, &1})]}
               ]
 
-      skill_sources = Map.new(Enum.filter(sessions, &(&1.skills != nil)), &{&1.id, &1.skills})
-      session_opts = [profiles: Map.new(sessions, &{&1.id, &1}), routes: routes]
+      skill_sources = Map.new(Enum.filter(profiles, &(&1.skills != nil)), &{&1.id, &1.skills})
+      request_opts = [profiles: Map.new(profiles, &{&1.id, &1}), routes: routes]
 
-      session_opts =
-        if map_size(skill_sources) == 0, do: session_opts, else: Keyword.put(session_opts, :skills, skill_sources)
+      request_opts =
+        if map_size(skill_sources) == 0, do: request_opts, else: Keyword.put(request_opts, :skills, skill_sources)
 
       plugins =
-        if sessions == [],
+        if profiles == [],
           do: plugins,
           else:
             plugins ++
               [
-                {Jido.AI.Orchestration.Plugin, session_opts}
+                {Jido.AI.Orchestration.Plugin, request_opts}
               ]
 
       plugins =
@@ -284,11 +299,9 @@ defmodule Jido.AI.Authoring do
     match?({:ok, [_ | _]}, Jido.Signal.Router.route(router, signal))
   end
 
-  defp flow(%{requests: %{mode: :session}} = profile),
+  defp flow(profile),
     do: Jido.AI.Orchestration.admission_target(profile)
 
-  defp flow(profile), do: {:ok, {Jido.AI.Runtime.Run, %{profile_id: profile.id}}}
-
   @doc false
-  def reasoning_flow(profile), do: Jido.AI.Runtime.Flow.build(profile)
+  def reasoning_flow(profile), do: Jido.AI.Execution.Flow.build(profile)
 end

@@ -27,7 +27,7 @@ transport and AgentServer, with [test setup](../../../test/examples/support/exam
 The Agents set `store_content true` in their `observability` blocks to retain
 tool arguments and results. This does not permit rich content in public streams
 or private reasoning in storage. Without storage permission, tool work can run,
-but a later request cannot resume a conversation with omitted tool content.
+but a later request cannot resume a context with omitted tool content.
 
 ### Optional live Haiku demonstration
 

@@ -29,7 +29,7 @@ This example grants `diagnostics_content` in the Profile. Its detailed tests
 also pass `include_content: true` when they inspect payloads. Both are required;
 normal inspection excludes content. The example separately permits stream
 content and retained/streamed reasoning to demonstrate their inspection paths.
-Pending input remains in the request record, not completed conversation.
+Pending input remains in the request record, not completed context.
 
 ## Limits
 

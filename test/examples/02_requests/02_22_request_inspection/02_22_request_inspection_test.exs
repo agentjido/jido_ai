@@ -1,6 +1,7 @@
 defmodule JidoAI.Examples.RequestInspectionTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Request, Orchestration}
+  alias Jido.AI.Request
+  alias Jido.AI.Orchestration
   alias JidoAI.Examples.RequestInspection.Agent
 
   defp submit(server, context, opts \\ []) do
@@ -79,7 +80,7 @@ defmodule JidoAI.Examples.RequestInspectionTest do
     assert view.live.worker_status == :running
     assert Enum.map(view.details.trace.events, & &1.kind) == [:request_started, :llm_started]
     assert :ok = Jido.Action.validate_static_data(view.agent.state)
-    assert view.details.conversation == []
+    assert view.details.context == []
     assert view.request.query == "Inspect this request"
     :ok = MockLLM.release(mock, :model)
     assert {:ok, "Done"} = Request.await(request)
@@ -111,11 +112,8 @@ defmodule JidoAI.Examples.RequestInspectionTest do
     assert_script_done(mock)
   end
 
-  for {module, streaming?} <- [
-        {JidoAI.Examples.RequestInspection.ReplayBuffered, false},
-        {JidoAI.Examples.RequestInspection.ReplayStream, true}
-      ] do
-    test "#{module} keeps tool results and the live phase when a completion is replayed", %{jido: jido} do
+  for streaming? <- [false, true] do
+    test "streaming #{streaming?} keeps tool results and the live phase when a completion is replayed", %{jido: jido} do
       calls = [
         %{id: "held", name: "inspect_hold", arguments: %{case_id: "one"}},
         %{id: "failed", name: "inspect_fail", arguments: %{}}
@@ -128,8 +126,8 @@ defmodule JidoAI.Examples.RequestInspectionTest do
           %{reply: {:wait, :next, {:text, "Next"}}}
         ])
 
-      server = start_agent(jido, unquote(module).new!())
-      assert {:ok, request} = submit(server, context)
+      server = start_agent(jido, JidoAI.Examples.RequestInspection.Replay.new!())
+      assert {:ok, request} = submit(server, context, stream: unquote(streaming?))
       assert_receive {:inspection_tool, tool}, 2_000
       assert {:ok, held} = Orchestration.snapshot(server, include_content: true)
 
@@ -180,7 +178,7 @@ defmodule JidoAI.Examples.RequestInspectionTest do
 
       assert {:ok, retained} = Orchestration.snapshot(server, include_content: true, request_id: request.id)
       assert retained.request == done.request
-      assert {:ok, next} = submit(server, context)
+      assert {:ok, next} = submit(server, context, stream: unquote(streaming?))
       assert_receive {:mock_llm_waiting, ^mock, :next, _}, 2_000
       assert {:ok, fresh} = Orchestration.snapshot(server, include_content: true)
       assert fresh.details.tool_results == [] and fresh.details.tool_calls == []

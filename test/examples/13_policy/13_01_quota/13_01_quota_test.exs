@@ -91,7 +91,9 @@ defmodule JidoAI.Examples.QuotaTest do
     server = start_agent(jido, definition)
 
     assert {:error, _} =
-             Server.call(server, Example.signal("case.review", %{query: "Review"}), context: context)
+             Jido.AI.Test.Requests.call_and_await(server, Example.signal("case.review", %{query: "Review"}),
+               context: context
+             )
 
     assert Server.agent(server).state.result == nil
     assert %{requests: 1, total_tokens: 15} = Store.get("team")
@@ -148,13 +150,17 @@ defmodule JidoAI.Examples.QuotaTest do
     server = start_agent(jido, definition)
 
     assert {:ok, agent} =
-             Server.call(server, Example.signal("case.review", %{query: "Label"}), context: context)
+             Jido.AI.Test.Requests.call_and_await(server, Example.signal("case.review", %{query: "Label"}),
+               context: context
+             )
 
     assert agent.state.result == %{label: "ready"}
     assert %{requests: 2, total_tokens: 30} = Store.get("team")
 
     assert {:error, %{type: :quota_exceeded}} =
-             Server.call(server, Example.signal("case.review", %{query: "Again"}), context: context)
+             Jido.AI.Test.Requests.call_and_await(server, Example.signal("case.review", %{query: "Again"}),
+               context: context
+             )
 
     assert_script_done(mock)
   end
@@ -172,7 +178,9 @@ defmodule JidoAI.Examples.QuotaTest do
     server = start_agent(jido, definition)
 
     assert {:error, _} =
-             Server.call(server, Example.signal("case.review", %{query: "Review"}), context: context)
+             Jido.AI.Test.Requests.call_and_await(server, Example.signal("case.review", %{query: "Review"}),
+               context: context
+             )
 
     assert Server.agent(server).state.result == nil
     assert %{requests: 1, total_tokens: 15} = Store.get("team")
@@ -205,7 +213,9 @@ defmodule JidoAI.Examples.QuotaTest do
     context = Map.put(context, :jido_ai_callable_profile, reasoning_profile())
 
     assert {:ok, agent} =
-             Server.call(server, Example.signal("case.review", %{query: "Review"}), context: context)
+             Jido.AI.Test.Requests.call_and_await(server, Example.signal("case.review", %{query: "Review"}),
+               context: context
+             )
 
     assert agent.state.result == "Reviewed"
     assert %{requests: 3, total_tokens: 45} = Store.get("team")
@@ -221,13 +231,15 @@ defmodule JidoAI.Examples.QuotaTest do
 
     task =
       Task.async(fn ->
-        Server.call(first, Example.signal("case.review", %{query: "Review"}), context: context)
+        Jido.AI.Test.Requests.call_and_await(first, Example.signal("case.review", %{query: "Review"}), context: context)
       end)
 
     assert_receive {:mock_llm_waiting, ^mock, :last_slot, _}, 2_000
 
     assert {:error, %{type: :quota_exceeded}} =
-             Server.call(second, Example.signal("case.review", %{query: "Review"}), context: context)
+             Jido.AI.Test.Requests.call_and_await(second, Example.signal("case.review", %{query: "Review"}),
+               context: context
+             )
 
     assert %{requests: 1, total_tokens: 0} = Store.get("team")
     assert :ok = MockLLM.release(mock, :last_slot)
@@ -279,15 +291,14 @@ defmodule JidoAI.Examples.QuotaTest do
         }
       ])
 
-    profile = %{requests: %{mode: :session, streaming: true}}
-    assert {:ok, definition} = Example.definition(profile: profile)
+    assert {:ok, definition} = Example.definition()
     server = start_agent(jido, definition)
 
     assert {:ok, _} =
              Server.call(
                server,
                Example.signal("case.review", %{query: "Review", request_id: "cancel"}),
-               context: context
+               context: Map.put(context, :jido_ai_request, %{stream: true})
              )
 
     assert_receive {:mock_llm_waiting, ^mock, :partial_usage, provider}, 2_000
@@ -308,19 +319,25 @@ defmodule JidoAI.Examples.QuotaTest do
     server = start_agent(jido, Example.Agent.new!())
 
     assert {:ok, agent} =
-             Server.call(server, Example.signal("case.review", %{query: "Review"}), context: context)
+             Jido.AI.Test.Requests.call_and_await(server, Example.signal("case.review", %{query: "Review"}),
+               context: context
+             )
 
     assert agent.state.result == "Reviewed" and agent.state.case_id == "case-13"
 
     assert {:error, %{type: :quota_exceeded}} =
-             Server.call(server, Example.signal("case.review", %{query: "Again"}), context: context)
+             Jido.AI.Test.Requests.call_and_await(server, Example.signal("case.review", %{query: "Again"}),
+               context: context
+             )
 
     assert {:ok, agent} = Server.call(server, Example.signal("quota.status", %{}))
     assert agent.state.result.quota.usage.requests == 1
     assert {:ok, _} = Server.call(server, Example.signal("quota.reset", %{}))
 
     assert {:ok, _} =
-             Server.call(server, Example.signal("case.review", %{query: "Again"}), context: context)
+             Jido.AI.Test.Requests.call_and_await(server, Example.signal("case.review", %{query: "Again"}),
+               context: context
+             )
 
     assert %{requests: 1, total_tokens: 15} = Store.get("dsl")
     assert_script_done(mock)
@@ -343,11 +360,15 @@ defmodule JidoAI.Examples.QuotaTest do
         }
       ])
 
-    assert {:ok, definition} = Example.definition(profile: %{requests: %{streaming: true}})
+    assert {:ok, definition} = Example.definition()
     server = start_agent(jido, definition)
 
     assert {:ok, agent} =
-             Server.call(server, Example.signal("case.review", %{query: "Review"}), context: context)
+             Jido.AI.Test.Requests.call_and_await(
+               server,
+               Example.signal("case.review", %{query: "Review"}),
+               context: Map.put(context, :jido_ai_request, %{stream: true})
+             )
 
     assert agent.state.result == "Reviewed"
     assert %{requests: 1, total_tokens: 15} = Store.get("team")
@@ -371,11 +392,15 @@ defmodule JidoAI.Examples.QuotaTest do
         }
       ])
 
-    assert {:ok, definition} = Example.definition(profile: %{requests: %{streaming: true}})
+    assert {:ok, definition} = Example.definition()
     server = start_agent(jido, definition)
 
     assert {:error, _} =
-             Server.call(server, Example.signal("case.review", %{query: "Review"}), context: context)
+             Jido.AI.Test.Requests.call_and_await(
+               server,
+               Example.signal("case.review", %{query: "Review"}),
+               context: Map.put(context, :jido_ai_request, %{stream: true})
+             )
 
     assert Server.agent(server).state.result == nil
     assert %{requests: 1, total_tokens: 5} = Store.get("team")
@@ -390,7 +415,9 @@ defmodule JidoAI.Examples.QuotaTest do
 
     task =
       Task.async(fn ->
-        Server.call(server, Example.signal("case.review", %{query: "Review"}), context: context)
+        Jido.AI.Test.Requests.call_and_await(server, Example.signal("case.review", %{query: "Review"}),
+          context: context
+        )
       end)
 
     assert_receive {:mock_llm_waiting, ^mock, :reset_window, _}, 2_000
@@ -442,7 +469,9 @@ defmodule JidoAI.Examples.QuotaTest do
     server = start_agent(jido, disabled)
 
     assert {:ok, _} =
-             Server.call(server, Example.signal("case.review", %{query: "Review"}), context: context)
+             Jido.AI.Test.Requests.call_and_await(server, Example.signal("case.review", %{query: "Review"}),
+               context: context
+             )
 
     assert {:ok, enabled} = Example.definition(max_requests: 0)
     server = start_agent(jido, enabled)
@@ -484,7 +513,9 @@ defmodule JidoAI.Examples.QuotaTest do
     context = Map.put(context, :jido_ai_callable_profile, reasoning_profile())
 
     assert {:error, _} =
-             Server.call(server, Example.signal("case.review", %{query: "Review"}), context: context)
+             Jido.AI.Test.Requests.call_and_await(server, Example.signal("case.review", %{query: "Review"}),
+               context: context
+             )
 
     assert %{requests: 1, total_tokens: 15} = Store.get("team")
     assert Server.agent(server).state.result == nil
@@ -540,7 +571,9 @@ defmodule JidoAI.Examples.QuotaTest do
     server = start_agent(jido, definition)
 
     assert {:ok, _} =
-             Server.call(server, Example.signal("case.review", %{query: "Review"}), context: context)
+             Jido.AI.Test.Requests.call_and_await(server, Example.signal("case.review", %{query: "Review"}),
+               context: context
+             )
 
     assert %{requests: 1, total_tokens: 0} = Store.get("team")
     assert [%{status: :unknown, total_tokens: nil}] = Store.ledger("team")
@@ -561,7 +594,9 @@ defmodule JidoAI.Examples.QuotaTest do
     server = start_agent(jido, definition)
 
     assert {:ok, _} =
-             Server.call(server, Example.signal("case.review", %{query: "Review"}), context: context)
+             Jido.AI.Test.Requests.call_and_await(server, Example.signal("case.review", %{query: "Review"}),
+               context: context
+             )
 
     assert length(MockLLM.report(mock).requests) == 2
     assert %{requests: 1, total_tokens: 15} = Store.get("team")
@@ -627,7 +662,9 @@ defmodule JidoAI.Examples.QuotaTest do
     server = start_agent(jido, definition)
 
     assert {:error, _} =
-             Server.call(server, Example.signal("case.review", %{query: "Review"}), context: context)
+             Jido.AI.Test.Requests.call_and_await(server, Example.signal("case.review", %{query: "Review"}),
+               context: context
+             )
 
     Store.add_usage("team", 15, 60_000)
     stop_supervised!(Store)
@@ -654,14 +691,11 @@ defmodule JidoAI.Examples.QuotaTest do
       model: MockLLM.model(),
       reasoning: :chain_of_thought,
       controls: %{timeout: 5_000},
-      requests: %{mode: :session},
       result: %{into: :answer}
     })
   end
 
-  defp await(:turn, _, _), do: :ok
-
-  defp await(:session, server, id) do
+  defp await(_mode, server, id) do
     assert {:ok, _} = Jido.AI.Orchestration.await(server, id, 5_000)
     :ok
   end

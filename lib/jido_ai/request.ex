@@ -157,6 +157,8 @@ defmodule Jido.AI.Request do
     or a request-scoped structured output config
   - `:extra_refs` - Map of additional refs to attach to the user message thread entry
   - `:stream_to` - Optional request-scoped runtime event sink, currently `{:pid, pid}`
+  - `:stream` - Use provider streaming. Defaults to true with an event sink,
+    otherwise false. Set false with a sink to receive lifecycle events only.
   - `:request_id` - Custom request ID (auto-generated if not provided)
   - `:run_id` - Custom nonempty run ID (auto-generated if not provided)
 
@@ -197,13 +199,15 @@ defmodule Jido.AI.Request do
     stream_to = Keyword.get(opts, :stream_to)
 
     with {:ok, query} <- Query.attach_file_references(query, opts),
-         {:ok, stream_to} <- RequestStream.normalize_sink(stream_to) do
+         {:ok, stream_to} <- RequestStream.normalize_sink(stream_to),
+         stream = Keyword.get(opts, :stream, stream_to != nil),
+         :ok <- validate_stream(stream) do
       # Build payload with request_id for correlation.
       # Keep both query and prompt keys so all strategy start schemas can consume it.
       extra_refs = Keyword.get(opts, :extra_refs, %{})
 
       payload =
-        %{query: query, prompt: query, request_id: request_id}
+        %{query: query, prompt: query, request_id: request_id, stream: stream}
         |> maybe_add_model(Keyword.get(opts, :model))
         |> maybe_add_tool_context(tool_context)
         |> maybe_add_tools(tools)
@@ -228,6 +232,12 @@ defmodule Jido.AI.Request do
       Jido.AI.Orchestration.submit(server, signal, stream_to, opts)
     end
   end
+
+  def create_and_send(_server, _query, _opts),
+    do: Jido.AI.Profile.error("query", "Expected text or a list of content parts")
+
+  defp validate_stream(value) when is_boolean(value), do: :ok
+  defp validate_stream(_), do: Jido.AI.Profile.error("request.stream", "Expected a boolean")
 
   @doc """
   Synchronously sends a request and waits for the result.

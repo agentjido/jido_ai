@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.Session.Agent do
   @moduledoc "A request session can run while ordinary domain commands commit."
-  use Jido.AI.Agent, name: "ai_session_example"
+  use Jido.AI.Agent, name: "ai_request_example"
 
   agent do
     schema Zoi.object(%{
@@ -19,13 +19,6 @@ defmodule JidoAI.Examples.Session.Agent do
 
       reasoning :react do
         model :answer
-      end
-
-      requests do
-        mode :session
-        streaming true
-        on_busy :reject
-        max_requests 2
       end
 
       controls do

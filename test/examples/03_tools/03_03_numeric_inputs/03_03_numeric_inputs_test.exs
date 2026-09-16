@@ -1,6 +1,7 @@
 defmodule JidoAI.Examples.NumericInputsTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Request, Orchestration}
+  alias Jido.AI.Request
+  alias Jido.AI.Orchestration
   alias JidoAI.Examples.NumericInputs.Agent
 
   defp request(server, context) do

@@ -60,7 +60,7 @@ defmodule Jido.AI.Actions.Planning.Decompose do
   @impl Jido.Action
   def on_before_validate_params(params), do: Request.before_validate(schema(), params)
 
-  alias Jido.AI.Turn
+  alias Jido.AI.Model.Response
   alias ReqLLM.Context
 
   @decomposition_prompt """
@@ -156,7 +156,7 @@ defmodule Jido.AI.Actions.Planning.Decompose do
   defp clamp_depth(_), do: 3
 
   defp format_result(response, model, goal, depth) do
-    decomposition_text = Turn.extract_text(response)
+    decomposition_text = Response.extract_text(response)
 
     %{
       decomposition: decomposition_text,

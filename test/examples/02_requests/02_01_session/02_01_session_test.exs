@@ -1,6 +1,7 @@
 defmodule JidoAI.Examples.SessionTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Request, Orchestration}
+  alias Jido.AI.Request
+  alias Jido.AI.Orchestration
   alias Jido.AI.Request.Stream
   alias JidoAI.Examples.Session.Agent
 
@@ -38,7 +39,7 @@ defmodule JidoAI.Examples.SessionTest do
 
   defp streaming_server(jido, changes \\ %{}, schema \\ Agent.domain_schema()) do
     {definition, _, _} =
-      session_definition(Map.put(changes, :requests, %{mode: :session, streaming: true}), schema)
+      session_definition(changes, schema)
 
     start_agent(jido, Jido.Agent.instantiate!(definition))
   end
@@ -51,7 +52,7 @@ defmodule JidoAI.Examples.SessionTest do
   test "the authored session runs without test controls or blocking tools", %{jido: jido} do
     {mock, context} = mock([%{reply: {:text, "Ready"}}, %{reply: {:text, "Streaming"}}])
     server = start_agent(jido, Agent.new!())
-    assert {:ok, request} = Agent.ask(server, "Help", context: context)
+    assert {:ok, request} = Agent.ask(server, "Help", context: context, stream: true)
     assert {:ok, "Ready"} = Request.await(request)
     assert {:ok, %{request: streamed, events: events}} = Agent.ask_stream(server, "Continue", context: context)
     assert {:ok, "Streaming"} = Request.await(streamed)
@@ -133,7 +134,7 @@ defmodule JidoAI.Examples.SessionTest do
                     }}
 
     assert {:error, %{details: %{reason: :duplicate_request}}} =
-             Agent.ask(server, "Again", context: context, request_id: "first", stream_to: self())
+             Agent.ask(server, "Again", context: context, stream: true, request_id: "first", stream_to: self())
 
     assert request_state(server) == before
     MockLLM.release(mock, :answer)
@@ -174,7 +175,7 @@ defmodule JidoAI.Examples.SessionTest do
     assert {:error, :cancelled} = Request.await(request)
     assert Enum.count(events, &(&1.kind == :request_cancelled)) == 1
     assert Server.agent(server).state.requests[request.id].meta.usage.total_tokens > 0
-    assert {:ok, next} = Agent.ask(server, "Next", context: context)
+    assert {:ok, next} = Agent.ask(server, "Next", context: context, stream: true)
     assert {:error, %{details: %{reason: :request_already_finished}}} = Orchestration.cancel(request)
     assert {:ok, "Next"} = Request.await(next)
     assert_script_done(mock)
@@ -189,7 +190,7 @@ defmodule JidoAI.Examples.SessionTest do
       ])
 
     server = start_fixture(jido)
-    assert {:ok, request} = Agent.ask(server, "Wait", context: context, stream_to: self())
+    assert {:ok, request} = Agent.ask(server, "Wait", context: context, stream: true, stream_to: self())
     id = request.id
     assert_receive {:session_owner, owner, ^id}, 2_000
     assert_receive {:tool_waiting, worker, 2}, 2_000
@@ -197,7 +198,7 @@ defmodule JidoAI.Examples.SessionTest do
     Process.exit(owner, :kill)
     assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 2_000
     assert {:error, :stream_interrupted} = Request.await(request)
-    assert {:ok, next} = Agent.ask(server, "Next", context: context)
+    assert {:ok, next} = Agent.ask(server, "Next", context: context, stream: true)
     assert {:ok, "Recovered"} = Request.await(next)
     next_id = next.id
     assert_receive {:session_owner, next_owner, ^next_id}
@@ -208,7 +209,7 @@ defmodule JidoAI.Examples.SessionTest do
   test "untrusted completion input cannot publish a result", %{jido: jido} do
     {mock, context} = mock([%{reply: {:wait, :answer, {:text, "Real"}}}])
     server = start_fixture(jido)
-    {:ok, request} = Agent.ask(server, "Work", context: context)
+    {:ok, request} = Agent.ask(server, "Work", context: context, stream: true)
     assert_receive {:mock_llm_waiting, ^mock, :answer, _}, 2_000
     before = request_state(server)
 
@@ -229,10 +230,10 @@ defmodule JidoAI.Examples.SessionTest do
     before = Server.snapshot(server)
 
     assert {:error, {:invalid_stream_to, :invalid}} =
-             Agent.ask(server, "Work", context: context, stream_to: :invalid)
+             Agent.ask(server, "Work", context: context, stream: true, stream_to: :invalid)
 
     assert {:error, _} =
-             Agent.ask(server, "Work", context: context, request_transformer: __MODULE__)
+             Agent.ask(server, "Work", context: context, stream: true, request_transformer: __MODULE__)
 
     assert Server.snapshot(server) == before
     assert_script_done(mock)
@@ -279,12 +280,15 @@ defmodule JidoAI.Examples.SessionTest do
   end
 
   test "completed requests have bounded retention and await_many keeps input order", %{jido: jido} do
+    previous = Application.get_env(:jido_ai, :max_retained_requests, 100)
+    Application.put_env(:jido_ai, :max_retained_requests, 2)
+    on_exit(fn -> Application.put_env(:jido_ai, :max_retained_requests, previous) end)
     {mock, context} = mock(for text <- ["One", "Two", "Three"], do: %{reply: {:text, text}})
     server = start_fixture(jido)
 
     requests =
       for text <- ["One", "Two", "Three"] do
-        {:ok, request} = Agent.ask(server, text, context: context)
+        {:ok, request} = Agent.ask(server, text, context: context, stream: true)
         assert {:ok, ^text} = Request.await(request)
         request
       end
@@ -333,7 +337,7 @@ defmodule JidoAI.Examples.SessionTest do
       mock([%{reply: {:stream, [%{content: "Partial"}, {:wait, :break}, :disconnect]}}])
 
     server = streaming_server(jido)
-    {:ok, request} = Agent.ask(server, "Stream", context: context, stream_to: self())
+    {:ok, request} = Agent.ask(server, "Stream", context: context, stream: true, stream_to: self())
     id = request.id
     assert_receive {:mock_llm_waiting, ^mock, :break, _}, 2_000
 
@@ -357,14 +361,14 @@ defmodule JidoAI.Examples.SessionTest do
       ])
 
     server = streaming_server(jido)
-    {:ok, request} = Agent.ask(server, "Stream", context: context, stream_to: self())
+    {:ok, request} = Agent.ask(server, "Stream", context: context, stream: true, stream_to: self())
     assert_receive {:mock_llm_waiting, ^mock, :cancel, worker}, 2_000
     monitor = Process.monitor(worker)
     assert :ok = Orchestration.cancel(request)
     assert_receive {:DOWN, ^monitor, :process, ^worker, _}, 2_000
     assert_receive {:mock_llm_closed, ^mock, ^worker}, 2_000
     assert {:error, :cancelled} = Request.await(request)
-    {:ok, next} = Agent.ask(server, "Next", context: context)
+    {:ok, next} = Agent.ask(server, "Next", context: context, stream: true)
     assert {:ok, "Next stream"} = Request.await(next)
     assert_script_done(mock)
   end
@@ -402,7 +406,7 @@ defmodule JidoAI.Examples.SessionTest do
 
     result = %{schema: Zoi.object(%{answer: Zoi.string()}), into: :reply}
     server = streaming_server(jido, %{tools: [], result: result}, schema)
-    {:ok, request} = Agent.ask(server, "Object", context: context)
+    {:ok, request} = Agent.ask(server, "Object", context: context, stream: true)
     assert {:ok, %{answer: "Typed"}} = Request.await(request)
     assert [wire] = MockLLM.report(mock).requests
     assert wire.body["stream"] == true
@@ -420,14 +424,14 @@ defmodule JidoAI.Examples.SessionTest do
       })
 
     server = streaming_server(jido, %{}, schema)
-    {:ok, request} = Agent.ask(server, "Work", context: context)
+    {:ok, request} = Agent.ask(server, "Work", context: context, stream: true)
     assert {:error, :invalid_domain_result} = Request.await(request)
     assert Server.agent(server).state.reply == %{}
     assert_script_done(mock)
   end
 
   test "restored request records reject runtime resources and mismatched IDs" do
-    schema = Orchestration.Record.records_schema()
+    schema = Jido.AI.Request.Record.records_schema()
     assert {:error, _} = Zoi.parse(schema, %{"bad" => %{stream_to: self()}})
 
     record = %{
@@ -439,7 +443,7 @@ defmodule JidoAI.Examples.SessionTest do
       inserted_at: 1,
       completed_at: nil,
       streamed: false,
-      max_requests: 2
+      max_retained_requests: 2
     }
 
     assert {:error, _} = Zoi.parse(schema, %{"bad" => record})
@@ -489,7 +493,7 @@ defmodule JidoAI.Examples.SessionTest do
       :session,
       :on_busy,
       :reject,
-      :max_requests,
+      :max_retained_requests,
       :streaming,
       :steering,
       :memory,
@@ -518,7 +522,7 @@ defmodule JidoAI.Examples.SessionTest do
     assert {:ok, ^definition} = Jido.AI.Authoring.Codec.decode(base, document, registry)
     {mock, context} = mock([%{reply: {:text, "Imported session"}}])
     server = start_agent(jido, Jido.Agent.instantiate!(definition))
-    {:ok, request} = Agent.ask(server, "Imported", context: context)
+    {:ok, request} = Agent.ask(server, "Imported", context: context, stream: true)
     assert {:ok, "Imported session"} = Request.await(request)
     assert_script_done(mock)
   end
@@ -543,7 +547,7 @@ defmodule JidoAI.Examples.SessionTest do
       mock([%{reply: {:tools, [%{id: "held", name: "wait", arguments: %{n: 9}}]}}])
 
     server = start_fixture(jido)
-    {:ok, _request} = Agent.ask(server, "Wait", context: context)
+    {:ok, _request} = Agent.ask(server, "Wait", context: context, stream: true)
     assert_receive {:tool_waiting, worker, 9}, 2_000
     monitor = Process.monitor(worker)
     assert :ok = Server.stop(server)
@@ -603,7 +607,7 @@ defmodule JidoAI.Examples.SessionTest do
   test "non-empty incomplete content fails without changing the result", %{jido: jido} do
     {mock, context} = mock([%{reply: {:stream, [%{content: "Usable partial"}], "incomplete"}}])
     server = streaming_server(jido)
-    {:ok, request} = Agent.ask(server, "Work", context: context)
+    {:ok, request} = Agent.ask(server, "Work", context: context, stream: true)
     assert {:error, {:incomplete_response, :error}} = Request.await(request)
     assert Server.agent(server).state.reply == ""
     assert_script_done(mock)

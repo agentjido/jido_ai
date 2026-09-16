@@ -145,6 +145,9 @@ defmodule Jido.AI.Authoring.FullSpecParityTest do
           max_model_calls 12
           max_tool_calls 16
           timeout 60_000
+          steering true
+          idle_timeout 30_000
+          tool_heartbeat 5_000
           input Control
           model Control
           operation Control, when: [name: :resolve_case, kind: :flow]
@@ -156,16 +159,6 @@ defmodule Jido.AI.Authoring.FullSpecParityTest do
                max_repairs: 1,
                on_validation_error: :repair,
                repair_action: Repair
-
-        requests do
-          mode :session
-          on_busy :reject
-          max_requests 100
-          streaming true
-          steering true
-          idle_timeout 30_000
-          tool_heartbeat 5_000
-        end
 
         memory history: :messages
 
@@ -241,11 +234,7 @@ defmodule Jido.AI.Authoring.FullSpecParityTest do
              %{module: Control, when: %{"kind" => "flow", "name" => "resolve_case"}}
            ]
 
-    assert profile.requests == %{
-             mode: :session,
-             on_busy: :reject,
-             max_requests: 100,
-             streaming: true,
+    assert Map.take(profile.controls, [:steering, :idle_timeout, :tool_heartbeat]) == %{
              steering: true,
              idle_timeout: 30_000,
              tool_heartbeat: 5_000

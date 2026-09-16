@@ -6,7 +6,11 @@ defmodule Jido.AI.Tools.Executor do
   execute_target/5 inside its bounded attempt, then applies Profile controls,
   interception, and effect policy before committing any proposed state.
   """
-  alias Jido.AI.{Effects, Error, Observe, ToolAdapter, Turn}
+  alias Jido.AI.Effects
+  alias Jido.AI.Error
+  alias Jido.AI.Observe
+  alias Jido.AI.ToolAdapter
+  alias Jido.AI.Model.Response
   require Logger
   @default_timeout 30_000
   @type execute_opts :: [
@@ -80,28 +84,28 @@ defmodule Jido.AI.Tools.Executor do
   @doc """
   Executes all requested tools for the turn and returns the updated turn.
   """
-  @spec run_tools(Turn.t(), map(), run_opts()) :: {:ok, Turn.t()} | {:error, term()}
+  @spec run_tools(Response.t(), map(), run_opts()) :: {:ok, Response.t()} | {:error, term()}
   def run_tools(turn, context, opts \\ [])
 
-  def run_tools(%Turn{type: :tool_calls} = turn, context, opts) do
+  def run_tools(%Response{type: :tool_calls} = turn, context, opts) do
     with {:ok, tool_results} <- run_tool_calls(turn.tool_calls, context, opts) do
-      {:ok, Turn.with_tool_results(turn, tool_results)}
+      {:ok, Response.with_tool_results(turn, tool_results)}
     end
   end
 
-  def run_tools(%Turn{tool_calls: tool_calls} = turn, context, opts)
+  def run_tools(%Response{tool_calls: tool_calls} = turn, context, opts)
       when is_list(tool_calls) and tool_calls != [] do
     with {:ok, tool_results} <- run_tool_calls(tool_calls, context, opts) do
-      {:ok, Turn.with_tool_results(turn, tool_results)}
+      {:ok, Response.with_tool_results(turn, tool_results)}
     end
   end
 
-  def run_tools(%Turn{} = turn, _context, _opts), do: {:ok, turn}
+  def run_tools(%Response{} = turn, _context, _opts), do: {:ok, turn}
 
   @doc """
   Executes normalized tool calls and returns normalized tool results.
   """
-  @spec run_tool_calls([term()], map(), run_opts()) :: {:ok, [Turn.tool_result()]}
+  @spec run_tool_calls([term()], map(), run_opts()) :: {:ok, [Response.tool_result()]}
   def run_tool_calls(tool_calls, context, opts \\ []) when is_list(tool_calls) do
     tools = resolve_tools(context, opts)
     timeout = normalize_timeout(Keyword.get(opts, :timeout))
@@ -288,7 +292,7 @@ defmodule Jido.AI.Tools.Executor do
 
   defp run_single_tool(tool_call, context, tools, timeout) do
     %{id: call_id, name: tool_name, arguments: arguments} =
-      Turn.normalize_tool_call(if(is_map(tool_call), do: tool_call, else: %{}))
+      Response.normalize_tool_call(if(is_map(tool_call), do: tool_call, else: %{}))
 
     exec_opts =
       [tools: tools]

@@ -1,6 +1,7 @@
 defmodule JidoAI.Examples.TypedSignalsTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Request, Turn}
+  alias Jido.AI.Request
+  alias Jido.AI.Model.Response
   alias Jido.AI.Signal
   alias JidoAI.Examples.TypedSignals.{Chat, Echo, Hold, Publisher}
   alias ReqLLM.Message.ContentPart
@@ -32,7 +33,7 @@ defmodule JidoAI.Examples.TypedSignalsTest do
   end
 
   defp event(kind, data, opts \\ []) do
-    Jido.AI.Runtime.Event.new(
+    Jido.AI.Observe.Event.new(
       Map.merge(
         %{
           kind: kind,
@@ -253,8 +254,8 @@ defmodule JidoAI.Examples.TypedSignalsTest do
     responses = Enum.filter(projected, &(&1.type == "ai.llm.response"))
 
     assert [
-             %{data: %{result: {:ok, %Turn{type: :tool_calls}, []}}},
-             %{data: %{result: {:ok, %Turn{text: "Done now"}, []}}}
+             %{data: %{result: {:ok, %Response{type: :tool_calls}, []}}},
+             %{data: %{result: {:ok, %Response{text: "Done now"}, []}}}
            ] = responses
 
     tool = Enum.find(projected, &(&1.type == "ai.tool.result"))
@@ -343,7 +344,7 @@ defmodule JidoAI.Examples.TypedSignalsTest do
                duration_ms: 12
              )
 
-    assert {:ok, %Turn{text: "Converted"}, []} = signal.data.result
+    assert {:ok, %Response{text: "Converted"}, []} = signal.data.result
     assert signal.data.usage.total_tokens == 15 and signal.data.duration_ms == 12
     assert Signal.LLMResponse.extract_tool_calls(signal) == []
 
@@ -361,7 +362,7 @@ defmodule JidoAI.Examples.TypedSignalsTest do
     assert_receive {:signal,
                     %{
                       type: "ai.llm.response",
-                      data: %{result: {:ok, %Turn{text: "Converted"}, []}}
+                      data: %{result: {:ok, %Response{text: "Converted"}, []}}
                     }}
 
     publish(publisher, %{typed: embed})
@@ -373,7 +374,7 @@ defmodule JidoAI.Examples.TypedSignalsTest do
 
   test "DSL data Builder and source JSON produce the same projected model and completion Signals",
        %{jido: jido} do
-    {_, options} = Enum.find(Chat.definition().plugins, &(elem(&1, 0) == Jido.AI.Runtime.Plugin))
+    {_, options} = Enum.find(Chat.definition().plugins, &(elem(&1, 0) == Jido.AI.Configuration.Plugin))
     source = Map.from_struct(options[:profiles].assistant)
 
     base = %{
@@ -435,7 +436,7 @@ defmodule JidoAI.Examples.TypedSignalsTest do
                &match?(
                  %{
                    type: "ai.llm.response",
-                   data: %{result: {:ok, %Turn{text: "Same answer"}, []}}
+                   data: %{result: {:ok, %Response{text: "Same answer"}, []}}
                  },
                  &1
                )
@@ -477,9 +478,9 @@ defmodule JidoAI.Examples.TypedSignalsTest do
       })
 
     assert {:ok, [%{data: %{result: {:ok, turn, []}}}, _]} = Signal.from_event(event)
-    assert Turn.images(turn) == [image] and turn.reasoning_details == details
+    assert Response.images(turn) == [image] and turn.reasoning_details == details
     assert turn.message_metadata == %{provider: "kept"}
-    assert Turn.result(turn) == event.data.content_parts
+    assert Response.result(turn) == event.data.content_parts
 
     assert {:ok, [delta]} =
              Signal.from_event(event(:llm_delta, %{chunk_type: :content_part, delta: image}))

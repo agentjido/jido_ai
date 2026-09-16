@@ -1,8 +1,9 @@
 defmodule Jido.AI.Orchestration.Inspection do
   @moduledoc false
-  alias Jido.AI.{Configuration, Profile}
+  alias Jido.AI.Configuration
+  alias Jido.AI.Profile
   alias Jido.AI.Thread.Control
-  alias Jido.AI.Runtime.Event
+  alias Jido.AI.Observe.Event
 
   @limit 2_000
   @terminal [:request_completed, :request_failed, :request_cancelled]
@@ -125,7 +126,7 @@ defmodule Jido.AI.Orchestration.Inspection do
   end
 
   def fit(record, candidate, context) do
-    limit = Jido.AI.Runtime.StateSize.limit(context.jido_ai_agent)
+    limit = Jido.AI.Execution.StateSize.limit(context.jido_ai_agent)
     state = put_in(candidate, [:requests, record.id], record)
 
     if is_integer(limit) and :erlang.external_size(state) > limit,
@@ -173,7 +174,7 @@ defmodule Jido.AI.Orchestration.Inspection do
       end
 
     lane = get_in(snapshot.agent.state, [Control.key(), profile_id]) || %{}
-    conversation = conversation(snapshot.agent.state, profile)
+    context = context(snapshot.agent.state, profile)
 
     details = %{
       phase: phase(request, inspection, live),
@@ -192,7 +193,7 @@ defmodule Jido.AI.Orchestration.Inspection do
       tool_results: Map.get(meta, :tool_results, []),
       current_llm_call_id: inspection[:llm_call_id],
       active_request_id: if(request && request.status == :pending, do: request.id),
-      active_context_ref: if(conversation, do: Map.get(lane, :active_context_ref, "default")),
+      active_context_ref: if(context, do: Map.get(lane, :active_context_ref, "default")),
       pending_context_op: lane[:pending_context_op],
       checkpoint_token: inspection[:checkpoint_token],
       cancel_reason: cancel_reason(request),
@@ -206,8 +207,9 @@ defmodule Jido.AI.Orchestration.Inspection do
 
           {id, %{events: length(trace.events), truncated?: trace.truncated?}}
         end),
+      streaming: if(request, do: Map.get(request, :streaming, false), else: false),
       config: config(profile),
-      conversation: conversation || []
+      context: context || []
     }
 
     result =
@@ -237,15 +239,14 @@ defmodule Jido.AI.Orchestration.Inspection do
       reqllm_tools: Jido.AI.ToolCatalog.definitions(profile.tools),
       max_iterations: profile.controls.max_iterations,
       max_tool_calls: profile.controls.max_tool_calls,
-      request_policy: profile.requests.on_busy,
-      streaming: profile.requests.streaming
+      request_policy: :reject
     })
   end
 
-  defp conversation(_, nil), do: nil
-  defp conversation(_, %{memory: %{history: nil}}), do: nil
+  defp context(_, nil), do: nil
+  defp context(_, %{memory: %{history: nil}}), do: nil
 
-  defp conversation(state, profile) do
+  defp context(state, profile) do
     case Jido.AI.Orchestration.Transcript.read(state, profile) do
       {:ok, entries} ->
         messages = Enum.map(entries, &Map.drop(&1, [:timestamp]))

@@ -1,4 +1,4 @@
-defmodule Jido.AI.Runtime.ResponseTest do
+defmodule Jido.AI.Execution.ResponseTest do
   use ExUnit.Case, async: true
   alias ReqLLM.{Context, Message, Response, ToolCall}
   alias ReqLLM.Message.ContentPart

@@ -8,8 +8,8 @@ Read [agent.ex](agent.ex).
 Then read the matching tests below.
 
 This lesson uses `Jido.AI.Agent` and its built-in request helpers.
-`Agent.ask/3` returns `{:ok, request}`. With streaming enabled,
-`Agent.ask_stream/3` returns `{:ok, %{request: request, events: events}}`.
+`Agent.ask/3` returns `{:ok, request}`. `Agent.ask_stream/3` selects streaming
+for this call and returns `{:ok, %{request: request, events: events}}`.
 No custom request wrappers are needed.
 
 ## Run it
@@ -28,8 +28,12 @@ Shared setup and fault fixtures stay in [test support](../../../test/examples/su
 
 Admission returns a request handle; `Request.await/2` reads its committed outcome. Busy requests are rejected. A later answer preserves intervening domain changes.
 
+The host setting `config :jido_ai, :max_retained_requests, 100` bounds terminal
+request records. The Coordinator captures this limit at startup. It is not a
+Profile setting and does not limit Session/Thread Context.
+
 `store_content true` permits the Agent to retain tool arguments and results for
-later requests. Failed or cancelled requests do not enter completed conversation.
+later requests. Failed or cancelled requests do not enter completed context.
 If required content was not retained, continuation returns an explicit error;
 the runtime does not keep a second hidden copy.
 

@@ -1,12 +1,14 @@
 defmodule Jido.AI.Orchestration.RequestScope do
   @moduledoc false
-  alias Jido.AI.{Output, Profile, ToolCatalog}
+  alias Jido.AI.Output
+  alias Jido.AI.Profile
+  alias Jido.AI.ToolCatalog
   alias Jido.AI.Reasoning.ReAct.ToolSelection
 
   def profile(profile, resources, context) do
     with {:ok, tools} <- tools(profile.tools, resources, context),
          {:ok, result} <- result(profile.result, resources[:output]) do
-      controls = limits(profile.controls, resources[:max_iterations])
+      controls = profile.controls |> limits(resources[:max_iterations]) |> activity_options(resources)
 
       reasoning =
         if resources[:request_transformer],
@@ -18,16 +20,15 @@ defmodule Jido.AI.Orchestration.RequestScope do
         | tools: tools,
           controls: controls,
           result: result,
-          reasoning: reasoning,
-          requests: stream_options(profile.requests, resources)
+          reasoning: reasoning
       })
     end
   end
 
-  def stream_options(requests, resources) do
+  defp activity_options(controls, resources) do
     idle = Map.get(resources, :stream_timeout_ms)
 
-    Enum.reduce([idle_timeout: idle, tool_heartbeat: resources[:tool_heartbeat_ms]], requests, fn
+    Enum.reduce([idle_timeout: idle, tool_heartbeat: resources[:tool_heartbeat_ms]], controls, fn
       {key, n}, acc when is_integer(n) and n >= 0 -> Map.put(acc, key, n)
       _, acc -> acc
     end)

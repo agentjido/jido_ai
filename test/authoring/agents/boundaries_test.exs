@@ -3,7 +3,8 @@ Code.require_file("../support/agents/corpus.exs", __DIR__)
 defmodule JidoAITest.Authoring.Agents.BoundariesTest do
   use ExUnit.Case, async: false
   @moduletag :authoring
-  alias Jido.AI.{Authoring, Profile}
+  alias Jido.AI.Authoring
+  alias Jido.AI.Profile
   alias Jido.Agent.{Builder, Codec}
   alias JidoAITest.Authoring.{Compiler, Agents.Corpus}
 
@@ -67,7 +68,7 @@ defmodule JidoAITest.Authoring.Agents.BoundariesTest do
     spec = Corpus.load!(:simple)
     assert {:error, _} = Authoring.lower(%{spec.attrs | routes: spec.attrs.routes ++ spec.attrs.routes}, spec.profiles)
     assert {:error, _} = Authoring.lower(%{spec.attrs | schema: Zoi.object(%{})}, spec.profiles)
-    assert {:error, _} = Authoring.lower(%{spec.attrs | plugins: [{Jido.AI.Runtime.Plugin, []}]}, spec.profiles)
+    assert {:error, _} = Authoring.lower(%{spec.attrs | plugins: [{Jido.AI.Configuration.Plugin, []}]}, spec.profiles)
     assert {:error, _} = Authoring.lower(Jido.Agent.instantiate!(Corpus.definition(spec, :map)), spec.profiles)
   end
 

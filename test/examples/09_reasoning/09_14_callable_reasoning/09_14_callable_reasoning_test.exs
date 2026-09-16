@@ -49,7 +49,6 @@ defmodule JidoAI.Examples.CallableReasoningTest do
         reasoning: :chain_of_thought,
         instructions: "Use the host facts",
         controls: %{timeout: 5_000},
-        requests: %{mode: :session},
         result: %{into: :answer}
       })
 

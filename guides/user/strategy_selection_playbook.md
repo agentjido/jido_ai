@@ -36,10 +36,6 @@ defmodule MyApp.SmartAgent do
         options(available_strategies: [:cod, :cot, :react, :tot, :got, :trm])
       end
 
-      requests do
-        mode(:session)
-      end
-
       result(nil, into: :answer)
     end
   end

@@ -1,6 +1,7 @@
 defmodule Jido.AI.Agent.InitialState do
   @moduledoc false
-  alias Jido.AI.{Configuration, Profile}
+  alias Jido.AI.Configuration
+  alias Jido.AI.Profile
   alias Jido.AI.Thread.Projection
 
   def import(source, state, opts) do
@@ -26,9 +27,9 @@ defmodule Jido.AI.Agent.InitialState do
     do: Configuration.direct(agent, :prompt, prompt, profile: profile.id)
 
   defp validate_state_size(agent, definition) do
-    case Jido.AI.Runtime.StateSize.limit(definition) do
+    case Jido.AI.Execution.StateSize.limit(definition) do
       nil -> :ok
-      limit -> Jido.AI.Runtime.StateSize.validate(agent.state, limit, %{})
+      limit -> Jido.AI.Execution.StateSize.validate(agent.state, limit, %{})
     end
   end
 

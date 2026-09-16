@@ -4,7 +4,7 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithToolsTest do
 
   alias Jido.AI.Actions.ToolCalling.{CallWithTools, Decide}
   alias Jido.AI.TestSupport.FakeReqLLM
-  alias Jido.AI.Turn
+  alias Jido.AI.Model.Response
 
   defmodule TestCalculator do
     use Jido.Action,
@@ -47,13 +47,13 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithToolsTest do
   defp tool_message_content(messages) when is_list(messages) do
     messages
     |> Enum.find_value(fn
-      %ReqLLM.Message{role: :tool, content: content} -> Turn.extract_from_content(content)
+      %ReqLLM.Message{role: :tool, content: content} -> Response.extract_from_content(content)
       %{role: role, content: content} when role in [:tool, "tool"] -> normalize_message_content(content)
       _ -> nil
     end)
   end
 
-  defp normalize_message_content(content) when is_list(content), do: Turn.extract_from_content(content)
+  defp normalize_message_content(content) when is_list(content), do: Response.extract_from_content(content)
   defp normalize_message_content(content), do: content
 
   describe "schema" do

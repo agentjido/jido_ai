@@ -1,6 +1,8 @@
 defmodule JidoAI.Examples.ToTTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Authoring, Request, Orchestration}
+  alias Jido.AI.Authoring
+  alias Jido.AI.Request
+  alias Jido.AI.Orchestration
   alias Jido.AI.Reasoning.TreeOfThoughts.{Machine, Result}
   alias JidoAI.Examples.ToT
 
@@ -374,6 +376,7 @@ defmodule JidoAI.Examples.ToTTest do
     context =
       Map.merge(context, %{
         agent_state: agent.state,
+        jido_ai_request: %{stream: true},
         jido_ai_agent: agent,
         jido_ai_profiles: %{assistant: profile}
       })
@@ -407,7 +410,7 @@ defmodule JidoAI.Examples.ToTTest do
       assert {:error, _} = ToT.definition(ToT.options(options))
     end
 
-    assert {:error, _} = ToT.definition(%{requests: %{ToT.source().requests | steering: true}})
+    assert {:error, _} = ToT.definition(%{controls: %{ToT.source().controls | steering: true}})
     assert {:error, _} = ToT.definition(%{result: %{ToT.source().result | schema: Zoi.string()}})
     server = start(jido)
 

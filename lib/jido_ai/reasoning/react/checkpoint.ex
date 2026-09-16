@@ -1,9 +1,9 @@
 defmodule Jido.AI.Reasoning.ReAct.Checkpoint do
   @moduledoc false
-  alias Jido.AI.Runtime
+  alias Jido.AI.Execution
   alias Jido.AI.Reasoning.ReAct.{Config, PendingToolCall, State}
 
-  @behaviour Jido.AI.Runtime.Checkpoint
+  @behaviour Jido.AI.Execution.Checkpoint
 
   @impl true
   def verify(%State{checkpoint: nil}, _), do: :ok
@@ -23,8 +23,8 @@ defmodule Jido.AI.Reasoning.ReAct.Checkpoint do
   def validate_state(%State{checkpoint: nil}), do: :ok
 
   def validate_state(%State{checkpoint: data} = state) when is_map(data) do
-    with :ok <- Runtime.Checkpoint.validate_data(data),
-         true <- state.iteration == Runtime.State.iteration(data.runtime, data.phase),
+    with :ok <- Execution.Checkpoint.validate_data(data),
+         true <- state.iteration == Execution.State.iteration(data.runtime, data.phase),
          {:ok, _} <- Jido.AI.Model.Messages.messages(Map.get(data.runtime, :pending_queries, [])),
          true <- Enum.all?(Map.get(data.runtime, :pending_queries, []), &(&1.role == :user)),
          true <-
@@ -63,11 +63,11 @@ defmodule Jido.AI.Reasoning.ReAct.Checkpoint do
     saved = %{
       initial
       | checkpoint: data,
-        context: State.conversation(native.history_delta, config.system_prompt),
+        context: State.context(native.history_delta, config.system_prompt),
         status: status(calls, phase),
         pending_tool_calls: calls,
         active_tools: Map.new(runtime[:active_tools] || [], &{&1.name, &1.target}),
-        iteration: Runtime.State.iteration(data.runtime, data.phase),
+        iteration: Execution.State.iteration(data.runtime, data.phase),
         llm_call_id: native[:llm_call_id],
         llm_response_id: if(native[:response], do: native.response.id),
         usage: native.usage,
@@ -128,8 +128,8 @@ defmodule Jido.AI.Reasoning.ReAct.Checkpoint do
         | checkpoint: data,
           status: status(pending(data.runtime, data.phase), data.phase),
           pending_tool_calls: pending(data.runtime, data.phase),
-          iteration: Runtime.State.iteration(data.runtime, data.phase),
-          context: State.conversation(data.runtime.history_delta, config.system_prompt),
+          iteration: Execution.State.iteration(data.runtime, data.phase),
+          context: State.context(data.runtime.history_delta, config.system_prompt),
           result: nil,
           error: nil,
           output: %{},

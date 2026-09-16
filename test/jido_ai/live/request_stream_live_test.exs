@@ -66,7 +66,6 @@ defmodule Jido.AI.Live.RequestStreamLiveTest do
           action(EchoTool)
         end
 
-        requests(mode: :session, streaming: true)
         memory(history: :messages)
         result(into: :last_result)
       end

@@ -5,7 +5,7 @@
 ## Architecture and contract status
 
 - Architecture category: [Observation and diagnostics](../ARCHITECTURE.md).
-- Owning subsystem: Observe, sanitization, Runtime.Event/Telemetry, typed Signal projections, Request metadata, and Orchestration.Inspection.
+- Owning subsystem: Observe, sanitization, Observe.Event/Telemetry, typed Signal projections, Request metadata, and Orchestration.Inspection.
 - Complete target: Preserve a complete versioned event contract, request/model/tool/delegation lineage, safe default projections, explicit rich-content policy, bounded diagnostics, and compatibility testing.
 - Decision boundary: Decide the common event representation and default rich/thinking-content policy. Observation must not become an execution or durable-event owner.
 - Current implementation, module links, example proof, and exact differences:

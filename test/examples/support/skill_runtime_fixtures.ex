@@ -114,10 +114,6 @@ defmodule JidoAI.Examples.SkillRuntime.FixtureAgent do
         history(:messages)
       end
 
-      requests do
-        mode(:session)
-      end
-
       result(nil, into: :reply)
     end
   end

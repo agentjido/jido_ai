@@ -61,7 +61,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
   end
 
   test "the start Action validates a query and request ID before admission" do
-    assert Jido.AI.Orchestration.Start.name() == "ai_session_start"
+    assert Jido.AI.Orchestration.Start.name() == "ai_request_start"
 
     assert {:ok, %{query: "Add", request_id: "one"}} =
              Zoi.parse(Jido.AI.Orchestration.Start.schema(), %{query: "Add", request_id: "one"})
@@ -86,7 +86,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
   test "query routes bind the CoT profile to the shared session", %{jido: jido} do
     server = start_reasoning(jido, :chain_of_thought)
     signal = Jido.Signal.new!("ai.cot.query", %{query: "Add"}, source: "/test")
-    assert %{id: :assistant, mode: :session} = Jido.AI.Authoring.request_binding(Server.agent(server), signal)
+    assert %{id: :assistant} = Jido.AI.Authoring.request_binding(Server.agent(server), signal)
     assert Jido.AI.Authoring.request_method(Server.agent(server), signal) == :chain_of_thought
     assert {:ok, router} = Jido.Signal.Router.new(Server.agent(server).routes)
     assert {:ok, _} = Jido.Signal.Router.route(router, %{signal | type: Orchestration.cancel_type()})
@@ -182,8 +182,8 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
     mock =
       mock([%{reply: {:stream, [%{content: "Step 1: Add."}, {:wait, :held}, %{content: "\nConclusion: 4"}], "stop"}}])
 
-    server = start_reasoning(jido, :chain_of_thought, streaming: true)
-    assert {:ok, handle} = request(server, mock, :chain_of_thought)
+    server = start_reasoning(jido, :chain_of_thought)
+    assert {:ok, handle} = request(server, mock, :chain_of_thought, "Solve this", stream: true)
     assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
     assert_receive {:jido_ai_request_event, %{kind: :llm_delta} = delta}, 1_000
     assert delta.data.delta == "Step 1: Add." and delta.data.chunk_type == :content
@@ -207,12 +207,9 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
     mock = mock([%{reply: {:stream, [delta, {:wait, :held}], "stop"}}])
 
     server =
-      start_reasoning(jido, :chain_of_thought,
-        streaming: true,
-        observability: %{stream_content: true, store_content: true}
-      )
+      start_reasoning(jido, :chain_of_thought, observability: %{stream_content: true, store_content: true})
 
-    assert {:ok, handle} = request(server, mock, :chain_of_thought)
+    assert {:ok, handle} = request(server, mock, :chain_of_thought, "Solve this", stream: true)
     assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
 
     assert_receive {:jido_ai_request_event, %{kind: :llm_delta, data: %{chunk_type: :content_part, delta: ^image}}},

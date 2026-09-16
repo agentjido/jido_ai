@@ -6,7 +6,7 @@
 
 - Architecture category: [Canonical interaction and AI values](../ARCHITECTURE.md).
 - Owning subsystem: Jido.Session, Jido.Thread, Jido.Thread.Entry, Query, Turn, Output, Usage, Error, and Thread.Projection.
-- Complete target: Use canonical Session/Thread values for conversation data. Preserve multimodal content, correlation, output validation, safe errors, and explicit portable encodings. Broader constructor uniformity and strict provider-neutral content remain decisions.
+- Complete target: Use canonical Session/Thread values for context data. Preserve multimodal content, correlation, output validation, safe errors, and explicit portable encodings. Broader constructor uniformity and strict provider-neutral content remain decisions.
 - Decision boundary: Resolve tagged constructor uniformity, provider-native content acceptance, and the proposed error taxonomy without reintroducing Context or History stores.
 - Current implementation, module links, example proof, and exact differences:
   [alignment](alignment.md). This design is a target, not an API reference.
@@ -16,13 +16,13 @@ Illustrative types are not evidence that a module or function exists. A
 requirement is not removed merely because the current implementation differs.
 Use the alignment matrix to distinguish current behavior from the full target.
 
-## Selected conversation projection policy
+## Selected context projection policy
 
-The [selected commit policy](../07_request_sessions/design.md#selected-conversation-commit-policy)
-distinguishes the canonical evidence log from its completed-conversation view.
-It does not create another conversation store.
+The [selected commit policy](../07_request_sessions/design.md#selected-context-commit-policy)
+distinguishes the canonical evidence log from its completed-context view.
+It does not create another context store.
 
-`VAL-REQ-023`: The default Thread model projection shall include request work only after successful settlement promotes it into the completed conversation.
+`VAL-REQ-023`: The default Thread model projection shall include request work only after successful settlement promotes it into the completed context.
 
 `VAL-REQ-024`: The default Thread model projection shall exclude unresolved tool exchanges without inventing tool results.
 
@@ -41,8 +41,8 @@ They support the [data-focused direction](../00_boundary_invariants/design.md#se
 
 Thread sequence means committed order. Request/run references group execution;
 native tool-call IDs link calls and results. Model rounds can be derived views,
-not another conversation store. ReqLLM.Context remains temporary model input;
-Session/Thread remains the canonical conversation record. Preserve native
+not another context store. ReqLLM.Context remains temporary model input;
+Session/Thread remains the canonical context record. Preserve native
 message payloads and open-tool-call validation.
 
 Exact schemas, duplicate-entry rules, batch conflicts, and receipt validation
@@ -62,19 +62,19 @@ execution data remains unchanged.
 
 ## Scope and owner
 
-- Owner: `Jido.AI.Query`, `Jido.Session` with `Jido.Thread` and `Jido.Thread.Entry`, `Jido.AI.Turn`, `Jido.AI.Output`, `Jido.AI.Usage`, and `Jido.AI.Error`.
-- In scope: Portable query content, conversation entries, model turns, output contracts, usage, result metadata, errors, validation, redaction, and codec rules.
+- Owner: `Jido.AI.Query`, `Jido.Session` with `Jido.Thread` and `Jido.Thread.Entry`, `Jido.AI.Model.Response`, `Jido.AI.Output`, `Jido.AI.Usage`, and `Jido.AI.Error`.
+- In scope: Portable query content, context entries, model turns, output contracts, usage, result metadata, errors, validation, redaction, and codec rules.
 - Out of scope: Provider calls, tool execution, request lifecycle, Agent commit, storage, process ownership, and transport.
 
 ## V2 capability anchor
 
-V2 supplied text and multimodal queries, conversation context, normalized model turns, structured output, usage metadata, and typed errors. V3 retains these capabilities and makes their public representation provider-neutral and portable.
+V2 supplied text and multimodal queries, context context, normalized model turns, structured output, usage metadata, and typed errors. V3 retains these capabilities and makes their public representation provider-neutral and portable.
 
 | V2 capability | V3 target |
 | --- | --- |
 | String or provider content-part query | `Jido.AI.Query` with Jido AI content parts and explicit provider conversion |
-| Conversation context | Portable `Jido.Session` with `Jido.Thread` and `Jido.Thread.Entry` entries in chronological semantic order |
-| Model response maps | Validated `Jido.AI.Turn` with ordered content and tool calls |
+| Context context | Portable `Jido.Session` with `Jido.Thread` and `Jido.Thread.Entry` entries in chronological semantic order |
+| Model response maps | Validated `Jido.AI.Model.Response` with ordered content and tool calls |
 | Structured output options | Validated `Jido.AI.Output` contract with Zoi or JSON Schema input |
 | Provider usage maps | Canonical token and cost fields plus bounded provider metadata |
 | Nested AI exceptions | Stable Jido AI error category, code, message, details, and cause |
@@ -84,8 +84,8 @@ V2 supplied text and multimodal queries, conversation context, normalized model 
 The value layer has six groups:
 
 1. `Jido.AI.Query` is validated text or a nonempty ordered list of Jido AI content parts.
-2. `Jido.Session` owns one `Jido.Thread` of `Jido.Thread.Entry` values. AI roles and provider messages are projections, not a second conversation store.
-3. `Jido.AI.Turn` is one normalized model response. It is either a final answer or an ordered tool-call request.
+2. `Jido.Session` owns one `Jido.Thread` of `Jido.Thread.Entry` values. AI roles and provider messages are projections, not a second context store.
+3. `Jido.AI.Model.Response` is one normalized model response. It is either a final answer or an ordered tool-call request.
 4. `Jido.AI.Output` is a structured-output contract. It contains a schema, validation mode, and bounded repair policy.
 5. `Jido.AI.Usage` is canonical usage data with optional bounded provider extensions.
 6. `Jido.AI.Error` is the common AI failure value.
@@ -123,7 +123,7 @@ The final list and fields require approval. Unknown types are validation errors.
 
 `VAL-REQ-007`: When Jido AI summarizes multimodal content for logs or events, it shall not expose binary content, file bytes, credentials, or hidden thinking text.
 
-### Canonical conversation and turn
+### Canonical context and turn
 
 `VAL-REQ-008`: A context shall preserve semantic message order, roles, tool-call correlation, reasoning details when allowed, and caller references.
 
@@ -173,7 +173,7 @@ Jido.Session.new(opts) :: Jido.Session.t()
 Jido.Session.append(session, entries) :: Jido.Session.t()
 # AI projection belongs to Jido.AI.Thread.Projection, not a second Context value.
 
-Jido.AI.Turn.from_provider(response, adapter_opts) :: {:ok, Turn.t()} | {:error, Jido.AI.Error.t()}
+Jido.AI.Model.Response.from_provider(response, adapter_opts) :: {:ok, Turn.t()} | {:error, Jido.AI.Error.t()}
 Jido.AI.Output.new(attrs) :: {:ok, Output.t() | nil} | {:error, Jido.AI.Error.t()}
 Jido.AI.Output.validate(output, value) :: {:ok, map()} | {:error, Jido.AI.Error.t()}
 Jido.AI.Usage.normalize(provider_usage) :: Jido.AI.Usage.t()
@@ -190,7 +190,7 @@ Compatibility applies to encoded semantic fields, not to debug fields, internal 
 ## Invariants
 
 - `VAL-INV-001`: Public portable values contain no provider client, process, function, task, monitor, or secret.
-- `VAL-INV-002`: Conversation order and tool-call correlation are never changed by normalization.
+- `VAL-INV-002`: Context order and tool-call correlation are never changed by normalization.
 - `VAL-INV-003`: A turn has one response class.
 - `VAL-INV-004`: Structured output repair is bounded.
 - `VAL-INV-005`: Provider types do not cross the stable value boundary.

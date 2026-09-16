@@ -28,12 +28,13 @@ case mode do
     options = [base_url: url, api_key: "local-example-key", max_retries: 0, req_http_options: [retry: false]]
 
     {:ok, agent} =
-      Jido.AgentServer.call(server, signal,
+      Jido.AI.Test.Requests.call_and_await(server, signal,
         context: %{tenant: "FRESH", ai: %{assistant: %{options: options}}},
         timeout: 10_000
       )
 
-    true = agent.state === %{reply: "Inline transported", case_id: "case-17", jido_ai_config: %{}}
+    true =
+      Map.delete(agent.state, :requests) === %{reply: "Inline transported", case_id: "case-17", jido_ai_config: %{}}
 
   "missing_profile" ->
     # Core stores the Profile as a registered value, not embedded executable code.

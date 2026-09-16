@@ -1,6 +1,8 @@
 defmodule JidoAI.Examples.TRMTest do
   use JidoAI.Examples.Case
-  alias Jido.AI.{Authoring, Request, Orchestration}
+  alias Jido.AI.Authoring
+  alias Jido.AI.Request
+  alias Jido.AI.Orchestration
   alias Jido.AI.Reasoning.TRM.{Machine, Reasoning, Supervision}
   alias JidoAI.Examples.TRM
 
@@ -9,13 +11,14 @@ defmodule JidoAI.Examples.TRMTest do
     start_agent(jido, Jido.Agent.instantiate!(definition))
   end
 
-  defp request(server, context, query \\ "Explain the answer"),
+  defp request(server, context, query \\ "Explain the answer", stream? \\ true),
     do:
       Request.create_and_send(server, query,
         signal_type: "ai.trm.query",
         source: "/examples/trm",
         context: context,
-        stream_to: self()
+        stream_to: self(),
+        stream: stream?
       )
 
   defp record(server, handle), do: Server.agent(server).state.requests[handle.id]
@@ -223,13 +226,12 @@ defmodule JidoAI.Examples.TRMTest do
     server =
       start(jido, %{
         instructions: "Use the supplied facts",
-        requests: %{mode: :session, streaming: false},
         models: %{
           answer: %{model: MockLLM.model(), generation: [temperature: 0.4, max_tokens: 75]}
         }
       })
 
-    assert {:ok, handle} = request(server, context)
+    assert {:ok, handle} = request(server, context, "Explain the answer", false)
     assert {:ok, "Unreviewed improvement"} = Request.await(handle)
 
     systems = [
@@ -265,7 +267,7 @@ defmodule JidoAI.Examples.TRMTest do
 
     for change <- [
           %{tools: [%{name: "work", target: JidoAI.Examples.ToT.Work}]},
-          %{requests: %{mode: :session, steering: true}},
+          %{controls: %{steering: true}},
           %{result: %{schema: Zoi.string(), into: :reply}}
         ] do
       assert {:error, _} = TRM.definition(change)
@@ -576,12 +578,12 @@ defmodule JidoAI.Examples.TRMTest do
              Jido.Exec.run(flow, %{query: "Explain the answer"}, direct_context)
 
     assert meta.reasoning.trm.supervision_step == 1
-    server = start(jido, %{requests: %{mode: :turn}})
+    server = start(jido)
 
     signal =
       Jido.Signal.new!("ai.trm.query", %{query: "Explain the answer"}, source: "/examples/trm")
 
-    assert {:ok, agent} = Server.call(server, signal, context: context, timeout: 5_000)
+    assert {:ok, agent} = Jido.AI.Test.Requests.call_and_await(server, signal, context: context, timeout: 5_000)
     assert agent.state.reply == "Unreviewed improvement"
     assert_script_done(mock)
   end
