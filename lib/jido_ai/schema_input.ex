@@ -1,5 +1,5 @@
 defmodule Jido.AI.SchemaInput do
-  @moduledoc "Normalizes known model keys and atom labels through a Zoi schema."
+  @moduledoc false
 
   @doc "Normalizes tool arguments, including complete numeric strings for numeric schema fields."
   def normalize_tool(schema, value) do

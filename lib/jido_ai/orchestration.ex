@@ -4,8 +4,8 @@ defmodule Jido.AI.Orchestration do
 
   `Jido.Session` is the portable interaction value. This module manages active
   work through core Agent and Plugin APIs; it does not define a Session value.
-  `Jido.AI.Orchestration.Coordinator` keeps worker lifetime and ordered commits
-  together. `Jido.AI.Execution` executes each prepared request.
+  The Coordinator keeps worker lifetime and ordered commits together.
+  `Jido.AI.Execution` executes each prepared request.
 
   Agent topology and child process ownership belong to core Jido. Future
   delegation must link requests without treating a peer as a supervised child

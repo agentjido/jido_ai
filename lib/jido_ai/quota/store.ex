@@ -19,26 +19,33 @@ defmodule Jido.AI.Quota.Store do
           total_tokens: non_neg_integer()
         }
 
+  @doc "Starts an empty quota store. Pass `name: nil` for an unnamed instance."
   def start_link(opts \\ []) do
     name = Keyword.get(opts, :name, __MODULE__)
     GenServer.start_link(__MODULE__, opts, if(is_nil(name), do: [], else: [name: name]))
   end
 
+  @doc "Checks that the store is ready to accept quota calls."
   def ensure_table!(store \\ __MODULE__), do: GenServer.call(store, :ready)
 
+  @doc "Returns the current usage counters for a scope."
   def get(scope, store \\ __MODULE__) when is_binary(scope),
     do: GenServer.call(store, {:get, scope})
 
+  @doc "Resets a scope and starts a fresh accounting window."
   def reset(scope, store \\ __MODULE__) when is_binary(scope),
     do: GenServer.call(store, {:reset, scope})
 
+  @doc "Returns the scope's quota status for the given limits and window."
   def status(scope, limits, window_ms, store \\ __MODULE__)
       when is_binary(scope) and is_map(limits),
       do: GenServer.call(store, {:status, scope, limits, window_ms})
 
+  @doc "Lists call records retained in the scope's current window."
   def ledger(scope, store \\ __MODULE__) when is_binary(scope),
     do: GenServer.call(store, {:ledger, scope})
 
+  @doc "Adds a token report with a generated call ID."
   def add_usage(scope, tokens, window_ms, store \\ __MODULE__)
       when is_binary(scope) and is_integer(tokens) and tokens >= 0 do
     record_usage(scope, Jido.Signal.ID.generate!(), tokens, window_ms, store)

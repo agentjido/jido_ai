@@ -1,5 +1,5 @@
 defmodule Jido.AI.Thread.Control do
-  @moduledoc "Portable context lanes, deferred operations, and their Agent-owned sessions."
+  @moduledoc false
   alias Jido.AI.Configuration
   alias Jido.AI.Profile
   alias Jido.AI.Thread.Projection

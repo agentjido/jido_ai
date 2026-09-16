@@ -13,8 +13,12 @@ defmodule Jido.AI.Actions.Quota.Reset do
 
   alias Jido.AI.Quota.Store
 
+  @doc "Returns the Action category."
   def category, do: "ai"
+
+  @doc "Returns tags that classify this Action."
   def tags, do: ["quota", "usage", "budget"]
+  @doc "Returns the Action metadata version."
   def vsn, do: "1.0.0"
   @impl Jido.Action
   def on_before_validate_params(params), do: Jido.AI.ActionInput.before_validate(schema(), params)

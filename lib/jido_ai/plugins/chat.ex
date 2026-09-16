@@ -33,18 +33,28 @@ defmodule Jido.AI.Plugins.Chat do
     available_tools: []
   }
 
+  @doc "Returns the Plugin name."
   def name, do: "chat"
+  @doc "Returns a short description of the Plugin."
   def description, do: "Provides conversational AI with built-in tool calling"
+  @doc "Returns the Plugin category."
   def category, do: "ai"
+  @doc "Returns tags that classify the Plugin."
   def tags, do: ["chat", "context", "tool-calling", "llm"]
+  @doc "Returns the Plugin metadata version."
   def vsn, do: "2.0.0"
+  @doc "Returns the Agent state key owned by the Plugin."
   def state_key, do: :chat
+  @doc "Returns the Actions exposed by the Plugin."
   def actions, do: Enum.map(@routes, &elem(&1, 1))
+  @doc "Returns Signal types handled by the Plugin."
   def signal_patterns, do: Enum.map(@routes, &elem(&1, 0))
 
+  @doc "Returns routes installed for the Plugin's Signals."
   def signal_routes(_config),
     do: Enum.map(signal_patterns(), &{&1, Jido.AI.Actions.Chat.RunCapability})
 
+  @doc "Returns the schema for the Plugin's state."
   def schema, do: state_schema(@defaults) |> Zoi.default(@defaults)
 
   @doc false

@@ -8,6 +8,8 @@ defmodule Jido.AI.Reasoning.ChainOfThought do
 
   alias Jido.AI.Reasoning.Linear
 
+  @type step :: %{number: pos_integer(), content: String.t()}
+
   @doc "Returns the method value accepted by the shared AI profile."
   def method, do: :chain_of_thought
 
@@ -38,6 +40,6 @@ defmodule Jido.AI.Reasoning.ChainOfThought do
   @doc """
   Extracts structured steps and conclusion from CoT output text.
   """
-  @spec extract_steps_and_conclusion(term()) :: {[Linear.step()], String.t() | nil}
+  @spec extract_steps_and_conclusion(term()) :: {[step()], String.t() | nil}
   defdelegate extract_steps_and_conclusion(text), to: Linear
 end

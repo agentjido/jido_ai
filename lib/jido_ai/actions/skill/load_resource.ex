@@ -31,8 +31,12 @@ defmodule Jido.AI.Actions.Skill.LoadResource do
       })
       |> Zoi.refine({__MODULE__, :validate_resource_selector, []})
 
+  @doc "Returns the Action category."
   def category, do: "ai"
+
+  @doc "Returns tags that classify this Action."
   def tags, do: ["skills", "resources", "lazy-loading"]
+  @doc "Returns the Action metadata version."
   def vsn, do: "1.0.0"
 
   @impl Jido.Action

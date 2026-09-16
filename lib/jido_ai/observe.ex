@@ -17,7 +17,7 @@ defmodule Jido.AI.Observe do
   require Logger
 
   defmodule Span do
-    @moduledoc false
+    @moduledoc "Context returned by `Jido.AI.Observe.start_span/3` for a live telemetry span."
 
     @enforce_keys [:event_prefix, :start_time, :metadata]
     defstruct [:event_prefix, :start_time, :metadata]

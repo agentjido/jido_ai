@@ -32,12 +32,19 @@ defmodule Jido.AI.Plugins.ModelRouting do
 
   use Jido.Plugin, agent: Jido.AI.Plugins.ModelRouting.Agent
 
+  @doc "Returns the Plugin name."
   def name, do: "model_routing"
+  @doc "Returns a short description of the Plugin."
   def description, do: "Routes model selection by signal intent"
+  @doc "Returns the Plugin category."
   def category, do: "ai"
+  @doc "Returns tags that classify the Plugin."
   def tags, do: ["models", "routing", "policy"]
+  @doc "Returns the Plugin metadata version."
   def vsn, do: "1.0.0"
+  @doc "Returns the Agent state key owned by the Plugin."
   def state_key, do: :model_routing
+  @doc "Returns the Actions exposed by the Plugin."
   def actions, do: []
 
   @default_routes %{
@@ -61,6 +68,7 @@ defmodule Jido.AI.Plugins.ModelRouting do
     {:model_routing, state_schema(routes)}
   end
 
+  @doc "Returns the schema for the Plugin's state."
   def schema, do: state_schema(@default_routes)
 
   defp state_schema(routes),

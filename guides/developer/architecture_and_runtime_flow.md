@@ -21,7 +21,7 @@ the Agent commit runs through Actions and Flows.
 - `Jido.AI.Models` resolves optional application model aliases.
 - `Jido.AI.Profile`, `Jido.AI.DSL`, and `Jido.AI.Authoring` define inert AI configuration.
 - `Jido.AI.Orchestration` owns live request admission, work, events, and completion.
-- `Jido.AI.Reasoning` selects and runs one reasoning method.
+- The reasoning layer prepares the selected method for the shared execution Flow.
 - `Jido.AI.Actions.*` owns model, tool, planning, retrieval, and quota operations.
 - `Jido.AI.Signal.*` owns typed public event data.
 

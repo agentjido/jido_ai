@@ -30,6 +30,7 @@ defmodule Jido.AI.Signal.Usage do
   end
 
   def extension_policy, do: %{}
+  @doc "Returns this Signal's definition metadata as a map."
   def to_json, do: Jido.AI.Signal.Definition.metadata(__MODULE__)
   def __signal_metadata__, do: to_json()
 end

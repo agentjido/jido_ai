@@ -17,12 +17,19 @@ defmodule Jido.AI.Plugins.Policy do
   alias Jido.AI.Signal.Helpers, as: SignalHelpers
   alias Jido.Signal, as: BaseSignal
 
+  @doc "Returns the Plugin name."
   def name, do: "policy"
+  @doc "Returns a short description of the Plugin."
   def description, do: "Enforces policy checks and normalizes runtime signal envelopes"
+  @doc "Returns the Plugin category."
   def category, do: "ai"
+  @doc "Returns tags that classify the Plugin."
   def tags, do: ["policy", "guardrails", "safety"]
+  @doc "Returns the Plugin metadata version."
   def vsn, do: "1.0.0"
+  @doc "Returns the Agent state key owned by the Plugin."
   def state_key, do: :policy
+  @doc "Returns the Actions exposed by the Plugin."
   def actions, do: []
   @defaults %{mode: :enforce, max_delta_chars: 4000, block_on_validation_error: true}
 
@@ -43,6 +50,7 @@ defmodule Jido.AI.Plugins.Policy do
     end
   end
 
+  @doc "Returns the schema for the Plugin's state."
   def schema, do: state_schema(@defaults)
 
   defp state_schema(defaults) do

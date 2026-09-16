@@ -1,8 +1,9 @@
 defmodule Jido.AI.Reasoning.Linear do
-  @moduledoc "Shared CoT and CoD prompt and result rules. Core Flow owns execution."
+  @moduledoc false
   @type step :: %{number: pos_integer(), content: String.t()}
 
   def linear?(method), do: method in [:chain_of_thought, :chain_of_draft]
+  @doc "Returns the display label for a linear reasoning method."
   defdelegate label(method), to: Jido.AI.Reasoning
 
   def instructions(method, value)

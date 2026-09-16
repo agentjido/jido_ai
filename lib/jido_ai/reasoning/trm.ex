@@ -3,6 +3,7 @@ defmodule Jido.AI.Reasoning.TRM do
   alias Jido.AI.Reasoning.Linear
   alias Jido.AI.Reasoning.TRM.{Machine, Reasoning, Supervision}
 
+  @doc "Returns the method ID stored with TRM requests."
   def method, do: :trm
 
   defdelegate generate_call_id(), to: Machine
@@ -20,18 +21,23 @@ defmodule Jido.AI.Reasoning.TRM do
   def get_answer_history(%Jido.Agent{} = agent, request_id \\ nil),
     do: machine(agent, request_id).answer_history
 
+  @doc "Reads the most recent answer retained for the selected request."
   def get_current_answer(%Jido.Agent{} = agent, request_id \\ nil),
     do: machine(agent, request_id).current_answer
 
+  @doc "Reads the retained confidence score for the current answer."
   def get_confidence(%Jido.Agent{} = agent, request_id \\ nil),
     do: machine(agent, request_id).latent_state.confidence_score
 
+  @doc "Reads the retained supervision step."
   def get_supervision_step(%Jido.Agent{} = agent, request_id \\ nil),
     do: machine(agent, request_id).supervision_step
 
+  @doc "Reads the best answer retained across the request's steps."
   def get_best_answer(%Jido.Agent{} = agent, request_id \\ nil),
     do: machine(agent, request_id).best_answer
 
+  @doc "Reads the retained score for the best answer."
   def get_best_score(%Jido.Agent{} = agent, request_id \\ nil),
     do: machine(agent, request_id).best_score
 

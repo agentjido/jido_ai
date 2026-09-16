@@ -44,8 +44,12 @@ defmodule Jido.AI.Actions.LLM.Complete do
         timeout: Zoi.integer(description: "Request timeout in milliseconds") |> Zoi.optional()
       })
 
+  @doc "Returns the Action category."
   def category, do: "ai"
+
+  @doc "Returns tags that classify this Action."
   def tags, do: ["llm", "completion", "generation"]
+  @doc "Returns the Action metadata version."
   def vsn, do: "1.0.0"
 
   @impl Jido.Action

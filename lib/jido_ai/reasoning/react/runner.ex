@@ -1,12 +1,5 @@
 defmodule Jido.AI.Reasoning.ReAct.Runner do
-  @moduledoc """
-  A lazy standalone stream backed by a private v3 Agent and its Orchestration.
-
-  Enumeration owns the Agent lifetime. The shared Agent/Flow runtime executes
-  all model and tool work. Terminal tokens contain AI data, never Exec values.
-  Model and tool checkpoints resume through the shared Flow with fresh runtime
-  resources.
-  """
+  @moduledoc false
   alias Jido.AI.Request
   alias Jido.AI.Orchestration
   alias Jido.AI.Reasoning.ReAct.{Authoring, Checkpoint, Config, State, Token}

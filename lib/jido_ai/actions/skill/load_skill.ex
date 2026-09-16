@@ -50,8 +50,12 @@ defmodule Jido.AI.Actions.Skill.LoadSkill do
           |> Zoi.optional()
       })
 
+  @doc "Returns the Action category."
   def category, do: "ai"
+
+  @doc "Returns tags that classify this Action."
   def tags, do: ["skills", "lazy-loading"]
+  @doc "Returns the Action metadata version."
   def vsn, do: "1.0.0"
 
   @impl Jido.Action

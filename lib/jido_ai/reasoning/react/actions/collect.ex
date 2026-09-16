@@ -46,8 +46,12 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Collect do
   alias Jido.AI.Reasoning.ReAct
   alias Jido.AI.Reasoning.ReAct.Actions.Helpers
 
+  @doc "Returns the Action category."
   def category, do: "ai"
+
+  @doc "Returns tags that classify this Action."
   def tags, do: ["react", "runtime", "collect"]
+  @doc "Returns the Action metadata version."
   def vsn, do: "1.0.0"
 
   @impl Jido.Action

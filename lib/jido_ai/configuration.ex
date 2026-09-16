@@ -1,5 +1,5 @@
 defmodule Jido.AI.Configuration do
-  @moduledoc "Portable profile overrides. Active requests keep their admission snapshot."
+  @moduledoc false
   alias Jido.AI.Profile
   alias Jido.AI.ToolCatalog
   alias Jido.AI.Configuration.Change

@@ -50,8 +50,12 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Start do
   alias Jido.AI.Reasoning.ReAct.Actions.Helpers
   alias Jido.AI.Validation
 
+  @doc "Returns the Action category."
   def category, do: "ai"
+
+  @doc "Returns tags that classify this Action."
   def tags, do: ["react", "runtime", "streaming"]
+  @doc "Returns the Action metadata version."
   def vsn, do: "1.0.0"
 
   @impl Jido.Action

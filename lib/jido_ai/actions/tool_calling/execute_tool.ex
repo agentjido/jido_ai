@@ -43,8 +43,12 @@ defmodule Jido.AI.Actions.ToolCalling.ExecuteTool do
           |> Zoi.optional()
       })
 
+  @doc "Returns the Action category."
   def category, do: "ai"
+
+  @doc "Returns tags that classify this Action."
   def tags, do: ["tool-calling", "execution", "tools"]
+  @doc "Returns the Action metadata version."
   def vsn, do: "1.0.0"
 
   @impl Jido.Action

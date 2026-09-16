@@ -48,6 +48,6 @@ runtime is separate from Agent authoring.
 - Add public configuration to `Jido.AI.Profile` and the Spark DSL.
 - Keep profile construction free of model and tool calls.
 - Put shared request execution in `Jido.AI.Orchestration` and `Jido.AI.Execution`.
-- Put method-specific preparation, parsing, and advancement in
-  `Jido.AI.Reasoning`.
+- Put method-specific preparation, parsing, and advancement in the reasoning
+  modules.
 - Do not add a method-specific Agent macro or Strategy wrapper.

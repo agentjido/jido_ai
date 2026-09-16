@@ -3,6 +3,7 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts do
   alias Jido.AI.Reasoning.Linear
   alias Jido.AI.Reasoning.TreeOfThoughts.Machine
 
+  @doc "Returns the method ID stored with tree-of-thoughts requests."
   def method, do: :tree_of_thoughts
 
   defdelegate generate_call_id(), to: Machine
@@ -22,9 +23,11 @@ defmodule Jido.AI.Reasoning.TreeOfThoughts do
   def get_nodes(%Jido.Agent{} = agent, request_id \\ nil),
     do: Map.get(search(agent, request_id), :nodes, %{})
 
+  @doc "Reads the retained solution path for the selected request."
   def get_solution_path(%Jido.Agent{} = agent, request_id \\ nil),
     do: Map.get(search(agent, request_id), :solution_path, [])
 
+  @doc "Finds the best retained leaf node, if one exists."
   def get_best_node(%Jido.Agent{} = agent, request_id \\ nil),
     do: Machine.find_best_leaf(Machine.from_map(%{nodes: get_nodes(agent, request_id)}))
 

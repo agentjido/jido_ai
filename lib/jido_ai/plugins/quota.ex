@@ -40,17 +40,26 @@ defmodule Jido.AI.Plugins.Quota do
   ]
   @routes %{"quota.status" => GetStatus, "quota.reset" => Reset}
 
+  @doc "Returns the Plugin name."
   def name, do: "quota"
+  @doc "Returns a short description of the Plugin."
   def description, do: "Tracks usage and enforces rolling request/token budgets"
+  @doc "Returns the Plugin category."
   def category, do: "ai"
+  @doc "Returns tags that classify the Plugin."
   def tags, do: ["quota", "budget", "usage"]
+  @doc "Returns the Plugin metadata version."
   def vsn, do: "1.0.0"
+  @doc "Returns the Agent state key owned by the Plugin."
   def state_key, do: :quota
+  @doc "Returns the Actions exposed by the Plugin."
   def actions, do: [GetStatus, Reset]
 
+  @doc "Returns routes installed for the Plugin's Signals."
   def signal_routes(_),
     do: Enum.map(["quota.status", "quota.reset"], &{&1, Jido.AI.Actions.Quota.RunCapability})
 
+  @doc "Returns the schema for the Plugin's state."
   def schema, do: state_schema(@defaults)
 
   @doc false

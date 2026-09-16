@@ -32,6 +32,7 @@ defmodule Jido.AI.Test.MockLLM do
   @type entry :: %{required(:reply) => response(), optional(:match) => map()}
 
   @spec start_link(keyword()) :: GenServer.on_start()
+  @doc "Starts a local HTTP model server with the supplied response script."
   def start_link(opts), do: GenServer.start_link(__MODULE__, opts)
 
   @doc "Selects the tested chat wire format explicitly, independent of catalog defaults."
@@ -41,6 +42,7 @@ defmodule Jido.AI.Test.MockLLM do
   end
 
   @spec options(GenServer.server(), :chat | :embedding | :anthropic) :: keyword()
+  @doc "Returns ReqLLM options that point the selected protocol at this server."
   def options(server, operation \\ :chat) do
     url = GenServer.call(server, :url)
     url = if operation == :anthropic, do: String.trim_trailing(url, "/v1"), else: url
@@ -57,9 +59,11 @@ defmodule Jido.AI.Test.MockLLM do
   end
 
   @spec report(GenServer.server()) :: map()
+  @doc "Returns captured requests and script outcomes for assertions."
   def report(server), do: GenServer.call(server, :report)
 
   @spec release(GenServer.server(), term()) :: :ok | {:error, :not_waiting}
+  @doc "Releases a named response barrier when the server is waiting on it."
   def release(server, tag), do: GenServer.call(server, {:release, tag})
 
   @impl true

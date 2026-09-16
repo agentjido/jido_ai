@@ -3,6 +3,7 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts do
   alias Jido.AI.Reasoning.Linear
   alias Jido.AI.Reasoning.GraphOfThoughts.Machine
 
+  @doc "Returns the method ID stored with graph-of-thoughts requests."
   def method, do: :graph_of_thoughts
 
   defdelegate generate_call_id(), to: Machine
@@ -24,12 +25,15 @@ defmodule Jido.AI.Reasoning.GraphOfThoughts do
   def get_nodes(%Jido.Agent{} = agent, request_id \\ nil),
     do: agent |> machine(request_id) |> Machine.get_nodes()
 
+  @doc "Reads retained graph edges for the selected request."
   def get_edges(%Jido.Agent{} = agent, request_id \\ nil),
     do: machine(agent, request_id).edges
 
+  @doc "Finds the best retained leaf node, if one exists."
   def get_best_node(%Jido.Agent{} = agent, request_id \\ nil),
     do: agent |> machine(request_id) |> Machine.find_best_leaf()
 
+  @doc "Traces the retained path to the best leaf node."
   def get_solution_path(%Jido.Agent{} = agent, request_id \\ nil) do
     machine = machine(agent, request_id)
 

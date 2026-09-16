@@ -25,7 +25,7 @@ provider metadata. Entry identity, sequence, and time belong to Thread.Entry.
 `:ai_context_operation` payloads also have a version. They contain operation ID,
 lane, type, reason, optional base sequence, metadata, and an encoded canonical
 Thread snapshot for replacement. A switch has no replacement snapshot.
-`Jido.AI.Thread.Operation` validates and encodes this internal contract.
+The internal thread operation encoder validates this contract.
 
 Application entry kinds are retained by Thread but excluded from model input.
 Malformed AI payloads return errors rather than becoming provider messages.
@@ -58,7 +58,7 @@ format is version 4 and encodes that Thread. Execution checkpoint data retains
 the pending runtime position and resumes through the shared Agent/Flow runtime.
 Do not use a context import to resume tool execution.
 
-`Jido.AI.Execution.State` defines the temporary execution map used by all reasoning
+The internal execution state defines the temporary map used by all reasoning
 methods. The model, decision, and tool-batch Actions validate its schema.
 Working provider messages and uncommitted entry deltas are temporary inputs to
 the commit path, not another retained context store. Live options remain

@@ -24,8 +24,12 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Cancel do
   alias Jido.AI.Reasoning.ReAct.Actions.Helpers
   alias Jido.AI.Reasoning.ReAct
 
+  @doc "Returns the Action category."
   def category, do: "ai"
+
+  @doc "Returns tags that classify this Action."
   def tags, do: ["react", "runtime", "cancel"]
+  @doc "Returns the Action metadata version."
   def vsn, do: "1.0.0"
 
   @impl Jido.Action

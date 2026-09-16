@@ -25,14 +25,22 @@ defmodule Jido.AI.Plugins.Retrieval do
     "retrieval.clear" => ClearMemory
   }
 
+  @doc "Returns the Plugin name."
   def name, do: "retrieval"
+  @doc "Returns a short description of the Plugin."
   def description, do: "In-process retrieval memory with optional prompt enrichment"
+  @doc "Returns the Plugin category."
   def category, do: "ai"
+  @doc "Returns tags that classify the Plugin."
   def tags, do: ["retrieval", "memory", "rag"]
+  @doc "Returns the Plugin metadata version."
   def vsn, do: "1.0.0"
+  @doc "Returns the Agent state key owned by the Plugin."
   def state_key, do: :retrieval
+  @doc "Returns the Actions exposed by the Plugin."
   def actions, do: [UpsertMemory, RecallMemory, ClearMemory]
 
+  @doc "Returns routes installed for the Plugin's Signals."
   def signal_routes(_),
     do:
       Enum.map(
@@ -40,6 +48,7 @@ defmodule Jido.AI.Plugins.Retrieval do
         &{&1, Jido.AI.Actions.Retrieval.RunCapability}
       )
 
+  @doc "Returns the schema for the Plugin's state."
   def schema, do: state_schema(@defaults)
 
   @doc false

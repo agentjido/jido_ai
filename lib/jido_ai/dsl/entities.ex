@@ -1,6 +1,7 @@
 defmodule Jido.AI.DSL.Entities do
   @moduledoc false
   defmodule Profile do
+    @moduledoc false
     defstruct [
       :id,
       :instructions,
@@ -22,14 +23,17 @@ defmodule Jido.AI.DSL.Entities do
   end
 
   defmodule Models do
+    @moduledoc false
     defstruct [:router, :fallback, :__spark_metadata__, entries: [], routers: []]
   end
 
   defmodule Router do
+    @moduledoc false
     defstruct [:module, :fallback, :__spark_metadata__]
   end
 
   defmodule Model do
+    @moduledoc false
     defstruct [
       :first,
       :second,
@@ -46,6 +50,7 @@ defmodule Jido.AI.DSL.Entities do
   end
 
   defmodule Reasoning do
+    @moduledoc false
     defstruct [
       :method,
       :model,
@@ -58,6 +63,7 @@ defmodule Jido.AI.DSL.Entities do
   end
 
   defmodule Controls do
+    @moduledoc false
     defstruct [
       :__spark_metadata__,
       max_iterations: 8,
@@ -75,14 +81,17 @@ defmodule Jido.AI.DSL.Entities do
   end
 
   defmodule Check do
+    @moduledoc false
     defstruct [:module, :when, :__spark_metadata__]
   end
 
   defmodule Tools do
+    @moduledoc false
     defstruct [:__spark_metadata__, entries: []]
   end
 
   defmodule Skills do
+    @moduledoc false
     defstruct [
       :paths,
       :trust,
@@ -99,14 +108,17 @@ defmodule Jido.AI.DSL.Entities do
   end
 
   defmodule Skill do
+    @moduledoc false
     defstruct [:module, :__spark_metadata__]
   end
 
   defmodule SkillPath do
+    @moduledoc false
     defstruct [:path, :__spark_metadata__]
   end
 
   defmodule Tool do
+    @moduledoc false
     defstruct [
       :target,
       :as,
@@ -123,6 +135,7 @@ defmodule Jido.AI.DSL.Entities do
   end
 
   defmodule AshResource do
+    @moduledoc false
     defstruct [
       :resource,
       :description,
@@ -134,6 +147,7 @@ defmodule Jido.AI.DSL.Entities do
   end
 
   defmodule MCPTools do
+    @moduledoc false
     defstruct [
       :endpoint,
       :prefix,
@@ -154,6 +168,7 @@ defmodule Jido.AI.DSL.Entities do
   end
 
   defmodule Browser do
+    @moduledoc false
     defstruct [
       :name,
       :description,
@@ -166,6 +181,7 @@ defmodule Jido.AI.DSL.Entities do
   end
 
   defmodule Catalog do
+    @moduledoc false
     defstruct [
       :catalog,
       :description,
@@ -181,14 +197,17 @@ defmodule Jido.AI.DSL.Entities do
   end
 
   defmodule ToolSkill do
+    @moduledoc false
     defstruct [:skill, :__spark_metadata__]
   end
 
   defmodule ToolSkillPath do
+    @moduledoc false
     defstruct [:path, :__spark_metadata__]
   end
 
   defmodule Subagent do
+    @moduledoc false
     defstruct [
       :agent,
       :as,
@@ -203,6 +222,7 @@ defmodule Jido.AI.DSL.Entities do
   end
 
   defmodule Handoff do
+    @moduledoc false
     defstruct [
       :agent,
       :as,
@@ -216,6 +236,7 @@ defmodule Jido.AI.DSL.Entities do
   end
 
   defmodule Result do
+    @moduledoc false
     defstruct [
       :schema,
       :into,
@@ -228,10 +249,12 @@ defmodule Jido.AI.DSL.Entities do
   end
 
   defmodule Memory do
+    @moduledoc false
     defstruct [:history, :__spark_metadata__]
   end
 
   defmodule Observability do
+    @moduledoc false
     defstruct [
       :emit_telemetry,
       :emit_signals,

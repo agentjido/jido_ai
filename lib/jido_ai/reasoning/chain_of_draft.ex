@@ -41,6 +41,6 @@ defmodule Jido.AI.Reasoning.ChainOfDraft do
   Extracts structured steps and conclusion from CoD output text.
   """
   @spec extract_steps_and_conclusion(term()) ::
-          {[Jido.AI.Reasoning.Linear.step()], String.t() | nil}
+          {[ChainOfThought.step()], String.t() | nil}
   defdelegate extract_steps_and_conclusion(text), to: ChainOfThought
 end
