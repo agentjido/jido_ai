@@ -7,6 +7,8 @@ defmodule JidoAI.Examples.StandaloneAuthoring do
       model: "openai:gpt-4o-mini",
       system_prompt: "Use multiply for arithmetic.",
       tools: %{"multiply" => JidoAI.Examples.Support.Multiply},
+      stream_content: true,
+      store_content: true,
       max_iterations: 2,
       max_tokens: 256,
       tool_timeout_ms: 1_000,

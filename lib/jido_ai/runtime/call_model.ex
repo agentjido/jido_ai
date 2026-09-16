@@ -150,24 +150,19 @@ defmodule Jido.AI.Runtime.CallModel do
   end
 
   defp terminal_response(response, request, state, context) do
-    visible = response |> Jido.AI.Turn.from_response() |> Jido.AI.Turn.result()
-
     result =
       cond do
-        ReqLLM.Response.tool_calls(response) != [] or visible != "" or
-            not is_nil(response.object) ->
-          :ok
+        response.finish_reason not in [nil, :stop, :tool_calls, "stop", "tool_calls", "completed"] ->
+          {:error, {:incomplete_response, response.finish_reason}}
 
-        request.schema == nil and response.finish_reason in [:tool_calls, "tool_calls"] ->
+        request.schema == nil and response.finish_reason in [:tool_calls, "tool_calls"] and
+            ReqLLM.Response.tool_calls(response) == [] ->
           # A provider can discard an incomplete or unnamed tool call during
           # assembly. An empty declared tool round is not a final answer.
           {:error, {:incomplete_response, :tool_calls}}
 
-        response.finish_reason in [nil, :stop, :tool_calls, "stop", "tool_calls", "completed"] ->
-          :ok
-
         true ->
-          {:error, {:incomplete_response, response.finish_reason}}
+          :ok
       end
 
     case result do

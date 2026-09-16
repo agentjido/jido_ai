@@ -75,6 +75,10 @@ defmodule JidoAI.Examples.ToolLimits.FixtureAgent do
     ai :assistant do
       tool_interceptor(JidoAI.Examples.ToolLimits.Rewrite)
 
+      observability do
+        store_content true
+      end
+
       models do
         model(:answer, JidoAI.Examples.MockLLM.model())
       end

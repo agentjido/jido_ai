@@ -56,6 +56,8 @@ defmodule JidoAI.Examples.StandaloneAuthoringTest do
 
     config =
       config(mock,
+        stream_content: true,
+        store_content: true,
         token_secret: "standalone-secret-a",
         llm_opts: [
           api_key: "transport-secret-a",
@@ -327,6 +329,8 @@ defmodule JidoAI.Examples.StandaloneAuthoringTest do
           model: MockLLM.model(),
           tools: [],
           streaming: false,
+          stream_content: true,
+          store_content: true,
           token_secret: "standalone-fixture-secret",
           llm_opts: MockLLM.options(mock)
         ],

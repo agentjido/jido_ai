@@ -48,10 +48,10 @@ defmodule JidoAI.Examples.SteeringTest do
       ])
 
     server = start(jido)
-    {:ok, request, events} = API.ask_stream(server, "Review the code", context: context)
+    {:ok, %{request: request, events: events}} = API.ask_stream(server, "Review the code", context: context)
     id = request.id
     assert_receive {:tool_waiting, tool, 7}, 2_000
-    assert texts(server) == ["Review the code"]
+    assert texts(server) == []
 
     assert {:ok, %{status: :queued, request_id: ^id, input_id: first_id}} =
              Orchestration.steer(request, "  Focus on auth.  ",
@@ -62,7 +62,7 @@ defmodule JidoAI.Examples.SteeringTest do
     assert {:ok, %{status: :queued, input_id: second_id}} =
              Orchestration.inject(server, "Include expired tokens.", source: "/peer")
 
-    assert texts(server) == ["Review the code"]
+    assert texts(server) == []
     send(tool, :release)
     assert {:ok, "Updated answer"} = Request.await(request)
     events = Enum.to_list(events)
@@ -104,7 +104,7 @@ defmodule JidoAI.Examples.SteeringTest do
       ])
 
     server = start(jido)
-    {:ok, request, events} = API.ask_stream(server, "Report", context: context)
+    {:ok, %{request: request, events: events}} = API.ask_stream(server, "Report", context: context)
     assert_receive {:mock_llm_waiting, ^mock, :first, _}, 2_000
     assert {:ok, %{status: :queued}} = Orchestration.steer(request, "Add the missing case.")
     MockLLM.release(mock, :first)
@@ -129,7 +129,7 @@ defmodule JidoAI.Examples.SteeringTest do
     {:ok, request} = API.ask(server, "Report", context: context)
     assert_receive {:control_waiting, control}, 2_000
     assert {:error, %{status: :rejected, reason: :closed}} = Orchestration.steer(request, "Too late")
-    assert texts(server) == ["Report"]
+    assert texts(server) == []
     send(control, :release)
     assert {:ok, "Sealed"} = Request.await(request)
     assert_script_done(mock)
@@ -147,7 +147,7 @@ defmodule JidoAI.Examples.SteeringTest do
              Orchestration.steer(server, "Wrong request", expected_request_id: "stale")
 
     assert {:error, %{reason: :empty_content}} = Orchestration.steer(request, " \n ")
-    assert texts(server) == ["Report"]
+    assert texts(server) == []
     MockLLM.release(mock, :held)
     assert {:ok, "Done"} = Request.await(request)
     assert_script_done(mock)
@@ -193,10 +193,10 @@ defmodule JidoAI.Examples.SteeringTest do
     monitor = Process.monitor(queue)
     assert :ok = Orchestration.cancel(request)
     assert_receive {:DOWN, ^monitor, :process, ^queue, _}, 2_000
-    assert texts(server) == ["Report"]
+    assert texts(server) == []
     {:ok, next} = API.ask(server, "Next", context: context)
     assert {:ok, "Next"} = Request.await(next)
-    assert texts(server) == ["Report", "Next"]
+    assert texts(server) == ["Next"]
     assert_script_done(mock)
   end
 
@@ -214,7 +214,7 @@ defmodule JidoAI.Examples.SteeringTest do
         }
       })
 
-    {:ok, request, events} = API.ask_stream(server, "Report", context: context)
+    {:ok, %{request: request, events: events}} = API.ask_stream(server, "Report", context: context)
     assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
     assert {:ok, _} = Orchestration.steer(request, "Consumed without a second call")
     MockLLM.release(mock, :held)
@@ -223,7 +223,7 @@ defmodule JidoAI.Examples.SteeringTest do
     assert Enum.count(events, &(&1.kind == :llm_started)) == 1
     assert Enum.any?(events, &(&1.kind == :input_injected))
     assert List.last(events).kind == :request_failed
-    assert texts(server) == ["Report", "Consumed without a second call"]
+    assert texts(server) == []
     assert_script_done(mock)
   end
 

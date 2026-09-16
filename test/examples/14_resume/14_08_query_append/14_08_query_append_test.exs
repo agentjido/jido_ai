@@ -110,7 +110,14 @@ defmodule JidoAI.Examples.QueryAppendTest do
     assert_receive {:standalone_add, _, 2, 3}
     assert {:ok, saved, _} = Token.decode_state(after_tools.data.token, config)
     assert saved.iteration == 2
-    assert Enum.any?(conversation_entries(saved.context), &(Jido.AI.Query.summarize(&1.content) == "Explain later"))
+
+    evidence =
+      Enum.map(saved.context.entries, fn entry ->
+        {:ok, message} = Jido.AI.Thread.Projection.message(entry)
+        message
+      end)
+
+    assert Enum.any?(evidence, &(Jido.AI.Query.summarize(&1.content) == "Explain later"))
     assert {:ok, next} = ReAct.continue(after_tools.data.token, config, opts(jido))
     result = ReAct.collect_stream(next.events)
     assert result.result == "Explained"
@@ -188,7 +195,7 @@ defmodule JidoAI.Examples.QueryAppendTest do
   test "initial State append keeps rich content and sends both user entries once", %{jido: jido} do
     {mock, _} = mock([%{reply: {:text, "File read"}}])
     model = put_in(MockLLM.model().extra.wire.protocol, "openai_responses")
-    config = config(mock, model: model)
+    config = config(mock, model: model, stream_content: true, store_content: true)
 
     query = [
       ReqLLM.Message.ContentPart.text("Read this"),
@@ -295,6 +302,8 @@ defmodule JidoAI.Examples.QueryAppendTest do
             model: MockLLM.model(),
             tools: [],
             streaming: false,
+            stream_content: true,
+            store_content: true,
             token_secret: "query-append-fixture",
             llm_opts: MockLLM.options(mock)
           ],

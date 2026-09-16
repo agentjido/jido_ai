@@ -18,6 +18,10 @@ defmodule JidoAI.Examples.SkillAuthoring.Public do
         model(:answer)
       end
 
+      observability do
+        store_content true
+      end
+
       skills do
         skill(JidoAI.Examples.SkillAuthoring.Review)
       end

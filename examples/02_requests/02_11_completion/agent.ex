@@ -15,6 +15,10 @@ defmodule JidoAI.Examples.Completion.Agent do
         effect_policy(%{allow: [JidoAI.Examples.Completion.Receipt]})
       end
 
+      observability do
+        store_content true
+      end
+
       tools do
         action JidoAI.Examples.Completion.RecordReceipt, as: :record_receipt
       end

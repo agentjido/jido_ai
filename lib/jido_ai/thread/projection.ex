@@ -20,10 +20,20 @@ defmodule Jido.AI.Thread.Projection do
   end
 
   @doc false
-  def append_entries(value, entries, extra_refs \\ %{}) do
+  def append_entries(value, entries, extra_refs \\ %{}, policy \\ nil) do
     Enum.reduce(entries, value, fn entry, value ->
       {:ok, messages} = Jido.AI.Model.Messages.messages([entry])
       refs = Map.merge(Map.get(entry, :refs) || %{}, extra_refs)
+
+      {messages, omitted?} =
+        if is_map(policy) do
+          pairs = Enum.map(messages, &Jido.AI.Observe.Content.message(&1, policy))
+          {Enum.map(pairs, &elem(&1, 0)), Enum.any?(pairs, &elem(&1, 1))}
+        else
+          {messages, false}
+        end
+
+      refs = if omitted?, do: Map.put(refs, :content_omitted, true), else: refs
       {:ok, [canonical]} = entries(messages, refs)
 
       canonical =
@@ -89,20 +99,26 @@ defmodule Jido.AI.Thread.Projection do
 
   def messages(%Thread{} = thread) do
     with {:ok, thread} <- select(thread) do
-      safely(fn ->
-        thread
-        |> Thread.to_list()
-        |> Enum.filter(&(&1.kind in [:ai_message, "ai_message"]))
-        |> Enum.map(&decode(&1.payload))
-      end)
+      evidence_messages(thread)
     end
   end
 
-  @doc "Selects the active conversation from the append-only log, or a named lane."
-  def select(value, ref \\ nil)
-  def select(%Session{thread: thread}, ref), do: select(thread, ref)
+  @doc false
+  def evidence_messages(%Session{thread: thread}), do: evidence_messages(thread)
 
-  def select(%Thread{} = thread, ref) do
+  def evidence_messages(%Thread{} = thread) do
+    safely(fn ->
+      thread.entries
+      |> Enum.filter(&(&1.kind in [:ai_message, "ai_message"]))
+      |> Enum.map(&decode(&1.payload))
+    end)
+  end
+
+  @doc "Selects the active conversation from the append-only log, or a named lane."
+  def select(value, ref \\ nil, opts \\ [])
+  def select(%Session{thread: thread}, ref, opts), do: select(thread, ref, opts)
+
+  def select(%Thread{} = thread, ref, opts) do
     with {:ok, _} <- Thread.validate(thread) do
       safely(fn ->
         operations = Enum.filter(thread.entries, &(&1.kind in [:ai_context_operation, "ai_context_operation"]))
@@ -114,6 +130,15 @@ defmodule Jido.AI.Thread.Projection do
               entry -> operation!(entry).context_ref
             end
 
+        settled =
+          thread.entries
+          |> Enum.filter(
+            &(&1.kind in [:ai_request_settled, "ai_request_settled"] and
+                field(&1.payload, :status) in [:completed, "completed"])
+          )
+          |> Enum.map(&{field(&1.refs, :request_id), field(&1.refs, :run_id)})
+          |> MapSet.new()
+
         {entries, metadata} =
           Enum.reduce(thread.entries, {[], thread.metadata}, fn entry, acc ->
             lane = field(entry.refs, :context_ref) || field(entry.payload, :context_ref) || "default"
@@ -122,7 +147,8 @@ defmodule Jido.AI.Thread.Projection do
               {true, kind} when kind in [:ai_context_operation, "ai_context_operation"] ->
                 case operation!(entry).operation do
                   %{type: :replace, result_context: snapshot} ->
-                    entries = Enum.filter(snapshot.entries, &(&1.kind in [:ai_message, "ai_message"]))
+                    {:ok, selected} = select(snapshot, nil, opts)
+                    entries = selected.entries
                     {Enum.reverse(entries), snapshot.metadata}
 
                   %{type: :switch} ->
@@ -131,19 +157,61 @@ defmodule Jido.AI.Thread.Projection do
 
               {true, kind} when kind in [:ai_message, "ai_message"] ->
                 {entries, metadata} = acc
-                {[entry | entries], metadata}
+
+                if field(entry.refs, :conversation) in [:pending, "pending"] and
+                     not MapSet.member?(settled, {field(entry.refs, :request_id), field(entry.refs, :run_id)}) do
+                  acc
+                else
+                  entry = %{entry | refs: Map.drop(entry.refs, [:conversation, "conversation"])}
+                  {[entry | entries], metadata}
+                end
 
               _ ->
                 acc
             end
           end)
 
-        Thread.new(id: thread.id, metadata: metadata) |> Thread.append(Enum.reverse(entries))
+        entries = Enum.reverse(entries)
+        entries = if Keyword.get(opts, :complete_exchanges, true), do: complete_exchanges(entries), else: entries
+        Thread.new(id: thread.id, metadata: metadata) |> Thread.append(entries)
       end)
     end
   end
 
-  def select(_, _), do: {:error, :invalid_conversation}
+  def select(_, _, _), do: {:error, :invalid_conversation}
+
+  # Keep an exchange only when all call IDs have matching results. Never invent
+  # a tool response for an incomplete exchange in the retained evidence.
+  defp complete_exchanges(entries) do
+    {completed, _pending, _open} =
+      Enum.reduce(entries, {[], [], %{}}, fn entry, {completed, pending, open} ->
+        message = decode(entry.payload)
+
+        cond do
+          message.role == :assistant and (message.tool_calls || []) != [] ->
+            calls = Enum.map(message.tool_calls, &ReqLLM.ToolCall.to_map/1)
+            ids = Enum.map(calls, & &1.id)
+
+            if length(ids) == length(Enum.uniq(ids)),
+              do: {completed, [entry], Map.new(calls, &{&1.id, &1.name})},
+              else: {completed, [], %{}}
+
+          message.role == :tool and Map.has_key?(open, message.tool_call_id) and
+              message.name in [nil, open[message.tool_call_id]] ->
+            open = Map.delete(open, message.tool_call_id)
+            pending = [entry | pending]
+            if map_size(open) == 0, do: {pending ++ completed, [], open}, else: {completed, pending, open}
+
+          message.role == :tool ->
+            {completed, pending, open}
+
+          true ->
+            {[entry | completed], [], %{}}
+        end
+      end)
+
+    Enum.reverse(completed)
+  end
 
   defp operation!(entry) do
     {:ok, operation} = Jido.AI.Thread.Operation.decode(entry)

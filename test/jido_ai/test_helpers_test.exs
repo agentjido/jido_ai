@@ -61,6 +61,7 @@ defmodule Jido.AI.TestHelpersTest do
         ReAct.run("summarize README", %{
           model: :fast,
           tools: [ReadTool],
+          stream_content: true,
           token_secret: "test-secret-that-is-long-enough-123"
         })
 

@@ -268,6 +268,8 @@ defmodule JidoAI.Examples.StandaloneActionsTest do
         llm_opts: options,
         tools: [Add],
         token_secret: "standalone-actions",
+        stream_content: true,
+        store_content: true,
         limits: %{timeout: 5_000, max_tool_calls: 32}
       },
       extra

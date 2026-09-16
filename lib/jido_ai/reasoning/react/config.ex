@@ -1,6 +1,14 @@
 defmodule Jido.AI.Reasoning.ReAct.Config do
   @moduledoc """
   Configuration for the standalone ReAct adapter over the shared Agent runtime.
+
+  `stream_content`, `store_content`, `stream_reasoning`, `store_reasoning`, and
+  `diagnostics_content` use the same default-off permissions as `Jido.AI.Profile`.
+  Checkpoint tokens are signed, not encrypted. Automatic token export is
+  withheld when its native state cannot satisfy both storage and stream content
+  permissions. The live request can still complete. A missing token is reported
+  as `:checkpoint_content_not_retained` by `Token.decode/2`; it is not a resumable
+  redacted checkpoint.
   """
 
   alias Jido.AI.Output
@@ -33,7 +41,12 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
   @observability_schema Zoi.object(%{
                           emit_signals?: Zoi.boolean() |> Zoi.default(true),
                           emit_telemetry?: Zoi.boolean() |> Zoi.default(true),
-                          redact_tool_args?: Zoi.boolean() |> Zoi.default(true)
+                          redact_tool_args?: Zoi.boolean() |> Zoi.default(true),
+                          stream_content: Zoi.boolean() |> Zoi.default(false),
+                          store_content: Zoi.boolean() |> Zoi.default(false),
+                          stream_reasoning: Zoi.boolean() |> Zoi.default(false),
+                          store_reasoning: Zoi.boolean() |> Zoi.default(false),
+                          diagnostics_content: Zoi.boolean() |> Zoi.default(false)
                         })
 
   @trace_schema Zoi.object(%{
@@ -121,7 +134,12 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
     observability = %{
       emit_signals?: normalize_boolean(get_opt(opts_map, :emit_signals?, true), true),
       emit_telemetry?: normalize_boolean(get_opt(opts_map, :emit_telemetry?, true), true),
-      redact_tool_args?: normalize_boolean(get_opt(opts_map, :redact_tool_args?, true), true)
+      redact_tool_args?: normalize_boolean(get_opt(opts_map, :redact_tool_args?, true), true),
+      stream_content: normalize_boolean(get_opt(opts_map, :stream_content, false), false),
+      store_content: normalize_boolean(get_opt(opts_map, :store_content, false), false),
+      stream_reasoning: normalize_boolean(get_opt(opts_map, :stream_reasoning, false), false),
+      store_reasoning: normalize_boolean(get_opt(opts_map, :store_reasoning, false), false),
+      diagnostics_content: normalize_boolean(get_opt(opts_map, :diagnostics_content, false), false)
     }
 
     trace = %{

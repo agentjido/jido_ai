@@ -20,6 +20,10 @@ for {module, streaming?} <- [
           request_transformer(JidoAI.Examples.ModelOptions.Switch)
         end
 
+        observability do
+          store_content true
+        end
+
         tools do
           action(JidoAI.Examples.ModelOptions.SwitchProbe, as: :switch_probe)
         end

@@ -103,7 +103,7 @@ defmodule JidoAI.Examples.InitialStateTest do
       [_, wire] = MockLLM.report(mock).requests
       assert Enum.count(wire.body["messages"], &(&1["role"] == "tool")) == 1
       assert Enum.all?(MockLLM.report(mock).requests, &(&1.body["stream"] == unquote(streaming?)))
-      assert Jido.Thread.entry_count(Server.agent(restored).state.messages.thread) == 8
+      assert Jido.Thread.entry_count(Server.agent(restored).state.messages.thread) == 10
       refute_received {:example_action_started, "import_echo"}
       assert_script_done(mock)
     end

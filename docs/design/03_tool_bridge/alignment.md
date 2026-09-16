@@ -5,10 +5,10 @@
 ## Status
 
 - Reviewed: 2026-09-15.
-- Code: `v3-spike`, HEAD `c4e57c8d34d09ffc922c37fb41cccc2e1491123e`, plus the uncommitted Orchestration and canonical-value file reorganization.
+- Code for the example audit: `v3-spike`, HEAD `7bb011e98349af8bf580e7b93afa60990972beae`, plus uncommitted example, test, formatter, and documentation changes. No `lib/` or dependency changes.
 - Prerequisite alignments used: [01 Canonical interaction and AI values](../01_ai_values/alignment.md).
 - Alignment state: Draft. Current ownership is mapped; target decisions and full acceptance proof remain.
-- Verification: source and test inspection in this documentation task. The preceding code-change run reported 2,809 passing tests and one existing exclusion, including authoring and MockLLM examples. That run is not proof of every target requirement; no Elixir tests were rerun here.
+- Verification: the example-driven review below adds fresh MockLLM runs to the earlier source review. Earlier statements that no tests ran refer to that prior review, not this follow-up.
 
 ## Current architecture
 
@@ -48,7 +48,7 @@ proof is still incomplete. Inert declaration support is not runtime support.
 Preserve static and advanced tool sources, provider-native tools, interception, approvals, bounded results, and replay-aware effect semantics. Separate tool policy from batch scheduling and Agent commit.
 
 Preserve current public behavior unless an approved decision includes a
-migration. No runtime or example changes are authorized by this review.
+migration. The initial audit changed examples and tests. The implementation follow-up also changes the runtime; see the current evidence below.
 Advanced requirements remain in the target even when they are not implemented.
 
 ## Gap register
@@ -86,37 +86,51 @@ Define executable source contracts separately from declaration support; settle r
 This is a dependency and outcome plan, not a formal implementation task list.
 Implementation planning follows approval of the seam intent and requirements.
 
+## Example-driven review
+
+This follow-up uses the later selected decisions when older wording conflicts.
+The [audit summary](../README.md#example-driven-design-audit) separates target
+failures, related scenarios, API gates, and non-example release checks. All
+requirements in this seam appear in the acceptance matrix below.
+
+The new target checks extend existing example lessons. They use public APIs and
+the local MockLLM transport. No target failure is skipped or changed to accept
+the current behavior. Tests blocked by an unspecified public contract are
+marked as a gate; no invented API is presented as an executable example.
+
 ## Acceptance matrix
 
-This table is rebuilt from the actual requirement IDs in `design.md`; earlier
-tables sometimes mapped evidence to the wrong requirement. “Implemented;
-evidence incomplete” means the subsystem has relevant code, not that every
-clause is met. No row below grants approval or claims a fresh test run.
+Requirement IDs and target wording come from `design.md`. The evidence column
+now names related example scenarios. **Related evidence is partial**, not full
+requirement acceptance. A passing target check proves only its stated case.
+`To be implemented — reproduced` identifies a failed target assertion, not a
+failure inferred from a missing example. Source/release checks and public API
+gates are separate. No row grants document approval.
 
 | Requirement | Evidence state | Current evidence | Required acceptance outcome |
 | --- | --- | --- | --- |
-| `TLS-REQ-001` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When a local Action is added to a tool catalog, the bridge shall validate the Action and derive a provider-safe name, description, and input schema. |
-| `TLS-REQ-002` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: A tool catalog shall reject duplicate public names, invalid Action targets, invalid schemas, and unsupported provider-native entries. |
-| `TLS-REQ-003` | Proposed; not implemented | No complete implementation claimed | Verify the target behavior: A dynamic tool source shall return a validated list of catalog entries and shall identify its trust level and runtime resource needs. |
-| `TLS-REQ-004` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When an allowlist is present, the effective catalog shall exclude every tool that is not explicitly allowed. |
-| `TLS-REQ-005` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Tool context in a profile or request record shall be portable data; runtime resources shall be resolved through trusted binding. |
-| `TLS-REQ-006` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When a model proposes a tool call, the bridge shall normalize and validate its identifier, name, and arguments before execution. |
-| `TLS-REQ-007` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When the call name is absent from the effective catalog, the bridge shall return a model-visible tool error without executing a fallback Action. |
-| `TLS-REQ-008` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Before a local Action runs, the bridge shall apply effect policy and the configured interceptor. |
-| `TLS-REQ-009` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: A local tool attempt shall execute as one `Jido.Instruction` through the public `Jido.Exec` contract. |
-| `TLS-REQ-010` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: The bridge shall honor Action input validation, context validation, timeout, and result rules without an alternate execution path. |
-| `TLS-REQ-011` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: A provider-native tool shall never be executed as a local Action unless a separate approved adapter declares that mapping. |
-| `TLS-REQ-012` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Each tool attempt shall return one normalized `ToolResult` correlated with the original call identifier. |
-| `TLS-REQ-013` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: The model-visible result shall be bounded, transport-safe content and shall not contain a process, exception stack, credential, or arbitrary inspected runtime term. |
-| `TLS-REQ-014` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When a tool proposes Agent state changes or Directives, the bridge shall return portable effect proposals and shall not commit them. |
-| `TLS-REQ-015` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When the Action returns extra direct-caller data that Flow does not preserve, the bridge shall not depend on that data for Flow behavior. |
-| `TLS-REQ-016` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: An after-call interceptor shall receive the normalized result and shall not replace the call identifier or bypass effect validation. |
-| `TLS-REQ-017` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: The tool bridge shall not create workers or schedule a tool batch. |
-| `TLS-REQ-018` | Decision required | See current contract and gap register | Verify the target behavior: When multiple tool calls are selected, seam 04 shall execute them with `Jido.Flow.Map` and an explicit `max_concurrency` value. |
-| `TLS-REQ-019` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Tool results returned to the model shall preserve the model's original tool-call order, independent of completion order. |
-| `TLS-REQ-020` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: The bridge shall classify retry eligibility from the tool contract, error category, attempt count, and AI policy. |
-| `TLS-REQ-021` | Decision required | See current contract and gap register | Verify the target behavior: A retry decision shall be portable data and shall include `retry?`, `attempt`, `max_attempts`, and an optional delay request. |
-| `TLS-REQ-022` | Decision required | See current contract and gap register | Verify the target behavior: The bridge shall not sleep, spawn a retry worker, or persist retry execution state. |
+| `TLS-REQ-001` | Implemented; evidence incomplete | Related example evidence (partial): [an Action and Flow supply real, correlated results to the next model call](../../../test/examples/01_authoring/01_02_tool_flow/01_02_tool_flow_test.exs); [unknown and conflicting fields and duplicate catalogs fail before work](../../../test/examples/01_authoring/01_07_ai_runtime/01_07_ai_runtime_test.exs). | Verify the target behavior: When a local Action is added to a tool catalog, the bridge shall validate the Action and derive a provider-safe name, description, and input schema. |
+| `TLS-REQ-002` | Implemented; evidence incomplete | Related example evidence (partial): [an Action and Flow supply real, correlated results to the next model call](../../../test/examples/01_authoring/01_02_tool_flow/01_02_tool_flow_test.exs); [unknown and conflicting fields and duplicate catalogs fail before work](../../../test/examples/01_authoring/01_07_ai_runtime/01_07_ai_runtime_test.exs). | Verify the target behavior: A tool catalog shall reject duplicate public names, invalid Action targets, invalid schemas, and unsupported provider-native entries. |
+| `TLS-REQ-003` | Proposed; not implemented | Deferred by user: dynamic tool sources. Keep the target; do not add an adapter that hides the missing public source contract. | Verify the target behavior: A dynamic tool source shall return a validated list of catalog entries and shall identify its trust level and runtime resource needs. |
+| `TLS-REQ-004` | Implemented; evidence incomplete | Related example evidence (partial): [tool filters restrict both advertised and executable tools and list schemas keep defaults](../../../test/examples/16_capabilities/16_02_chat/16_02_chat_test.exs). | Verify the target behavior: When an allowlist is present, the effective catalog shall exclude every tool that is not explicitly allowed. |
+| `TLS-REQ-005` | Implemented; evidence incomplete | Related example evidence (partial): [resume binds a new local transport without saving credentials or callback handles](../../../test/examples/14_resume/14_03_checkpoint_resume/14_03_checkpoint_resume_test.exs). | Verify the target behavior: Tool context in a profile or request record shall be portable data; runtime resources shall be resolved through trusted binding. |
+| `TLS-REQ-006` | Implemented; evidence incomplete | Related example evidence (partial): [#{tool} converts complete numeric strings and nested values before execution](../../../test/examples/03_tools/03_03_numeric_inputs/03_03_numeric_inputs_test.exs). | Verify the target behavior: When a model proposes a tool call, the bridge shall normalize and validate its identifier, name, and arguments before execution. |
+| `TLS-REQ-007` | Implemented; evidence incomplete | Target scenario repaired: [TLS-REQ-007 target check](../../../test/examples/01_authoring/01_02_tool_flow/design_requirements_test.exs). Unknown tools return correlated model errors. A mixed known/unknown batch is rejected before any tool runs. Full-clause and provider-matrix proof remains separate. | Verify the target behavior: When the call name is absent from the effective catalog, the bridge shall return a model-visible tool error without executing a fallback Action. |
+| `TLS-REQ-008` | Implemented; evidence incomplete | Related example evidence (partial): [batch preflight rejects #{inspect(invalid)} before any tool starts](../../../test/examples/01_authoring/01_02_tool_flow/01_02_tool_flow_test.exs). | Verify the target behavior: Before a local Action runs, the bridge shall apply effect policy and the configured interceptor. |
+| `TLS-REQ-009` | Implemented; evidence incomplete | Related example evidence (partial): [an Action and Flow supply real, correlated results to the next model call](../../../test/examples/01_authoring/01_02_tool_flow/01_02_tool_flow_test.exs). | Verify the target behavior: A local tool attempt shall execute as one `Jido.Instruction` through the public `Jido.Exec` contract. |
+| `TLS-REQ-010` | Implemented; evidence incomplete | Related example evidence (partial): [an Action and Flow supply real, correlated results to the next model call](../../../test/examples/01_authoring/01_02_tool_flow/01_02_tool_flow_test.exs). | Verify the target behavior: The bridge shall honor Action input validation, context validation, timeout, and result rules without an alternate execution path. |
+| `TLS-REQ-011` | Implemented; evidence incomplete | Public-contract gate: ToolCatalog.new/1 currently accepts only local Action/Flow targets. Select the supported provider-native entry and transport contract before testing that no local Action runs. | Verify the target behavior: A provider-native tool shall never be executed as a local Action unless a separate approved adapter declares that mapping. |
+| `TLS-REQ-012` | Implemented; evidence incomplete | Related example evidence (partial): [an Action and Flow supply real, correlated results to the next model call](../../../test/examples/01_authoring/01_02_tool_flow/01_02_tool_flow_test.exs). | Verify the target behavior: Each tool attempt shall return one normalized `ToolResult` correlated with the original call identifier. |
+| `TLS-REQ-013` | Implemented; evidence incomplete | Related example evidence (partial): [a held model has live identity and a separate committed request](../../../test/examples/02_requests/02_22_request_inspection/02_22_request_inspection_test.exs). | Verify the target behavior: The model-visible result shall be bounded, transport-safe content and shall not contain a process, exception stack, credential, or arbitrary inspected runtime term. |
+| `TLS-REQ-014` | Implemented; evidence incomplete | Related example evidence (partial): [DSL helper executes Action and Flow tools and preserves Plugin ownership](../../../test/examples/01_authoring/01_07_ai_runtime/01_07_ai_runtime_test.exs). | Verify the target behavior: When a tool proposes Agent state changes or Directives, the bridge shall return portable effect proposals and shall not commit them. |
+| `TLS-REQ-015` | Implemented; evidence incomplete | Target scenario passed: [TLS-REQ-015 target check](../../../test/examples/01_authoring/01_02_tool_flow/design_requirements_test.exs). Core Exec returns direct-caller receipt extras; the same Action inside a Flow tool supplies only its declared price result to the next real model request. | Verify the target behavior: When the Action returns extra direct-caller data that Flow does not preserve, the bridge shall not depend on that data for Flow behavior. |
+| `TLS-REQ-016` | Implemented; evidence incomplete | Related example evidence (partial): [a real activation survives compaction and reaches the next HTTP request](../../../test/examples/18_skills/18_01_skill_runtime/18_01_skill_runtime_test.exs). | Verify the target behavior: An after-call interceptor shall receive the normalized result and shall not replace the call identifier or bypass effect validation. |
+| `TLS-REQ-017` | Implemented; evidence incomplete | Source check: tool bridge owns one invocation; execution Flow owns workers and batches. | Verify the target behavior: The tool bridge shall not create workers or schedule a tool batch. |
+| `TLS-REQ-018` | Decision required | Related example evidence (partial): [tools run in each phase with callbacks and ordered results after reverse completion](../../../test/examples/09_reasoning/09_04_tot/09_04_tot_test.exs). | Verify the target behavior: When multiple tool calls are selected, seam 04 shall execute them with `Jido.Flow.Map` and an explicit `max_concurrency` value. |
+| `TLS-REQ-019` | Implemented; evidence incomplete | Related example evidence (partial): [tools run in each phase with callbacks and ordered results after reverse completion](../../../test/examples/09_reasoning/09_04_tot/09_04_tot_test.exs). | Verify the target behavior: Tool results returned to the model shall preserve the model's original tool-call order, independent of completion order. |
+| `TLS-REQ-020` | Implemented; evidence incomplete | Related example evidence (partial): [repair calls share one request and token budget](../../../test/examples/13_policy/13_01_quota/13_01_quota_test.exs). | Verify the target behavior: The bridge shall classify retry eligibility from the tool contract, error category, attempt count, and AI policy. |
+| `TLS-REQ-021` | Decision required | To be implemented: expose the portable retry decision at the agreed boundary, then assert eligibility, attempt budget, and optional delay. | Verify the target behavior: A retry decision shall be portable data and shall include `retry?`, `attempt`, `max_attempts`, and an optional delay request. |
+| `TLS-REQ-022` | Decision required | Source check and implementation gap: ToolAttempt currently sleeps for retry delay. Prove delay moves to the approved execution owner. | Verify the target behavior: The bridge shall not sleep, spawn a retry worker, or persist retry execution state. |
 
 ## Migration and compatibility
 
@@ -127,6 +141,13 @@ approved. A documentation rename does not authorize a wire-format change.
 Retained advanced proposals need their own migration and operational review.
 Source paths above replace old `operations/`, `shared/`, live Session, and
 `examples/v3/` references as evidence; historical paths are not current owners.
+
+## Runtime repair follow-up
+
+The current worktree adds runtime repairs over the audit baseline. Dependencies
+are unchanged. The [audit summary](../README.md#example-driven-design-audit)
+separates the repaired scenarios from the remaining advanced API gates. A passing
+scenario is not complete requirement conformance.
 
 ## Completion criteria
 

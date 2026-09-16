@@ -87,6 +87,95 @@ actual target requirement IDs, not the old migration assessments. Evidence
 states distinguish relevant implementation from complete requirement proof.
 The review does not certify every target requirement or grant design approval.
 
+## Example-driven design audit
+
+The acceptance matrices now index all **408 numbered requirements** and name
+matching example tests or an explicit evidence gap. This is not complete design
+conformance. In particular, a related example does not prove every clause of a
+requirement.
+
+| Evidence classification | Requirements | Meaning |
+| --- | ---: | --- |
+| Related example evidence | 310 | A matching scenario exists; full requirement assertion coverage remains incomplete |
+| Passing target scenario | 22 | Target scenarios pass after the runtime repair; documented proof limits still apply |
+| To be implemented — reproduced | 0 | The 12 reproduced assertions from the initial audit are repaired |
+| Public-contract gate | 32 | A required API, field, or adapter contract is missing or not selected; no fictional API test was added |
+| Source or release check | 38 | Consumer examples alone cannot prove package ownership, compatibility, or release policy |
+| Wording reconciliation | 5 | Apply the later selected decision; correct the older wording without treating it as a runtime bug |
+| Deferred | 1 | Dynamic tool sources remain on hold |
+
+Follow each seam's **Acceptance matrix** for the exact requirement, related
+test, observed failure, or missing acceptance case. Newer requirements that
+were absent from the old matrices are included. Named-document approval remains
+pending. Advanced target work has not been removed.
+
+### Executed evidence
+
+Run from `jido_ai`:
+
+```sh
+mix examples --seed 0
+mix test test/examples --only design_requirement --seed 0
+mix test --include authoring --include example --warnings-as-errors --seed 0
+```
+
+The **initial audit** MockLLM run on 2026-09-15 completed with **667 of 679 tests passing and
+12 failures**. All 12 failures are new target checks. The existing 660 examples
+passed. The 19 added target cases had 7 passes and 12 failures. These are historical
+test counts, not requirement-conformance counts. No checks are skipped to hide
+the failures. No live provider call was made for this audit.
+
+Initial audit baseline: `v3-spike`, HEAD
+`7bb011e98349af8bf580e7b93afa60990972beae`, with uncommitted example, test,
+formatter, and documentation changes. No `lib/` or dependency changes. This
+is not a stable-release pass. The implementation follow-up now also changes
+`lib/`, tests, examples, and API inventory. Dependencies remain unchanged.
+
+### Repairs in the current worktree
+
+- [Values and projection](01_ai_values/alignment.md#acceptance-matrix):
+  successful settlement promotes conversation; incomplete tool exchanges and
+  hidden-thinking summaries are excluded from default projection.
+- [Request settlement](07_request_sessions/alignment.md#acceptance-matrix):
+  failed and cancelled input stays in execution evidence, not completed conversation.
+- [Model completion](02_model_gateway/alignment.md#acceptance-matrix):
+  nonempty truncated output fails without an answer commit.
+- [Tool recovery](03_tool_bridge/alignment.md#acceptance-matrix):
+  unknown tools return correlated model-visible errors. A mixed batch performs
+  no partial tool work.
+- [Content permissions](12_observation_diagnostics/alignment.md#acceptance-matrix):
+  default-off stream/storage and reasoning permissions are separate. Inspection
+  requires trusted Profile permission plus explicit content access. Missing
+  retained content cannot silently become resumable model state.
+
+These repairs do not close the advanced API gates below. They preserve all eight
+reasoning methods and use the existing Agent, Flow, Session, and Thread owners.
+
+Repair verification on 2026-09-15, against the uncommitted worktree above:
+
+- `mix compile --force --warnings-as-errors`: passed.
+- `mix test --include authoring --include example --warnings-as-errors --seed 0`:
+  2,853 passed, zero failures, one existing flaky exclusion. No new skips.
+- `mix format --check-formatted`: passed.
+- All 408 requirement IDs remain in the acceptance matrices; no IDs were removed.
+- Local links in the changed Markdown files are valid.
+
+This run used deterministic model responses. No live provider call was made.
+These are verification results for this worktree, not a release certification.
+
+### Later decisions and remaining work
+
+Use Session-scoped skill activation, not the older request-scoped wording.
+Use distinct execution-attempt identity, not a new ReAct run ID as a substitute.
+Do not restore the removed execution CLI. Keep dynamic sources deferred.
+
+The API gates include linked delegation, capability policy stages, transform
+contracts, execution-attempt reporting, and uncertain-effect handling. Their
+matrix rows name the missing scenario. They have not been run through invented
+stubs, and they are not counted as passed. Continue full-clause assertion review
+for the related-evidence rows before claiming that the complete design is
+proved.
+
 ## Seam document pattern
 
 Use [the architectural seam template](SEAM_TEMPLATE.md):

@@ -1,5 +1,5 @@
 defmodule JidoAI.Examples.ReasoningCapabilities.MixedAgent do
-  use Jido.Agent, name: "native_and_callable_reasoning", extensions: [Jido.AI.DSL]
+  use Jido.AI.Agent, name: "native_and_callable_reasoning"
 
   agent do
     schema Zoi.object(%{

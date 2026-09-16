@@ -5,10 +5,10 @@
 ## Status
 
 - Reviewed: 2026-09-15.
-- Code: `v3-spike`, HEAD `c4e57c8d34d09ffc922c37fb41cccc2e1491123e`, plus the uncommitted Orchestration and canonical-value file reorganization.
+- Code for the example audit: `v3-spike`, HEAD `7bb011e98349af8bf580e7b93afa60990972beae`, plus uncommitted example, test, formatter, and documentation changes. No `lib/` or dependency changes.
 - Prerequisite alignments used: None.
 - Alignment state: Draft. Current ownership is mapped; target decisions and full acceptance proof remain.
-- Verification: source and test inspection in this documentation task. The preceding code-change run reported 2,809 passing tests and one existing exclusion, including authoring and MockLLM examples. That run is not proof of every target requirement; no Elixir tests were rerun here.
+- Verification: the example-driven review below adds fresh MockLLM runs to the earlier source review. Earlier statements that no tests ran refer to that prior review, not this follow-up.
 
 ## Current architecture
 
@@ -46,7 +46,7 @@ proof is still incomplete. Inert declaration support is not runtime support.
 Preserve the complete AI capability set above public lower-package contracts. Separate in-memory coordination from host-owned durability and external-effect guarantees.
 
 Preserve current public behavior unless an approved decision includes a
-migration. No runtime or example changes are authorized by this review.
+migration. This follow-up changes examples and their tests, not runtime implementation.
 Advanced requirements remain in the target even when they are not implemented.
 
 ## Gap register
@@ -84,31 +84,45 @@ Confirm the retry-delay boundary and the external-effect contract before changin
 This is a dependency and outcome plan, not a formal implementation task list.
 Implementation planning follows approval of the seam intent and requirements.
 
+## Example-driven review
+
+This follow-up uses the later selected decisions when older wording conflicts.
+The [audit summary](../README.md#example-driven-design-audit) separates target
+failures, related scenarios, API gates, and non-example release checks. All
+requirements in this seam appear in the acceptance matrix below.
+
+The new target checks extend existing example lessons. They use public APIs and
+the local MockLLM transport. No target failure is skipped or changed to accept
+the current behavior. Tests blocked by an unspecified public contract are
+marked as a gate; no invented API is presented as an executable example.
+
 ## Acceptance matrix
 
-This table is rebuilt from the actual requirement IDs in `design.md`; earlier
-tables sometimes mapped evidence to the wrong requirement. “Implemented;
-evidence incomplete” means the subsystem has relevant code, not that every
-clause is met. No row below grants approval or claims a fresh test run.
+Requirement IDs and target wording come from `design.md`. The evidence column
+now names related example scenarios. **Related evidence is partial**, not full
+requirement acceptance. A passing target check proves only its stated case.
+`To be implemented — reproduced` identifies a failed target assertion, not a
+failure inferred from a missing example. Source/release checks and public API
+gates are separate. No row grants document approval.
 
 | Requirement | Evidence state | Current evidence | Required acceptance outcome |
 | --- | --- | --- | --- |
-| `BND-REQ-001` | Decision required | See current contract and gap register | Verify the target behavior: The Jido AI package shall own only model-provider integration, AI data, AI reasoning, AI tool policy, AI request policy, AI capability policy, AI skill behavior, AI resume data, and AI observation semantics. |
-| `BND-REQ-002` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: The Jido AI package shall use `Jido.Action`, `Jido.Instruction`, `Jido.Flow`, and `Jido.Exec` as the only public computation and in-memory execution contracts. |
-| `BND-REQ-003` | Decision required | See current contract and gap register | Verify the target behavior: The Jido AI package shall use core `Jido.Agent`, Turn, Plugin, Directive, commit, AgentServer, checkpoint, and OTP runtime contracts without a competing implementation. |
-| `BND-REQ-004` | Not revalidated | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: The Jido AI package shall use `Jido.Signal` as the only Signal envelope and shall use public Signal routing, dispatch, and bus contracts. |
-| `BND-REQ-005` | Decision required | See current contract and gap register | Verify the target behavior: The Jido AI package shall consume browser functions only as Actions or explicit adapters owned by `jido_browser`. |
-| `BND-REQ-006` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: The host application shall own credentials, provider-client supervision, application stores, durable queues, deployment, distribution, domain tools, and product policy. |
-| `BND-REQ-007` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When Jido AI accepts static definition data, it shall reject a process, port, reference, task, monitor, anonymous function, or other nonportable runtime value unless the public contract explicitly identifies a local-only field. |
-| `BND-REQ-008` | Not revalidated | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When Jido AI needs a runtime resource, it shall resolve that resource from the caller context, Plugin runtime, or an explicit host registry after definition validation. |
-| `BND-REQ-009` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Jido AI shall not store credentials or live runtime handles in Agent domain state, Plugin state, Signals, codecs, or checkpoints. |
-| `BND-REQ-010` | Not revalidated | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When AI work runs as a core Turn, it shall return a complete candidate Agent and validated Directives through the public Turn result contract. |
-| `BND-REQ-011` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Jido AI shall not mutate private AgentServer state or dispatch post-commit work before core commit succeeds. |
-| `BND-REQ-012` | Decision required | See current contract and gap register | Verify the target behavior: When an Action or Flow performs external I/O before commit, the public contract shall state that rollback is not available and shall identify any idempotency requirement. |
-| `BND-REQ-013` | Not revalidated | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When the same admitted command uses direct and live core execution, Jido AI shall preserve the same AI validation, Flow, candidate, and Directive semantics, except for behavior that requires an explicitly declared live runtime. |
-| `BND-REQ-014` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Jido AI shall not describe `Jido.Exec` state, Flow step state, or an AI session process as a durable checkpoint. |
-| `BND-REQ-015` | Not revalidated | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When durable orchestration is required, Jido AI shall expose portable commands, results, events, and resume data for a host-owned or separately owned orchestrator. |
-| `BND-REQ-016` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: V3 integration tests shall use compatible V3 package versions unless a test explicitly verifies V2 migration or compatibility. |
+| `BND-REQ-001` | Decision required | Related example evidence (partial): [nested AI syntax lowers to an ordinary Agent and Flow](../../../test/examples/01_authoring/01_06_ai_extension/01_06_ai_extension_test.exs); [an Action and Flow supply real, correlated results to the next model call](../../../test/examples/01_authoring/01_02_tool_flow/01_02_tool_flow_test.exs); [all ten public Signal definitions validate and pass through real core outbound delivery](../../../test/examples/02_requests/02_16_typed_signals/02_16_typed_signals_test.exs). | Verify the target behavior: The Jido AI package shall own only model-provider integration, AI data, AI reasoning, AI tool policy, AI request policy, AI capability policy, AI skill behavior, AI resume data, and AI observation semantics. |
+| `BND-REQ-002` | Implemented; evidence incomplete | Related example evidence (partial): [nested AI syntax lowers to an ordinary Agent and Flow](../../../test/examples/01_authoring/01_06_ai_extension/01_06_ai_extension_test.exs); [an Action and Flow supply real, correlated results to the next model call](../../../test/examples/01_authoring/01_02_tool_flow/01_02_tool_flow_test.exs); [all ten public Signal definitions validate and pass through real core outbound delivery](../../../test/examples/02_requests/02_16_typed_signals/02_16_typed_signals_test.exs). | Verify the target behavior: The Jido AI package shall use `Jido.Action`, `Jido.Instruction`, `Jido.Flow`, and `Jido.Exec` as the only public computation and in-memory execution contracts. |
+| `BND-REQ-003` | Decision required | Related example evidence (partial): [nested AI syntax lowers to an ordinary Agent and Flow](../../../test/examples/01_authoring/01_06_ai_extension/01_06_ai_extension_test.exs); [an Action and Flow supply real, correlated results to the next model call](../../../test/examples/01_authoring/01_02_tool_flow/01_02_tool_flow_test.exs); [all ten public Signal definitions validate and pass through real core outbound delivery](../../../test/examples/02_requests/02_16_typed_signals/02_16_typed_signals_test.exs). | Verify the target behavior: The Jido AI package shall use core `Jido.Agent`, Turn, Plugin, Directive, commit, AgentServer, checkpoint, and OTP runtime contracts without a competing implementation. |
+| `BND-REQ-004` | Not revalidated | Related example evidence (partial): [nested AI syntax lowers to an ordinary Agent and Flow](../../../test/examples/01_authoring/01_06_ai_extension/01_06_ai_extension_test.exs); [an Action and Flow supply real, correlated results to the next model call](../../../test/examples/01_authoring/01_02_tool_flow/01_02_tool_flow_test.exs); [all ten public Signal definitions validate and pass through real core outbound delivery](../../../test/examples/02_requests/02_16_typed_signals/02_16_typed_signals_test.exs). | Verify the target behavior: The Jido AI package shall use `Jido.Signal` as the only Signal envelope and shall use public Signal routing, dispatch, and bus contracts. |
+| `BND-REQ-005` | Decision required | Source check: confirm browser execution stays in jido_browser Actions/adapters. A consumer example cannot prove package ownership. | Verify the target behavior: The Jido AI package shall consume browser functions only as Actions or explicit adapters owned by `jido_browser`. |
+| `BND-REQ-006` | Implemented; evidence incomplete | Related example evidence (partial): [the supervised store survives callers and an Agent stop](../../../test/examples/07_retrieval/07_01_memory/07_01_memory_test.exs); [resume binds a new local transport without saving credentials or callback handles](../../../test/examples/14_resume/14_03_checkpoint_resume/14_03_checkpoint_resume_test.exs). | Verify the target behavior: The host application shall own credentials, provider-client supervision, application stores, durable queues, deployment, distribution, domain tools, and product policy. |
+| `BND-REQ-007` | Implemented; evidence incomplete | Related example evidence (partial): [versioned documents round-trip and reject runtime data](../../../test/examples/02_requests/02_27_thread_session_values/02_27_thread_session_values_test.exs); [restored request records reject runtime resources and mismatched IDs](../../../test/examples/02_requests/02_01_session/02_01_session_test.exs). | Verify the target behavior: When Jido AI accepts static definition data, it shall reject a process, port, reference, task, monitor, anonymous function, or other nonportable runtime value unless the public contract explicitly identifies a local-only field. |
+| `BND-REQ-008` | Not revalidated | Related example evidence (partial): [resume binds a new local transport without saving credentials or callback handles](../../../test/examples/14_resume/14_03_checkpoint_resume/14_03_checkpoint_resume_test.exs); [declared sources own their catalogue provider and resource policy](../../../test/examples/18_skills/18_02_skill_authoring/18_02_skill_authoring_test.exs). | Verify the target behavior: When Jido AI needs a runtime resource, it shall resolve that resource from the caller context, Plugin runtime, or an explicit host registry after definition validation. |
+| `BND-REQ-009` | Implemented; evidence incomplete | Related example evidence (partial): [versioned documents round-trip and reject runtime data](../../../test/examples/02_requests/02_27_thread_session_values/02_27_thread_session_values_test.exs); [restored request records reject runtime resources and mismatched IDs](../../../test/examples/02_requests/02_01_session/02_01_session_test.exs). | Verify the target behavior: Jido AI shall not store credentials or live runtime handles in Agent domain state, Plugin state, Signals, codecs, or checkpoints. |
+| `BND-REQ-010` | Not revalidated | Related example evidence (partial): [the generated command commits an answer and preserves domain data](../../../test/examples/01_authoring/01_01_authoring_formats/01_01_authoring_formats_test.exs); [DSL helper executes Action and Flow tools and preserves Plugin ownership](../../../test/examples/01_authoring/01_07_ai_runtime/01_07_ai_runtime_test.exs). | Verify the target behavior: When AI work runs as a core Turn, it shall return a complete candidate Agent and validated Directives through the public Turn result contract. |
+| `BND-REQ-011` | Implemented; evidence incomplete | Related example evidence (partial): [a refused durable completion stops the Agent without another write or Directive dispatch](../../../test/examples/02_requests/02_11_completion/02_11_completion_test.exs). | Verify the target behavior: Jido AI shall not mutate private AgentServer state or dispatch post-commit work before core commit succeeds. |
+| `BND-REQ-012` | Decision required | Related example evidence (partial): [a failed Agent result commit does not undo the external memory write](../../../test/examples/07_retrieval/07_01_memory/07_01_memory_test.exs). | Verify the target behavior: When an Action or Flow performs external I/O before commit, the public contract shall state that rollback is not available and shall identify any idempotency requirement. |
+| `BND-REQ-013` | Not revalidated | Related example evidence (partial): [common AI lowering composes with core data, Builder and JSON](../../../test/examples/01_authoring/01_06_ai_extension/01_06_ai_extension_test.exs). | Verify the target behavior: When the same admitted command uses direct and live core execution, Jido AI shall preserve the same AI validation, Flow, candidate, and Directive semantics, except for behavior that requires an explicitly declared live runtime. |
+| `BND-REQ-014` | Implemented; evidence incomplete | Related example evidence (partial): [after-tools checkpoint preserves completed tool history and does not repeat its side effect](../../../test/examples/14_resume/14_03_checkpoint_resume/14_03_checkpoint_resume_test.exs). | Verify the target behavior: Jido AI shall not describe `Jido.Exec` state, Flow step state, or an AI session process as a durable checkpoint. |
+| `BND-REQ-015` | Not revalidated | Related example evidence (partial): [after-tools checkpoint preserves completed tool history and does not repeat its side effect](../../../test/examples/14_resume/14_03_checkpoint_resume/14_03_checkpoint_resume_test.exs). | Verify the target behavior: When durable orchestration is required, Jido AI shall expose portable commands, results, events, and resume data for a host-owned or separately owned orchestrator. |
+| `BND-REQ-016` | Implemented; evidence incomplete | Release check: inspect the resolved dependency graph and run the compatible V3 matrix. | Verify the target behavior: V3 integration tests shall use compatible V3 package versions unless a test explicitly verifies V2 migration or compatibility. |
 
 ## Migration and compatibility
 

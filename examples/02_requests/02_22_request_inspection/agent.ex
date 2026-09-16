@@ -32,6 +32,11 @@ defmodule JidoAI.Examples.RequestInspection.Agent do
       end
 
       observability do
+        store_content true
+        diagnostics_content true
+        stream_content true
+        stream_reasoning true
+        store_reasoning true
         emit_signals(false)
         redact_tool_args(true)
       end

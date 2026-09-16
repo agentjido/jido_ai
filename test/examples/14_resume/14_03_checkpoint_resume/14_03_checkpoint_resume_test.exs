@@ -447,6 +447,8 @@ defmodule JidoAI.Examples.CheckpointResumeTest do
           model: MockLLM.model(),
           streaming: false,
           tools: [],
+          stream_content: true,
+          store_content: true,
           token_secret: "checkpoint-resume-fixture"
         ],
         extra

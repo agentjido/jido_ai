@@ -248,6 +248,11 @@ defmodule Jido.AI.DSL.Entities do
       :emit_signals,
       :emit_llm_deltas,
       :redact_tool_args,
+      :stream_content,
+      :store_content,
+      :stream_reasoning,
+      :store_reasoning,
+      :diagnostics_content,
       :__spark_metadata__
     ]
   end

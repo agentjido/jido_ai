@@ -5,10 +5,10 @@
 ## Status
 
 - Reviewed: 2026-09-15.
-- Code: `v3-spike`, HEAD `c4e57c8d34d09ffc922c37fb41cccc2e1491123e`, plus the uncommitted Orchestration and canonical-value file reorganization.
+- Code for the example audit: `v3-spike`, HEAD `7bb011e98349af8bf580e7b93afa60990972beae`, plus uncommitted example, test, formatter, and documentation changes. No `lib/` or dependency changes.
 - Prerequisite alignments used: [00 Package boundary and invariants](../00_boundary_invariants/alignment.md).
 - Alignment state: Draft. Current ownership is mapped; target decisions and full acceptance proof remain.
-- Verification: source and test inspection in this documentation task. The preceding code-change run reported 2,809 passing tests and one existing exclusion, including authoring and MockLLM examples. That run is not proof of every target requirement; no Elixir tests were rerun here.
+- Verification: the example-driven review below adds fresh MockLLM runs to the earlier source review. Earlier statements that no tests ran refer to that prior review, not this follow-up.
 
 ## Current architecture
 
@@ -48,7 +48,7 @@ proof is still incomplete. Inert declaration support is not runtime support.
 Use canonical Session/Thread values for conversation data. Preserve multimodal content, correlation, output validation, safe errors, and explicit portable encodings. Broader constructor uniformity and strict provider-neutral content remain decisions.
 
 Preserve current public behavior unless an approved decision includes a
-migration. No runtime or example changes are authorized by this review.
+migration. The initial audit changed examples and tests. The implementation follow-up also changes the runtime; see the current evidence below.
 Advanced requirements remain in the target even when they are not implemented.
 
 ## Gap register
@@ -89,10 +89,8 @@ by context operations and lanes, without the selected successful-settlement
 boundary. It cannot yet separate retained failed-work evidence from the next
 default model context as required by VAL-REQ-023/024.
 
-| Requirement | Evidence state | Acceptance outcome |
-| --- | --- | --- |
-| VAL-REQ-023 | Proposed; not implemented | Successful work advances default context; failed/cancelled work does not |
-| VAL-REQ-024 | Proposed; not implemented | Unresolved tool exchanges are excluded without fabricated results |
+The [acceptance matrix](#acceptance-matrix) now contains the evidence and
+remaining work for `VAL-REQ-023`, `VAL-REQ-024`.
 
 See the [scenario plan](../07_request_sessions/alignment.md#selected-conversation-policy-gaps-and-acceptance).
 Promotion metadata and deferred replacement depend on seam 07 settlement.
@@ -118,37 +116,53 @@ Resolve tagged constructor uniformity, provider-native content acceptance, and t
 This is a dependency and outcome plan, not a formal implementation task list.
 Implementation planning follows approval of the seam intent and requirements.
 
+## Example-driven review
+
+This follow-up uses the later selected decisions when older wording conflicts.
+The [audit summary](../README.md#example-driven-design-audit) separates target
+failures, related scenarios, API gates, and non-example release checks. All
+requirements in this seam appear in the acceptance matrix below.
+
+The new target checks extend existing example lessons. They use public APIs and
+the local MockLLM transport. No target failure is skipped or changed to accept
+the current behavior. Tests blocked by an unspecified public contract are
+marked as a gate; no invented API is presented as an executable example.
+
 ## Acceptance matrix
 
-This table is rebuilt from the actual requirement IDs in `design.md`; earlier
-tables sometimes mapped evidence to the wrong requirement. “Implemented;
-evidence incomplete” means the subsystem has relevant code, not that every
-clause is met. No row below grants approval or claims a fresh test run.
+Requirement IDs and target wording come from `design.md`. The evidence column
+now names related example scenarios. **Related evidence is partial**, not full
+requirement acceptance. A passing target check proves only its stated case.
+`To be implemented — reproduced` identifies a failed target assertion, not a
+failure inferred from a missing example. Source/release checks and public API
+gates are separate. No row grants document approval.
 
 | Requirement | Evidence state | Current evidence | Required acceptance outcome |
 | --- | --- | --- | --- |
-| `VAL-REQ-001` | Decision required | See current contract and gap register | Verify the target behavior: When a caller constructs a public AI value, the owning module shall validate it with a Zoi schema and return `{:ok, value}` or `{:error, %Jido.AI.Error{}}`. |
-| `VAL-REQ-002` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Each public AI value shall reject unknown fields by default at an encoded or untrusted boundary. |
-| `VAL-REQ-003` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Each portable AI value shall contain only data accepted by the package portability rule. |
-| `VAL-REQ-004` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When a string-keyed map enters a public schema, the owning module shall normalize only known keys and shall not create atoms from untrusted input. |
-| `VAL-REQ-005` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: A query shall be nonempty text or a nonempty ordered list of supported content parts. |
-| `VAL-REQ-006` | Decision required | See current contract and gap register | Verify the target behavior: When a caller adds a file reference, the query contract shall preserve the file identifier, media type, filename, and safe metadata without requiring a provider struct. |
-| `VAL-REQ-007` | Decision required | See current contract and gap register | Verify the target behavior: When Jido AI summarizes multimodal content for logs or events, it shall not expose binary content, file bytes, credentials, or hidden thinking text. |
-| `VAL-REQ-008` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: A context shall preserve semantic message order, roles, tool-call correlation, reasoning details when allowed, and caller references. |
-| `VAL-REQ-009` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Projection to a provider request shall be an adapter operation and shall not change the stored context. |
-| `VAL-REQ-010` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: A normalized turn shall identify exactly one response class: `:final_answer` or `:tool_calls`. |
-| `VAL-REQ-011` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: A turn with tool calls shall preserve provider order and stable call identifiers. |
-| `VAL-REQ-012` | Decision required | See current contract and gap register | Verify the target behavior: A turn shall preserve ordered visible content separately from private thinking or provider reasoning details. |
-| `VAL-REQ-013` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: An output contract shall accept an object-shaped Zoi schema or object-shaped JSON Schema and shall reject a non-object root. |
-| `VAL-REQ-014` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When output validation fails, the output contract shall apply the configured `:error` or bounded `:repair` policy. |
-| `VAL-REQ-015` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: A repair attempt shall never exceed the configured retry limit and shall return the last validation error when the limit is reached. |
-| `VAL-REQ-016` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: An output contract shall have a deterministic fingerprint based on its portable semantic fields. |
-| `VAL-REQ-017` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Usage normalization shall provide nonnegative `input_tokens`, `output_tokens`, and `total_tokens` when provider data contains those counts. |
-| `VAL-REQ-018` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Usage merge shall sum known numeric counters and preserve bounded provider metadata without replacing canonical counters. |
-| `VAL-REQ-019` | Decision required | See current contract and gap register | Verify the target behavior: Every public AI error shall include a stable category and code, a safe message, bounded details, and an optional cause. |
-| `VAL-REQ-020` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Error inspection and telemetry conversion shall redact credentials, request bodies, raw file content, and configured sensitive keys. |
-| `VAL-REQ-021` | Decision required | See current contract and gap register | Verify the target behavior: Every value that can enter a Signal, profile, Agent state, or checkpoint shall have a versioned portable encoding contract. |
-| `VAL-REQ-022` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: A decoder shall reject an unsupported future version and shall identify the supported version range. |
+| `VAL-REQ-001` | Decision required | Related example evidence (partial): [versioned documents round-trip and reject runtime data](../../../test/examples/02_requests/02_27_thread_session_values/02_27_thread_session_values_test.exs). | Verify the target behavior: When a caller constructs a public AI value, the owning module shall validate it with a Zoi schema and return `{:ok, value}` or `{:error, %Jido.AI.Error{}}`. |
+| `VAL-REQ-002` | Implemented; evidence incomplete | Target scenario passed: [VAL-REQ-002 target check](../../../test/examples/02_requests/02_27_thread_session_values/design_requirements_test.exs). Session rejects an unknown encoded key without creating an atom and rejects a future version. Other values and supported-version-range reporting remain unproved. Related example evidence (partial): [versioned documents round-trip and reject runtime data](../../../test/examples/02_requests/02_27_thread_session_values/02_27_thread_session_values_test.exs). | Verify the target behavior: Each public AI value shall reject unknown fields by default at an encoded or untrusted boundary. |
+| `VAL-REQ-003` | Implemented; evidence incomplete | Related example evidence (partial): [versioned documents round-trip and reject runtime data](../../../test/examples/02_requests/02_27_thread_session_values/02_27_thread_session_values_test.exs). | Verify the target behavior: Each portable AI value shall contain only data accepted by the package portability rule. |
+| `VAL-REQ-004` | Implemented; evidence incomplete | Target scenario passed: [VAL-REQ-004 target check](../../../test/examples/02_requests/02_27_thread_session_values/design_requirements_test.exs). Session rejects an unknown encoded key without creating an atom and rejects a future version. Other values and supported-version-range reporting remain unproved. Related example evidence (partial): [versioned documents round-trip and reject runtime data](../../../test/examples/02_requests/02_27_thread_session_values/02_27_thread_session_values_test.exs). | Verify the target behavior: When a string-keyed map enters a public schema, the owning module shall normalize only known keys and shall not create atoms from untrusted input. |
+| `VAL-REQ-005` | Implemented; evidence incomplete | Related example evidence (partial): [media query, model options, refs and real tool output reach the provider](../../../test/examples/02_requests/02_01_session/02_01_session_test.exs). | Verify the target behavior: A query shall be nonempty text or a nonempty ordered list of supported content parts. |
+| `VAL-REQ-006` | Decision required | Related example evidence (partial): [media query, model options, refs and real tool output reach the provider](../../../test/examples/02_requests/02_01_session/02_01_session_test.exs). | Verify the target behavior: When a caller adds a file reference, the query contract shall preserve the file identifier, media type, filename, and safe metadata without requiring a provider struct. |
+| `VAL-REQ-007` | Implemented; evidence incomplete | Target scenario repaired: [VAL-REQ-007 target check](../../../test/examples/02_requests/02_27_thread_session_values/design_requirements_test.exs). Query summaries omit unsupported and hidden-thinking parts instead of inspecting their payloads. Full-clause and provider-matrix proof remains separate. | Verify the target behavior: When Jido AI summarizes multimodal content for logs or events, it shall not expose binary content, file bytes, credentials, or hidden thinking text. |
+| `VAL-REQ-008` | Implemented; evidence incomplete | Related example evidence (partial): [three dependent tool rounds precede the committed answer](../../../test/examples/01_authoring/01_02_tool_flow/multi_round_test.exs). | Verify the target behavior: A context shall preserve semantic message order, roles, tool-call correlation, reasoning details when allowed, and caller references. |
+| `VAL-REQ-009` | Implemented; evidence incomplete | Target scenario passed: [VAL-REQ-009 target check](../../../test/examples/02_requests/02_27_thread_session_values/design_requirements_test.exs). Projection leaves the encoded Thread unchanged. This does not prove every projection policy. Related example evidence (partial): [three dependent tool rounds precede the committed answer](../../../test/examples/01_authoring/01_02_tool_flow/multi_round_test.exs). | Verify the target behavior: Projection to a provider request shall be an adapter operation and shall not change the stored context. |
+| `VAL-REQ-010` | Implemented; evidence incomplete | Related example evidence (partial): [complete content parts and reasoning stay intact through Signal and Turn conversion](../../../test/examples/02_requests/02_16_typed_signals/02_16_typed_signals_test.exs). | Verify the target behavior: A normalized turn shall identify exactly one response class: `:final_answer` or `:tool_calls`. |
+| `VAL-REQ-011` | Implemented; evidence incomplete | Related example evidence (partial): [three dependent tool rounds precede the committed answer](../../../test/examples/01_authoring/01_02_tool_flow/multi_round_test.exs). | Verify the target behavior: A turn with tool calls shall preserve provider order and stable call identifiers. |
+| `VAL-REQ-012` | Decision required | Related example evidence (partial): [complete content parts and reasoning stay intact through Signal and Turn conversion](../../../test/examples/02_requests/02_16_typed_signals/02_16_typed_signals_test.exs). | Verify the target behavior: A turn shall preserve ordered visible content separately from private thinking or provider reasoning details. |
+| `VAL-REQ-013` | Implemented; evidence incomplete | Related example evidence (partial): [schema feedback reaches one repair before a valid object commits](../../../test/examples/01_authoring/01_03_structured_output/01_03_structured_output_test.exs); [repair exhaustion preserves complete prior state and a later request succeeds](../../../test/examples/01_authoring/01_03_structured_output/01_03_structured_output_test.exs). | Verify the target behavior: An output contract shall accept an object-shaped Zoi schema or object-shaped JSON Schema and shall reject a non-object root. |
+| `VAL-REQ-014` | Implemented; evidence incomplete | Related example evidence (partial): [schema feedback reaches one repair before a valid object commits](../../../test/examples/01_authoring/01_03_structured_output/01_03_structured_output_test.exs); [repair exhaustion preserves complete prior state and a later request succeeds](../../../test/examples/01_authoring/01_03_structured_output/01_03_structured_output_test.exs). | Verify the target behavior: When output validation fails, the output contract shall apply the configured `:error` or bounded `:repair` policy. |
+| `VAL-REQ-015` | Implemented; evidence incomplete | Related example evidence (partial): [schema feedback reaches one repair before a valid object commits](../../../test/examples/01_authoring/01_03_structured_output/01_03_structured_output_test.exs); [repair exhaustion preserves complete prior state and a later request succeeds](../../../test/examples/01_authoring/01_03_structured_output/01_03_structured_output_test.exs). | Verify the target behavior: A repair attempt shall never exceed the configured retry limit and shall return the last validation error when the limit is reached. |
+| `VAL-REQ-016` | Implemented; evidence incomplete | Public-contract gate: Output.fingerprint/1 exists as an undocumented internal function. Select a supported public identity observation before adding an output-identity example; do not expose an internal helper just for the test. | Verify the target behavior: An output contract shall have a deterministic fingerprint based on its portable semantic fields. |
+| `VAL-REQ-017` | Implemented; evidence incomplete | Related example evidence (partial): [failed provider invocations retain unknown usage and consume a request slot](../../../test/examples/13_policy/13_01_quota/13_01_quota_test.exs). | Verify the target behavior: Usage normalization shall provide nonnegative `input_tokens`, `output_tokens`, and `total_tokens` when provider data contains those counts. |
+| `VAL-REQ-018` | Implemented; evidence incomplete | Related example evidence (partial): [failed provider invocations retain unknown usage and consume a request slot](../../../test/examples/13_policy/13_01_quota/13_01_quota_test.exs). | Verify the target behavior: Usage merge shall sum known numeric counters and preserve bounded provider metadata without replacing canonical counters. |
+| `VAL-REQ-019` | Decision required | Related example evidence (partial): [provider errors keep the native ReqLLM tagged result](../../../test/examples/01_authoring/01_08_model_helpers/01_08_model_helpers_test.exs). | Verify the target behavior: Every public AI error shall include a stable category and code, a safe message, bounded details, and an optional cause. |
+| `VAL-REQ-020` | Implemented; evidence incomplete | Related example evidence (partial): [provider errors keep the native ReqLLM tagged result](../../../test/examples/01_authoring/01_08_model_helpers/01_08_model_helpers_test.exs). | Verify the target behavior: Error inspection and telemetry conversion shall redact credentials, request bodies, raw file content, and configured sensitive keys. |
+| `VAL-REQ-021` | Decision required | Related example evidence (partial): [versioned documents round-trip and reject runtime data](../../../test/examples/02_requests/02_27_thread_session_values/02_27_thread_session_values_test.exs). | Verify the target behavior: Every value that can enter a Signal, profile, Agent state, or checkpoint shall have a versioned portable encoding contract. |
+| `VAL-REQ-022` | Implemented; evidence incomplete | Target scenario passed: [VAL-REQ-022 target check](../../../test/examples/02_requests/02_27_thread_session_values/design_requirements_test.exs). Session rejects an unknown encoded key without creating an atom and rejects a future version. Other values and supported-version-range reporting remain unproved. Related example evidence (partial): [versioned documents round-trip and reject runtime data](../../../test/examples/02_requests/02_27_thread_session_values/02_27_thread_session_values_test.exs). | Verify the target behavior: A decoder shall reject an unsupported future version and shall identify the supported version range. |
+| `VAL-REQ-023` | Implemented; evidence incomplete | Target scenario repaired: [VAL-REQ-023 target check](../../../test/examples/02_requests/02_02_steering/design_requirements_test.exs). Pending request messages remain evidence until a matching successful-settlement entry promotes them. Full-clause and provider-matrix proof remains separate. | Verify the target behavior: The default Thread model projection shall include request work only after successful settlement promotes it into the completed conversation. |
+| `VAL-REQ-024` | Implemented; evidence incomplete | Target scenario repaired: [VAL-REQ-024 target check](../../../test/examples/02_requests/02_27_thread_session_values/design_requirements_test.exs). Default projection omits incomplete or mismatched tool exchanges without inventing results. Full-clause and provider-matrix proof remains separate. | Verify the target behavior: The default Thread model projection shall exclude unresolved tool exchanges without inventing tool results. |
 
 ## Migration and compatibility
 
@@ -159,6 +173,13 @@ approved. A documentation rename does not authorize a wire-format change.
 Retained advanced proposals need their own migration and operational review.
 Source paths above replace old `operations/`, `shared/`, live Session, and
 `examples/v3/` references as evidence; historical paths are not current owners.
+
+## Runtime repair follow-up
+
+The current worktree adds runtime repairs over the audit baseline. Dependencies
+are unchanged. The [audit summary](../README.md#example-driven-design-audit)
+separates the repaired scenarios from the remaining advanced API gates. A passing
+scenario is not complete requirement conformance.
 
 ## Completion criteria
 

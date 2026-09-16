@@ -3885,7 +3885,7 @@
       "modules": [
         "Jido.AI.Agent.InitialState"
       ],
-      "sha256": "d4459860814c92067edfb24ba74a70ee31fb98a0ed940bfbdb1f034f9c15a7cf",
+      "sha256": "f5e7ef3d06e636ea23931027850fdf743f71e997c1e87221a89949a2c22d328e",
       "declarations": [
         {
           "line": 1,
@@ -4771,7 +4771,7 @@
       "modules": [
         "Jido.AI.DSL"
       ],
-      "sha256": "ee0e5019a32a391a4b5f40055a66687757526d372fa5775e43b9f013bf416f2e",
+      "sha256": "f1baf4a7631ff0f182c583092263208eed97b1bc1d9778504e4fda16b5483ab6",
       "declarations": [
         {
           "line": 1,
@@ -4789,14 +4789,14 @@
           "quoted": false
         },
         {
-          "line": 310,
+          "line": 315,
           "module": "Jido.AI.DSL",
           "source": "[\n  Spark.Dsl.Extension,\n  [\n    transformers: [Jido.AI.DSL.StateSizeTransformer],\n    dsl_patches: [%Spark.Dsl.Patch.AddEntity{section_path: [:agent], entity: @profile}],\n    imports: [Jido.AI.DSL.Macros]\n  ]\n]",
           "kind": "use",
           "quoted": false
         },
         {
-          "line": 315,
+          "line": 320,
           "module": "Jido.AI.DSL",
           "name": "behaviour",
           "source": "[Jido.Agent.Extension]",
@@ -4804,7 +4804,7 @@
           "quoted": false
         },
         {
-          "line": 318,
+          "line": 323,
           "module": "Jido.AI.DSL",
           "name": "route_target_options",
           "kind": "def",
@@ -4813,11 +4813,11 @@
             0
           ],
           "clause_lines": [
-            318
+            323
           ]
         },
         {
-          "line": 320,
+          "line": 325,
           "module": "Jido.AI.DSL",
           "name": "doc",
           "status": "hidden",
@@ -4825,7 +4825,7 @@
           "quoted": false
         },
         {
-          "line": 321,
+          "line": 326,
           "module": "Jido.AI.DSL",
           "name": "normalize_model_entity",
           "kind": "def",
@@ -4834,12 +4834,12 @@
             1
           ],
           "clause_lines": [
-            321,
-            324
+            326,
+            329
           ]
         },
         {
-          "line": 328,
+          "line": 333,
           "module": "Jido.AI.DSL",
           "name": "lower_agent",
           "kind": "def",
@@ -4848,7 +4848,7 @@
             2
           ],
           "clause_lines": [
-            328
+            333
           ]
         }
       ]
@@ -4961,7 +4961,7 @@
         "Jido.AI.DSL.Entities.Memory",
         "Jido.AI.DSL.Entities.Observability"
       ],
-      "sha256": "c750012a801314328c49b2e95142e1191acfadcc0311ea280b3f39d68ea54fcf",
+      "sha256": "b8ea57385804510651d626114e00a7a846516b8750e098100118ec9efd4478fe",
       "declarations": [
         {
           "line": 1,
@@ -5310,7 +5310,7 @@
         {
           "line": 246,
           "module": "Jido.AI.DSL.Entities.Observability",
-          "source": "[[:emit_telemetry, :emit_signals, :emit_llm_deltas, :redact_tool_args, :__spark_metadata__]]",
+          "source": "[\n  [\n    :emit_telemetry,\n    :emit_signals,\n    :emit_llm_deltas,\n    :redact_tool_args,\n    :stream_content,\n    :store_content,\n    :stream_reasoning,\n    :store_reasoning,\n    :diagnostics_content,\n    :__spark_metadata__\n  ]\n]",
           "kind": "defstruct",
           "quoted": false
         }
@@ -7569,6 +7569,83 @@
       ]
     },
     {
+      "path": "lib/jido_ai/observe/content.ex",
+      "modules": [
+        "Jido.AI.Observe.Content"
+      ],
+      "sha256": "38a41600007721725eec1daf34c6433ee0abb746b3923ca97b9a548bbc6f29f4",
+      "declarations": [
+        {
+          "line": 1,
+          "module": null,
+          "name": "Jido.AI.Observe.Content",
+          "kind": "defmodule",
+          "quoted": false
+        },
+        {
+          "line": 2,
+          "module": "Jido.AI.Observe.Content",
+          "name": "moduledoc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 13,
+          "module": "Jido.AI.Observe.Content",
+          "name": "retainable?",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            13
+          ]
+        },
+        {
+          "line": 31,
+          "module": "Jido.AI.Observe.Content",
+          "name": "project",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3,
+            4
+          ],
+          "clause_lines": [
+            31
+          ]
+        },
+        {
+          "line": 48,
+          "module": "Jido.AI.Observe.Content",
+          "name": "event",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3
+          ],
+          "clause_lines": [
+            48
+          ]
+        },
+        {
+          "line": 68,
+          "module": "Jido.AI.Observe.Content",
+          "name": "message",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            68
+          ]
+        }
+      ]
+    },
+    {
       "path": "lib/jido_ai/observe/sanitize.ex",
       "modules": [
         "Jido.AI.Observe.Sanitize"
@@ -7689,7 +7766,7 @@
       "modules": [
         "Jido.AI.Orchestration"
       ],
-      "sha256": "52a49f842b914aa6393224e7758e803c82b49f0b9197ec959e7184f896c3a833",
+      "sha256": "ac1389a84f273fab632714e336ca7c724895299655eba921780fffcb69ea5f0c",
       "declarations": [
         {
           "line": 1,
@@ -7715,7 +7792,7 @@
           "quoted": false
         },
         {
-          "line": 51,
+          "line": 57,
           "module": "Jido.AI.Orchestration",
           "name": "snapshot",
           "kind": "def",
@@ -7725,11 +7802,11 @@
             2
           ],
           "clause_lines": [
-            51
+            57
           ]
         },
         {
-          "line": 78,
+          "line": 84,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "documented",
@@ -7737,7 +7814,7 @@
           "quoted": false
         },
         {
-          "line": 79,
+          "line": 85,
           "module": "Jido.AI.Orchestration",
           "name": "modify_context",
           "kind": "def",
@@ -7747,11 +7824,11 @@
             3
           ],
           "clause_lines": [
-            79
+            85
           ]
         },
         {
-          "line": 82,
+          "line": 88,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "documented",
@@ -7759,7 +7836,7 @@
           "quoted": false
         },
         {
-          "line": 83,
+          "line": 89,
           "module": "Jido.AI.Orchestration",
           "name": "skill_catalog",
           "kind": "def",
@@ -7769,11 +7846,11 @@
             2
           ],
           "clause_lines": [
-            83
+            89
           ]
         },
         {
-          "line": 97,
+          "line": 103,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "hidden",
@@ -7781,7 +7858,7 @@
           "quoted": false
         },
         {
-          "line": 98,
+          "line": 104,
           "module": "Jido.AI.Orchestration",
           "name": "publish_type",
           "kind": "def",
@@ -7790,11 +7867,11 @@
             0
           ],
           "clause_lines": [
-            98
+            104
           ]
         },
         {
-          "line": 99,
+          "line": 105,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "hidden",
@@ -7802,7 +7879,7 @@
           "quoted": false
         },
         {
-          "line": 100,
+          "line": 106,
           "module": "Jido.AI.Orchestration",
           "name": "ignore_type",
           "kind": "def",
@@ -7811,11 +7888,11 @@
             0
           ],
           "clause_lines": [
-            100
+            106
           ]
         },
         {
-          "line": 101,
+          "line": 107,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "hidden",
@@ -7823,7 +7900,7 @@
           "quoted": false
         },
         {
-          "line": 102,
+          "line": 108,
           "module": "Jido.AI.Orchestration",
           "name": "observation_type?",
           "kind": "def",
@@ -7832,11 +7909,11 @@
             1
           ],
           "clause_lines": [
-            102
+            108
           ]
         },
         {
-          "line": 104,
+          "line": 110,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "documented",
@@ -7844,7 +7921,7 @@
           "quoted": false
         },
         {
-          "line": 105,
+          "line": 111,
           "module": "Jido.AI.Orchestration",
           "name": "delivery_status",
           "kind": "def",
@@ -7853,11 +7930,11 @@
             2
           ],
           "clause_lines": [
-            105
+            111
           ]
         },
         {
-          "line": 114,
+          "line": 120,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "hidden",
@@ -7865,7 +7942,7 @@
           "quoted": false
         },
         {
-          "line": 115,
+          "line": 121,
           "module": "Jido.AI.Orchestration",
           "name": "settle_signal",
           "kind": "def",
@@ -7874,11 +7951,11 @@
             1
           ],
           "clause_lines": [
-            115
+            121
           ]
         },
         {
-          "line": 118,
+          "line": 124,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "hidden",
@@ -7886,7 +7963,7 @@
           "quoted": false
         },
         {
-          "line": 119,
+          "line": 125,
           "module": "Jido.AI.Orchestration",
           "name": "routes",
           "kind": "def",
@@ -7895,71 +7972,8 @@
             1
           ],
           "clause_lines": [
-            119,
-            121
-          ]
-        },
-        {
-          "line": 151,
-          "module": "Jido.AI.Orchestration",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 152,
-          "module": "Jido.AI.Orchestration",
-          "name": "settle_type",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            0
-          ],
-          "clause_lines": [
-            152
-          ]
-        },
-        {
-          "line": 153,
-          "module": "Jido.AI.Orchestration",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 154,
-          "module": "Jido.AI.Orchestration",
-          "name": "cancel_type",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            0
-          ],
-          "clause_lines": [
-            154
-          ]
-        },
-        {
-          "line": 155,
-          "module": "Jido.AI.Orchestration",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 156,
-          "module": "Jido.AI.Orchestration",
-          "name": "history_type",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            0
-          ],
-          "clause_lines": [
-            156
+            125,
+            127
           ]
         },
         {
@@ -7973,7 +7987,7 @@
         {
           "line": 158,
           "module": "Jido.AI.Orchestration",
-          "name": "progress_type",
+          "name": "settle_type",
           "kind": "def",
           "quoted": false,
           "arities": [
@@ -7984,7 +7998,7 @@
           ]
         },
         {
-          "line": 160,
+          "line": 159,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "hidden",
@@ -7992,7 +8006,70 @@
           "quoted": false
         },
         {
+          "line": 160,
+          "module": "Jido.AI.Orchestration",
+          "name": "cancel_type",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            0
+          ],
+          "clause_lines": [
+            160
+          ]
+        },
+        {
           "line": 161,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 162,
+          "module": "Jido.AI.Orchestration",
+          "name": "history_type",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            0
+          ],
+          "clause_lines": [
+            162
+          ]
+        },
+        {
+          "line": 163,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 164,
+          "module": "Jido.AI.Orchestration",
+          "name": "progress_type",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            0
+          ],
+          "clause_lines": [
+            164
+          ]
+        },
+        {
+          "line": 166,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 167,
           "module": "Jido.AI.Orchestration",
           "name": "publish_selection",
           "kind": "def",
@@ -8001,13 +8078,13 @@
             3
           ],
           "clause_lines": [
-            161,
-            163,
-            179
+            167,
+            169,
+            185
           ]
         },
         {
-          "line": 181,
+          "line": 187,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "hidden",
@@ -8015,7 +8092,7 @@
           "quoted": false
         },
         {
-          "line": 182,
+          "line": 188,
           "module": "Jido.AI.Orchestration",
           "name": "caller_context",
           "kind": "def",
@@ -8024,11 +8101,11 @@
             1
           ],
           "clause_lines": [
-            182
+            188
           ]
         },
         {
-          "line": 210,
+          "line": 216,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "documented",
@@ -8036,7 +8113,7 @@
           "quoted": false
         },
         {
-          "line": 211,
+          "line": 217,
           "module": "Jido.AI.Orchestration",
           "name": "steer",
           "kind": "def",
@@ -8046,11 +8123,11 @@
             3
           ],
           "clause_lines": [
-            211
+            217
           ]
         },
         {
-          "line": 212,
+          "line": 218,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "documented",
@@ -8058,7 +8135,7 @@
           "quoted": false
         },
         {
-          "line": 213,
+          "line": 219,
           "module": "Jido.AI.Orchestration",
           "name": "inject",
           "kind": "def",
@@ -8068,11 +8145,11 @@
             3
           ],
           "clause_lines": [
-            213
+            219
           ]
         },
         {
-          "line": 215,
+          "line": 221,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "hidden",
@@ -8080,7 +8157,7 @@
           "quoted": false
         },
         {
-          "line": 216,
+          "line": 222,
           "module": "Jido.AI.Orchestration",
           "name": "control_agent",
           "kind": "def",
@@ -8089,11 +8166,11 @@
             4
           ],
           "clause_lines": [
-            216
+            222
           ]
         },
         {
-          "line": 258,
+          "line": 264,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "hidden",
@@ -8101,7 +8178,7 @@
           "quoted": false
         },
         {
-          "line": 259,
+          "line": 265,
           "module": "Jido.AI.Orchestration",
           "name": "publish_history",
           "kind": "def",
@@ -8110,28 +8187,7 @@
             2
           ],
           "clause_lines": [
-            259
-          ]
-        },
-        {
-          "line": 289,
-          "module": "Jido.AI.Orchestration",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 290,
-          "module": "Jido.AI.Orchestration",
-          "name": "admission_target",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            1
-          ],
-          "clause_lines": [
-            290
+            265
           ]
         },
         {
@@ -8145,6 +8201,27 @@
         {
           "line": 296,
           "module": "Jido.AI.Orchestration",
+          "name": "admission_target",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            296
+          ]
+        },
+        {
+          "line": 301,
+          "module": "Jido.AI.Orchestration",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 302,
+          "module": "Jido.AI.Orchestration",
           "name": "submit",
           "kind": "def",
           "quoted": false,
@@ -8152,11 +8229,11 @@
             4
           ],
           "clause_lines": [
-            296
+            302
           ]
         },
         {
-          "line": 369,
+          "line": 375,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "documented",
@@ -8164,7 +8241,7 @@
           "quoted": false
         },
         {
-          "line": 370,
+          "line": 376,
           "module": "Jido.AI.Orchestration",
           "name": "cancel",
           "kind": "def",
@@ -8174,11 +8251,11 @@
             2
           ],
           "clause_lines": [
-            370
+            376
           ]
         },
         {
-          "line": 387,
+          "line": 393,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "hidden",
@@ -8186,7 +8263,7 @@
           "quoted": false
         },
         {
-          "line": 388,
+          "line": 394,
           "module": "Jido.AI.Orchestration",
           "name": "await",
           "kind": "def",
@@ -8195,12 +8272,12 @@
             3
           ],
           "clause_lines": [
-            388,
-            396
+            394,
+            402
           ]
         },
         {
-          "line": 446,
+          "line": 452,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "hidden",
@@ -8208,7 +8285,7 @@
           "quoted": false
         },
         {
-          "line": 447,
+          "line": 453,
           "module": "Jido.AI.Orchestration",
           "name": "inspect_reasoning",
           "kind": "def",
@@ -8217,12 +8294,12 @@
             2
           ],
           "clause_lines": [
-            447,
-            449
+            453,
+            455
           ]
         },
         {
-          "line": 456,
+          "line": 462,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "hidden",
@@ -8230,7 +8307,7 @@
           "quoted": false
         },
         {
-          "line": 457,
+          "line": 463,
           "module": "Jido.AI.Orchestration",
           "name": "reasoning_iteration",
           "kind": "def",
@@ -8239,11 +8316,11 @@
             2
           ],
           "clause_lines": [
-            457
+            463
           ]
         },
         {
-          "line": 467,
+          "line": 473,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "hidden",
@@ -8251,7 +8328,7 @@
           "quoted": false
         },
         {
-          "line": 468,
+          "line": 474,
           "module": "Jido.AI.Orchestration",
           "name": "failure_type",
           "kind": "def",
@@ -8260,11 +8337,11 @@
             2
           ],
           "clause_lines": [
-            468
+            474
           ]
         },
         {
-          "line": 475,
+          "line": 481,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "hidden",
@@ -8272,7 +8349,7 @@
           "quoted": false
         },
         {
-          "line": 476,
+          "line": 482,
           "module": "Jido.AI.Orchestration",
           "name": "account",
           "kind": "def",
@@ -8281,11 +8358,11 @@
             2
           ],
           "clause_lines": [
-            476
+            482
           ]
         },
         {
-          "line": 483,
+          "line": 489,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "hidden",
@@ -8293,7 +8370,7 @@
           "quoted": false
         },
         {
-          "line": 484,
+          "line": 490,
           "module": "Jido.AI.Orchestration",
           "name": "failed_metadata",
           "kind": "def",
@@ -8302,11 +8379,11 @@
             2
           ],
           "clause_lines": [
-            484
+            490
           ]
         },
         {
-          "line": 490,
+          "line": 496,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "hidden",
@@ -8314,7 +8391,7 @@
           "quoted": false
         },
         {
-          "line": 491,
+          "line": 497,
           "module": "Jido.AI.Orchestration",
           "name": "output",
           "kind": "def",
@@ -8323,11 +8400,11 @@
             4
           ],
           "clause_lines": [
-            491
+            497
           ]
         },
         {
-          "line": 508,
+          "line": 514,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "hidden",
@@ -8335,7 +8412,7 @@
           "quoted": false
         },
         {
-          "line": 509,
+          "line": 515,
           "module": "Jido.AI.Orchestration",
           "name": "event_state",
           "kind": "def",
@@ -8344,11 +8421,11 @@
             1
           ],
           "clause_lines": [
-            509
+            515
           ]
         },
         {
-          "line": 516,
+          "line": 522,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "hidden",
@@ -8356,7 +8433,7 @@
           "quoted": false
         },
         {
-          "line": 517,
+          "line": 523,
           "module": "Jido.AI.Orchestration",
           "name": "activity",
           "kind": "def",
@@ -8366,11 +8443,11 @@
             2
           ],
           "clause_lines": [
-            517
+            523
           ]
         },
         {
-          "line": 524,
+          "line": 530,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "hidden",
@@ -8378,7 +8455,7 @@
           "quoted": false
         },
         {
-          "line": 525,
+          "line": 531,
           "module": "Jido.AI.Orchestration",
           "name": "tool_signature",
           "kind": "def",
@@ -8387,11 +8464,11 @@
             2
           ],
           "clause_lines": [
-            525
+            531
           ]
         },
         {
-          "line": 532,
+          "line": 538,
           "module": "Jido.AI.Orchestration",
           "name": "doc",
           "status": "hidden",
@@ -8399,7 +8476,7 @@
           "quoted": false
         },
         {
-          "line": 533,
+          "line": 539,
           "module": "Jido.AI.Orchestration",
           "name": "emit",
           "kind": "def",
@@ -8409,7 +8486,7 @@
             3
           ],
           "clause_lines": [
-            533
+            539
           ]
         }
       ]
@@ -8691,7 +8768,7 @@
       "modules": [
         "Jido.AI.Orchestration.Coordinator"
       ],
-      "sha256": "4d6fc341871ddecd1c5172efbbe8e8591dd2d5ce7a3c9928706d44513344ca45",
+      "sha256": "80b10f80c887f77da9ed7502f1e86d566431362ec3e789666791fdb079242dcf",
       "declarations": [
         {
           "line": 1,
@@ -8786,19 +8863,19 @@
             358,
             363,
             379,
-            407,
-            418,
-            428,
-            441,
-            457,
-            468,
-            481,
-            493,
-            504
+            410,
+            421,
+            431,
+            444,
+            460,
+            471,
+            484,
+            496,
+            507
           ]
         },
         {
-          "line": 516,
+          "line": 519,
           "module": "Jido.AI.Orchestration.Coordinator",
           "name": "handle_info",
           "kind": "def",
@@ -8807,15 +8884,15 @@
             2
           ],
           "clause_lines": [
-            516,
-            543,
-            548,
-            559,
-            562
+            519,
+            546,
+            551,
+            562,
+            565
           ]
         },
         {
-          "line": 938,
+          "line": 944,
           "module": "Jido.AI.Orchestration.Coordinator",
           "name": "terminate",
           "kind": "def",
@@ -8824,7 +8901,7 @@
             2
           ],
           "clause_lines": [
-            938
+            944
           ]
         }
       ]
@@ -9162,7 +9239,7 @@
       "modules": [
         "Jido.AI.Orchestration.Inspection"
       ],
-      "sha256": "a6fdfa2d2637c1dc585317c02c3e266fe8bbb3b5e0304a11a7a9ea372c603db2",
+      "sha256": "e1f474e35b501391af530342b6fe66d499a93ebdeab6e7dffcf6ca664e424da0",
       "declarations": [
         {
           "line": 1,
@@ -9251,7 +9328,8 @@
           "kind": "def",
           "quoted": false,
           "arities": [
-            3
+            3,
+            4
           ],
           "clause_lines": [
             153
@@ -9402,7 +9480,7 @@
       "modules": [
         "Jido.AI.Orchestration.Plugin.Agent"
       ],
-      "sha256": "2a6e3118987dcd84400258c94d16fec93f2542d1725145b28dca6c25000be1cb",
+      "sha256": "4c24e1b7a5bdffabc3810422de2261254b495f5120e265f56c4955f28b9636fc",
       "declarations": [
         {
           "line": 1,
@@ -9782,7 +9860,7 @@
       "modules": [
         "Jido.AI.Orchestration.Settle"
       ],
-      "sha256": "f5c195866c8d6c3e096d075a4b3be308b6aa5aabac487a80a65017b8022ce5d1",
+      "sha256": "72d83a97df40d38715bffd953fdceb2d0d8cedfaf9853dbbf295755facb673f9",
       "declarations": [
         {
           "line": 1,
@@ -9870,7 +9948,7 @@
       "modules": [
         "Jido.AI.Orchestration.Transcript"
       ],
-      "sha256": "248370f21a432be2131c47958f13e7e14895021196b6646f3b1ef2e596e7b6be",
+      "sha256": "2106d4b233b3a13311d433880e551b7272a357c563369e97a1465cd3b722ae8b",
       "declarations": [
         {
           "line": 1,
@@ -9925,11 +10003,11 @@
           "clause_lines": [
             19,
             21,
-            34
+            38
           ]
         },
         {
-          "line": 36,
+          "line": 40,
           "module": "Jido.AI.Orchestration.Transcript",
           "name": "request_refs",
           "kind": "def",
@@ -9939,11 +10017,11 @@
             2
           ],
           "clause_lines": [
-            36
+            40
           ]
         },
         {
-          "line": 43,
+          "line": 47,
           "module": "Jido.AI.Orchestration.Transcript",
           "name": "start",
           "kind": "def",
@@ -9952,11 +10030,11 @@
             4
           ],
           "clause_lines": [
-            43
+            47
           ]
         },
         {
-          "line": 48,
+          "line": 52,
           "module": "Jido.AI.Orchestration.Transcript",
           "name": "append",
           "kind": "def",
@@ -9965,12 +10043,26 @@
             3
           ],
           "clause_lines": [
-            48,
-            50
+            52,
+            54
           ]
         },
         {
-          "line": 57,
+          "line": 65,
+          "module": "Jido.AI.Orchestration.Transcript",
+          "name": "settle",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            3
+          ],
+          "clause_lines": [
+            65,
+            67
+          ]
+        },
+        {
+          "line": 84,
           "module": "Jido.AI.Orchestration.Transcript",
           "name": "record",
           "kind": "def",
@@ -9979,7 +10071,7 @@
             3
           ],
           "clause_lines": [
-            57
+            84
           ]
         }
       ]
@@ -12695,7 +12787,7 @@
       "modules": [
         "Jido.AI.Profile"
       ],
-      "sha256": "d9a1d682adccf8346dc33cdff924fd4c3c6c5559bf0a2b44eb143e1eaef00183",
+      "sha256": "d7dd9a8e82ce84c1ccf3ee9a916eeaa297d86680890260503466aff5b0fe33f7",
       "declarations": [
         {
           "line": 1,
@@ -12713,14 +12805,14 @@
           "quoted": false
         },
         {
-          "line": 44,
+          "line": 59,
           "module": "Jido.AI.Profile",
           "source": "[Zoi.Struct.struct_fields(@schema)]",
           "kind": "defstruct",
           "quoted": false
         },
         {
-          "line": 68,
+          "line": 83,
           "module": "Jido.AI.Profile",
           "name": "doc",
           "status": "documented",
@@ -12728,7 +12820,7 @@
           "quoted": false
         },
         {
-          "line": 69,
+          "line": 84,
           "module": "Jido.AI.Profile",
           "name": "new",
           "kind": "def",
@@ -12738,13 +12830,13 @@
             2
           ],
           "clause_lines": [
-            69,
-            71,
-            73
+            84,
+            86,
+            88
           ]
         },
         {
-          "line": 129,
+          "line": 144,
           "module": "Jido.AI.Profile",
           "name": "doc",
           "status": "documented",
@@ -12752,7 +12844,7 @@
           "quoted": false
         },
         {
-          "line": 131,
+          "line": 146,
           "module": "Jido.AI.Profile",
           "name": "new!",
           "kind": "def",
@@ -12762,11 +12854,11 @@
             2
           ],
           "clause_lines": [
-            131
+            146
           ]
         },
         {
-          "line": 138,
+          "line": 153,
           "module": "Jido.AI.Profile",
           "name": "doc",
           "status": "documented",
@@ -12774,7 +12866,7 @@
           "quoted": false
         },
         {
-          "line": 140,
+          "line": 155,
           "module": "Jido.AI.Profile",
           "name": "validate",
           "kind": "def",
@@ -12783,29 +12875,7 @@
             1
           ],
           "clause_lines": [
-            140
-          ]
-        },
-        {
-          "line": 221,
-          "module": "Jido.AI.Profile",
-          "name": "doc",
-          "status": "hidden",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 222,
-          "module": "Jido.AI.Profile",
-          "name": "fields",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            3
-          ],
-          "clause_lines": [
-            222,
-            234
+            155
           ]
         },
         {
@@ -12819,18 +12889,19 @@
         {
           "line": 237,
           "module": "Jido.AI.Profile",
-          "name": "error",
+          "name": "fields",
           "kind": "def",
           "quoted": false,
           "arities": [
-            2
+            3
           ],
           "clause_lines": [
-            237
+            237,
+            249
           ]
         },
         {
-          "line": 240,
+          "line": 251,
           "module": "Jido.AI.Profile",
           "name": "doc",
           "status": "hidden",
@@ -12838,7 +12909,28 @@
           "quoted": false
         },
         {
-          "line": 241,
+          "line": 252,
+          "module": "Jido.AI.Profile",
+          "name": "error",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            2
+          ],
+          "clause_lines": [
+            252
+          ]
+        },
+        {
+          "line": 255,
+          "module": "Jido.AI.Profile",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 256,
           "module": "Jido.AI.Profile",
           "name": "traverse",
           "kind": "def",
@@ -12847,11 +12939,11 @@
             2
           ],
           "clause_lines": [
-            241
+            256
           ]
         },
         {
-          "line": 243,
+          "line": 258,
           "module": "Jido.AI.Profile",
           "name": "doc",
           "status": "hidden",
@@ -12859,7 +12951,7 @@
           "quoted": false
         },
         {
-          "line": 244,
+          "line": 259,
           "module": "Jido.AI.Profile",
           "name": "source",
           "kind": "def",
@@ -12868,12 +12960,12 @@
             1
           ],
           "clause_lines": [
-            244,
-            248
+            259,
+            263
           ]
         },
         {
-          "line": 878,
+          "line": 898,
           "module": "Jido.AI.Profile",
           "name": "doc",
           "status": "hidden",
@@ -12881,7 +12973,7 @@
           "quoted": false
         },
         {
-          "line": 879,
+          "line": 899,
           "module": "Jido.AI.Profile",
           "name": "resolve_controls",
           "kind": "def",
@@ -12890,12 +12982,12 @@
             1
           ],
           "clause_lines": [
-            879,
-            882
+            899,
+            902
           ]
         },
         {
-          "line": 938,
+          "line": 958,
           "module": "Jido.AI.Profile",
           "name": "doc",
           "status": "hidden",
@@ -12903,7 +12995,7 @@
           "quoted": false
         },
         {
-          "line": 939,
+          "line": 959,
           "module": "Jido.AI.Profile",
           "name": "portable_data",
           "kind": "def",
@@ -12912,14 +13004,14 @@
             1
           ],
           "clause_lines": [
-            939,
-            943,
-            944,
-            945
+            959,
+            963,
+            964,
+            965
           ]
         },
         {
-          "line": 987,
+          "line": 1007,
           "module": "Jido.AI.Profile",
           "name": "doc",
           "status": "hidden",
@@ -12927,7 +13019,7 @@
           "quoted": false
         },
         {
-          "line": 988,
+          "line": 1008,
           "module": "Jido.AI.Profile",
           "name": "output_contract",
           "kind": "def",
@@ -12936,9 +13028,9 @@
             1
           ],
           "clause_lines": [
-            988,
-            989,
-            991
+            1008,
+            1009,
+            1011
           ]
         }
       ]
@@ -13334,7 +13426,7 @@
       "modules": [
         "Jido.AI.Query"
       ],
-      "sha256": "d6a8be85bb74a0fbf800f37d0343a2cfb5c979caeafbe230a5dbc05775af81f9",
+      "sha256": "50562cab034a6cb1af9b232b77c753d53e41d1a89b42411c90edca3ee028a31a",
       "declarations": [
         {
           "line": 1,
@@ -16420,7 +16512,7 @@
       "modules": [
         "Jido.AI.Reasoning.ReAct.Actions.Collect"
       ],
-      "sha256": "e42fa54f8526251291c0ea5d31320bd057dd3f8317e6d66225d346e7588581f2",
+      "sha256": "008c42e792b6b398a721a91f3682e76e3c1f4261db0dae3191c554fe82352f1d",
       "declarations": [
         {
           "line": 1,
@@ -16440,12 +16532,12 @@
         {
           "line": 8,
           "module": "Jido.AI.Reasoning.ReAct.Actions.Collect",
-          "source": "[\n  Jido.Action,\n  [\n    name: \"react_collect\",\n    description: \"Collect terminal output from ReAct runtime events/checkpoint\",\n    schema:\n      Zoi.object(%{\n        events: Zoi.any() |> Zoi.optional(),\n        checkpoint_token: Zoi.string() |> Zoi.optional(),\n        run_until_terminal?: Zoi.boolean() |> Zoi.default(true),\n        query: Query.schema() |> Zoi.optional(),\n        model: Zoi.any() |> Zoi.optional(),\n        system_prompt: Zoi.string() |> Zoi.optional(),\n        tools: Zoi.any() |> Zoi.optional(),\n        allowed_tools: Zoi.list(Zoi.string()) |> Zoi.optional(),\n        request_transformer: Zoi.atom() |> Zoi.optional(),\n        max_iterations: Zoi.integer() |> Zoi.default(10),\n        max_tokens: Zoi.integer() |> Zoi.default(4096),\n        temperature: Zoi.float() |> Zoi.default(0.2),\n        llm_opts: Zoi.any() |> Zoi.optional(),\n        llm_timeout_ms: Zoi.integer() |> Zoi.optional(),\n        req_http_options: Zoi.list(Zoi.any()) |> Zoi.optional(),\n        stream_timeout_ms: Zoi.integer() |> Zoi.optional(),\n        tool_heartbeat_ms: Zoi.integer() |> Zoi.optional(),\n        tool_timeout_ms: Zoi.integer() |> Zoi.default(15000),\n        tool_max_retries: Zoi.integer() |> Zoi.default(1),\n        tool_retry_backoff_ms: Zoi.integer() |> Zoi.default(200),\n        tool_concurrency: Zoi.integer() |> Zoi.default(4),\n        token_secret: Zoi.string() |> Zoi.optional(),\n        token_ttl_ms: Zoi.integer() |> Zoi.optional(),\n        token_compress?: Zoi.boolean() |> Zoi.default(false),\n        task_supervisor: Zoi.any() |> Zoi.optional(),\n        limits: Zoi.map() |> Zoi.optional(),\n        runtime_context: Zoi.map() |> Zoi.optional()\n      })\n  ]\n]",
+          "source": "[\n  Jido.Action,\n  [\n    name: \"react_collect\",\n    description: \"Collect terminal output from ReAct runtime events/checkpoint\",\n    schema:\n      Zoi.object(%{\n        events: Zoi.any() |> Zoi.optional(),\n        checkpoint_token: Zoi.string() |> Zoi.optional(),\n        run_until_terminal?: Zoi.boolean() |> Zoi.default(true),\n        query: Query.schema() |> Zoi.optional(),\n        model: Zoi.any() |> Zoi.optional(),\n        system_prompt: Zoi.string() |> Zoi.optional(),\n        tools: Zoi.any() |> Zoi.optional(),\n        allowed_tools: Zoi.list(Zoi.string()) |> Zoi.optional(),\n        request_transformer: Zoi.atom() |> Zoi.optional(),\n        max_iterations: Zoi.integer() |> Zoi.default(10),\n        max_tokens: Zoi.integer() |> Zoi.default(4096),\n        temperature: Zoi.float() |> Zoi.default(0.2),\n        llm_opts: Zoi.any() |> Zoi.optional(),\n        llm_timeout_ms: Zoi.integer() |> Zoi.optional(),\n        req_http_options: Zoi.list(Zoi.any()) |> Zoi.optional(),\n        stream_timeout_ms: Zoi.integer() |> Zoi.optional(),\n        tool_heartbeat_ms: Zoi.integer() |> Zoi.optional(),\n        tool_timeout_ms: Zoi.integer() |> Zoi.default(15000),\n        tool_max_retries: Zoi.integer() |> Zoi.default(1),\n        tool_retry_backoff_ms: Zoi.integer() |> Zoi.default(200),\n        tool_concurrency: Zoi.integer() |> Zoi.default(4),\n        stream_content: Zoi.boolean() |> Zoi.default(false),\n        store_content: Zoi.boolean() |> Zoi.default(false),\n        stream_reasoning: Zoi.boolean() |> Zoi.default(false),\n        store_reasoning: Zoi.boolean() |> Zoi.default(false),\n        token_secret: Zoi.string() |> Zoi.optional(),\n        token_ttl_ms: Zoi.integer() |> Zoi.optional(),\n        token_compress?: Zoi.boolean() |> Zoi.default(false),\n        task_supervisor: Zoi.any() |> Zoi.optional(),\n        limits: Zoi.map() |> Zoi.optional(),\n        runtime_context: Zoi.map() |> Zoi.optional()\n      })\n  ]\n]",
           "kind": "use",
           "quoted": false
         },
         {
-          "line": 45,
+          "line": 49,
           "module": "Jido.AI.Reasoning.ReAct.Actions.Collect",
           "name": "category",
           "kind": "def",
@@ -16454,11 +16546,11 @@
             0
           ],
           "clause_lines": [
-            45
+            49
           ]
         },
         {
-          "line": 46,
+          "line": 50,
           "module": "Jido.AI.Reasoning.ReAct.Actions.Collect",
           "name": "tags",
           "kind": "def",
@@ -16467,11 +16559,11 @@
             0
           ],
           "clause_lines": [
-            46
+            50
           ]
         },
         {
-          "line": 47,
+          "line": 51,
           "module": "Jido.AI.Reasoning.ReAct.Actions.Collect",
           "name": "vsn",
           "kind": "def",
@@ -16480,11 +16572,11 @@
             0
           ],
           "clause_lines": [
-            47
+            51
           ]
         },
         {
-          "line": 50,
+          "line": 54,
           "module": "Jido.AI.Reasoning.ReAct.Actions.Collect",
           "name": "on_before_validate_params",
           "kind": "def",
@@ -16493,11 +16585,11 @@
             1
           ],
           "clause_lines": [
-            50
+            54
           ]
         },
         {
-          "line": 54,
+          "line": 58,
           "module": "Jido.AI.Reasoning.ReAct.Actions.Collect",
           "name": "run",
           "kind": "def",
@@ -16506,7 +16598,7 @@
             2
           ],
           "clause_lines": [
-            54
+            58
           ]
         }
       ]
@@ -16516,7 +16608,7 @@
       "modules": [
         "Jido.AI.Reasoning.ReAct.Actions.Continue"
       ],
-      "sha256": "047c1757d37ab82c16325040a49101f4cb9e0fdce096f6e9b0ca1ebfd9f6e217",
+      "sha256": "b674d3cae1d0b57a1c2d4dbc036d029d6994bdc42f4365ce4bff097781bd1431",
       "declarations": [
         {
           "line": 1,
@@ -16536,12 +16628,12 @@
         {
           "line": 8,
           "module": "Jido.AI.Reasoning.ReAct.Actions.Continue",
-          "source": "[\n  Jido.Action,\n  [\n    name: \"react_continue\",\n    description: \"Resume a ReAct checkpoint through an Agent and Session\",\n    schema:\n      Zoi.object(%{\n        checkpoint_token: Zoi.string(description: \"Signed ReAct checkpoint token\"),\n        query: Query.schema() |> Zoi.optional(),\n        model: Zoi.any() |> Zoi.optional(),\n        system_prompt: Zoi.string() |> Zoi.optional(),\n        tools: Zoi.any() |> Zoi.optional(),\n        allowed_tools: Zoi.list(Zoi.string()) |> Zoi.optional(),\n        request_transformer: Zoi.atom() |> Zoi.optional(),\n        max_iterations: Zoi.integer() |> Zoi.default(10),\n        max_tokens: Zoi.integer() |> Zoi.default(4096),\n        temperature: Zoi.float() |> Zoi.default(0.2),\n        llm_opts: Zoi.any() |> Zoi.optional(),\n        llm_timeout_ms: Zoi.integer() |> Zoi.optional(),\n        req_http_options: Zoi.list(Zoi.any()) |> Zoi.optional(),\n        stream_timeout_ms: Zoi.integer() |> Zoi.optional(),\n        tool_heartbeat_ms: Zoi.integer() |> Zoi.optional(),\n        tool_timeout_ms: Zoi.integer() |> Zoi.default(15000),\n        tool_max_retries: Zoi.integer() |> Zoi.default(1),\n        tool_retry_backoff_ms: Zoi.integer() |> Zoi.default(200),\n        tool_concurrency: Zoi.integer() |> Zoi.default(4),\n        emit_signals?: Zoi.boolean() |> Zoi.default(true),\n        emit_telemetry?: Zoi.boolean() |> Zoi.default(true),\n        redact_tool_args?: Zoi.boolean() |> Zoi.default(true),\n        capture_deltas?: Zoi.boolean() |> Zoi.default(true),\n        token_secret: Zoi.string() |> Zoi.optional(),\n        token_ttl_ms: Zoi.integer() |> Zoi.optional(),\n        token_compress?: Zoi.boolean() |> Zoi.default(false),\n        task_supervisor: Zoi.any() |> Zoi.optional(),\n        limits: Zoi.map() |> Zoi.optional(),\n        runtime_context: Zoi.map() |> Zoi.optional()\n      })\n  ]\n]",
+          "source": "[\n  Jido.Action,\n  [\n    name: \"react_continue\",\n    description: \"Resume a ReAct checkpoint through an Agent and Session\",\n    schema:\n      Zoi.object(%{\n        checkpoint_token: Zoi.string(description: \"Signed ReAct checkpoint token\"),\n        query: Query.schema() |> Zoi.optional(),\n        model: Zoi.any() |> Zoi.optional(),\n        system_prompt: Zoi.string() |> Zoi.optional(),\n        tools: Zoi.any() |> Zoi.optional(),\n        allowed_tools: Zoi.list(Zoi.string()) |> Zoi.optional(),\n        request_transformer: Zoi.atom() |> Zoi.optional(),\n        max_iterations: Zoi.integer() |> Zoi.default(10),\n        max_tokens: Zoi.integer() |> Zoi.default(4096),\n        temperature: Zoi.float() |> Zoi.default(0.2),\n        llm_opts: Zoi.any() |> Zoi.optional(),\n        llm_timeout_ms: Zoi.integer() |> Zoi.optional(),\n        req_http_options: Zoi.list(Zoi.any()) |> Zoi.optional(),\n        stream_timeout_ms: Zoi.integer() |> Zoi.optional(),\n        tool_heartbeat_ms: Zoi.integer() |> Zoi.optional(),\n        tool_timeout_ms: Zoi.integer() |> Zoi.default(15000),\n        tool_max_retries: Zoi.integer() |> Zoi.default(1),\n        tool_retry_backoff_ms: Zoi.integer() |> Zoi.default(200),\n        tool_concurrency: Zoi.integer() |> Zoi.default(4),\n        emit_signals?: Zoi.boolean() |> Zoi.default(true),\n        emit_telemetry?: Zoi.boolean() |> Zoi.default(true),\n        redact_tool_args?: Zoi.boolean() |> Zoi.default(true),\n        capture_deltas?: Zoi.boolean() |> Zoi.default(true),\n        stream_content: Zoi.boolean() |> Zoi.default(false),\n        store_content: Zoi.boolean() |> Zoi.default(false),\n        stream_reasoning: Zoi.boolean() |> Zoi.default(false),\n        store_reasoning: Zoi.boolean() |> Zoi.default(false),\n        token_secret: Zoi.string() |> Zoi.optional(),\n        token_ttl_ms: Zoi.integer() |> Zoi.optional(),\n        token_compress?: Zoi.boolean() |> Zoi.default(false),\n        task_supervisor: Zoi.any() |> Zoi.optional(),\n        limits: Zoi.map() |> Zoi.optional(),\n        runtime_context: Zoi.map() |> Zoi.optional()\n      })\n  ]\n]",
           "kind": "use",
           "quoted": false
         },
         {
-          "line": 47,
+          "line": 51,
           "module": "Jido.AI.Reasoning.ReAct.Actions.Continue",
           "name": "category",
           "kind": "def",
@@ -16550,11 +16642,11 @@
             0
           ],
           "clause_lines": [
-            47
+            51
           ]
         },
         {
-          "line": 48,
+          "line": 52,
           "module": "Jido.AI.Reasoning.ReAct.Actions.Continue",
           "name": "tags",
           "kind": "def",
@@ -16563,11 +16655,11 @@
             0
           ],
           "clause_lines": [
-            48
+            52
           ]
         },
         {
-          "line": 49,
+          "line": 53,
           "module": "Jido.AI.Reasoning.ReAct.Actions.Continue",
           "name": "vsn",
           "kind": "def",
@@ -16576,11 +16668,11 @@
             0
           ],
           "clause_lines": [
-            49
+            53
           ]
         },
         {
-          "line": 52,
+          "line": 56,
           "module": "Jido.AI.Reasoning.ReAct.Actions.Continue",
           "name": "on_before_validate_params",
           "kind": "def",
@@ -16589,11 +16681,11 @@
             1
           ],
           "clause_lines": [
-            52
+            56
           ]
         },
         {
-          "line": 56,
+          "line": 60,
           "module": "Jido.AI.Reasoning.ReAct.Actions.Continue",
           "name": "run",
           "kind": "def",
@@ -16602,7 +16694,7 @@
             2
           ],
           "clause_lines": [
-            56
+            60
           ]
         }
       ]
@@ -16612,7 +16704,7 @@
       "modules": [
         "Jido.AI.Reasoning.ReAct.Actions.Helpers"
       ],
-      "sha256": "29d334a53c6f32c1059a2aad6b8311492a2fbc93e12328a3c1e21b4a60ec4999",
+      "sha256": "60aff43a724df67e49d389a8d5326cc221eb29defafa06d4746b114e0633823c",
       "declarations": [
         {
           "line": 1,
@@ -16651,7 +16743,7 @@
           ]
         },
         {
-          "line": 45,
+          "line": 49,
           "module": "Jido.AI.Reasoning.ReAct.Actions.Helpers",
           "name": "doc",
           "status": "documented",
@@ -16659,7 +16751,7 @@
           "quoted": false
         },
         {
-          "line": 49,
+          "line": 53,
           "module": "Jido.AI.Reasoning.ReAct.Actions.Helpers",
           "name": "build_runner_opts",
           "kind": "def",
@@ -16668,11 +16760,11 @@
             2
           ],
           "clause_lines": [
-            49
+            53
           ]
         },
         {
-          "line": 62,
+          "line": 66,
           "module": "Jido.AI.Reasoning.ReAct.Actions.Helpers",
           "name": "doc",
           "status": "documented",
@@ -16680,7 +16772,7 @@
           "quoted": false
         },
         {
-          "line": 66,
+          "line": 70,
           "module": "Jido.AI.Reasoning.ReAct.Actions.Helpers",
           "name": "resolve_task_supervisor",
           "kind": "def",
@@ -16689,7 +16781,7 @@
             2
           ],
           "clause_lines": [
-            66
+            70
           ]
         }
       ]
@@ -16699,7 +16791,7 @@
       "modules": [
         "Jido.AI.Reasoning.ReAct.Actions.Start"
       ],
-      "sha256": "3611ee4ab874c3a5e88be69bb67d6b5bce8ed2566d447abe9c1e8b0c0c07b3b5",
+      "sha256": "025878818aec587ff4a545a9c8ee7795f6cf6bec7156cde981a2dc6d59741504",
       "declarations": [
         {
           "line": 1,
@@ -16719,12 +16811,12 @@
         {
           "line": 8,
           "module": "Jido.AI.Reasoning.ReAct.Actions.Start",
-          "source": "[\n  Jido.Action,\n  [\n    name: \"react_start\",\n    description: \"Start a ReAct stream through an Agent and Session\",\n    schema:\n      Zoi.object(%{\n        query: Query.schema(description: \"User query for ReAct execution\"),\n        request_id: Zoi.string() |> Zoi.optional(),\n        run_id: Zoi.string() |> Zoi.optional(),\n        model: Zoi.any() |> Zoi.optional(),\n        system_prompt: Zoi.string() |> Zoi.optional(),\n        tools: Zoi.any() |> Zoi.optional(),\n        allowed_tools: Zoi.list(Zoi.string()) |> Zoi.optional(),\n        request_transformer: Zoi.atom() |> Zoi.optional(),\n        max_iterations: Zoi.integer() |> Zoi.default(10),\n        max_tokens: Zoi.integer() |> Zoi.default(4096),\n        temperature: Zoi.float() |> Zoi.default(0.2),\n        llm_opts: Zoi.any() |> Zoi.optional(),\n        llm_timeout_ms: Zoi.integer() |> Zoi.optional(),\n        req_http_options: Zoi.list(Zoi.any()) |> Zoi.optional(),\n        stream_timeout_ms: Zoi.integer() |> Zoi.optional(),\n        tool_heartbeat_ms: Zoi.integer() |> Zoi.optional(),\n        tool_timeout_ms: Zoi.integer() |> Zoi.default(15000),\n        tool_max_retries: Zoi.integer() |> Zoi.default(1),\n        tool_retry_backoff_ms: Zoi.integer() |> Zoi.default(200),\n        tool_concurrency: Zoi.integer() |> Zoi.default(4),\n        emit_signals?: Zoi.boolean() |> Zoi.default(true),\n        emit_telemetry?: Zoi.boolean() |> Zoi.default(true),\n        redact_tool_args?: Zoi.boolean() |> Zoi.default(true),\n        capture_deltas?: Zoi.boolean() |> Zoi.default(true),\n        token_secret: Zoi.string() |> Zoi.optional(),\n        token_ttl_ms: Zoi.integer() |> Zoi.optional(),\n        token_compress?: Zoi.boolean() |> Zoi.default(false),\n        task_supervisor: Zoi.any() |> Zoi.optional(),\n        limits: Zoi.map() |> Zoi.optional(),\n        runtime_context: Zoi.map() |> Zoi.optional()\n      })\n  ]\n]",
+          "source": "[\n  Jido.Action,\n  [\n    name: \"react_start\",\n    description: \"Start a ReAct stream through an Agent and Session\",\n    schema:\n      Zoi.object(%{\n        query: Query.schema(description: \"User query for ReAct execution\"),\n        request_id: Zoi.string() |> Zoi.optional(),\n        run_id: Zoi.string() |> Zoi.optional(),\n        model: Zoi.any() |> Zoi.optional(),\n        system_prompt: Zoi.string() |> Zoi.optional(),\n        tools: Zoi.any() |> Zoi.optional(),\n        allowed_tools: Zoi.list(Zoi.string()) |> Zoi.optional(),\n        request_transformer: Zoi.atom() |> Zoi.optional(),\n        max_iterations: Zoi.integer() |> Zoi.default(10),\n        max_tokens: Zoi.integer() |> Zoi.default(4096),\n        temperature: Zoi.float() |> Zoi.default(0.2),\n        llm_opts: Zoi.any() |> Zoi.optional(),\n        llm_timeout_ms: Zoi.integer() |> Zoi.optional(),\n        req_http_options: Zoi.list(Zoi.any()) |> Zoi.optional(),\n        stream_timeout_ms: Zoi.integer() |> Zoi.optional(),\n        tool_heartbeat_ms: Zoi.integer() |> Zoi.optional(),\n        tool_timeout_ms: Zoi.integer() |> Zoi.default(15000),\n        tool_max_retries: Zoi.integer() |> Zoi.default(1),\n        tool_retry_backoff_ms: Zoi.integer() |> Zoi.default(200),\n        tool_concurrency: Zoi.integer() |> Zoi.default(4),\n        emit_signals?: Zoi.boolean() |> Zoi.default(true),\n        emit_telemetry?: Zoi.boolean() |> Zoi.default(true),\n        redact_tool_args?: Zoi.boolean() |> Zoi.default(true),\n        capture_deltas?: Zoi.boolean() |> Zoi.default(true),\n        stream_content: Zoi.boolean() |> Zoi.default(false),\n        store_content: Zoi.boolean() |> Zoi.default(false),\n        stream_reasoning: Zoi.boolean() |> Zoi.default(false),\n        store_reasoning: Zoi.boolean() |> Zoi.default(false),\n        token_secret: Zoi.string() |> Zoi.optional(),\n        token_ttl_ms: Zoi.integer() |> Zoi.optional(),\n        token_compress?: Zoi.boolean() |> Zoi.default(false),\n        task_supervisor: Zoi.any() |> Zoi.optional(),\n        limits: Zoi.map() |> Zoi.optional(),\n        runtime_context: Zoi.map() |> Zoi.optional()\n      })\n  ]\n]",
           "kind": "use",
           "quoted": false
         },
         {
-          "line": 49,
+          "line": 53,
           "module": "Jido.AI.Reasoning.ReAct.Actions.Start",
           "name": "category",
           "kind": "def",
@@ -16733,11 +16825,11 @@
             0
           ],
           "clause_lines": [
-            49
+            53
           ]
         },
         {
-          "line": 50,
+          "line": 54,
           "module": "Jido.AI.Reasoning.ReAct.Actions.Start",
           "name": "tags",
           "kind": "def",
@@ -16746,11 +16838,11 @@
             0
           ],
           "clause_lines": [
-            50
+            54
           ]
         },
         {
-          "line": 51,
+          "line": 55,
           "module": "Jido.AI.Reasoning.ReAct.Actions.Start",
           "name": "vsn",
           "kind": "def",
@@ -16759,11 +16851,11 @@
             0
           ],
           "clause_lines": [
-            51
+            55
           ]
         },
         {
-          "line": 54,
+          "line": 58,
           "module": "Jido.AI.Reasoning.ReAct.Actions.Start",
           "name": "on_before_validate_params",
           "kind": "def",
@@ -16772,11 +16864,11 @@
             1
           ],
           "clause_lines": [
-            54
+            58
           ]
         },
         {
-          "line": 58,
+          "line": 62,
           "module": "Jido.AI.Reasoning.ReAct.Actions.Start",
           "name": "run",
           "kind": "def",
@@ -16785,7 +16877,7 @@
             2
           ],
           "clause_lines": [
-            58
+            62
           ]
         }
       ]
@@ -16795,7 +16887,7 @@
       "modules": [
         "Jido.AI.Reasoning.ReAct.Authoring"
       ],
-      "sha256": "cad22d9d4a74ba79e8f0585a1c7f237cb4eeb946ae81ac7b5a0067a0bc8babc8",
+      "sha256": "664a6d0e2343bc261148828146394a9d5c63768118b2f8921a55f2630d607487",
       "declarations": [
         {
           "line": 1,
@@ -16841,7 +16933,7 @@
           ]
         },
         {
-          "line": 93,
+          "line": 99,
           "module": "Jido.AI.Reasoning.ReAct.Authoring",
           "name": "doc",
           "status": "hidden",
@@ -16849,7 +16941,7 @@
           "quoted": false
         },
         {
-          "line": 94,
+          "line": 100,
           "module": "Jido.AI.Reasoning.ReAct.Authoring",
           "name": "tool_defaults",
           "kind": "def",
@@ -16858,7 +16950,7 @@
             1
           ],
           "clause_lines": [
-            94
+            100
           ]
         }
       ]
@@ -16981,7 +17073,7 @@
       "modules": [
         "Jido.AI.Reasoning.ReAct.Config"
       ],
-      "sha256": "b5d5d64c9a18eda26f778a5477aa012d9c050b24b30fef5166a89236e00c38bd",
+      "sha256": "dbb4a5a6cbb076ea1344fc092bff0cfcf0c26d9589e31ec9ac98ba1bbfcbd4dc",
       "declarations": [
         {
           "line": 1,
@@ -16999,14 +17091,14 @@
           "quoted": false
         },
         {
-          "line": 76,
+          "line": 89,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "source": "[Zoi.Struct.struct_fields(@schema)]",
           "kind": "defstruct",
           "quoted": false
         },
         {
-          "line": 78,
+          "line": 91,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "doc",
           "status": "hidden",
@@ -17014,7 +17106,7 @@
           "quoted": false
         },
         {
-          "line": 79,
+          "line": 92,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "schema",
           "kind": "def",
@@ -17023,11 +17115,11 @@
             0
           ],
           "clause_lines": [
-            79
+            92
           ]
         },
         {
-          "line": 81,
+          "line": 94,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "doc",
           "status": "documented",
@@ -17035,7 +17127,7 @@
           "quoted": false
         },
         {
-          "line": 85,
+          "line": 98,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "new",
           "kind": "def",
@@ -17045,11 +17137,11 @@
             1
           ],
           "clause_lines": [
-            85
+            98
           ]
         },
         {
-          "line": 172,
+          "line": 190,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "doc",
           "status": "documented",
@@ -17057,7 +17149,7 @@
           "quoted": false
         },
         {
-          "line": 176,
+          "line": 194,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "fingerprint",
           "kind": "def",
@@ -17066,11 +17158,11 @@
             1
           ],
           "clause_lines": [
-            176
+            194
           ]
         },
         {
-          "line": 198,
+          "line": 216,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "doc",
           "status": "documented",
@@ -17078,7 +17170,7 @@
           "quoted": false
         },
         {
-          "line": 202,
+          "line": 220,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "reqllm_tools",
           "kind": "def",
@@ -17087,11 +17179,11 @@
             1
           ],
           "clause_lines": [
-            202
+            220
           ]
         },
         {
-          "line": 208,
+          "line": 226,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "doc",
           "status": "documented",
@@ -17099,7 +17191,7 @@
           "quoted": false
         },
         {
-          "line": 216,
+          "line": 234,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "stream_timeout",
           "kind": "def",
@@ -17108,11 +17200,11 @@
             1
           ],
           "clause_lines": [
-            216
+            234
           ]
         },
         {
-          "line": 223,
+          "line": 241,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "doc",
           "status": "documented",
@@ -17120,7 +17212,7 @@
           "quoted": false
         },
         {
-          "line": 232,
+          "line": 250,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "tool_heartbeat_ms",
           "kind": "def",
@@ -17129,12 +17221,12 @@
             1
           ],
           "clause_lines": [
-            232,
-            235
+            250,
+            253
           ]
         },
         {
-          "line": 237,
+          "line": 255,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "doc",
           "status": "documented",
@@ -17142,7 +17234,7 @@
           "quoted": false
         },
         {
-          "line": 242,
+          "line": 260,
           "module": "Jido.AI.Reasoning.ReAct.Config",
           "name": "llm_opts",
           "kind": "def",
@@ -17151,7 +17243,7 @@
             1
           ],
           "clause_lines": [
-            242
+            260
           ]
         }
       ]
@@ -17332,7 +17424,7 @@
       "modules": [
         "Jido.AI.Reasoning.ReAct.Runner"
       ],
-      "sha256": "c9b51981123a40486f88a1994e2df3365cdb0b80e3ae865739113ad4d52d9bbe",
+      "sha256": "be00a8c91dabe67447978394c9cf0f1b13f6d6bd2bbf450b49fdf69e648c5858",
       "declarations": [
         {
           "line": 1,
@@ -17384,7 +17476,7 @@
       "modules": [
         "Jido.AI.Reasoning.ReAct.State"
       ],
-      "sha256": "b0d2071859c839d052ff1f9ee385af124d5eafeb7ba93b12e4196d25e33dcd53",
+      "sha256": "1ee2bd53ed406898dbd18a95c7cbc5f10b8ad261aaee96742dd68a98e9515099",
       "declarations": [
         {
           "line": 1,
@@ -17834,7 +17926,7 @@
           ]
         },
         {
-          "line": 354,
+          "line": 357,
           "module": "Jido.AI.Reasoning.ReAct.State",
           "name": "doc",
           "status": "hidden",
@@ -17842,7 +17934,7 @@
           "quoted": false
         },
         {
-          "line": 355,
+          "line": 358,
           "module": "Jido.AI.Reasoning.ReAct.State",
           "name": "messages",
           "kind": "def",
@@ -17851,7 +17943,7 @@
             1
           ],
           "clause_lines": [
-            355
+            358
           ]
         }
       ]
@@ -17861,7 +17953,7 @@
       "modules": [
         "Jido.AI.Reasoning.ReAct.Token"
       ],
-      "sha256": "54c4d02a94b7150287aa66205868f74ebd35debc3620a562d4feb3c88802d0d9",
+      "sha256": "b7c14c9a8fa663218e3f5275a6e18bf213c5360432ab6b327169e7192444d012",
       "declarations": [
         {
           "line": 1,
@@ -17917,11 +18009,13 @@
             2
           ],
           "clause_lines": [
-            59
+            59,
+            68,
+            69
           ]
         },
         {
-          "line": 68,
+          "line": 71,
           "module": "Jido.AI.Reasoning.ReAct.Token",
           "name": "doc",
           "status": "documented",
@@ -17929,7 +18023,7 @@
           "quoted": false
         },
         {
-          "line": 72,
+          "line": 75,
           "module": "Jido.AI.Reasoning.ReAct.Token",
           "name": "decode_state",
           "kind": "def",
@@ -17938,11 +18032,11 @@
             2
           ],
           "clause_lines": [
-            72
+            75
           ]
         },
         {
-          "line": 79,
+          "line": 82,
           "module": "Jido.AI.Reasoning.ReAct.Token",
           "name": "doc",
           "status": "documented",
@@ -17950,7 +18044,7 @@
           "quoted": false
         },
         {
-          "line": 83,
+          "line": 86,
           "module": "Jido.AI.Reasoning.ReAct.Token",
           "name": "mark_cancelled",
           "kind": "def",
@@ -17959,7 +18053,7 @@
             3
           ],
           "clause_lines": [
-            83
+            86
           ]
         }
       ]
@@ -21154,7 +21248,7 @@
       "modules": [
         "Jido.AI.Runtime.CallModel"
       ],
-      "sha256": "9eda06c06463accb067ee4fd3cff9c69c7e8f19b8ea804a572789423c8319e39",
+      "sha256": "4eb33b86379081b9aead57c6def801f626acca2b5d30eaa5167dc513a1093fc7",
       "declarations": [
         {
           "line": 1,
@@ -21481,7 +21575,7 @@
       "modules": [
         "Jido.AI.Runtime.Decide"
       ],
-      "sha256": "71b816d7c53e64b371a2319f1d1344eedae55e3bbd94a64bb1ac2360f1d6498b",
+      "sha256": "105690696850371c34cb99bbccea3f4ba7ff97b8421d8f0a65668be95f83ebc3",
       "declarations": [
         {
           "line": 1,
@@ -22309,7 +22403,7 @@
       "modules": [
         "Jido.AI.Runtime.RequestTransform"
       ],
-      "sha256": "f42c8e727a9df5adacfccbad30716b7a51d2bf3359d20c7f2d0ef569b559a8f2",
+      "sha256": "869fab22ce9f7ed60f9b68bd05884264032cb2a16e3519caf7734f91ce84da4c",
       "declarations": [
         {
           "line": 1,
@@ -22372,7 +22466,7 @@
       "modules": [
         "Jido.AI.Runtime.Run"
       ],
-      "sha256": "81f12d76904935eb1e32b58b6ac2975d13fef3a84abf96ba8242973eef21c84b",
+      "sha256": "0d7cc0cdc419f42a1e0835ec88a669673e61b23e8fa6ec87879d24e2a9c5c451",
       "declarations": [
         {
           "line": 1,
@@ -28596,7 +28690,7 @@
       "modules": [
         "Jido.AI.Thread.Projection"
       ],
-      "sha256": "bb130f4ab3492b97a84e7e6d967007040c0fa32e9af24e636b57b60f8e462ef4",
+      "sha256": "4b533a0f5276cdc92196d27b7000a52c58f83636a66ffcb258968637a26b1ebb",
       "declarations": [
         {
           "line": 1,
@@ -28650,14 +28744,15 @@
           "quoted": false,
           "arities": [
             2,
-            3
+            3,
+            4
           ],
           "clause_lines": [
             23
           ]
         },
         {
-          "line": 49,
+          "line": 59,
           "module": "Jido.AI.Thread.Projection",
           "name": "doc",
           "status": "documented",
@@ -28665,7 +28760,7 @@
           "quoted": false
         },
         {
-          "line": 50,
+          "line": 60,
           "module": "Jido.AI.Thread.Projection",
           "name": "schema",
           "kind": "def",
@@ -28674,11 +28769,11 @@
             0
           ],
           "clause_lines": [
-            50
+            60
           ]
         },
         {
-          "line": 52,
+          "line": 62,
           "module": "Jido.AI.Thread.Projection",
           "name": "doc",
           "status": "hidden",
@@ -28686,7 +28781,7 @@
           "quoted": false
         },
         {
-          "line": 53,
+          "line": 63,
           "module": "Jido.AI.Thread.Projection",
           "name": "before_request",
           "kind": "def",
@@ -28695,12 +28790,12 @@
             2
           ],
           "clause_lines": [
-            53,
-            62
+            63,
+            72
           ]
         },
         {
-          "line": 64,
+          "line": 74,
           "module": "Jido.AI.Thread.Projection",
           "name": "doc",
           "status": "documented",
@@ -28708,7 +28803,7 @@
           "quoted": false
         },
         {
-          "line": 65,
+          "line": 75,
           "module": "Jido.AI.Thread.Projection",
           "name": "entries",
           "kind": "def",
@@ -28718,11 +28813,11 @@
             2
           ],
           "clause_lines": [
-            65
+            75
           ]
         },
         {
-          "line": 75,
+          "line": 85,
           "module": "Jido.AI.Thread.Projection",
           "name": "doc",
           "status": "documented",
@@ -28730,7 +28825,7 @@
           "quoted": false
         },
         {
-          "line": 76,
+          "line": 86,
           "module": "Jido.AI.Thread.Projection",
           "name": "append",
           "kind": "def",
@@ -28740,11 +28835,11 @@
             3
           ],
           "clause_lines": [
-            76
+            86
           ]
         },
         {
-          "line": 87,
+          "line": 97,
           "module": "Jido.AI.Thread.Projection",
           "name": "doc",
           "status": "documented",
@@ -28752,7 +28847,7 @@
           "quoted": false
         },
         {
-          "line": 88,
+          "line": 98,
           "module": "Jido.AI.Thread.Projection",
           "name": "messages",
           "kind": "def",
@@ -28761,12 +28856,34 @@
             1
           ],
           "clause_lines": [
-            88,
-            90
+            98,
+            100
           ]
         },
         {
-          "line": 101,
+          "line": 106,
+          "module": "Jido.AI.Thread.Projection",
+          "name": "doc",
+          "status": "hidden",
+          "kind": "attribute",
+          "quoted": false
+        },
+        {
+          "line": 107,
+          "module": "Jido.AI.Thread.Projection",
+          "name": "evidence_messages",
+          "kind": "def",
+          "quoted": false,
+          "arities": [
+            1
+          ],
+          "clause_lines": [
+            107,
+            109
+          ]
+        },
+        {
+          "line": 117,
           "module": "Jido.AI.Thread.Projection",
           "name": "doc",
           "status": "documented",
@@ -28774,24 +28891,25 @@
           "quoted": false
         },
         {
-          "line": 102,
+          "line": 118,
           "module": "Jido.AI.Thread.Projection",
           "name": "select",
           "kind": "def",
           "quoted": false,
           "arities": [
             1,
-            2
+            2,
+            3
           ],
           "clause_lines": [
-            102,
-            103,
-            105,
-            146
+            118,
+            119,
+            121,
+            181
           ]
         },
         {
-          "line": 155,
+          "line": 223,
           "module": "Jido.AI.Thread.Projection",
           "name": "doc",
           "status": "documented",
@@ -28799,7 +28917,7 @@
           "quoted": false
         },
         {
-          "line": 156,
+          "line": 224,
           "module": "Jido.AI.Thread.Projection",
           "name": "message",
           "kind": "def",
@@ -28808,12 +28926,12 @@
             1
           ],
           "clause_lines": [
-            156,
-            159
+            224,
+            227
           ]
         },
         {
-          "line": 161,
+          "line": 229,
           "module": "Jido.AI.Thread.Projection",
           "name": "doc",
           "status": "documented",
@@ -28821,7 +28939,7 @@
           "quoted": false
         },
         {
-          "line": 162,
+          "line": 230,
           "module": "Jido.AI.Thread.Projection",
           "name": "open_tool_calls",
           "kind": "def",
@@ -28830,7 +28948,7 @@
             1
           ],
           "clause_lines": [
-            162
+            230
           ]
         }
       ]
@@ -31663,7 +31781,6 @@
     }
   ],
   "generator": "scripts/api_inventory.exs",
-  "schema_version": 2,
   "limits": [
     "No compilation or macro evaluation is used to index source declarations.",
     "Public def/defmacro declarations include implementation helpers; consult the contract map for supported use.",
@@ -31672,10 +31789,11 @@
     "Doc attributes are retained as declarations, not interpreted as per-function public API approval.",
     "Source presence and checksums do not establish passing behavior, compatibility, or release readiness."
   ],
+  "schema_version": 2,
   "historical_inventory": "api-inventory-v2.json",
   "contract_map": "public-api-map.md",
-  "source_digest": "9fc417fc2b08b4c301879ab48e6f3998dc2cd97e144540b9226cec5eb1e67d0d",
-  "file_count": 255,
+  "source_digest": "031695d299c374bad4304ec4fb2984efed5096c5adb0544a8931d0d84938ce3a",
+  "file_count": 256,
   "ownership": {
     "Jido.Session": "jido_ai",
     "Jido.Thread": "jido_ai",

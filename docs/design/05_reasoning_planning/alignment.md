@@ -5,10 +5,10 @@
 ## Status
 
 - Reviewed: 2026-09-15.
-- Code: `v3-spike`, HEAD `c4e57c8d34d09ffc922c37fb41cccc2e1491123e`, plus the uncommitted Orchestration and canonical-value file reorganization.
+- Code for the example audit: `v3-spike`, HEAD `7bb011e98349af8bf580e7b93afa60990972beae`, plus uncommitted example, test, formatter, and documentation changes. No `lib/` or dependency changes.
 - Prerequisite alignments used: [04 Shared AI execution](../04_ai_execution/alignment.md).
 - Alignment state: Draft. Current ownership is mapped; target decisions and full acceptance proof remain.
-- Verification: source and test inspection in this documentation task. The preceding code-change run reported 2,809 passing tests and one existing exclusion, including authoring and MockLLM examples. That run is not proof of every target requirement; no Elixir tests were rerun here.
+- Verification: the example-driven review below adds fresh MockLLM runs to the earlier source review. Earlier statements that no tests ran refer to that prior review, not this follow-up.
 
 ## Current architecture
 
@@ -48,7 +48,7 @@ proof is still incomplete. Inert declaration support is not runtime support.
 Preserve all eight methods, advanced search and recursive behavior, custom-method extension, and portable plans. Keep algorithms above Flow and provider/tool boundaries.
 
 Preserve current public behavior unless an approved decision includes a
-migration. No runtime or example changes are authorized by this review.
+migration. This follow-up changes examples and their tests, not runtime implementation.
 Advanced requirements remain in the target even when they are not implemented.
 
 ## Gap register
@@ -101,38 +101,52 @@ Do not infer a reduced stable method set from the old first-release recommendati
 This is a dependency and outcome plan, not a formal implementation task list.
 Implementation planning follows approval of the seam intent and requirements.
 
+## Example-driven review
+
+This follow-up uses the later selected decisions when older wording conflicts.
+The [audit summary](../README.md#example-driven-design-audit) separates target
+failures, related scenarios, API gates, and non-example release checks. All
+requirements in this seam appear in the acceptance matrix below.
+
+The new target checks extend existing example lessons. They use public APIs and
+the local MockLLM transport. No target failure is skipped or changed to accept
+the current behavior. Tests blocked by an unspecified public contract are
+marked as a gate; no invented API is presented as an executable example.
+
 ## Acceptance matrix
 
-This table is rebuilt from the actual requirement IDs in `design.md`; earlier
-tables sometimes mapped evidence to the wrong requirement. “Implemented;
-evidence incomplete” means the subsystem has relevant code, not that every
-clause is met. No row below grants approval or claims a fresh test run.
+Requirement IDs and target wording come from `design.md`. The evidence column
+now names related example scenarios. **Related evidence is partial**, not full
+requirement acceptance. A passing target check proves only its stated case.
+`To be implemented — reproduced` identifies a failed target assertion, not a
+failure inferred from a missing example. Source/release checks and public API
+gates are separate. No row grants document approval.
 
 | Requirement | Evidence state | Current evidence | Required acceptance outcome |
 | --- | --- | --- | --- |
-| `RSN-REQ-001` | Decision required | See current contract and gap register | Verify the target behavior: Each public reasoning method shall have a stable identifier, option schema, state schema, capability declaration, Flow factory, and result contract. |
-| `RSN-REQ-002` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Method options and state shall be portable data and shall reject unknown fields at untrusted boundaries. |
-| `RSN-REQ-003` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: A method shall use seam 02 for every model call and seam 03 for every local tool call. |
-| `RSN-REQ-004` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: A method shall use public Flow components for branching, fan-out, reduction, iteration, subflows, and continuation. |
-| `RSN-REQ-005` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: A method shall not create a worker pool, private task supervisor, graph scheduler, or direct Runic workflow. |
-| `RSN-REQ-006` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: ReAct shall alternate model decisions and approved tool batches until final answer, failure, cancellation, or a limit. |
-| `RSN-REQ-007` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Linear methods shall preserve prompt-step order and shall return one final answer or structured result. |
-| `RSN-REQ-008` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Search methods shall assign stable candidate identifiers before concurrent evaluation. |
-| `RSN-REQ-009` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Search methods shall define deterministic score ordering and a deterministic tie-break rule. |
-| `RSN-REQ-010` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When a method prunes candidates, it shall retain the reason and score data required for safe diagnostics. |
-| `RSN-REQ-011` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: An Adaptive method shall select only a declared method whose capabilities satisfy the request. |
-| `RSN-REQ-012` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When a method does not support a requested feature, profile validation shall fail before model execution. |
-| `RSN-REQ-013` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Each method shall declare finite defaults and hard maxima for its iterations, candidates, depth, breadth, and model calls as applicable. |
-| `RSN-REQ-014` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: The execution seam shall apply the most restrictive method, profile, request, and Exec bounds. |
-| `RSN-REQ-015` | Decision required | See current contract and gap register | Verify the target behavior: Every terminal method result shall include method ID, status, value, termination reason, usage, and safe method metadata. |
-| `RSN-REQ-016` | Decision required | See current contract and gap register | Verify the target behavior: A method result shall not expose private chain-of-thought by default. |
-| `RSN-REQ-017` | Decision required | See current contract and gap register | Verify the target behavior: When a method retains reasoning details, policy shall identify whether the data is private, provider-required, or safe for user output. |
-| `RSN-REQ-018` | Proposed; not implemented | No complete implementation claimed | Verify the target behavior: Planning shall produce a validated portable plan value with stable step identifiers and declared dependencies. |
-| `RSN-REQ-019` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Planning shall not execute a plan unless the plan is explicitly lowered to a `Jido.Flow` or submitted to a host-owned orchestrator. |
-| `RSN-REQ-020` | Proposed; not implemented | No complete implementation claimed | Verify the target behavior: When a plan is lowered to Flow, every executable plan step shall resolve to an approved Action or Subflow through a trusted registry. |
-| `RSN-REQ-021` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: An encoded plan shall not contain anonymous functions, PIDs, provider clients, or unregistered executable targets. |
-| `RSN-REQ-022` | Proposed; not implemented | No complete implementation claimed | Verify the target behavior: A custom method shall register through a trusted method registry and shall pass the same option, state, capability, and Flow validation as built-in methods. |
-| `RSN-REQ-023` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: The Agent DSL and profile codec shall refer to methods by stable identifiers and portable options. |
+| `RSN-REQ-001` | Decision required | Related example evidence (partial): [invalid options tools steering typed results and rich queries fail before provider work](../../../test/examples/09_reasoning/09_06_got/09_06_got_test.exs); [DSL data Builder source JSON direct Flow and ordinary turns use the same recursive contract](../../../test/examples/09_reasoning/09_08_trm/09_08_trm_test.exs). | Verify the target behavior: Each public reasoning method shall have a stable identifier, option schema, state schema, capability declaration, Flow factory, and result contract. |
+| `RSN-REQ-002` | Implemented; evidence incomplete | Related example evidence (partial): [invalid options tools steering typed results and rich queries fail before provider work](../../../test/examples/09_reasoning/09_06_got/09_06_got_test.exs); [DSL data Builder source JSON direct Flow and ordinary turns use the same recursive contract](../../../test/examples/09_reasoning/09_08_trm/09_08_trm_test.exs). | Verify the target behavior: Method options and state shall be portable data and shall reject unknown fields at untrusted boundaries. |
+| `RSN-REQ-003` | Implemented; evidence incomplete | Related example evidence (partial): [DSL data Builder source JSON direct Flow and ordinary turns use the same recursive contract](../../../test/examples/09_reasoning/09_08_trm/09_08_trm_test.exs). | Verify the target behavior: A method shall use seam 02 for every model call and seam 03 for every local tool call. |
+| `RSN-REQ-004` | Implemented; evidence incomplete | Related example evidence (partial): [DSL data Builder source JSON direct Flow and ordinary turns use the same recursive contract](../../../test/examples/09_reasoning/09_08_trm/09_08_trm_test.exs). | Verify the target behavior: A method shall use public Flow components for branching, fan-out, reduction, iteration, subflows, and continuation. |
+| `RSN-REQ-005` | Implemented; evidence incomplete | Related example evidence (partial): [DSL data Builder source JSON direct Flow and ordinary turns use the same recursive contract](../../../test/examples/09_reasoning/09_08_trm/09_08_trm_test.exs). | Verify the target behavior: A method shall not create a worker pool, private task supervisor, graph scheduler, or direct Runic workflow. |
+| `RSN-REQ-006` | Implemented; evidence incomplete | Related example evidence (partial): [three dependent tool rounds precede the committed answer](../../../test/examples/01_authoring/01_02_tool_flow/multi_round_test.exs). | Verify the target behavior: ReAct shall alternate model decisions and approved tool batches until final answer, failure, cancellation, or a limit. |
+| `RSN-REQ-007` | Implemented; evidence incomplete | Related example evidence (partial): [Profile policy and route bindings are stable with reverse order #{reverse}](../../../test/examples/16_capabilities/16_01_reasoning/16_01_reasoning_test.exs). | Verify the target behavior: Linear methods shall preserve prompt-step order and shall return one final answer or structured result. |
+| `RSN-REQ-008` | Implemented; evidence incomplete | Related example evidence (partial): [search returns ranked candidates and paths after two real model calls](../../../test/examples/09_reasoning/09_04_tot/09_04_tot_test.exs). | Verify the target behavior: Search methods shall assign stable candidate identifiers before concurrent evaluation. |
+| `RSN-REQ-009` | Implemented; evidence incomplete | Related example evidence (partial): [search returns ranked candidates and paths after two real model calls](../../../test/examples/09_reasoning/09_04_tot/09_04_tot_test.exs). | Verify the target behavior: Search methods shall define deterministic score ordering and a deterministic tie-break rule. |
+| `RSN-REQ-010` | Implemented; evidence incomplete | Related example evidence (partial): [best-first beam retains only the configured frontier and top candidates](../../../test/examples/09_reasoning/09_04_tot/09_04_tot_test.exs). | Verify the target behavior: When a method prunes candidates, it shall retain the reason and score data required for safe diagnostics. |
+| `RSN-REQ-011` | Implemented; evidence incomplete | Related example evidence (partial): [automatic #{method} selection executes the actual method without an extra model call](../../../test/examples/09_reasoning/09_10_adaptive/09_10_adaptive_test.exs). | Verify the target behavior: An Adaptive method shall select only a declared method whose capabilities satisfy the request. |
+| `RSN-REQ-012` | Implemented; evidence incomplete | Related example evidence (partial): [invalid options tools steering typed results and rich queries fail before provider work](../../../test/examples/09_reasoning/09_06_got/09_06_got_test.exs). | Verify the target behavior: When a method does not support a requested feature, profile validation shall fail before model execution. |
+| `RSN-REQ-013` | Implemented; evidence incomplete | Related example evidence (partial): [the common model-call budget stops before a new phase and retains prior work](../../../test/examples/09_reasoning/09_06_got/09_06_got_test.exs). | Verify the target behavior: Each method shall declare finite defaults and hard maxima for its iterations, candidates, depth, breadth, and model calls as applicable. |
+| `RSN-REQ-014` | Implemented; evidence incomplete | Related example evidence (partial): [the common model-call budget stops before a new phase and retains prior work](../../../test/examples/09_reasoning/09_06_got/09_06_got_test.exs). | Verify the target behavior: The execution seam shall apply the most restrictive method, profile, request, and Exec bounds. |
+| `RSN-REQ-015` | Decision required | Related example evidence (partial): [search returns ranked candidates and paths after two real model calls](../../../test/examples/09_reasoning/09_04_tot/09_04_tot_test.exs); [DSL data Builder source JSON direct Flow and ordinary turns use the same recursive contract](../../../test/examples/09_reasoning/09_08_trm/09_08_trm_test.exs). | Verify the target behavior: Every terminal method result shall include method ID, status, value, termination reason, usage, and safe method metadata. |
+| `RSN-REQ-016` | Decision required | Related example evidence (partial): [namespace method selection runs both profiles and reads their separate stored results](../../../test/examples/09_reasoning/09_02_method_api/09_02_method_api_test.exs). CoT/CoD request results contain conclusions rather than their steps. This does not prove privacy across every method or the explicit detail accessors. | Verify the target behavior: A method result shall not expose private chain-of-thought by default. |
+| `RSN-REQ-017` | Decision required | To be implemented: retained reasoning classification with explicit private/provider-required/user-safe policy. | Verify the target behavior: When a method retains reasoning details, policy shall identify whether the data is private, provider-required, or safe for user output. |
+| `RSN-REQ-018` | Proposed; not implemented | Related example evidence (partial): [planning prompts carry constraints resources depth and priority criteria](../../../test/examples/08_planning/08_01_planning/08_01_planning_test.exs). | Verify the target behavior: Planning shall produce a validated portable plan value with stable step identifiers and declared dependencies. |
+| `RSN-REQ-019` | Implemented; evidence incomplete | Related example evidence (partial): [planning prompts carry constraints resources depth and priority criteria](../../../test/examples/08_planning/08_01_planning/08_01_planning_test.exs). | Verify the target behavior: Planning shall not execute a plan unless the plan is explicitly lowered to a `Jido.Flow` or submitted to a host-owned orchestrator. |
+| `RSN-REQ-020` | Proposed; not implemented | Related example evidence (partial): [planning prompts carry constraints resources depth and priority criteria](../../../test/examples/08_planning/08_01_planning/08_01_planning_test.exs). | Verify the target behavior: When a plan is lowered to Flow, every executable plan step shall resolve to an approved Action or Subflow through a trusted registry. |
+| `RSN-REQ-021` | Implemented; evidence incomplete | Related example evidence (partial): [planning prompts carry constraints resources depth and priority criteria](../../../test/examples/08_planning/08_01_planning/08_01_planning_test.exs). | Verify the target behavior: An encoded plan shall not contain anonymous functions, PIDs, provider clients, or unregistered executable targets. |
+| `RSN-REQ-022` | Proposed; not implemented | Decision gate: trusted custom-method registration and validation API is not selected. Do not invent a registry in an example. | Verify the target behavior: A custom method shall register through a trusted method registry and shall pass the same option, state, capability, and Flow validation as built-in methods. |
+| `RSN-REQ-023` | Implemented; evidence incomplete | Related example evidence (partial): [DSL data Builder source JSON direct Flow and ordinary turns use the same recursive contract](../../../test/examples/09_reasoning/09_08_trm/09_08_trm_test.exs). | Verify the target behavior: The Agent DSL and profile codec shall refer to methods by stable identifiers and portable options. |
 
 ## Migration and compatibility
 

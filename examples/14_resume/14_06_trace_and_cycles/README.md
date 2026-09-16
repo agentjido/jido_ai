@@ -25,7 +25,11 @@ Repeated tool inputs produce a warning before the next model call. Different ful
 
 ## Limits
 
-Repeated calls still execute. The redaction flag does not sanitize complete model history or checkpoint data. It is not a general secret-removal or deduplication mechanism.
+Repeated calls still execute. The trace cases opt in to stream content and to
+stored/streamed reasoning. Credentials remain redacted even with these permissions
+and with `redact_tool_args` disabled. The native tool still receives its original
+input. Checkpoint export is withheld if it would retain excluded content or
+credentials. These controls do not deduplicate tool execution.
 
 ## Files
 

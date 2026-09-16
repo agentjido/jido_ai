@@ -139,8 +139,10 @@ defmodule Jido.AI.Skill.BinaryResourcesTest do
       assert {:ok, _} = Jason.decode(json)
       refute String.contains?(json, bytes)
       message = %ReqLLM.Message{role: :tool, tool_call_id: "call-1", name: LoadResource.name(), content: parts}
-      {:ok, thread} = Projection.append(Jido.Thread.new(), [message])
-      assert {:ok, [%{content: ^parts}]} = Projection.messages(thread)
+      call = ReqLLM.ToolCall.new("call-1", LoadResource.name(), "{}")
+      assistant = %ReqLLM.Message{role: :assistant, content: [], tool_calls: [call]}
+      {:ok, thread} = Projection.append(Jido.Thread.new(), [assistant, message])
+      assert {:ok, [_, %{content: ^parts}]} = Projection.messages(thread)
     end
   end
 

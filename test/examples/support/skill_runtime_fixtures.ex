@@ -70,6 +70,10 @@ defmodule JidoAI.Examples.SkillRuntime.FixtureAgent do
       instructions("Use the available skills.")
       tool_interceptor(JidoAI.Examples.SkillRuntime.Interceptor)
 
+      observability do
+        store_content true
+      end
+
       models do
         model(:answer, JidoAI.Examples.MockLLM.model())
       end

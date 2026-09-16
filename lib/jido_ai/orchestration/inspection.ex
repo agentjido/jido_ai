@@ -150,7 +150,7 @@ defmodule Jido.AI.Orchestration.Inspection do
     end
   end
 
-  def snapshot(snapshot, request, live) do
+  def snapshot(snapshot, request, live, opts \\ []) do
     records = Map.get(snapshot.agent.state, :requests, %{})
 
     inspection =
@@ -210,11 +210,15 @@ defmodule Jido.AI.Orchestration.Inspection do
       conversation: conversation || []
     }
 
-    Map.merge(snapshot, %{
-      request: request,
-      details: details,
-      live: live && Map.drop(live, [:inspection, :meta, :reasoning])
-    })
+    result =
+      Map.merge(snapshot, %{
+        request: request,
+        details: details,
+        live: live && Map.drop(live, [:inspection, :meta, :reasoning])
+      })
+
+    policy = if profile, do: profile.observability, else: %{}
+    Jido.AI.Observe.Content.project(result, policy, :diagnostics, opts[:include_content] == true)
   end
 
   defp config(nil), do: %{}

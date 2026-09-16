@@ -21,11 +21,22 @@ Shared setup and fault fixtures stay in [test support](../../../test/examples/su
 
 ## Expected result and failure behavior
 
-`Session.snapshot/2` returns the core revision, retained request and trace. Live work has the same request/run identity. Unknown IDs return `:request_not_found`.
+`Jido.AI.Orchestration.snapshot/2` returns the core revision, retained request,
+and trace. Live work has the same request/run identity. Unknown IDs return
+`:request_not_found`.
+
+This example grants `diagnostics_content` in the Profile. Its detailed tests
+also pass `include_content: true` when they inspect payloads. Both are required;
+normal inspection excludes content. The example separately permits stream
+content and retained/streamed reasoning to demonstrate their inspection paths.
+Pending input remains in the request record, not completed conversation.
 
 ## Limits
 
-The live view is a later sample, not the same atomic snapshot as committed state. Worker PIDs stay outside portable state. Saved traces can be prefixes, not full durable event logs.
+The live view is a later sample, not the same atomic snapshot as committed state.
+Worker PIDs stay outside portable state. Saved traces can be prefixes, not full
+durable event logs. An inspection view is not a native checkpoint. Use core
+AgentServer APIs when a native checkpoint is required.
 
 ## Files
 

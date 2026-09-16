@@ -65,7 +65,8 @@ defmodule Jido.AI.Agent.InitialState do
 
       input ->
         with {:ok, session} <- Jido.Session.decode(input),
-             {:ok, messages} <- Projection.messages(session),
+             {:ok, evidence} <- Projection.select(session, nil, complete_exchanges: false),
+             {:ok, messages} <- Projection.evidence_messages(evidence),
              {:ok, open} <- Projection.open_tool_calls(messages),
              true <- map_size(open) == 0,
              {:ok, selected} <- Projection.select(session),

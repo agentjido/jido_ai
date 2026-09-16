@@ -41,6 +41,12 @@ defmodule Jido.AI.Orchestration do
   matching Session run; it does not change the committed request record.
   Live process identifiers are never stored in Agent state.
 
+  Content is excluded by default, including content in the returned Agent view.
+  Both the Profile's `observability.diagnostics_content` permission and the
+  caller option `include_content: true` are required to include it. This view
+  is for inspection; use core AgentServer APIs to obtain a native checkpoint.
+  `details.conversation` contains completed conversation, not pending input.
+
   `details.trace` is an observed event prefix. Its `seq` is the last sampled
   sequence, including events omitted by the 2,000-event cap. History commits
   save active prefixes; completion saves the final sampled prefix. The request
@@ -57,7 +63,7 @@ defmodule Jido.AI.Orchestration do
       {:error, :request_not_found}
     else
       live = live_inspection(server, request, timeout)
-      {:ok, Jido.AI.Orchestration.Inspection.snapshot(snapshot, request, live)}
+      {:ok, Jido.AI.Orchestration.Inspection.snapshot(snapshot, request, live, opts)}
     end
   catch
     :exit, {:timeout, _} -> {:error, :timeout}

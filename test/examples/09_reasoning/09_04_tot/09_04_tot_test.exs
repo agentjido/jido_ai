@@ -48,38 +48,36 @@ defmodule JidoAI.Examples.ToTTest do
     assert_script_done(mock)
   end
 
-  test "decoded thought and score objects survive a provider length limit", %{jido: jido} do
+  test "a decoded thought object does not bypass a provider length limit", %{jido: jido} do
     {mock, context} =
       mock([
-        %{reply: {:stream, [%{content: ToT.thoughts(["Complete candidate"])}], "length"}},
-        %{reply: {:stream, [%{content: ToT.scores(%{t1: 0.8})}], "length"}}
+        %{reply: {:stream, [%{content: ToT.thoughts(["Complete candidate"])}], "length"}}
       ])
 
     server = start(jido)
     assert {:ok, handle} = request(server, context)
-    assert {:ok, result} = Request.await(handle)
-    assert Result.best_answer(result) == "Complete candidate"
-    assert result.usage.total_tokens == 30
+    assert {:error, {:failed, {:incomplete_response, :length}, result}} = Request.await(handle)
+    assert result.usage.total_tokens == 15
     assert result.diagnostics.parse_retries == %{generation: 0, evaluation: 0}
-    assert Server.agent(server).state.reply == result
+    assert Server.agent(server).state.reply == nil
     completed = Enum.filter(events(handle), &(&1.kind == :llm_completed))
-    assert Enum.map(completed, & &1.data.reasoning_phase) == [:generation, :evaluation]
-    assert Enum.all?(completed, &(&1.data.finish_reason == :length))
-    assert Enum.all?(completed, &(&1.data.text == ""))
+    assert completed == []
     assert_script_done(mock)
   end
 
-  test "a decoded length-limited object still requires valid thought content", %{jido: jido} do
+  test "a decoded length-limited object fails before parser repair and the next request works", %{jido: jido} do
     {mock, context} =
       mock([%{reply: {:stream, [%{content: "{}"}], "length"}}] ++ ToT.script())
 
     server = start(jido)
     assert {:ok, handle} = request(server, context)
-    assert {:ok, result} = Request.await(handle)
+    assert {:error, {:failed, {:incomplete_response, :length}, failed}} = Request.await(handle)
+    assert failed.diagnostics.parse_retries.generation == 0
+    assert {:ok, next} = request(server, context)
+    assert {:ok, result} = Request.await(next)
     assert result.best.content == "Better path"
-    assert result.diagnostics.parse_retries.generation == 1
-    assert result.usage.total_tokens == 45
-    assert wire_text(Enum.at(MockLLM.report(mock).requests, 1)) =~ "SOURCE:\n{}"
+    assert result.diagnostics.parse_retries.generation == 0
+    assert result.usage.total_tokens == 30
     assert_script_done(mock)
   end
 

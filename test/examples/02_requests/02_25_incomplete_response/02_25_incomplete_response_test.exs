@@ -25,8 +25,7 @@ defmodule JidoAI.Examples.IncompleteResponseTest do
       result = execute(unquote(api), jido, mock, context)
       assert result.outcome == {:error, {:incomplete_response, reason}}
       assert result.status == :failed
-      assert Enum.map(result.messages, & &1.role) == [:user]
-      assert Jido.AI.Query.summarize(hd(result.messages).content) == "Hello"
+      assert result.messages == []
       assert Usage.token_counts(result.usage) == %{input_tokens: 5, output_tokens: 0, total_tokens: 5}
       refute Enum.any?(result.events, &(&1.kind in [:llm_completed, :request_completed]))
       refute Enum.any?(result.events, &(&1.kind == :checkpoint and &1.data.reason == :after_llm))
@@ -40,19 +39,16 @@ defmodule JidoAI.Examples.IncompleteResponseTest do
   end
 
   for api <- [:agent, :standalone], content <- [:text, :image] do
-    @tag history_case: "HIST-06/accepted-partial"
-    test "#{api} accepts partial #{content} and retains the length finish reason", %{jido: jido} do
-      {deltas, expected} = partial(unquote(content))
+    @tag history_case: "HIST-06/rejected-partial"
+    test "#{api} rejects partial #{content} and retains the length finish reason", %{jido: jido} do
+      {deltas, _expected} = partial(unquote(content))
       {mock, context} = mock([%{reply: {:stream, deltas, "length"}}])
       result = execute(unquote(api), jido, mock, context)
-      assert result.outcome == {:ok, expected}
-      assert result.status == :completed
-      assert Enum.map(result.messages, & &1.role) == [:user, :assistant]
-      [call] = Enum.filter(result.events, &(&1.kind == :llm_completed))
-      assert call.data.finish_reason == :length
-      [completed] = Enum.filter(result.events, &(&1.kind == :request_completed))
-      assert completed.data.result == expected
-      refute Enum.any?(result.events, &(&1.kind == :request_failed))
+      assert result.outcome == {:error, {:incomplete_response, :length}}
+      assert result.status == :failed
+      assert result.messages == []
+      refute Enum.any?(result.events, &(&1.kind in [:llm_completed, :request_completed]))
+      assert Enum.any?(result.events, &(&1.kind == :request_failed))
       assert result.usage.total_tokens == 15
       assert_script_done(mock)
     end

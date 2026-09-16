@@ -12,6 +12,10 @@ defmodule JidoAI.Examples.ToolFlow.Agent do
       model "openai:gpt-4o-mini"
       instructions "Use the calculation tools and answer from their results."
 
+      observability do
+        store_content true
+      end
+
       tools do
         action JidoAI.Examples.Support.Multiply, as: :multiply
         flow JidoAI.Examples.Authoring.Support.Quote, as: :quote

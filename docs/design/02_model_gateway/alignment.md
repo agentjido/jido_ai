@@ -5,10 +5,10 @@
 ## Status
 
 - Reviewed: 2026-09-15.
-- Code: `v3-spike`, HEAD `c4e57c8d34d09ffc922c37fb41cccc2e1491123e`, plus the uncommitted Orchestration and canonical-value file reorganization.
+- Code for the example audit: `v3-spike`, HEAD `7bb011e98349af8bf580e7b93afa60990972beae`, plus uncommitted example, test, formatter, and documentation changes. No `lib/` or dependency changes.
 - Prerequisite alignments used: [01 Canonical interaction and AI values](../01_ai_values/alignment.md).
 - Alignment state: Draft. Current ownership is mapped; target decisions and full acceptance proof remain.
-- Verification: source and test inspection in this documentation task. The preceding code-change run reported 2,809 passing tests and one existing exclusion, including authoring and MockLLM examples. That run is not proof of every target requirement; no Elixir tests were rerun here.
+- Verification: the example-driven review below adds fresh MockLLM runs to the earlier source review. Earlier statements that no tests ran refer to that prior review, not this follow-up.
 
 ## Current architecture
 
@@ -47,7 +47,7 @@ proof is still incomplete. Inert declaration support is not runtime support.
 Keep trusted provider binding, deterministic option precedence, bounded streaming and repair, and advanced named request-transform stages. Do not assume a new ModelRef wrapper is needed to achieve these capabilities.
 
 Preserve current public behavior unless an approved decision includes a
-migration. No runtime or example changes are authorized by this review.
+migration. The initial audit changed examples and tests. The implementation follow-up also changes the runtime; see the current evidence below.
 Advanced requirements remain in the target even when they are not implemented.
 
 ## Gap register
@@ -104,37 +104,51 @@ Separate native direct-call APIs from portable stored data. Resolve transform st
 This is a dependency and outcome plan, not a formal implementation task list.
 Implementation planning follows approval of the seam intent and requirements.
 
+## Example-driven review
+
+This follow-up uses the later selected decisions when older wording conflicts.
+The [audit summary](../README.md#example-driven-design-audit) separates target
+failures, related scenarios, API gates, and non-example release checks. All
+requirements in this seam appear in the acceptance matrix below.
+
+The new target checks extend existing example lessons. They use public APIs and
+the local MockLLM transport. No target failure is skipped or changed to accept
+the current behavior. Tests blocked by an unspecified public contract are
+marked as a gate; no invented API is presented as an executable example.
+
 ## Acceptance matrix
 
-This table is rebuilt from the actual requirement IDs in `design.md`; earlier
-tables sometimes mapped evidence to the wrong requirement. “Implemented;
-evidence incomplete” means the subsystem has relevant code, not that every
-clause is met. No row below grants approval or claims a fresh test run.
+Requirement IDs and target wording come from `design.md`. The evidence column
+now names related example scenarios. **Related evidence is partial**, not full
+requirement acceptance. A passing target check proves only its stated case.
+`To be implemented — reproduced` identifies a failed target assertion, not a
+failure inferred from a missing example. Source/release checks and public API
+gates are separate. No row grants document approval.
 
 | Requirement | Evidence state | Current evidence | Required acceptance outcome |
 | --- | --- | --- | --- |
-| `MDL-REQ-001` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When a request names a profile model alias, the gateway shall resolve the alias at request start against that profile's validated model table. |
-| `MDL-REQ-002` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When model-routing policy selects a model, the gateway shall record the selected alias, concrete model identifier, and routing reason in request-local metadata. |
-| `MDL-REQ-003` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When a model alias or concrete model cannot be resolved, the gateway shall return a validation error before a provider call starts. |
-| `MDL-REQ-004` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: A model reference stored in a profile, Signal, or checkpoint shall be portable data and shall not contain a provider client or credential. |
-| `MDL-REQ-005` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: The gateway shall apply option precedence in the documented order and shall expose the effective safe options for diagnostics. |
-| `MDL-REQ-006` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: The gateway shall reject a provider or transport option that arrives through untrusted Signal data. |
-| `MDL-REQ-007` | Decision required | See current contract and gap register | Verify the target behavior: When request transforms are configured, the gateway shall run them in declared stage order and shall stop at the first error. |
-| `MDL-REQ-008` | Decision required | See current contract and gap register | Verify the target behavior: A request transform shall receive portable request data and explicit context and shall return `{:ok, value}` or `{:error, reason}`. |
-| `MDL-REQ-009` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: The gateway shall add structured-output instructions and provider schema data from the approved `Jido.AI.Output` contract. |
-| `MDL-REQ-010` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: All text, object, embedding, and stream provider calls shall enter through the ReqLLM integration boundary. |
-| `MDL-REQ-011` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: A model Action shall call the gateway and shall return only public Jido Action result forms. |
-| `MDL-REQ-012` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When a provider stream starts, the gateway shall assign one stable model-call identifier before it emits the first item. |
-| `MDL-REQ-013` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: The gateway shall preserve provider item order and shall assign a monotonic sequence number when the provider does not supply one. |
-| `MDL-REQ-014` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When a stream ends normally, the gateway shall produce the same normalized terminal Turn and Usage value as the equivalent non-stream call. |
-| `MDL-REQ-015` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When a stream fails or stops early, the gateway shall return a normalized error and shall not present partial content as a completed result. |
-| `MDL-REQ-016` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Direct model calls shall keep the native ReqLLM response and usage contracts. |
-| `MDL-REQ-017` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Agent runtime seams can convert ReqLLM values when an Agent contract needs a stable stored result. |
-| `MDL-REQ-018` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When structured-output validation requests repair, the gateway shall perform only the bounded attempts allowed by the output contract. |
-| `MDL-REQ-019` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Each repair call shall use a new model-call identifier and shall remain correlated with the parent AI request. |
-| `MDL-REQ-020` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: When the gateway needs a provider client or credential, it shall resolve it from a trusted runtime binding supplied by the host. |
-| `MDL-REQ-021` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: Direct calls shall keep ReqLLM errors. Agent runtime seams shall preserve the provider cause in a bounded internal field when they convert an error. |
-| `MDL-REQ-022` | Implemented; evidence incomplete | [Current subsystem evidence](#inputs-and-evidence); not full requirement proof | Verify the target behavior: The gateway shall classify retry eligibility but shall not schedule retry delay or create an independent retry worker. |
+| `MDL-REQ-001` | Implemented; evidence incomplete | Related example evidence (partial): [rich model aliases resolve at the request boundary and text output uses the same operation](../../../test/examples/01_authoring/01_06_ai_extension/01_06_ai_extension_test.exs). | Verify the target behavior: When a request names a profile model alias, the gateway shall resolve the alias at request start against that profile's validated model table. |
+| `MDL-REQ-002` | Implemented; evidence incomplete | Related example evidence (partial): [built in routing selects actual models for Chat operations](../../../test/examples/16_capabilities/16_03_routing_policy/16_03_routing_policy_test.exs). | Verify the target behavior: When model-routing policy selects a model, the gateway shall record the selected alias, concrete model identifier, and routing reason in request-local metadata. |
+| `MDL-REQ-003` | Implemented; evidence incomplete | Related example evidence (partial): [invalid explicit or routed native models fail before provider work](../../../test/examples/16_capabilities/16_03_routing_policy/16_03_routing_policy_test.exs). | Verify the target behavior: When a model alias or concrete model cannot be resolved, the gateway shall return a validation error before a provider call starts. |
+| `MDL-REQ-004` | Implemented; evidence incomplete | Related example evidence (partial): [rich model aliases resolve at the request boundary and text output uses the same operation](../../../test/examples/01_authoring/01_06_ai_extension/01_06_ai_extension_test.exs). | Verify the target behavior: A model reference stored in a profile, Signal, or checkpoint shall be portable data and shall not contain a provider client or credential. |
+| `MDL-REQ-005` | Implemented; evidence incomplete | Related example evidence (partial): [built in routing selects actual models for Chat operations](../../../test/examples/16_capabilities/16_03_routing_policy/16_03_routing_policy_test.exs); [media query, model options, refs and real tool output reach the provider](../../../test/examples/02_requests/02_01_session/02_01_session_test.exs). | Verify the target behavior: The gateway shall apply option precedence in the documented order and shall expose the effective safe options for diagnostics. |
+| `MDL-REQ-006` | Implemented; evidence incomplete | Related example evidence (partial): [Signal data cannot replace a host profile](../../../test/examples/01_authoring/01_07_ai_runtime/01_07_ai_runtime_test.exs). | Verify the target behavior: The gateway shall reject a provider or transport option that arrives through untrusted Signal data. |
+| `MDL-REQ-007` | Decision required | To be implemented: named-stage transform example with two stages and a first-stage failure. Select the common portable callback contract before adding a runnable consumer. | Verify the target behavior: When request transforms are configured, the gateway shall run them in declared stage order and shall stop at the first error. |
+| `MDL-REQ-008` | Decision required | To be implemented: portable transform input/context and tagged errors. Current ReAct callback views do not establish the selected shared contract. | Verify the target behavior: A request transform shall receive portable request data and explicit context and shall return `{:ok, value}` or `{:error, reason}`. |
+| `MDL-REQ-009` | Implemented; evidence incomplete | Related example evidence (partial): [streamed objects use the provider schema and the common result validator](../../../test/examples/02_requests/02_01_session/02_01_session_test.exs). | Verify the target behavior: The gateway shall add structured-output instructions and provider schema data from the approved `Jido.AI.Output` contract. |
+| `MDL-REQ-010` | Implemented; evidence incomplete | Related example evidence (partial): [text generation uses the resolved alias with the native ReqLLM API](../../../test/examples/01_authoring/01_08_model_helpers/01_08_model_helpers_test.exs); [structured generation stays on the native ReqLLM contract](../../../test/examples/01_authoring/01_08_model_helpers/01_08_model_helpers_test.exs); [two tool rounds preserve options usage and one assistant message per response](../../../test/examples/16_capabilities/16_02_chat/16_02_chat_test.exs). | Verify the target behavior: All text, object, embedding, and stream provider calls shall enter through the ReqLLM integration boundary. |
+| `MDL-REQ-011` | Implemented; evidence incomplete | Related example evidence (partial): [text generation uses the resolved alias with the native ReqLLM API](../../../test/examples/01_authoring/01_08_model_helpers/01_08_model_helpers_test.exs); [structured generation stays on the native ReqLLM contract](../../../test/examples/01_authoring/01_08_model_helpers/01_08_model_helpers_test.exs); [two tool rounds preserve options usage and one assistant message per response](../../../test/examples/16_capabilities/16_02_chat/16_02_chat_test.exs). | Verify the target behavior: A model Action shall call the gateway and shall return only public Jido Action result forms. |
+| `MDL-REQ-012` | Implemented; evidence incomplete | Related example evidence (partial): [streamed tool calls execute once and event IDs follow the model rounds](../../../test/examples/02_requests/02_01_session/02_01_session_test.exs); [real SSE text and request headers precede the final commit](../../../test/examples/02_requests/02_01_session/02_01_session_test.exs). | Verify the target behavior: When a provider stream starts, the gateway shall assign one stable model-call identifier before it emits the first item. |
+| `MDL-REQ-013` | Implemented; evidence incomplete | Related example evidence (partial): [streamed tool calls execute once and event IDs follow the model rounds](../../../test/examples/02_requests/02_01_session/02_01_session_test.exs); [real SSE text and request headers precede the final commit](../../../test/examples/02_requests/02_01_session/02_01_session_test.exs). | Verify the target behavior: The gateway shall preserve provider item order and shall assign a monotonic sequence number when the provider does not supply one. |
+| `MDL-REQ-014` | Implemented; evidence incomplete | Related example evidence (partial): [streamed objects use the provider schema and the common result validator](../../../test/examples/02_requests/02_01_session/02_01_session_test.exs). | Verify the target behavior: When a stream ends normally, the gateway shall produce the same normalized terminal Turn and Usage value as the equivalent non-stream call. |
+| `MDL-REQ-015` | Implemented; evidence incomplete | Target scenario repaired: [MDL-REQ-015 target check](../../../test/examples/02_requests/02_25_incomplete_response/design_requirements_test.exs). Nonempty truncated responses fail before successful completion, including decoded objects. Full-clause and provider-matrix proof remains separate. | Verify the target behavior: When a stream fails or stops early, the gateway shall return a normalized error and shall not present partial content as a completed result. |
+| `MDL-REQ-016` | Implemented; evidence incomplete | Related example evidence (partial): [text generation uses the resolved alias with the native ReqLLM API](../../../test/examples/01_authoring/01_08_model_helpers/01_08_model_helpers_test.exs); [structured generation stays on the native ReqLLM contract](../../../test/examples/01_authoring/01_08_model_helpers/01_08_model_helpers_test.exs); [two tool rounds preserve options usage and one assistant message per response](../../../test/examples/16_capabilities/16_02_chat/16_02_chat_test.exs). | Verify the target behavior: Direct model calls shall keep the native ReqLLM response and usage contracts. |
+| `MDL-REQ-017` | Implemented; evidence incomplete | Related example evidence (partial): [the generated command commits an answer and preserves domain data](../../../test/examples/01_authoring/01_01_authoring_formats/01_01_authoring_formats_test.exs). | Verify the target behavior: Agent runtime seams can convert ReqLLM values when an Agent contract needs a stable stored result. |
+| `MDL-REQ-018` | Implemented; evidence incomplete | Related example evidence (partial): [schema feedback reaches one repair before a valid object commits](../../../test/examples/01_authoring/01_03_structured_output/01_03_structured_output_test.exs); [repair calls share one request and token budget](../../../test/examples/13_policy/13_01_quota/13_01_quota_test.exs). | Verify the target behavior: When structured-output validation requests repair, the gateway shall perform only the bounded attempts allowed by the output contract. |
+| `MDL-REQ-019` | Implemented; evidence incomplete | Related example evidence (partial): [schema feedback reaches one repair before a valid object commits](../../../test/examples/01_authoring/01_03_structured_output/01_03_structured_output_test.exs); [repair calls share one request and token budget](../../../test/examples/13_policy/13_01_quota/13_01_quota_test.exs). | Verify the target behavior: Each repair call shall use a new model-call identifier and shall remain correlated with the parent AI request. |
+| `MDL-REQ-020` | Implemented; evidence incomplete | Related example evidence (partial): [resume binds a new local transport without saving credentials or callback handles](../../../test/examples/14_resume/14_03_checkpoint_resume/14_03_checkpoint_resume_test.exs). | Verify the target behavior: When the gateway needs a provider client or credential, it shall resolve it from a trusted runtime binding supplied by the host. |
+| `MDL-REQ-021` | Implemented; evidence incomplete | Related example evidence (partial): [provider errors keep the native ReqLLM tagged result](../../../test/examples/01_authoring/01_08_model_helpers/01_08_model_helpers_test.exs). | Verify the target behavior: Direct calls shall keep ReqLLM errors. Agent runtime seams shall preserve the provider cause in a bounded internal field when they convert an error. |
+| `MDL-REQ-022` | Implemented; evidence incomplete | Source check: provider retry classification versus execution-owned scheduling. A passing response alone cannot prove absence of independent workers. | Verify the target behavior: The gateway shall classify retry eligibility but shall not schedule retry delay or create an independent retry worker. |
 
 ## Migration and compatibility
 
@@ -145,6 +159,13 @@ approved. A documentation rename does not authorize a wire-format change.
 Retained advanced proposals need their own migration and operational review.
 Source paths above replace old `operations/`, `shared/`, live Session, and
 `examples/v3/` references as evidence; historical paths are not current owners.
+
+## Runtime repair follow-up
+
+The current worktree adds runtime repairs over the audit baseline. Dependencies
+are unchanged. The [audit summary](../README.md#example-driven-design-audit)
+separates the repaired scenarios from the remaining advanced API gates. A passing
+scenario is not complete requirement conformance.
 
 ## Completion criteria
 

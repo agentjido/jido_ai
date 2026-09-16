@@ -38,6 +38,7 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
     %{
       id: :assistant,
       instructions: "Base prompt",
+      observability: %{store_content: true},
       models: %{answer: :example},
       reasoning: %{method: :react, model: :answer},
       requests: %{mode: :session},

@@ -347,13 +347,16 @@ defmodule Jido.AI.Reasoning.ReAct.State do
 
   @doc false
   def history(%Thread{} = thread) do
-    {:ok, entries} = Jido.AI.Thread.Projection.project(thread)
-    entries
+    Enum.map(thread.entries, fn entry ->
+      {:ok, message} = Projection.message(entry)
+      [value] = Jido.AI.Model.Messages.entries([message])
+      %{value | refs: entry.refs, timestamp: DateTime.from_unix!(entry.at, :millisecond)}
+    end)
   end
 
   @doc false
   def messages(%Thread{} = thread) do
-    {:ok, messages} = Projection.messages(thread)
+    {:ok, messages} = Projection.evidence_messages(thread)
     prompt = Map.get(thread.metadata, :system_prompt, thread.metadata["system_prompt"])
     if is_binary(prompt), do: [ReqLLM.Context.system(prompt) | messages], else: messages
   end

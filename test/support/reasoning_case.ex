@@ -102,6 +102,7 @@ defmodule Jido.AI.Test.ReasoningCase do
           timeout: Keyword.get(opts, :request_timeout_ms, 60_000)
         },
         requests: requests,
+        observability: Keyword.get(opts, :observability, %{}),
         effect_policy: Keyword.get(opts, :effect_policy, %{}),
         tool_context: Keyword.get(opts, :tool_context, %{}),
         tools: tools,

@@ -353,7 +353,9 @@ defmodule JidoAI.Examples.StandaloneInputTest do
             tools: [],
             streaming: false,
             pending_input_server: queue,
+            store_content: true,
             token_secret: "standalone-input-fixture",
+            stream_content: true,
             llm_opts: MockLLM.options(mock)
           ],
           extra

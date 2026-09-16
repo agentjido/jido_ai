@@ -75,6 +75,12 @@ for {module, streaming?} <- [
           history(:messages)
         end
 
+        observability do
+          store_content true
+          diagnostics_content true
+          stream_content true
+        end
+
         result(nil, into: :reply)
       end
     end

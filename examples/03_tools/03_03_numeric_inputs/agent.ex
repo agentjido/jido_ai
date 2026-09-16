@@ -14,6 +14,10 @@ defmodule JidoAI.Examples.NumericInputs.Agent do
         model(:answer)
       end
 
+      observability do
+        store_content true
+      end
+
       tools do
         action JidoAI.Examples.NumericInputs.Read,
           as: :numeric_input

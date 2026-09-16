@@ -278,7 +278,12 @@ defmodule Jido.AI.DSL do
       emit_telemetry: [type: :boolean],
       emit_signals: [type: :boolean],
       emit_llm_deltas: [type: :boolean],
-      redact_tool_args: [type: :boolean]
+      redact_tool_args: [type: :boolean],
+      stream_content: [type: :boolean],
+      store_content: [type: :boolean],
+      stream_reasoning: [type: :boolean],
+      store_reasoning: [type: :boolean],
+      diagnostics_content: [type: :boolean]
     ]
   }
   @profile %Spark.Dsl.Entity{

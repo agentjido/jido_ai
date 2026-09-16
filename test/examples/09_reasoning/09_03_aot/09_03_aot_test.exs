@@ -487,7 +487,7 @@ defmodule JidoAI.Examples.AoTTest do
     assert_script_done(mock)
   end
 
-  test "blank and incomplete AoT replies retain usage while accepted partial text can finish", %{
+  test "blank and incomplete AoT replies retain usage without completing partial text", %{
     jido: jido
   } do
     {mock, context} =
@@ -514,8 +514,9 @@ defmodule JidoAI.Examples.AoTTest do
     end
 
     assert {:ok, next} = request(server, context)
-    assert {:ok, result} = Request.await(next)
-    assert result.answer == "partial" and result.raw_response == "answer: partial"
+    assert {:error, {:failed, :error, result}} = Request.await(next)
+    assert result.diagnostics.cause == {:incomplete_response, :length}
+    assert Server.agent(server).state.reply == nil
     assert result.usage.total_tokens == 15
     assert_script_done(mock)
   end

@@ -29,6 +29,7 @@ for {module, capture?} <- [
         end
 
         observability do
+          store_content true
           emit_llm_deltas(@capture)
         end
 

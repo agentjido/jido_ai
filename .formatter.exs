@@ -43,6 +43,7 @@ ai_locals = [
   output: 1,
   output: 2,
   result: 1,
+  result: 2,
   requests: 1,
   mode: 1,
   on_busy: 1,
@@ -57,6 +58,11 @@ ai_locals = [
   emit_signals: 1,
   emit_llm_deltas: 1,
   redact_tool_args: 1,
+  stream_content: 1,
+  store_content: 1,
+  stream_reasoning: 1,
+  store_reasoning: 1,
+  diagnostics_content: 1,
   metadata: 1
 ]
 

@@ -34,6 +34,10 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Helpers do
       emit_telemetry?: params[:emit_telemetry?],
       redact_tool_args?: params[:redact_tool_args?],
       capture_deltas?: params[:capture_deltas?],
+      stream_content: params[:stream_content],
+      store_content: params[:store_content],
+      stream_reasoning: params[:stream_reasoning],
+      store_reasoning: params[:store_reasoning],
       token_secret: params[:token_secret] || context[:react_token_secret],
       token_ttl_ms: params[:token_ttl_ms],
       token_compress?: params[:token_compress?]

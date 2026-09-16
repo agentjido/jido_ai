@@ -23,6 +23,10 @@ for {module, stream} <- [
           model(:answer, JidoAI.Examples.MockLLM.model())
         end
 
+        observability do
+          store_content true
+        end
+
         tools do
           action(JidoAI.Examples.InitialState.Echo,
             as: :import_echo

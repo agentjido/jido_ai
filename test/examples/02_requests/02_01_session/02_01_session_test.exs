@@ -49,10 +49,15 @@ defmodule JidoAI.Examples.SessionTest do
   end
 
   test "the authored session runs without test controls or blocking tools", %{jido: jido} do
-    {mock, context} = mock([%{reply: {:text, "Ready"}}])
+    {mock, context} = mock([%{reply: {:text, "Ready"}}, %{reply: {:text, "Streaming"}}])
     server = start_agent(jido, Agent.new!())
     assert {:ok, request} = Agent.ask(server, "Help", context: context)
     assert {:ok, "Ready"} = Request.await(request)
+    assert {:ok, %{request: streamed, events: events}} = Agent.ask_stream(server, "Continue", context: context)
+    assert {:ok, "Streaming"} = Request.await(streamed)
+    events = Enum.to_list(events)
+    assert Enum.any?(events, &(&1.kind == :llm_delta))
+    assert List.last(events).kind == :request_completed
     assert_script_done(mock)
   end
 
@@ -62,7 +67,7 @@ defmodule JidoAI.Examples.SessionTest do
   } do
     {mock, context} = mock([%{reply: {:wait, :answer, {:text, "Done"}}}])
     server = start_fixture(jido)
-    assert {:ok, request, events} = Agent.ask_stream(server, "Work", context: context)
+    assert {:ok, %{request: request, events: events}} = Agent.ask_stream(server, "Work", context: context)
     id = request.id
     assert_receive {:mock_llm_waiting, ^mock, :answer, _}, 2_000
 
@@ -86,11 +91,12 @@ defmodule JidoAI.Examples.SessionTest do
     assert Enum.map(events, & &1.kind) == [
              :request_started,
              :llm_started,
+             :llm_delta,
              :llm_completed,
              :request_completed
            ]
 
-    assert Enum.map(events, & &1.seq) == [1, 2, 3, 4]
+    assert Enum.map(events, & &1.seq) == [1, 2, 3, 4, 5]
     assert Enum.all?(events, &(&1.request_id == id))
 
     assert %{state: %{reply: "Done", case_id: "closed", commits: final_commits} = state} =
@@ -106,7 +112,7 @@ defmodule JidoAI.Examples.SessionTest do
     {mock, context} = mock([%{reply: {:wait, :answer, {:text, "First"}}}])
     server = start_fixture(jido)
 
-    assert {:ok, first, events} =
+    assert {:ok, %{request: first, events: events}} =
              Agent.ask_stream(server, "First", context: context, request_id: "first")
 
     assert_receive {:mock_llm_waiting, ^mock, :answer, _}, 2_000
@@ -141,7 +147,7 @@ defmodule JidoAI.Examples.SessionTest do
     {mock, context} = mock([%{reply: {:wait, :answer, {:text, "Later"}}}])
     server = start_fixture(jido)
 
-    assert {:ok, request, events} =
+    assert {:ok, %{request: request, events: events}} =
              Agent.ask_stream(server, "Work", context: context, stream_event_timeout_ms: 10)
 
     assert_receive {:mock_llm_waiting, ^mock, :answer, _}, 2_000
@@ -160,7 +166,7 @@ defmodule JidoAI.Examples.SessionTest do
       ])
 
     server = start_fixture(jido)
-    assert {:ok, request, events} = Agent.ask_stream(server, "Wait", context: context)
+    assert {:ok, %{request: request, events: events}} = Agent.ask_stream(server, "Wait", context: context)
     assert_receive {:tool_waiting, worker, 1}, 2_000
     monitor = Process.monitor(worker)
     assert :ok = Orchestration.cancel(request)
@@ -268,7 +274,7 @@ defmodule JidoAI.Examples.SessionTest do
 
     assert {:ok, %{request: saved}} = Orchestration.snapshot(server, request_id: request.id)
     assert saved.extra_refs == %{case: "42"}
-    assert saved.result == "Twelve"
+    assert saved.result == ""
     assert_script_done(mock)
   end
 
@@ -372,7 +378,7 @@ defmodule JidoAI.Examples.SessionTest do
 
     server = streaming_server(jido)
     observe_tools()
-    {:ok, request, events} = Agent.ask_stream(server, "Calculate", context: context)
+    {:ok, %{request: request, events: events}} = Agent.ask_stream(server, "Calculate", context: context)
     assert {:ok, "Forty-two"} = Request.await(request)
     assert_receive {:example_tool_started, "multiply"}
     refute_received {:example_tool_started, "multiply"}
@@ -580,7 +586,7 @@ defmodule JidoAI.Examples.SessionTest do
     test "a blank SSE response with #{reason} does not complete and retains usage", %{jido: jido} do
       {mock, context} = mock([%{reply: {:stream, [], unquote(reason)}}])
       server = streaming_server(jido)
-      {:ok, request, events} = Agent.ask_stream(server, "Work", context: context)
+      {:ok, %{request: request, events: events}} = Agent.ask_stream(server, "Work", context: context)
       assert {:error, _} = Request.await(request)
       record = Server.agent(server).state.requests[request.id]
       assert record.status == :failed
@@ -593,12 +599,13 @@ defmodule JidoAI.Examples.SessionTest do
     end
   end
 
-  @tag history_case: "HIST-06/accepted-partial"
-  test "non-empty incomplete content keeps the accepted legacy result", %{jido: jido} do
+  @tag history_case: "HIST-06/rejected-partial"
+  test "non-empty incomplete content fails without changing the result", %{jido: jido} do
     {mock, context} = mock([%{reply: {:stream, [%{content: "Usable partial"}], "incomplete"}}])
     server = streaming_server(jido)
     {:ok, request} = Agent.ask(server, "Work", context: context)
-    assert {:ok, "Usable partial"} = Request.await(request)
+    assert {:error, {:incomplete_response, :error}} = Request.await(request)
+    assert Server.agent(server).state.reply == ""
     assert_script_done(mock)
   end
 end

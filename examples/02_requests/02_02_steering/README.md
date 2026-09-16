@@ -21,7 +21,20 @@ Shared setup and fault fixtures stay in [test support](../../../test/examples/su
 
 ## Expected result and failure behavior
 
-`Session.steer/3` and `Session.inject/3` queue input in order. Consumed text reaches the next model call. A closed queue rejects late input.
+`Jido.AI.Orchestration.steer/3` and `Jido.AI.Orchestration.inject/3` queue input in order. Consumed text reaches the next model call. A closed queue rejects late input.
+
+## Design target checks
+
+[The target checks](../../../test/examples/02_requests/02_02_steering/design_requirements_test.exs)
+separate queued steering from completed conversation. Queued input stays out
+until consumption (`SES-REQ-046`).
+
+Pending, failed, and cancelled request input stays
+out of the default completed-conversation projection (`VAL-REQ-023`,
+`SES-REQ-045`). The failed-request case inspects the next actual model request.
+Request records and raw Thread entries retain execution evidence. Successful
+settlement promotes the request's messages into completed conversation. See
+[request alignment](../../../docs/design/07_request_sessions/alignment.md#acceptance-matrix).
 
 ## Limits
 

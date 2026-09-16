@@ -5,6 +5,21 @@ defmodule Jido.AI.Profile do
   Construction does not call a model or tool. Model aliases resolve when a Turn
   starts. Runtime provider options belong in the caller context under
   `ai: %{profile_id => %{options: keyword()}}`; Signal data cannot set them.
+
+  Content permissions belong in `observability`. All default to false:
+
+  * `stream_content` permits media and tool payloads in public streams and Signals.
+  * `store_content` permits media and tool payloads in retained request and conversation data.
+  * `stream_reasoning` and `store_reasoning` independently permit provider reasoning.
+  * `diagnostics_content` permits inspection content only when the caller also
+    passes `include_content: true` to `Jido.AI.Orchestration.snapshot/2`.
+
+  Normal user and assistant text remains available in storage.
+  Execution receives native values before these output projections. Credentials
+  are removed and content is bounded even with permission. Removed content is
+  not kept in a second result store: `Request.await/2` reads the retained result.
+  Continuing a conversation that needs omitted content returns
+  `:conversation_content_not_retained`; replace its context or opt in before execution.
   """
   alias Jido.AI.Output
 
@@ -331,7 +346,12 @@ defmodule Jido.AI.Profile do
                :emit_telemetry,
                :emit_llm_deltas,
                :emit_signals,
-               :redact_tool_args
+               :redact_tool_args,
+               :stream_content,
+               :store_content,
+               :stream_reasoning,
+               :store_reasoning,
+               :diagnostics_content
              ],
              "observability"
            ),

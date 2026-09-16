@@ -26,6 +26,8 @@ config =
     tools: [Add],
     streaming: false,
     token_secret: "checkpoint-resume-fixture",
+    stream_content: true,
+    store_content: true,
     llm_opts: [
       base_url: base_url,
       api_key: "local-example-key",

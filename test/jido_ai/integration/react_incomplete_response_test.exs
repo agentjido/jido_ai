@@ -130,10 +130,7 @@ defmodule Jido.AI.Integration.ReActIncompleteResponseTest do
       assert {:ok, "Hello, World!"} = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000)
     end
 
-    test "incomplete finish_reason with actual text content is still accepted as final answer" do
-      # Edge case: if the model managed to emit text before getting cut off,
-      # we should still accept it rather than silently discarding a partial response.
-      # The validation only rejects blank text + failure finish_reason.
+    test "incomplete finish_reason rejects actual text content as a final answer" do
       Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
         {:ok,
          StreamResponseFactory.build(
@@ -145,7 +142,7 @@ defmodule Jido.AI.Integration.ReActIncompleteResponseTest do
 
       pid = start_basic_agent()
 
-      assert {:ok, "Partial response before cutoff"} = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000)
+      assert {:error, {:incomplete_response, :incomplete}} = BasicAgent.ask_sync(pid, "Hello!", timeout: 5_000)
     end
   end
 end

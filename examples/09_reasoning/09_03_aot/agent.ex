@@ -23,6 +23,10 @@ defmodule JidoAI.Examples.AoT.Agent do
         streaming(true)
       end
 
+      observability do
+        store_content true
+      end
+
       result(nil, into: :reply)
     end
   end

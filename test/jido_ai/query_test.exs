@@ -226,7 +226,7 @@ defmodule Jido.AI.QueryTest do
                    "[Image]",
                    "[File: string.pdf]",
                    "[File]",
-                   "%{unexpected: true}"
+                   "[Private or unsupported content]"
                  ],
                  "\n"
                )

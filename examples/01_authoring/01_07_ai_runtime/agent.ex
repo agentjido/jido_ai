@@ -1,6 +1,6 @@
 defmodule JidoAI.Examples.AIRuntime.Agent do
   @moduledoc "01_07: The AI DSL composes with ordinary routes and Plugin-owned state."
-  use Jido.Agent, name: "ai_runtime_example", extensions: [Jido.AI.DSL]
+  use Jido.AI.Agent, name: "ai_runtime_example"
 
   agent do
     schema Zoi.object(%{
@@ -22,6 +22,10 @@ defmodule JidoAI.Examples.AIRuntime.Agent do
       reasoning :react do
         model(:answer)
         tool_concurrency(2)
+      end
+
+      observability do
+        store_content true
       end
 
       tools do

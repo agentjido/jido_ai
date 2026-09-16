@@ -131,8 +131,8 @@ defmodule Jido.AI.Query do
       %{"type" => type} when type in @file_part_type_strings ->
         "[File]"
 
-      part ->
-        inspect(part)
+      _part ->
+        "[Private or unsupported content]"
     end)
   end
 

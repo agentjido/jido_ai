@@ -70,6 +70,12 @@ defmodule Jido.AI.Reasoning.ReAct.Authoring do
         emit_signals?: config.observability.emit_signals?,
         emit_telemetry?: config.observability.emit_telemetry?,
         redact_tool_args?: config.observability.redact_tool_args?,
+        stream_content: config.observability.stream_content,
+        stream_reasoning: config.observability.stream_reasoning,
+        # The private Agent owns live execution. Runner applies the caller's
+        # storage policy before it exports a token.
+        store_content: true,
+        store_reasoning: true,
         emit_llm_deltas?: config.trace.capture_deltas?
       },
       requests: %{

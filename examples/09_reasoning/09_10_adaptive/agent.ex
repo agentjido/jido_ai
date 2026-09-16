@@ -32,6 +32,11 @@ defmodule JidoAI.Examples.Adaptive.Agent do
         streaming(true)
       end
 
+      observability do
+        store_content true
+        stream_content true
+      end
+
       result(nil, into: :reply)
     end
   end

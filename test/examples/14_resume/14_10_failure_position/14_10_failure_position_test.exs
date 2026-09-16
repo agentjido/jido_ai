@@ -231,6 +231,8 @@ defmodule JidoAI.Examples.FailurePositionTest do
             tools: [],
             streaming: false,
             request_transformer: Example,
+            stream_content: true,
+            store_content: true,
             token_secret: "failure-position-case",
             llm_opts: MockLLM.options(mock)
           ],

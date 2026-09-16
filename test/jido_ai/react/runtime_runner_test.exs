@@ -938,7 +938,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
              output_tokens: 0
            }
 
-    assert user_contents(ReAct.State.messages(failed_state.context)) == ["Say hello"]
+    assert user_contents(ReAct.State.messages(failed_state.context)) == []
     assert assistant_contents(ReAct.State.messages(failed_state.context)) == []
   end
 
@@ -1374,6 +1374,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       Config.new(%{
         model: :capable,
         tools: %{NonRetryTool.name() => NonRetryTool},
+        stream_content: true,
         tool_max_retries: 2,
         tool_retry_backoff_ms: 0
       })
@@ -1393,6 +1394,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       Config.new(%{
         model: :capable,
         tools: %{SnapshotStateTool.name() => SnapshotStateTool},
+        stream_content: true,
         tool_max_retries: 0,
         tool_retry_backoff_ms: 0
       })
@@ -1422,6 +1424,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       Config.new(%{
         model: :capable,
         tools: %{SnapshotStateTool.name() => SnapshotStateTool},
+        stream_content: true,
         tool_max_retries: 0,
         tool_retry_backoff_ms: 0,
         effect_policy: %{mode: :deny_all}
@@ -1452,6 +1455,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       Config.new(%{
         model: :capable,
         tools: %{SnapshotStateTool.name() => SnapshotStateTool},
+        stream_content: true,
         tool_max_retries: 0,
         tool_retry_backoff_ms: 0,
         effect_policy: %{mode: :deny_all}
@@ -1503,7 +1507,9 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       Config.new(%{
         model: :capable,
         tools: %{CalculatorTool.name() => CalculatorTool},
-        token_secret: "resume-secret"
+        token_secret: "resume-secret",
+        store_content: true,
+        stream_content: true
       })
 
     after_llm_token =
@@ -1667,6 +1673,10 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
 
   defp mock_config(mock, overrides \\ []) do
     [
+      stream_content: true,
+      store_content: true,
+      stream_reasoning: true,
+      store_reasoning: true,
       model: MockLLM.model(),
       llm_opts: MockLLM.options(mock),
       token_secret: "runner-native-test-secret",

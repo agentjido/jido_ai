@@ -16,6 +16,10 @@ defmodule JidoAI.Examples.ReasoningTool.Agent do
         model(:answer)
       end
 
+      observability do
+        store_content true
+      end
+
       tools do
         action Jido.AI.Actions.Reasoning.RunStrategy,
           as: :reason,

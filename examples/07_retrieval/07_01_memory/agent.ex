@@ -16,6 +16,10 @@ defmodule JidoAI.Examples.Retrieval.Agent do
 
       reasoning(:react, model: :answer)
 
+      observability do
+        store_content true
+      end
+
       tools do
         action Jido.AI.Actions.Retrieval.RecallMemory,
           as: :recall_memory,

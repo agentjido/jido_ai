@@ -28,6 +28,10 @@ defmodule JidoAI.Examples.Steering.Agent do
         history(:messages)
       end
 
+      observability do
+        store_content true
+      end
+
       tools do
       end
 

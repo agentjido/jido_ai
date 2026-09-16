@@ -21,7 +21,23 @@ Shared setup and fault fixtures stay in [test support](../../../test/examples/su
 
 ## Expected result and failure behavior
 
-Blank failed responses retain usage and fail without an answer commit. Usable length-limited text and image content can complete under the existing untyped contract.
+Failed and length-limited responses retain usage and fail without an answer
+commit, even when they contain text, media, or a decoded object.
+
+## Design target checks
+
+[The target checks](../../../test/examples/02_requests/02_25_incomplete_response/design_requirements_test.exs)
+test completion and content protection with synthetic data.
+
+The runtime rejects length-truncated output (`MDL-REQ-015`). Media and hidden
+reasoning are excluded from default streams and storage; diagnostics exclude
+content (`OBS-REQ-032` through `OBS-REQ-036`). The Profile's `observability` block
+has separate `stream_content`, `store_content`, `stream_reasoning`,
+`store_reasoning`, and `diagnostics_content` permissions. All default to false.
+Inspection also requires `include_content: true`. `Request.await/2` returns
+the stored result, which can contain an omission placeholder. See
+[model alignment](../../../docs/design/02_model_gateway/alignment.md#acceptance-matrix)
+and [observation alignment](../../../docs/design/12_observation_diagnostics/alignment.md#acceptance-matrix).
 
 ## Limits
 

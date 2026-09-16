@@ -47,6 +47,60 @@ defmodule Jido.AI.Runtime.Decide do
   end
 
   defp tools(state, calls, context) do
+    catalog = Map.get(state, :active_tools, state.profile.tools)
+    normalized = Enum.map(calls, &ReqLLM.ToolCall.to_map/1)
+
+    if Enum.any?(normalized, fn call -> not Enum.any?(catalog, &(&1.name == call.name)) end) do
+      reject_unknown_batch(state, calls, catalog, context)
+    else
+      execute_tools(state, calls, context)
+    end
+  end
+
+  # An unknown tool is recoverable model input, not permission to execute a
+  # fallback. Reject the whole batch before effects and let the model correct it.
+  defp reject_unknown_batch(state, calls, catalog, context) do
+    known =
+      Enum.filter(calls, fn call ->
+        name = ReqLLM.ToolCall.to_map(call).name
+        Enum.any?(catalog, &(&1.name == name))
+      end)
+
+    calls = Enum.map(calls, &ReqLLM.ToolCall.to_map/1)
+    ids = Enum.map(calls, & &1.id)
+
+    with true <- state.repairs == 0 and state.tool_calls + length(calls) <= state.profile.controls.max_tool_calls,
+         true <- Enum.all?(calls, &(is_binary(&1.id) and &1.id != "" and is_map(&1.arguments))),
+         true <- length(ids) == length(Enum.uniq(ids)),
+         {:ok, _} <- ToolCatalog.admit(catalog, known),
+         {:ok, state} <- Jido.AI.Reasoning.tool_round(state) do
+      results =
+        Enum.map(calls, fn call ->
+          reason =
+            if Enum.any?(catalog, &(&1.name == call.name)),
+              do: "Batch rejected: another tool is unknown",
+              else: "Unknown tool: #{call.name}"
+
+          ReqLLM.Context.tool_result(call.id, call.name, Jason.encode!(%{ok: false, error: reason}))
+        end)
+
+      with {:ok, messages} <- ReqLLM.Context.append_tool_exchange(state.response.context, state.response, results),
+           {:ok, state} <-
+             Jido.AI.Orchestration.Transcript.record(state, Jido.AI.Model.Messages.entries(results), context) do
+        {:continue, %{state | messages: messages, tool_calls: state.tool_calls + length(calls)},
+         Jido.AI.Runtime.ReasonFlow}
+      end
+    else
+      false ->
+        {:error, reason} = Profile.error("tools.batch", "Invalid tool batch or exhausted tool limit")
+        {:error, Jido.AI.Reasoning.failure(state, reason)}
+
+      {:error, reason} ->
+        {:error, Jido.AI.Reasoning.failure(state, reason)}
+    end
+  end
+
+  defp execute_tools(state, calls, context) do
     with true <- state.repairs == 0,
          {:ok, state} <- Jido.AI.Reasoning.tool_round(state),
          true <- state.tool_calls + length(calls) <= state.profile.controls.max_tool_calls,

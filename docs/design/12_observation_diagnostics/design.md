@@ -51,7 +51,10 @@ These rules do not change native ReqLLM data needed during execution. They
 govern exposure and storage, including canonical log payloads and snapshots.
 Retention of execution evidence is not permission to retain rich or reasoning
 content: preserve permitted identity, order, status, and bounded metadata.
-Exact permission field names and migration remain open. Preserve canonical
+The current implementation uses Profile observability fields `stream_content`,
+`store_content`, `stream_reasoning`, `store_reasoning`, and `diagnostics_content`.
+See [alignment evidence and migration limits](alignment.md#content-permission-acceptance-additions)
+for the supported paths and remaining proof. Preserve canonical
 Session/Thread, Agent + DSL + Profile, all methods, advanced capabilities,
 and core topology ownership. Named-document approval remains pending.
 

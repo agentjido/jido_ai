@@ -9,6 +9,20 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
   alias Jido.AI.Thread.Control, as: ContextOps
   alias ReqLLM.Message.ContentPart
 
+  # These tests inspect full synthetic state. Default-deny projection has a
+  # separate suite; this fixture requests the content its assertions inspect.
+  defp start_observed_reasoning(jido, method, opts) do
+    policy = %{
+      diagnostics_content: true,
+      stream_content: true,
+      store_content: true,
+      stream_reasoning: true,
+      store_reasoning: true
+    }
+
+    Jido.AI.Test.ReasoningCase.start_reasoning(jido, method, Keyword.put_new(opts, :observability, policy))
+  end
+
   defmodule TestCalculator do
     use Jido.Action,
       name: "calculator",
@@ -76,7 +90,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
     server = native_start(jido, [tools: []], %{controls: %{output: [RawFailure]}})
     assert {:ok, handle} = request(server, mock, :react, "Fail", context: %{observer: self(), failure: raw})
     assert {:error, ^raw} = Request.await(handle)
-    assert {:ok, view} = Orchestration.snapshot(server)
+    assert {:ok, view} = Orchestration.snapshot(server, include_content: true)
     assert view.request.status == :failed and view.request.error == raw
     assert view.live == nil and view.details.active_request_id == nil
     streamed = events(handle)
@@ -88,10 +102,10 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
   defp native_checkpoint(jido) do
     mock = mock([%{reply: {:text, "Done"}}])
-    server = start_reasoning(jido, :react, tools: [])
+    server = start_observed_reasoning(jido, :react, tools: [])
     assert {:ok, handle} = request(server, mock, :react, "Checkpoint")
     assert {:ok, "Done"} = Request.await(handle)
-    assert {:ok, view} = Orchestration.snapshot(server)
+    assert {:ok, view} = Orchestration.snapshot(server, include_content: true)
     assert view.live == nil and view.details.active_request_id == nil
     assert {:ok, saved} = Jido.Agent.checkpoint(view.agent)
     assert saved.state.requests[handle.id] == view.request
@@ -138,6 +152,16 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
   defp native_definition(opts, changes \\ %{}) do
     opts = Keyword.merge([name: "react_setup", tools: [TestCalculator], model: MockLLM.model(), streaming: false], opts)
+
+    opts =
+      Keyword.put_new(opts, :observability, %{
+        diagnostics_content: true,
+        stream_content: true,
+        store_content: true,
+        stream_reasoning: true,
+        store_reasoning: true
+      })
+
     source = definition(:react, opts)
 
     plugins =
@@ -250,7 +274,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       end
 
     mock = mock([first, %{reply: {:text, "Next answer"}}])
-    server = start_reasoning(jido, :react, tools: [TestCalculator], system_prompt: "Original prompt")
+    server = start_observed_reasoning(jido, :react, tools: [TestCalculator], system_prompt: "Original prompt")
     context = %{observer: self(), hold_tool: terminal == :task_loss}
     assert {:ok, handle} = request(server, mock, :react, "Q1", context: context)
 
@@ -278,7 +302,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     case terminal do
       :task_loss ->
-        assert {:ok, view} = Orchestration.snapshot(server)
+        assert {:ok, view} = Orchestration.snapshot(server, include_content: true)
         assert view.details.phase == :executing_tool
         Process.exit(view.live.worker_pid, :kill)
         assert {:error, :worker_crash} = Request.await(handle)
@@ -390,7 +414,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
         assert after_signal.state == before
       end
 
-      assert {:ok, %{request: nil, live: nil}} = Orchestration.snapshot(server)
+      assert {:ok, %{request: nil, live: nil}} = Orchestration.snapshot(server, include_content: true)
     end
   end
 
@@ -398,11 +422,11 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
     test "start commits one request before its owned model worker runs", %{jido: jido} do
       mock = mock([%{reply: {:wait, :held, {:text, "4"}}}])
       server = native_start(jido, streaming: true)
-      assert {:ok, %{request: nil, live: nil}} = Orchestration.snapshot(server)
+      assert {:ok, %{request: nil, live: nil}} = Orchestration.snapshot(server, include_content: true)
       assert {:ok, handle} = request(server, mock, :react, "What is 2 + 2?", context: %{observer: self()})
       assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
       assert %{status: :pending, query: "What is 2 + 2?"} = record(server, handle)
-      assert {:ok, view} = Orchestration.snapshot(server)
+      assert {:ok, view} = Orchestration.snapshot(server, include_content: true)
       assert view.details.active_request_id == handle.id
       assert view.details.phase == :awaiting_llm
       assert Process.alive?(view.live.worker_pid)
@@ -560,7 +584,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert {:error, {:unknown_allowed_tools, ["search"]}} =
                request(server, mock, :react, "Bad tool", allowed_tools: ["search"], context: %{observer: self()})
 
-      assert {:ok, %{request: nil, live: nil}} = Orchestration.snapshot(server)
+      assert {:ok, %{request: nil, live: nil}} = Orchestration.snapshot(server, include_content: true)
       assert Server.agent(server).state.requests == %{}
       refute_receive {:prepared_request, _, _}, 0
       assert MockLLM.report(mock).requests == []
@@ -626,7 +650,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "the owned worker receives the prompt exactly once", %{jido: jido} do
       mock = mock([%{reply: {:wait, :held, {:text, "4"}}}])
-      server = start_reasoning(jido, :react, tools: [])
+      server = start_observed_reasoning(jido, :react, tools: [])
       assert {:ok, handle} = request(server, mock, :react, "Test prompt")
       assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
       assert [wire] = MockLLM.report(mock).requests
@@ -640,10 +664,10 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "owned runtime events update inspection and publish one request lifecycle", %{jido: jido} do
       mock = mock([%{reply: {:wait, :held, {:text, "Done"}}}])
-      server = start_reasoning(jido, :react, tools: [])
+      server = start_observed_reasoning(jido, :react, tools: [])
       assert {:ok, handle} = request(server, mock, :react, "Hello")
       assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
-      assert {:ok, active} = Orchestration.snapshot(server)
+      assert {:ok, active} = Orchestration.snapshot(server, include_content: true)
       assert active.details.phase == :awaiting_llm
       assert active.details.active_request_id == handle.id
       assert Enum.map(active.details.trace.events, & &1.kind) == [:request_started, :llm_started]
@@ -656,7 +680,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert Enum.count(all, &(&1.kind == :request_started)) == 1
       assert Enum.count(all, &(&1.kind == :request_completed)) == 1
       assert Enum.all?(all, &(&1.request_id == handle.id and &1.run_id == active.request.run_id))
-      assert {:ok, done} = Orchestration.snapshot(server)
+      assert {:ok, done} = Orchestration.snapshot(server, include_content: true)
       assert done.details.phase == :request_completed and done.live == nil
       assert done.details.trace.events == Enum.take(all, done.details.trace.seq)
       assert_script_done(mock)
@@ -664,7 +688,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "steer queues request input and preserves its source and refs on consumption", %{jido: jido} do
       mock = mock([%{reply: {:wait, :held, {:text, "First"}}}, %{reply: {:text, "Revised"}}])
-      server = start_reasoning(jido, :react, tools: [])
+      server = start_observed_reasoning(jido, :react, tools: [])
       assert {:ok, handle} = request(server, mock, :react, "Q1")
       assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
       id = handle.id
@@ -672,7 +696,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert {:ok, %{status: :queued, request_id: ^id, input_id: input_id}} =
                Orchestration.steer(handle, "Actually answer Q2", source: "/test/steer", extra_refs: %{origin: "suite"})
 
-      assert user_texts(server) == ["Q1"]
+      assert user_texts(server) == []
       assert :ok = MockLLM.release(mock, :held)
       assert {:ok, "Revised"} = Request.await(handle)
       assert [injected] = Enum.filter(events(handle), &(&1.kind == :input_injected))
@@ -685,7 +709,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "provider failure discards undrained input before the next request", %{jido: jido} do
       mock = mock([%{reply: {:wait, :held, {:error, 429, "Rate limited"}}}, %{reply: {:text, "Next"}}])
-      server = start_reasoning(jido, :react, tools: [])
+      server = start_observed_reasoning(jido, :react, tools: [])
       assert {:ok, first} = request(server, mock, :react, "Q1")
       assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
       assert {:ok, %{status: :queued}} = Orchestration.steer(first, "Discard this input")
@@ -693,12 +717,15 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert {:error, error} = Request.await(first)
       assert error.details.status == 429
       assert record(server, first).status == :failed
-      assert {:ok, %{live: nil, details: %{active_request_id: nil}}} = Orchestration.snapshot(server)
+
+      assert {:ok, %{live: nil, details: %{active_request_id: nil}}} =
+               Orchestration.snapshot(server, include_content: true)
+
       refute Enum.any?(events(first), &(&1.kind == :input_injected))
-      assert user_texts(server) == ["Q1"]
+      assert user_texts(server) == []
       assert {:ok, next} = request(server, mock, :react, "Q2")
       assert {:ok, "Next"} = Request.await(next)
-      assert user_texts(server) == ["Q1", "Q2"]
+      assert user_texts(server) == ["Q2"]
       [_, wire] = MockLLM.report(mock).requests
       refute Enum.any?(wire.body["messages"], &(&1["content"] == "Discard this input"))
       assert_script_done(mock)
@@ -706,21 +733,21 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "idle injection rejects without starting work or changing history", %{jido: jido} do
       mock = mock([])
-      server = start_reasoning(jido, :react, tools: [])
+      server = start_observed_reasoning(jido, :react, tools: [])
       before = Server.agent(server).state
 
       assert {:error, %{status: :rejected, reason: :idle, kind: :inject}} =
                Orchestration.inject(server, "Programmatic input")
 
       assert Server.agent(server).state == before
-      assert {:ok, %{request: nil, live: nil}} = Orchestration.snapshot(server)
+      assert {:ok, %{request: nil, live: nil}} = Orchestration.snapshot(server, include_content: true)
       assert MockLLM.report(mock).requests == []
       assert_script_done(mock)
     end
 
     test "stale steering rejects without adding an input or model call", %{jido: jido} do
       mock = mock([%{reply: {:wait, :held, {:text, "Done"}}}])
-      server = start_reasoning(jido, :react, tools: [])
+      server = start_observed_reasoning(jido, :react, tools: [])
       assert {:ok, handle} = request(server, mock, :react, "Q1")
       assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
       before = Server.agent(server).state.messages
@@ -739,7 +766,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "blank steering rejects without adding an input or model call", %{jido: jido} do
       mock = mock([%{reply: {:wait, :held, {:text, "Done"}}}])
-      server = start_reasoning(jido, :react, tools: [])
+      server = start_observed_reasoning(jido, :react, tools: [])
       assert {:ok, handle} = request(server, mock, :react, "Q1")
       assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
       before = Server.agent(server).state.messages
@@ -755,7 +782,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "consumed injection commits one user message before the next model call", %{jido: jido} do
       mock = mock([%{reply: {:wait, :held, {:text, "First"}}}, %{reply: {:text, "Revised"}}])
-      server = start_reasoning(jido, :react, tools: [])
+      server = start_observed_reasoning(jido, :react, tools: [])
       assert {:ok, handle} = request(server, mock, :react, "Q1")
       assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
 
@@ -765,7 +792,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
                  extra_refs: %{origin: "suite"}
                )
 
-      assert user_texts(server) == ["Q1"]
+      assert user_texts(server) == []
       assert :ok = MockLLM.release(mock, :held)
       assert {:ok, "Revised"} = Request.await(handle)
       assert [injected] = Enum.filter(events(handle), &(&1.kind == :input_injected))
@@ -795,7 +822,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       first = %{prompt_tokens: 10, completion_tokens: 5, total_tokens: 15}
       second = %{prompt_tokens: 7, completion_tokens: 3, total_tokens: 10}
       mock = mock([%{reply: {:wait, :draft, response("Draft one", first)}}, %{reply: response("Draft two", second)}])
-      server = start_reasoning(jido, :react, tools: [])
+      server = start_observed_reasoning(jido, :react, tools: [])
       assert {:ok, handle} = request(server, mock, :react, "Draft")
       assert_receive {:mock_llm_waiting, ^mock, :draft, _}, 2_000
       assert {:ok, _} = Orchestration.inject(handle, "Revise")
@@ -873,7 +900,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       }
 
       mock = mock([%{reply: {:raw, first}}, %{reply: response("5", %{})}])
-      server = start_reasoning(jido, :react, tools: [TestCalculator])
+      server = start_observed_reasoning(jido, :react, tools: [TestCalculator])
       assert {:ok, handle} = request(server, mock, :react, "Add")
       assert {:ok, "5"} = Request.await(handle)
       streamed = events(handle)
@@ -913,7 +940,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       wire_details = Enum.map(details, &ReqLLM.Message.ReasoningDetails.to_openai_compatible/1)
       delta = %{content: "You asked who you are.", reasoning_details: wire_details}
       mock = mock([%{reply: {:stream, [delta], "stop"}}, %{reply: {:text, "You asked who you are."}}])
-      server = start_reasoning(jido, :react, tools: [], streaming: true)
+      server = start_observed_reasoning(jido, :react, tools: [], streaming: true)
       assert {:ok, first} = request(server, mock, :react, "Who am I?")
       assert {:ok, "You asked who you are."} = Request.await(first)
       assert {:ok, next} = request(server, mock, :react, "What did I just ask?")
@@ -936,10 +963,10 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "inspection projects the committed message history", %{jido: jido} do
       mock = mock([%{reply: {:text, "Tracked"}}])
-      server = start_reasoning(jido, :react, tools: [])
+      server = start_observed_reasoning(jido, :react, tools: [])
       assert {:ok, handle} = request(server, mock, :react, "Track this")
       assert {:ok, "Tracked"} = Request.await(handle)
-      assert {:ok, view} = Orchestration.snapshot(server)
+      assert {:ok, view} = Orchestration.snapshot(server, include_content: true)
       conversation = Enum.reject(view.details.conversation, &(&1.role == :system))
 
       assert Enum.map(conversation, &%{role: &1.role, content: Jido.AI.Query.summarize(&1.content)}) ==
@@ -972,10 +999,10 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       }
 
       mock = mock([%{reply: {:raw, wire}}, %{reply: {:text, "5"}}])
-      server = start_reasoning(jido, :react, tools: [TestCalculator])
+      server = start_observed_reasoning(jido, :react, tools: [TestCalculator])
       assert {:ok, handle} = request(server, mock, :react, "Add", context: %{observer: self(), hold_tool: true})
       assert_receive {:calculator_held, tool}, 2_000
-      assert {:ok, view} = Orchestration.snapshot(server)
+      assert {:ok, view} = Orchestration.snapshot(server, include_content: true)
 
       assert view.details.tool_calls == [
                %{
@@ -989,7 +1016,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
       send(tool, :release)
       assert {:ok, "5"} = Request.await(handle)
-      assert {:ok, done} = Orchestration.snapshot(server)
+      assert {:ok, done} = Orchestration.snapshot(server, include_content: true)
       assert done.details.tool_calls == []
       assert [%{id: "call_string", result: {:ok, %{result: 5}, []}}] = done.details.tool_results
       assert_script_done(mock)
@@ -1008,22 +1035,22 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
           %{reply: {:wait, :next, {:text, "Next"}}}
         ])
 
-      server = start_reasoning(jido, :react, tools: [TestCalculator, TestSearch])
+      server = start_observed_reasoning(jido, :react, tools: [TestCalculator, TestSearch])
       assert {:ok, handle} = request(server, mock, :react, "Use tools")
       assert_receive {:mock_llm_waiting, ^mock, :final, _}, 2_000
-      assert {:ok, before} = Orchestration.snapshot(server)
+      assert {:ok, before} = Orchestration.snapshot(server, include_content: true)
       replay = Enum.find(before.details.trace.events, &(&1.kind == :tool_completed and &1.tool_call_id == "call_calc"))
       assert replay != nil
 
       assert :ok =
                GenServer.call(owner(server), {:event, handle.id, before.request.run_id, :tool_completed, replay.data})
 
-      assert {:ok, replayed} = Orchestration.snapshot(server)
+      assert {:ok, replayed} = Orchestration.snapshot(server, include_content: true)
       assert replayed.details.phase == :awaiting_llm
       assert replayed.details.tool_results == before.details.tool_results
       assert :ok = MockLLM.release(mock, :final)
       assert {:ok, "The tools finished."} = Request.await(handle)
-      assert {:ok, done} = Orchestration.snapshot(server)
+      assert {:ok, done} = Orchestration.snapshot(server, include_content: true)
       assert done.request.result == "The tools finished."
       assert done.details.tool_calls == []
 
@@ -1055,13 +1082,13 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert :ok =
                GenServer.call(owner(server), {:event, handle.id, before.request.run_id, :tool_completed, replay.data})
 
-      assert {:ok, retained} = Orchestration.snapshot(server, request_id: handle.id)
+      assert {:ok, retained} = Orchestration.snapshot(server, include_content: true, request_id: handle.id)
       assert retained.request == done.request
       assert {:ok, next} = request(server, mock, :react, "Next run")
       assert_receive {:mock_llm_waiting, ^mock, :next, _}, 2_000
-      assert {:ok, fresh} = Orchestration.snapshot(server)
+      assert {:ok, fresh} = Orchestration.snapshot(server, include_content: true)
       assert fresh.details.tool_results == [] and fresh.details.tool_calls == []
-      assert {:ok, retained} = Orchestration.snapshot(server, request_id: handle.id)
+      assert {:ok, retained} = Orchestration.snapshot(server, include_content: true, request_id: handle.id)
       assert retained.details.tool_results == done.details.tool_results
       assert :ok = MockLLM.release(mock, :next)
       assert {:ok, "Next"} = Request.await(next)
@@ -1070,7 +1097,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "request HTTP and generation overrides end before the next request", %{jido: jido} do
       mock = mock([%{reply: {:text, "First"}}, %{reply: {:text, "Next"}}])
-      server = start_reasoning(jido, :react, tools: [], llm_opts: [temperature: 0.3])
+      server = start_observed_reasoning(jido, :react, tools: [], llm_opts: [temperature: 0.3])
       definition = Jido.Agent.definition(Server.agent(server))
 
       assert {:ok, first} =
@@ -1080,7 +1107,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
                )
 
       assert {:ok, "First"} = Request.await(first)
-      assert {:ok, %{live: nil}} = Orchestration.snapshot(server)
+      assert {:ok, %{live: nil}} = Orchestration.snapshot(server, include_content: true)
       assert {:ok, next} = request(server, mock, :react, "Q2")
       assert {:ok, "Next"} = Request.await(next)
       [first_wire, next_wire] = MockLLM.report(mock).requests
@@ -1099,7 +1126,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       copy = saved |> :erlang.term_to_binary() |> :erlang.binary_to_term([:safe])
       assert {:ok, restored} = Jido.Agent.restore(Jido.Agent, copy)
       server = start_agent(jido, restored)
-      assert {:ok, view} = Orchestration.snapshot(server, request_id: handle.id)
+      assert {:ok, view} = Orchestration.snapshot(server, include_content: true, request_id: handle.id)
       assert view.request.status == :completed and view.request.result == "Done"
       assert view.live == nil and view.details.active_request_id == nil
       assert view.details.phase == :request_completed
@@ -1116,7 +1143,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "cancellation keeps its reason and closes the provider connection", %{jido: jido} do
       mock = mock([%{reply: {:wait, :held, {:text, "unused"}}}])
-      server = start_reasoning(jido, :react, tools: [])
+      server = start_observed_reasoning(jido, :react, tools: [])
       assert {:ok, handle} = request(server, mock, :react)
       assert_receive {:mock_llm_waiting, ^mock, :held, provider}, 2_000
       monitor = Process.monitor(provider)
@@ -1126,7 +1153,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert_receive {:DOWN, ^monitor, :process, ^provider, _}, 2_000
 
       assert {:ok, %{live: nil, details: %{active_request_id: nil, cancel_reason: :user_cancelled}}} =
-               Orchestration.snapshot(server)
+               Orchestration.snapshot(server, include_content: true)
 
       eventually(fn -> MockLLM.report(mock).waiting == [] end)
       assert_script_done(mock)
@@ -1134,16 +1161,19 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "a worker crash fails its request and permits a later request", %{jido: jido} do
       mock = mock([%{reply: {:wait, :held, {:text, "unused"}}}, %{reply: {:text, "Next"}}])
-      server = start_reasoning(jido, :react, tools: [])
+      server = start_observed_reasoning(jido, :react, tools: [])
       assert {:ok, first} = request(server, mock, :react)
       assert_receive {:mock_llm_waiting, ^mock, :held, provider}, 2_000
       monitor = Process.monitor(provider)
-      assert {:ok, view} = Orchestration.snapshot(server)
+      assert {:ok, view} = Orchestration.snapshot(server, include_content: true)
       Process.exit(view.live.worker_pid, :kill)
       assert {:error, :worker_crash} = Request.await(first)
       assert record(server, first).error == :worker_crash
       assert_receive {:DOWN, ^monitor, :process, ^provider, _}, 2_000
-      assert {:ok, %{live: nil, details: %{active_request_id: nil}}} = Orchestration.snapshot(server)
+
+      assert {:ok, %{live: nil, details: %{active_request_id: nil}}} =
+               Orchestration.snapshot(server, include_content: true)
+
       assert {:ok, next} = request(server, mock, :react, "Next")
       assert {:ok, "Next"} = Request.await(next)
       eventually(fn -> MockLLM.report(mock).waiting == [] end)
@@ -1154,7 +1184,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       mock =
         mock([%{reply: {:stream, [%{content: "Step 1: Add."}, {:wait, :held}, %{content: "\n4"}], "stop"}}])
 
-      server = start_reasoning(jido, :react, tools: [], streaming: true)
+      server = start_observed_reasoning(jido, :react, tools: [], streaming: true)
       assert {:ok, handle} = request(server, mock, :react)
       assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
       assert_receive {:jido_ai_request_event, %{kind: :llm_delta} = delta}, 1_000
@@ -1177,7 +1207,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       image = ContentPart.image(<<1, 2, 3>>, "image/png")
       delta = %{images: [%{type: "image_url", image_url: %{url: "data:image/png;base64,AQID"}}]}
       mock = mock([%{reply: {:stream, [delta, {:wait, :held}], "stop"}}])
-      server = start_reasoning(jido, :react, tools: [], streaming: true)
+      server = start_observed_reasoning(jido, :react, tools: [], streaming: true)
       assert {:ok, handle} = request(server, mock, :react)
       assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
 
@@ -1185,12 +1215,12 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
                      1_000
 
       assert_receive {:signal, %{type: "ai.llm.delta", data: %{chunk_type: :content_part, delta: ^image}}}, 1_000
-      assert {:ok, active} = Orchestration.snapshot(server)
+      assert {:ok, active} = Orchestration.snapshot(server, include_content: true)
       assert active.details.streaming_text == ""
       assert :ok = MockLLM.release(mock, :held)
       assert {:ok, [^image]} = Request.await(handle)
       assert record(server, handle).result == [image]
-      assert {:ok, %{details: %{streaming_text: ""}}} = Orchestration.snapshot(server)
+      assert {:ok, %{details: %{streaming_text: ""}}} = Orchestration.snapshot(server, include_content: true)
       assert :ok = Jido.Action.validate_static_data(Server.agent(server).state)
       assert_script_done(mock)
     end
@@ -1212,23 +1242,23 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
       on_exit(fn -> :telemetry.detach(handler_id) end)
       mock = mock([%{reply: {:stream, [%{content: "Runtime model"}], "stop"}}])
-      server = start_reasoning(jido, :react, tools: [], model: "openai:gpt-4o", streaming: true)
+      server = start_observed_reasoning(jido, :react, tools: [], model: "openai:gpt-4o", streaming: true)
       assert {:ok, handle} = request(server, mock, :react, "Use override", request_id: request_id)
       assert {:ok, "Runtime model"} = Request.await(handle)
       assert_receive {:delta_metadata, metadata}, 1_000
       assert metadata.model == "openai:gpt-4o-mini"
       assert [%{body: %{"model" => "gpt-4o-mini"}}] = MockLLM.report(mock).requests
-      assert {:ok, view} = Orchestration.snapshot(server)
+      assert {:ok, view} = Orchestration.snapshot(server, include_content: true)
       assert view.details.model == metadata.model
       assert_script_done(mock)
     end
 
     test "the trace keeps its first 2000 events and records overflow through completion", %{jido: jido} do
       mock = mock([%{reply: {:wait, :held, {:text, "Done"}}}])
-      server = start_reasoning(jido, :react, tools: [])
+      server = start_observed_reasoning(jido, :react, tools: [])
       assert {:ok, handle} = request(server, mock, :react)
       assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
-      assert {:ok, view} = Orchestration.snapshot(server)
+      assert {:ok, view} = Orchestration.snapshot(server, include_content: true)
 
       for n <- 1..2_010 do
         assert :ok =
@@ -1238,13 +1268,13 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
                  )
       end
 
-      assert {:ok, active} = Orchestration.snapshot(server)
+      assert {:ok, active} = Orchestration.snapshot(server, include_content: true)
       assert active.details.trace.truncated?
       assert Enum.map(active.details.trace.events, & &1.seq) == Enum.to_list(1..2_000)
       assert active.details.trace.seq == 2_012
       assert :ok = MockLLM.release(mock, :held)
       assert {:ok, "Done"} = Request.await(handle)
-      assert {:ok, done} = Orchestration.snapshot(server)
+      assert {:ok, done} = Orchestration.snapshot(server, include_content: true)
       assert done.details.trace.events == active.details.trace.events
       assert done.details.trace.truncated? and done.details.trace.seq > active.details.trace.seq
       assert done.request.status == :completed
@@ -1253,11 +1283,11 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "blank provider failure and the exact incomplete tuple retain their error values", %{jido: jido} do
       mock = mock([%{reply: {:stream, [], "incomplete"}}])
-      server = start_reasoning(jido, :react, tools: [], streaming: true)
+      server = start_observed_reasoning(jido, :react, tools: [], streaming: true)
       assert {:ok, handle} = request(server, mock, :react)
       # The Chat SDK maps the wire value to :error. Do not claim :incomplete decoding.
       assert {:error, {:incomplete_response, :error}} = Request.await(handle)
-      assert {:ok, view} = Orchestration.snapshot(server)
+      assert {:ok, view} = Orchestration.snapshot(server, include_content: true)
       assert view.request.error == {:incomplete_response, :error}
       assert view.request.meta.error_type == :llm_response
       assert_script_done(mock)
@@ -1280,7 +1310,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
           %{reply: {:text, "Found"}}
         ])
 
-      server = start_reasoning(jido, :react, tools: [TestCalculator])
+      server = start_observed_reasoning(jido, :react, tools: [TestCalculator])
       assert Jido.AI.list_tools(Server.agent(server)) == [TestCalculator]
       assert {:ok, _} = Configuration.live(server, :register, TestSearch)
       assert MapSet.new(Jido.AI.list_tools(Server.agent(server))) == MapSet.new([TestCalculator, TestSearch])
@@ -1295,7 +1325,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "tool removal updates the live catalog and the next provider request", %{jido: jido} do
       mock = mock([calculation(), %{reply: {:text, "Five"}}])
-      server = start_reasoning(jido, :react, tools: [TestCalculator, TestSearch])
+      server = start_observed_reasoning(jido, :react, tools: [TestCalculator, TestSearch])
       assert {:ok, _} = Configuration.live(server, :unregister, "search")
       assert Jido.AI.list_tools(Server.agent(server)) == [TestCalculator]
       assert {:ok, handle} = request(server, mock, :react, "Add")
@@ -1311,7 +1341,10 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "context replacement removes old defaults before real tool execution", %{jido: jido} do
       mock = mock([calculation(), %{reply: {:text, "Five"}}])
-      server = start_reasoning(jido, :react, tools: [TestCalculator], tool_context: %{tenant: "a", region: "us"})
+
+      server =
+        start_observed_reasoning(jido, :react, tools: [TestCalculator], tool_context: %{tenant: "a", region: "us"})
+
       assert {:ok, _} = Configuration.live(server, :tool_context, %{tenant: "b"})
       assert {:ok, profile} = Configuration.profile(Server.agent(server))
       assert profile.tool_context == %{tenant: "b"}
@@ -1325,7 +1358,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "prompt replacement reaches the next provider request exactly once", %{jido: jido} do
       mock = mock([%{reply: {:text, "Done"}}])
-      server = start_reasoning(jido, :react, tools: [], system_prompt: "Original prompt")
+      server = start_observed_reasoning(jido, :react, tools: [], system_prompt: "Original prompt")
       assert {:ok, _} = Configuration.live(server, :prompt, "Updated prompt")
       assert {:ok, profile} = Configuration.profile(Server.agent(server))
       assert profile.instructions == "Updated prompt"
@@ -1342,7 +1375,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "context replacement updates committed history and the next model prompt", %{jido: jido} do
       mock = mock([%{reply: {:text, "Done"}}])
-      server = start_reasoning(jido, :react, tools: [], system_prompt: "Original prompt")
+      server = start_observed_reasoning(jido, :react, tools: [], system_prompt: "Original prompt")
 
       replacement =
         conversation("Restored prompt", [%{role: :user, content: "Hello"}, %{role: :assistant, content: "Hi there"}])
@@ -1359,7 +1392,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "a promptless context replacement preserves the configured model prompt", %{jido: jido} do
       mock = mock([%{reply: {:text, "Done"}}])
-      server = start_reasoning(jido, :react, tools: [], system_prompt: "Keep me")
+      server = start_observed_reasoning(jido, :react, tools: [], system_prompt: "Keep me")
       replacement = conversation(nil, [%{role: :user, content: "test"}])
       assert {:ok, _} = replace_context(server, replacement, op_id: "nil-prompt")
       assert current_history(server) == history_entries(replacement)
@@ -1395,7 +1428,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "invalid context input returns an error without changing state", %{jido: jido} do
       mock = mock([])
-      server = start_reasoning(jido, :react, tools: [], system_prompt: "Original")
+      server = start_observed_reasoning(jido, :react, tools: [], system_prompt: "Original")
       before = Server.agent(server).state
 
       assert {:error, _} = replace_context(server, "not a context", op_id: "invalid")
@@ -1407,7 +1440,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "idle compaction records its operation metadata in the core Thread", %{jido: jido} do
       mock = mock([%{reply: {:text, "Done"}}])
-      server = start_reasoning(jido, :react, tools: [], system_prompt: "Original prompt")
+      server = start_observed_reasoning(jido, :react, tools: [], system_prompt: "Original prompt")
       replacement = conversation("Compacted prompt", [%{role: :user, content: "summary"}])
 
       assert {:ok, _} =
@@ -1453,7 +1486,12 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       mock = mock([%{reply: {:text, "Compacted"}}])
 
       agent =
-        definition(:react, tools: [TestCalculator], model: MockLLM.model(), system_prompt: "Original prompt")
+        definition(:react,
+          tools: [TestCalculator],
+          model: MockLLM.model(),
+          system_prompt: "Original prompt",
+          observability: %{diagnostics_content: true}
+        )
         |> Jido.Agent.instantiate!()
 
       original_thread =
@@ -1524,7 +1562,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
                )
 
       compacted = current_history(server)
-      assert {:ok, view} = Orchestration.snapshot(server)
+      assert {:ok, view} = Orchestration.snapshot(server, include_content: true)
       messages = view.details.conversation
 
       assistant = Enum.find(messages, &(&1[:role] == :assistant))
@@ -1544,7 +1582,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "duplicate context operation IDs preserve the first result and one Thread record", %{jido: jido} do
       mock = mock([%{reply: {:text, "Done"}}])
-      server = start_reasoning(jido, :react, tools: [], system_prompt: "Original prompt")
+      server = start_observed_reasoning(jido, :react, tools: [], system_prompt: "Original prompt")
       first = conversation("A", [%{role: :user, content: "A"}])
       second = conversation("B", [%{role: :user, content: "B"}])
       assert {:ok, _} = replace_context(server, first, op_id: "op_dup")
@@ -1562,7 +1600,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "lane switches restore the selected history and prompt for real model requests", %{jido: jido} do
       mock = mock([%{reply: {:text, "Alpha answer"}}, %{reply: {:text, "Beta answer"}}])
-      server = start_reasoning(jido, :react, tools: [], system_prompt: "Original prompt")
+      server = start_observed_reasoning(jido, :react, tools: [], system_prompt: "Original prompt")
       alpha = conversation("Alpha", [%{role: :user, content: "alpha"}])
       beta = conversation("Beta", [%{role: :user, content: "beta"}])
       assert {:ok, _} = replace_context(server, alpha, context_ref: "alpha", op_id: "alpha")
@@ -1593,7 +1631,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "a fresh lane has no previous messages and switching back retains the old lane", %{jido: jido} do
       mock = mock([%{reply: {:text, "A1"}}, %{reply: {:text, "A2"}}])
-      server = start_reasoning(jido, :react, tools: [], system_prompt: "Original prompt")
+      server = start_observed_reasoning(jido, :react, tools: [], system_prompt: "Original prompt")
       assert {:ok, first} = request(server, mock, :react, "Q1")
       assert {:ok, "A1"} = Request.await(first)
       assert {:ok, _} = Orchestration.modify_context(server, %{type: :switch}, context_ref: "fresh", op_id: "fresh")
@@ -1610,7 +1648,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "real tool turns append user assistant and tool messages to the core Thread", %{jido: jido} do
       mock = mock([calculation(), %{reply: {:text, "5"}}])
-      server = start_reasoning(jido, :react, tools: [TestCalculator])
+      server = start_observed_reasoning(jido, :react, tools: [TestCalculator])
       assert {:ok, handle} = request(server, mock, :react, "calculate")
       assert {:ok, "5"} = Request.await(handle)
       entries = thread_messages(server)
@@ -1637,7 +1675,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "request admission preserves caller refs in its portable record", %{jido: jido} do
       mock = mock([%{reply: {:wait, :held, {:text, "Done"}}}])
-      server = start_reasoning(jido, :react, tools: [])
+      server = start_observed_reasoning(jido, :react, tools: [])
       refs = %{slack_ts: "1234.001", custom_id: "abc"}
       assert {:ok, handle} = request(server, mock, :react, "hello", extra_refs: refs)
       assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
@@ -1651,7 +1689,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "admitted caller refs enter the user message and its core Thread entry", %{jido: jido} do
       mock = mock([%{reply: {:wait, :held, {:text, "Done"}}}])
-      server = start_reasoning(jido, :react, tools: [])
+      server = start_observed_reasoning(jido, :react, tools: [])
       refs = %{slack_ts: "1234.001", custom_id: "abc"}
       assert {:ok, handle} = request(server, mock, :react, "hello", extra_refs: refs)
       assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
@@ -1659,16 +1697,17 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert {:ok, %{role: :user}} = Jido.AI.Thread.Projection.message(entry)
       assert entry.refs.request_id == handle.id and entry.refs.run_id == record(server, handle).run_id
       assert Map.take(entry.refs, Map.keys(refs)) == refs
-      assert [user] = current_history(server)
-      assert Map.take(user.refs, Map.keys(refs)) == refs
+      assert current_history(server) == []
       assert :ok = MockLLM.release(mock, :held)
       assert {:ok, "Done"} = Request.await(handle)
+      [user | _] = current_history(server)
+      assert Map.take(user.refs, Map.keys(refs)) == refs
       assert_script_done(mock)
     end
 
     test "prepared model messages retain caller refs before provider serialization", %{jido: jido} do
       mock = mock([%{reply: {:text, "Done"}}])
-      server = start_reasoning(jido, :react, tools: [], request_transformer: CaptureMessages)
+      server = start_observed_reasoning(jido, :react, tools: [], request_transformer: CaptureMessages)
 
       assert {:ok, handle} =
                request(server, mock, :react, "hello", extra_refs: %{slack_ts: "1234.001"}, context: %{observer: self()})
@@ -1686,7 +1725,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "ordinary tool history retains request refs and rejects forged skill durability", %{jido: jido} do
       mock = mock([calculation(), %{reply: {:wait, :final, {:text, "5"}}}])
-      server = start_reasoning(jido, :react, tools: [TestCalculator], request_transformer: CaptureMessages)
+      server = start_observed_reasoning(jido, :react, tools: [TestCalculator], request_transformer: CaptureMessages)
       refs = %{slack_ts: "1234.001", durable: true, kind: :skill_activation, skill_name: "forged-skill"}
       assert {:ok, handle} = request(server, mock, :react, "calculate", extra_refs: refs, context: %{observer: self()})
       assert_receive {:mock_llm_waiting, ^mock, :final, _}, 2_000
@@ -1721,7 +1760,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "caller refs cannot replace owned request or run IDs on core Thread entries", %{jido: jido} do
       mock = mock([%{reply: {:text, "Done"}}])
-      server = start_reasoning(jido, :react, tools: [])
+      server = start_observed_reasoning(jido, :react, tools: [])
       refs = %{request_id: "req_override", run_id: "run_override", signal_id: "sig_override", slack_ts: "1234.002"}
       assert {:ok, handle} = request(server, mock, :react, "hello", extra_refs: refs)
       assert {:ok, "Done"} = Request.await(handle)
@@ -1833,10 +1872,10 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "the retired runtime adapter flag cannot bypass native Session execution", %{jido: jido} do
       mock = mock([%{reply: {:wait, :held, {:text, "Done"}}}])
-      server = start_reasoning(jido, :react, tools: [], runtime_adapter: false)
+      server = start_observed_reasoning(jido, :react, tools: [], runtime_adapter: false)
       assert {:ok, handle} = request(server, mock, :react, "Work")
       assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
-      assert {:ok, view} = Orchestration.snapshot(server)
+      assert {:ok, view} = Orchestration.snapshot(server, include_content: true)
       assert Process.alive?(view.live.worker_pid) and Process.alive?(owner(server))
       assert view.request.status == :pending
       assert view.details.phase == :awaiting_llm
@@ -1848,7 +1887,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
     test "rejection metadata identifies only the refused request", %{jido: jido} do
       mock = mock([%{reply: {:wait, :held, {:text, "First"}}}])
-      server = start_reasoning(jido, :react, tools: [])
+      server = start_observed_reasoning(jido, :react, tools: [])
       assert {:ok, first} = request(server, mock, :react)
       assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
       assert {:error, :busy} = request(server, mock, :react, "Second", request_id: "second")

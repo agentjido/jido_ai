@@ -24,6 +24,19 @@ Shared setup and fault fixtures stay in [test support](../../../test/examples/su
 
 Appending returns a new Thread or Session. Encode/decode preserves portable entries and rejects unsupported data. A closed Session rejects new entries.
 
+## Design target checks
+
+[The target checks](../../../test/examples/02_requests/02_27_thread_session_values/design_requirements_test.exs)
+check unknown-key and future-version rejection, atom safety, immutable
+projection, and bounded sanitization of malformed/runtime data.
+
+The default model projection excludes unresolved tool
+exchanges (`VAL-REQ-024`), and multimodal summaries exclude hidden thinking
+(`VAL-REQ-007`). Raw Thread entries still retain the unresolved evidence.
+Synthetic content is used throughout. These fixed cases do not prove arbitrary
+input safety or uniform behavior across every public value. See
+[value alignment](../../../docs/design/01_ai_values/alignment.md#acceptance-matrix).
+
 ## Limits
 
 `Jido.Session` is data; `Jido.AI.Orchestration` controls live requests. Closing a value does not cancel work. This lesson starts no model or Agent process.

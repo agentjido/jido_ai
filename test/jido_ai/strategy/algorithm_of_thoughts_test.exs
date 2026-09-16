@@ -60,10 +60,10 @@ defmodule Jido.AI.Reasoning.AlgorithmOfThoughts.StrategyTest do
 
   test "start owns a streaming call with a correlated request and prompt", %{jido: jido} do
     mock = mock([%{reply: {:stream, [%{content: "Trying"}, {:wait, :held}, %{content: "\nanswer: 24"}], "stop"}}])
-    server = start_reasoning(jido, Method.method(), streaming: true)
+    server = start_reasoning(jido, Method.method(), streaming: true, observability: %{diagnostics_content: true})
     assert {:ok, handle} = request(server, mock, Method.method(), "Solve this")
     assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
-    assert {:ok, view} = Orchestration.snapshot(server)
+    assert {:ok, view} = Orchestration.snapshot(server, include_content: true)
     assert view.request.query == "Solve this" and view.request.status == :pending
     assert is_binary(view.details.current_llm_call_id)
     assert Process.alive?(view.live.worker_pid)

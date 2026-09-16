@@ -382,7 +382,10 @@ defmodule Jido.AI.Orchestration.Coordinator do
         saved = %{saved | seq: job.seq + 1}
 
         case Jido.AI.Error.capture(fn ->
-               {:ok, adapter.issue(saved, config)}
+               token =
+                 if Jido.AI.Observe.Content.retainable?(saved, config.observability), do: adapter.issue(saved, config)
+
+               {:ok, token}
              end) do
           {:ok, token} ->
             event_id = Jido.Signal.ID.generate!()
@@ -878,10 +881,13 @@ defmodule Jido.AI.Orchestration.Coordinator do
   defp deliver(job, event) do
     %{kind: kind, data: data, iteration: iteration, llm_call_id: call_id, seq: seq} = event
     job = Map.put(job, :inspection, Inspection.record(Map.get(job, :inspection, %{}), event))
-    Stream.send_event(job.sink, event)
+    projected = Jido.AI.Observe.Content.event(event, job.observability, :stream)
+    # The private standalone Runner consumes native state before it projects
+    # its public stream. Ordinary request sinks only receive projected data.
+    Stream.send_event(job.sink, if(job[:checkpoint], do: event, else: projected))
     # Delivery is observational. Its bounded failure report is separate from
     # the committed request result and the caller's canonical event stream.
-    Jido.AI.Orchestration.Delivery.enqueue(Map.get(job, :delivery), event)
+    Jido.AI.Orchestration.Delivery.enqueue(Map.get(job, :delivery), projected)
 
     job =
       if kind == :llm_completed do

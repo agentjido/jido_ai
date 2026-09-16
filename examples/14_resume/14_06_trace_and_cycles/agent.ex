@@ -24,6 +24,8 @@ defmodule JidoAI.Examples.TraceAndCycles.Agent do
       end
 
       observability do
+        store_content true
+        stream_content true
         redact_tool_args(false)
       end
 

@@ -48,6 +48,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
               monitor: Process.monitor(pid),
               ref: ref,
               done?: false,
+              policy: config.observability,
               checkpoint_ack: nil
             }
 
@@ -74,7 +75,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
       {:react_runner, ^ref, %Event{} = event} ->
         ack = if event.kind == :checkpoint and event.data.reason != :terminal, do: event.id
-        {[event], %{stream | checkpoint_ack: ack}}
+        {[Jido.AI.Observe.Content.event(event, stream.policy, :stream)], %{stream | checkpoint_ack: ack}}
 
       {:DOWN, ^monitor, :process, ^pid, reason} ->
         raise "ReAct stream owner stopped: #{inspect(reason)}"
@@ -360,7 +361,9 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     record = agent.state.requests[state.request_id]
 
     {:ok, profile} = Jido.AI.Configuration.profile(agent)
-    {:ok, entries} = Jido.AI.Orchestration.Transcript.read(agent.state, profile)
+    # Native work can complete even when retention policy excludes part of its
+    # history. Keep the omission marker; token export must then be withheld.
+    {:ok, entries} = Jido.AI.Thread.Projection.project(agent.state[profile.memory.history] || Jido.Session.new())
 
     context = State.conversation(entries, config.system_prompt)
 
@@ -452,7 +455,11 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   defp checkpoint(owner, ref, state, config) do
     {state, event} = event(state, :checkpoint, %{reason: :terminal})
-    token = Token.issue(state, config)
+
+    token =
+      if Jido.AI.Observe.Content.retainable?(state, config.observability),
+        do: Token.issue(state, config)
+
     send(owner, {:react_runner, ref, %{event | data: Map.put(event.data, :token, token)}})
   end
 

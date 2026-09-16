@@ -31,12 +31,21 @@ defmodule JidoAI.Examples.ToolFlowTest do
       ] do
     test "batch preflight rejects #{inspect(invalid)} before any tool starts", %{jido: jido} do
       valid = %{id: "valid", name: "multiply", arguments: %{a: 2, b: 3}}
-      {mock, context} = native_mock([%{reply: {:tools, [valid, unquote(Macro.escape(invalid))]}}])
+      script = [%{reply: {:tools, [valid, unquote(Macro.escape(invalid))]}}]
+      script = if unquote(invalid.name == "unknown"), do: script ++ [%{reply: {:text, "Batch rejected"}}], else: script
+      {mock, context} = native_mock(script)
       server = start_agent(jido, Agent.new!())
       observe_tools()
       before = Server.agent(server).state
-      assert {:error, _} = Agent.calculate(server, "Calculate", context: context)
-      assert Server.agent(server).state == before
+      outcome = Agent.calculate(server, "Calculate", context: context)
+
+      if unquote(invalid.name == "unknown") do
+        assert {:ok, %{state: %{answer: "Batch rejected"}}} = outcome
+      else
+        assert {:error, _} = outcome
+        assert Server.agent(server).state == before
+      end
+
       refute_received {:example_tool_started, _}
       assert_script_done(mock)
     end

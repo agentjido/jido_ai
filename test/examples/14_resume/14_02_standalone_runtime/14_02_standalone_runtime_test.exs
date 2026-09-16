@@ -456,7 +456,9 @@ defmodule JidoAI.Examples.StandaloneRuntimeTest do
           model: MockLLM.model(),
           streaming: false,
           tools: [],
-          token_secret: "standalone-runtime-fixture"
+          store_content: true,
+          token_secret: "standalone-runtime-fixture",
+          stream_content: true
         ],
         extra
       )

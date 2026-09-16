@@ -25,7 +25,7 @@ defmodule Jido.AI.Runtime.Run do
       candidate =
         candidate
         |> Jido.AI.Orchestration.Transcript.append(profile, output.history_delta)
-        |> Map.put(profile.result.into, output.result)
+        |> Map.put(profile.result.into, Jido.AI.Observe.Content.project(output.result, profile.observability, :storage))
 
       {:ok, candidate, output.effect_plan.directives}
     end

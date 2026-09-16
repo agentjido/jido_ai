@@ -65,6 +65,9 @@ defmodule Jido.AI.Reasoning.ReAct.Token do
     end
   end
 
+  def decode(nil, %Config{}), do: {:error, :checkpoint_content_not_retained}
+  def decode(_, %Config{}), do: {:error, :invalid_token}
+
   @doc """
   Decodes a token and restores runtime state from its payload.
   """

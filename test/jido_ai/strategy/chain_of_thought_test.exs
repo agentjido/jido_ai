@@ -205,7 +205,13 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
     image = ContentPart.image(<<1, 2, 3>>, "image/png")
     delta = %{images: [%{type: "image_url", image_url: %{url: "data:image/png;base64,AQID"}}]}
     mock = mock([%{reply: {:stream, [delta, {:wait, :held}], "stop"}}])
-    server = start_reasoning(jido, :chain_of_thought, streaming: true)
+
+    server =
+      start_reasoning(jido, :chain_of_thought,
+        streaming: true,
+        observability: %{stream_content: true, store_content: true}
+      )
+
     assert {:ok, handle} = request(server, mock, :chain_of_thought)
     assert_receive {:mock_llm_waiting, ^mock, :held, _}, 2_000
 

@@ -26,7 +26,13 @@ defmodule Jido.AI.Orchestration.Settle do
                      plan,
                      context.jido_ai_agent
                    ),
-                 candidate = Map.put(candidate, profile.result.into, result),
+                 candidate =
+                   Map.put(
+                     candidate,
+                     profile.result.into,
+                     Jido.AI.Observe.Content.project(result, profile.observability, :storage)
+                   ),
+                 candidate = Jido.AI.Orchestration.Transcript.settle(candidate, profile, record),
                  {:ok, _} <- domain(candidate, context) do
               {candidate,
                %{

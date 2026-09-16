@@ -7,12 +7,12 @@ defmodule Jido.AI.ConversationRuntimeTest do
     assert {:ok, first} = request(server, mock, :react, "One")
     assert {:ok, "First"} = Request.await(first)
     initial = Server.agent(server).state.messages
-    assert %Jido.Session{thread: %Jido.Thread{rev: 2}} = initial
+    assert %Jido.Session{thread: %Jido.Thread{rev: 3}} = initial
     assert {:ok, second} = request(server, mock, :react, "Two")
     assert {:ok, "Second"} = Request.await(second)
     state = Server.agent(server).state
     assert state.messages.id == initial.id
-    assert state.messages.thread.rev == 4
+    assert state.messages.thread.rev == 6
     assert state[Jido.AI.Thread.Control.key()] == %{}
     assert {:ok, messages} = Jido.AI.Thread.Projection.messages(state.messages)
     assert Enum.map(messages, &Jido.AI.Query.summarize(&1.content)) == ["One", "First", "Two", "Second"]

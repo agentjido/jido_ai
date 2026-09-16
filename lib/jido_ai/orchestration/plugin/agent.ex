@@ -19,6 +19,18 @@ defmodule Jido.AI.Orchestration.Plugin.Agent do
        }}
 
   @impl Jido.Agent.Plugin
-  def reduce(reduction, _opts),
-    do: Plugin.reduce_records(reduction.plugin_state, reduction.directives)
+  def reduce(reduction, opts) do
+    directives =
+      Enum.map(reduction.directives, fn
+        %Change{record: record} = change ->
+          profile = (opts[:profiles] || %{})[record.profile_id]
+          policy = if profile, do: profile.observability, else: %{}
+          %{change | record: Jido.AI.Observe.Content.project(record, policy, :storage)}
+
+        other ->
+          other
+      end)
+
+    Plugin.reduce_records(reduction.plugin_state, directives)
+  end
 end

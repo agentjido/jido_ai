@@ -254,11 +254,25 @@ defmodule JidoAI.Examples.AIRuntimeTest do
         unquote(Macro.escape(invalid))
       ]
 
-      {mock, context} = mock([%{reply: {:tools, calls}}])
+      script = [%{reply: {:tools, calls}}]
+
+      script =
+        if unquote(invalid.name == "unknown"),
+          do: script ++ [%{reply: {:object, %{answer: "Batch rejected"}}}],
+          else: script
+
+      {mock, context} = mock(script)
       server = start(jido, profile())
       before = Server.snapshot(server)
-      assert {:error, _} = ask(server, context)
-      assert Server.snapshot(server) == before
+      outcome = ask(server, context)
+
+      if unquote(invalid.name == "unknown") do
+        assert {:ok, _} = outcome
+      else
+        assert {:error, _} = outcome
+        assert Server.snapshot(server) == before
+      end
+
       refute_received {:example_tool_started, _}
       assert_script_done(mock)
     end

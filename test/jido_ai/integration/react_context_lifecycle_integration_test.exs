@@ -32,6 +32,7 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
 
         requests(mode: :session, streaming: true)
         memory(history: :messages)
+        observability(diagnostics_content: true)
         result(into: :last_result)
       end
     end
@@ -183,7 +184,7 @@ defmodule Jido.AI.Integration.ReActContextLifecycleIntegrationTest do
   end
 
   defp conversation(pid) do
-    assert {:ok, view} = Orchestration.snapshot(pid)
+    assert {:ok, view} = Orchestration.snapshot(pid, include_content: true)
     view.details.conversation
   end
 

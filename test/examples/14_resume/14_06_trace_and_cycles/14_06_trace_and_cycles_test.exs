@@ -35,20 +35,18 @@ defmodule JidoAI.Examples.TraceAndCyclesTest do
       assert fingerprints(mock) == [digest(payload)]
       event = Enum.find(result.trace, &(&1.kind == :tool_started))
 
-      expected =
-        if @redact?,
-          do: %{
-            "payload" => %{
-              "password" => "[REDACTED]",
-              "nested" => %{"api_key" => "[REDACTED]", "name" => "Case"}
-            }
-          },
-          else: %{"payload" => payload}
+      expected = %{
+        "payload" => %{
+          "password" => "[REDACTED]",
+          "nested" => %{"api_key" => "[REDACTED]", "name" => "Case"}
+        }
+      }
 
       assert event.data.arguments == expected
-      # This setting controls tool-start events. Execution history stays complete.
+      # Credentials are always removed from public events. The provider above
+      # received the native tool result from the unmodified input.
       response = Enum.find(result.trace, &(&1.kind == :llm_completed))
-      assert hd(response.data.tool_calls).arguments == %{"payload" => payload}
+      assert hd(response.data.tool_calls).arguments == expected
       assert_script_done(mock)
     end
   end
@@ -228,7 +226,14 @@ defmodule JidoAI.Examples.TraceAndCyclesTest do
     second = next.events |> CheckpointResume.through_checkpoint(:after_tools) |> List.last()
     assert {:ok, second_state, _} = Token.decode_state(second.data.token, config)
     assert second_state.prev_tool_signature == first_state.prev_tool_signature
-    assert Enum.count(conversation_entries(second_state.context), &warning?/1) == 1
+
+    evidence =
+      Enum.map(second_state.context.entries, fn entry ->
+        {:ok, message} = Jido.AI.Thread.Projection.message(entry)
+        message
+      end)
+
+    assert Enum.count(evidence, &warning?/1) == 1
     assert {:ok, next} = ReAct.continue(second.data.token, config, opts(jido))
     result = ReAct.collect_stream(next.events)
     assert result.result == "Resumed"
@@ -308,6 +313,10 @@ defmodule JidoAI.Examples.TraceAndCyclesTest do
       Keyword.merge(
         [
           model: MockLLM.model(),
+          stream_content: true,
+          store_content: true,
+          stream_reasoning: true,
+          store_reasoning: true,
           streaming: false,
           tools: [Check],
           token_secret: "trace-and-cycles-fixture",

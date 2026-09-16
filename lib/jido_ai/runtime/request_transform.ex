@@ -193,7 +193,7 @@ defmodule Jido.AI.Runtime.RequestTransform do
   end
 
   def latest_query(context) do
-    {:ok, messages} = Jido.AI.Thread.Projection.messages(context)
+    {:ok, messages} = Jido.AI.Thread.Projection.evidence_messages(context)
 
     case Enum.find(Enum.reverse(messages), &(&1.role == :user)) do
       %{content: content} when is_binary(content) -> content

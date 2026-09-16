@@ -1,5 +1,5 @@
 defmodule JidoAI.Examples.TypedSignals.Chat do
-  use Jido.Agent, name: "typed_signal_chat", extensions: [Jido.AI.DSL]
+  use Jido.AI.Agent, name: "typed_signal_chat"
 
   agent do
     schema Zoi.object(%{reply: Zoi.string() |> Zoi.default("")})
@@ -20,6 +20,11 @@ defmodule JidoAI.Examples.TypedSignals.Chat do
       requests do
         mode(:session)
         streaming(true)
+      end
+
+      observability do
+        store_content true
+        stream_content true
       end
 
       result(nil, into: :reply)

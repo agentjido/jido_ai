@@ -11,7 +11,7 @@ defmodule Jido.AI.Orchestration.Transcript do
   def refs(record, source) do
     record.extra_refs
     |> Map.drop([:request_id, :run_id, :signal_id, "request_id", "run_id", "signal_id"])
-    |> Map.merge(%{request_id: record.id, run_id: record.run_id})
+    |> Map.merge(%{request_id: record.id, run_id: record.run_id, conversation: :pending})
     |> Map.put(:source, source)
     |> Jido.AI.Skill.Runtime.untrusted_refs()
   end
@@ -24,7 +24,11 @@ defmodule Jido.AI.Orchestration.Transcript do
         {:ok, []}
 
       %Jido.Session{} = session ->
-        Projection.project(session)
+        with {:ok, entries} <- Projection.project(session) do
+          if Enum.any?(entries, &(get_in(&1, [:refs, :content_omitted]) == true)),
+            do: {:error, :conversation_content_not_retained},
+            else: {:ok, entries}
+        end
 
       _ ->
         Profile.error("memory.history", "Expected a Jido.Session value")
@@ -51,7 +55,30 @@ defmodule Jido.AI.Orchestration.Transcript do
     session = Map.get(state, profile.memory.history) || Jido.Session.new()
     ref = Jido.AI.Thread.Control.active_ref(state, profile.id)
 
-    Map.put(state, profile.memory.history, Projection.append_entries(session, entries, %{context_ref: ref}))
+    Map.put(
+      state,
+      profile.memory.history,
+      Projection.append_entries(session, entries, %{context_ref: ref}, profile.observability)
+    )
+  end
+
+  def settle(state, %{memory: %{history: nil}}, _record), do: state
+
+  def settle(state, profile, record) do
+    session = Map.get(state, profile.memory.history)
+
+    if session do
+      entry =
+        Jido.Thread.Entry.new(
+          kind: :ai_request_settled,
+          payload: %{status: :completed},
+          refs: %{request_id: record.id, run_id: record.run_id}
+        )
+
+      Map.put(state, profile.memory.history, Jido.Session.append(session, entry))
+    else
+      state
+    end
   end
 
   def record(state, entries, context) do
@@ -69,7 +96,7 @@ defmodule Jido.AI.Orchestration.Transcript do
               refs
               |> Map.merge(existing || %{})
               |> Map.drop([:signal_id, "request_id", "run_id", "signal_id"])
-              |> Map.merge(%{request_id: record.id, run_id: record.run_id})
+              |> Map.merge(%{request_id: record.id, run_id: record.run_id, conversation: :pending})
             end)
           )
       end

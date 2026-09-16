@@ -19,6 +19,10 @@ defmodule JidoAI.Examples.SkillRuntime.Agent do
         model(:answer)
       end
 
+      observability do
+        store_content true
+      end
+
       tools do
         action Jido.AI.Actions.Skill.LoadSkill,
           as: :load_skill,

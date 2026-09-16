@@ -23,6 +23,11 @@ defmodule JidoAI.Examples.CallCounts.Agent do
         streaming(false)
       end
 
+      observability do
+        store_content true
+        stream_content true
+      end
+
       tools do
         action JidoAI.Examples.CallCounts.Echo, as: :scope_echo
       end

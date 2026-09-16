@@ -110,6 +110,8 @@ defmodule JidoAI.Examples.ModelOptionsTest do
         streaming: streaming?,
         llm_opts: base,
         request_transformer: JidoAI.Examples.ModelOptions.Switch,
+        stream_content: true,
+        store_content: true,
         token_secret: "provider-switch-test"
       })
 

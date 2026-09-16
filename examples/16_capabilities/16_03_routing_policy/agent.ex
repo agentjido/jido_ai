@@ -1,5 +1,5 @@
 defmodule JidoAI.Examples.RoutingPolicy.Agent do
-  use Jido.Agent, name: "routing_policy_dsl", extensions: [Jido.AI.DSL]
+  use Jido.AI.Agent, name: "routing_policy_dsl"
 
   agent do
     schema Zoi.object(%{

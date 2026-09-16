@@ -17,11 +17,17 @@ From the package root:
 mix test test/examples/01_authoring/01_02_tool_flow --include example --seed 0
 ```
 
-Expected result: all tests pass without credentials or a remote provider.
+Expected result: tool execution and unknown-tool recovery checks pass. No
+credentials or remote provider are needed.
 They use the [local model server](../../support/mock_llm.ex) through real ReqLLM
 transport and AgentServer, with [test setup](../../../test/examples/support/example_case.ex).
 
 ## Important behavior
+
+The Agents set `store_content true` in their `observability` blocks to retain
+tool arguments and results. This does not permit rich content in public streams
+or private reasoning in storage. Without storage permission, tool work can run,
+but a later request cannot resume a conversation with omitted tool content.
 
 ### Optional live Haiku demonstration
 
@@ -55,6 +61,19 @@ The next model call receives results `6` and `20`, with their original call IDs.
 The final answer enters Agent state. An unknown tool or invalid arguments in a
 batch prevent every tool in that batch from starting. The model-call limit
 stops further model calls without committing an answer.
+
+## Design target checks
+
+Read [the receipt Action and Flow](receipt.ex) for the direct-caller/Flow
+boundary. Core Exec returns the Action's receipt extras. The Flow tool returns
+only its explicit price output to the next model call.
+
+[The target checks](../../../test/examples/01_authoring/01_02_tool_flow/design_requirements_test.exs)
+also exercise `TLS-REQ-007`: an unknown tool must return a correlated error to
+the model without a fallback Action. The runtime rejects a mixed known/unknown
+batch before any tool runs and returns a correlated error for each call. The
+next model round can recover within the existing request limits. See
+[tool alignment](../../../docs/design/03_tool_bridge/alignment.md#acceptance-matrix).
 
 ## Limits
 

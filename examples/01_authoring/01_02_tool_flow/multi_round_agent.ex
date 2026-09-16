@@ -17,6 +17,10 @@ defmodule JidoAI.Examples.ToolFlow.MultiRoundAgent do
                      "Use quote for the first calculation, then multiply for each remaining calculation. " <>
                      "Do not calculate the results yourself. Finish with a short summary of all three results."
 
+      observability do
+        store_content true
+      end
+
       tools do
         flow JidoAI.Examples.Authoring.Support.Quote, as: :quote
         action JidoAI.Examples.Support.Multiply, as: :multiply

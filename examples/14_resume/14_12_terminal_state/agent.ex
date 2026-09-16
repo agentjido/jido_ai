@@ -40,6 +40,11 @@ for {module, stream} <- [
           history(:messages)
         end
 
+        observability do
+          store_content true
+          diagnostics_content true
+        end
+
         result(nil, into: :reply)
       end
     end

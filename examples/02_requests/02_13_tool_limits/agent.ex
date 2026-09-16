@@ -9,6 +9,10 @@ defmodule JidoAI.Examples.ToolLimits.Agent do
       model "openai:gpt-4o-mini"
       instructions "Use multiply and return its result."
 
+      observability do
+        store_content true
+      end
+
       tools do
         action JidoAI.Examples.Support.Multiply,
           as: :multiply,

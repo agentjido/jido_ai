@@ -100,6 +100,8 @@ defmodule JidoAI.Examples.StreamUsageTest do
         tools: [Echo],
         llm_opts: MockLLM.options(mock),
         capture_deltas?: capture?,
+        stream_content: true,
+        store_content: true,
         token_secret: "usage-test-secret"
       })
 
