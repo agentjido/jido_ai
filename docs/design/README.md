@@ -89,7 +89,7 @@ The review does not certify every target requirement or grant design approval.
 
 ## Example-driven design audit
 
-The acceptance matrices now index all **408 numbered requirements** and name
+The initial acceptance matrices indexed **408 numbered requirements** and named
 matching example tests or an explicit evidence gap. This is not complete design
 conformance. In particular, a related example does not prove every clause of a
 requirement.
@@ -229,6 +229,13 @@ No live provider call was made. Dependency pins and package versions are
 unchanged. These checks do not certify the advanced target design or a release.
 
 ### Later decisions and remaining work
+
+The selected Execution–Orchestration refinement adds nine private-boundary
+requirements: EXE-REQ-031/032 and SES-REQ-049 through 055. The owning alignment
+files track their evidence separately from the initial 408-requirement audit.
+All earlier identifiers and advanced targets remain. Document approval is
+still pending. See the
+[private bridge contract](07_request_sessions/design.md#selected-private-execution-bridge).
 
 Use Session-scoped skill activation, not the older request-scoped wording.
 Use distinct execution-attempt identity, not a new ReAct run ID as a substitute.

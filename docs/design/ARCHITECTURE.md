@@ -203,6 +203,20 @@ tests. No throughput or distributed recovery claim follows from this layout.
 Coordinator restart marks unfinished requests interrupted; it does not replay
 tool side effects.
 
+### Selected refinement: one private execution bridge
+
+Implementation scope is selected; the migration is not yet complete.
+`Orchestration.ExecutionBinding` will carry trusted, request-local ownership
+data. `Orchestration.ExecutionBridge` will own the internal calls for progress,
+ordered entry commits, input, and checkpoint acknowledgment. Neither is a
+process, public extension point, or portable Context value.
+
+Progress acceptance, entry commit, and checkpoint continuation have distinct
+meanings. Core Exec remains the completion path; Coordinator remains the
+lifetime and settlement owner. See the
+[detailed contract](07_request_sessions/design.md#selected-private-execution-bridge)
+and [migration evidence](07_request_sessions/alignment.md#selected-bridge-refinement).
+
 ### Flow mechanics versus AI meaning
 
 | Lower-package mechanism | AI responsibility above it |

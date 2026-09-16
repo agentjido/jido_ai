@@ -93,6 +93,26 @@ boundary positions, input order, commit waits, and unknown commit results.
 Resolve seam 01 batch data and seam 07 replies before implementation planning.
 No generic adapter framework is needed by this proposal.
 
+### Selected bridge refinement
+
+The user has selected the private bridge scope in
+[EXE-REQ-031/032](design.md#proposed-execution-to-orchestration-boundary) and
+[SES-REQ-049 through 055](../07_request_sessions/design.md#selected-private-execution-bridge).
+The current source still uses the old helper/context interface; migration is
+not yet complete. Existing model/tool contracts from prerequisite seams 02/03
+are preserved. No public batch/receipt or transformer API is required here.
+
+The acceptance evidence will cover one trusted binding, progress ordering,
+required commit waits, rejection versus unknown outcomes, input sealing,
+checkpoint continuation, owner loss, and ownerless direct Actions. Existing
+method, standalone, and MockLLM examples remain the compatibility checks.
+The bridge does not implement EXE-GAP-007's method-state changes.
+
+| Requirement | Evidence state | Required acceptance outcome |
+| --- | --- | --- |
+| `EXE-REQ-031` | Proposed; not implemented | Execution and model streaming use the bridge; no direct owner messages or queue access remain in execution steps. |
+| `EXE-REQ-032` | Implemented; evidence incomplete | Core Exec remains the only completion path after the migration; completion/cancellation tests pass unchanged. |
+
 ## Decisions and dependency gates
 
 Resolve portable public Execution types, explicit Map concurrency, and the exact public cancellation contract against current core APIs.

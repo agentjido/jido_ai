@@ -93,6 +93,30 @@ commit-unknown without retry, ordered input, caller loss, and checkpoint
 acknowledgment without a durability claim. Exact adapter tags and combined
 input/checkpoint control remain decisions, not implemented contracts.
 
+### Selected bridge refinement
+
+The [private execution bridge](design.md#selected-private-execution-bridge)
+now defines the selected scope. Implementation is pending. Prerequisite seam
+04 supplies safe execution positions, while seam 06 retains core Plugin,
+commit, and process ownership. The private batch format stays unchanged;
+public EntryBatch/CommitReceipt types and durable attempt history remain open.
+
+Migration preserves progress ordering first, then entry commits, input, and
+checkpoint control. Completion remains a core Exec result. The final check
+removes the old private helpers and ownership context fields. Tests belong in
+the existing execution/orchestration suites and existing examples, not a new
+architecture test tree.
+
+| Requirement | Evidence state | Required acceptance outcome |
+| --- | --- | --- |
+| `SES-REQ-049` | Proposed; not implemented | Caller-supplied bindings cannot replace the binding made from committed admission data. |
+| `SES-REQ-050` | Proposed; not implemented | Progress acknowledgment cannot be mistaken for an entry commit; stale reports do not alter terminal state. |
+| `SES-REQ-051` | Proposed; not implemented | A held entry commit prevents the next model/tool step; committed entries keep their order. |
+| `SES-REQ-052` | Proposed; not implemented | Commit timeout/exit is reported as unknown and the same batch is not replayed. |
+| `SES-REQ-053` | Proposed; not implemented | Missing/invalid managed binding and owner loss fail explicitly; a new request is not affected by old messages. |
+| `SES-REQ-054` | Proposed; not implemented | Checkpoint acknowledgment permits continuation without a storage claim; stale acknowledgment cannot replace a terminal outcome. |
+| `SES-REQ-055` | Proposed; not implemented | Direct Actions run without a Coordinator; managed requests cannot use that fallback. |
+
 ## Selected context policy: gaps and acceptance
 
 The [selected policy](design.md#selected-context-commit-policy) is not

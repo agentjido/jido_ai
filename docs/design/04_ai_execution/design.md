@@ -55,6 +55,17 @@ Preserve wait-for-entry-commit behavior unless explicitly changed. This
 boundary does not require a public execution model or a second context
 store.
 
+The user has now selected the scoped
+[private execution bridge](../07_request_sessions/design.md#selected-private-execution-bridge)
+for implementation. It centralizes request identity, owner communication,
+entry-commit acknowledgments, input queue access, and checkpoint coordination.
+Execution still owns safe positions and native model/tool state. The separate
+common method-state and transformer-view proposal is not part of this change.
+
+`EXE-REQ-031`: Execution steps shall access live request ownership and control through the private Orchestration execution bridge.
+
+`EXE-REQ-032`: Execution shall return its terminal result through the existing core Exec completion path.
+
 ## Context evidence and completion
 
 The [selected commit policy](../07_request_sessions/design.md#selected-context-commit-policy)

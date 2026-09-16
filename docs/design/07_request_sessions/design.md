@@ -100,6 +100,59 @@ Execution. Combining input and checkpoint control at those positions remains
 open, as do exact tags, validation, reply compatibility, conflict handling,
 and durable recovery semantics. This is not a generic framework or event store.
 
+## Selected private execution bridge
+
+The user selected this refinement for implementation after the runtime review.
+It does not approve this whole document. The existing public APIs, Profile,
+reasoning methods, and process tree stay unchanged.
+
+`Orchestration.ExecutionBinding` holds live, request-local access information.
+The Coordinator constructs it from the committed admission and trusted host
+resources. It carries request/run identity, source references, and the existing
+owner, server, input, and checkpoint resources. It is not a new Context value,
+service registry, stored record, or portable checkpoint.
+
+`Orchestration.ExecutionBridge` is the one private execution-to-owner interface.
+It is a function module, not a process or configurable adapter. It preserves
+the current synchronous ordering before any later performance changes.
+
+| Operation | Acknowledgment and failure meaning |
+| --- | --- |
+| Report progress | Observed or ignored. Neither response proves an Agent commit. Late observations cannot change a terminal outcome. |
+| Record entries | Committed only after the core Turn returns its commit result. A known refusal and an unknown result are distinct. |
+| Read/seal input | Ordered input or an explicit queue/control failure. Queued input does not imply consumption. |
+| Pause at a checkpoint | The existing consumer acknowledgment permits continuation. It is not a durable-storage receipt. |
+| Complete execution | The existing core Exec result reaches Coordinator settlement. There is no bridge completion channel. |
+
+Core commits remain outside Coordinator callbacks. The bridge can stage data
+with the Coordinator and invoke core from the execution caller, preserving
+the existing reentry-safe handoff. Only known pre-execution refusals can be
+retried within the existing deadline. A timeout or process exit during a core
+call does not prove refusal and does not permit replay.
+
+Ownerless direct Actions remain supported. Optional observations can be
+omitted for that explicit case. An invalid or missing binding on a managed
+execution is an error, not an ownerless fallback. Quota charging remains with
+the model-call ticket; bridge usage reports update observations only.
+
+The public EntryBatch/CommitReceipt proposal remains separate. This refinement
+uses the current private batch and core result contracts; it does not introduce
+durable attempt history, a new event store, or a public receipt API.
+
+`SES-REQ-049`: When Orchestration starts managed execution, the Coordinator shall construct its execution binding from trusted admission data.
+
+`SES-REQ-050`: When the bridge acknowledges a progress report, the bridge shall distinguish observation from a core commit result.
+
+`SES-REQ-051`: Where Thread history is retained, the bridge shall return a committed entry result only after the core commit call succeeds.
+
+`SES-REQ-052`: If a core commit call has an unknown outcome, then the bridge shall return that uncertainty without replaying the batch.
+
+`SES-REQ-053`: If a managed execution has no valid binding or loses its owner, then the bridge shall return an explicit failure.
+
+`SES-REQ-054`: When a checkpoint consumer acknowledges a pause, the bridge shall report permission to continue without claiming durable storage.
+
+`SES-REQ-055`: When an ownerless direct Action reports optional progress, the bridge shall preserve ownerless execution without starting a Coordinator.
+
 ## Content permission constraint
 
 Apply the [selected content permissions](../12_observation_diagnostics/design.md#selected-content-permissions).
