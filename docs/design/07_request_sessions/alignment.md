@@ -5,10 +5,11 @@
 ## Status
 
 - Reviewed: 2026-09-15.
-- Code baseline: `v3-spike`, HEAD `4ed6402f`, plus uncommitted runtime, test, example, and documentation refinement. Dependency pins are unchanged.
+- Code baseline: `v3-spike`, implementation checkpoint `bc920e4b`; source and tests are committed. The current changes update documentation only. Dependency pins are unchanged.
 - Prerequisite alignments used: [05 Reasoning and planning methods](../05_reasoning_planning/alignment.md), [06 Core runtime and Signal integration](../06_runtime_signal_integration/alignment.md).
 - Alignment state: Draft. Current ownership is mapped; target decisions and full acceptance proof remain.
 - Verification: the example-driven review below adds fresh MockLLM runs to the earlier source review. Earlier statements that no tests ran refer to that prior review, not this follow-up.
+- Bridge verification: 2,877 tests passed, one existing flaky exclusion, no new skips; full unit/authoring/MockLLM suite, seed 0, warnings as errors. Format, forced compile, inventory, and diff checks passed.
 
 ## Current architecture
 
@@ -77,45 +78,51 @@ requirement associations are not carried forward as proof.
 | `SES-GAP-005` | Resolved compile and naming issue | The former compile blocker is resolved and Orchestration replaces the live Session namespace. | Superseded | Retain current lifecycle gates. |
 | `SES-GAP-006` | `SES-REQ-035`, `SES-REQ-036`, `SES-REQ-037`, `SES-REQ-038`, `SES-REQ-039`, `SES-REQ-040`, `SES-REQ-041`, `SES-REQ-042` | Subagent/handoff declarations do not implement linked requests, context transfer, fan-out, or peer cancellation. | Proposed; not implemented | Retain delegation requirements with 03/06/11/12; core owns topology. |
 
-## Request adapter review gap
+## Request adapter boundary
 
-The [data-boundary proposal](design.md#proposed-data-boundary) replaces neither
-core commit nor Coordinator lifetime ownership.
-[Transcript](../../../lib/jido_ai/orchestration/transcript.ex) records message
-maps and waits for publication before extending history_delta.
-[Coordinator](../../../lib/jido_ai/orchestration/coordinator.ex) exposes separate
-history, checkpoint, progress, and control calls. Their replies do not have one
-validated vocabulary for receipt, commit, and checkpoint acknowledgment.
-
-Resolve seam 01 batch/receipt data and seam 04 safe positions first. Future
-acceptance evidence covers accepted versus committed replies, rejection,
-commit-unknown without retry, ordered input, caller loss, and checkpoint
-acknowledgment without a durability claim. Exact adapter tags and combined
-input/checkpoint control remain decisions, not implemented contracts.
+The earlier review found separate history, checkpoint, progress, and control
+protocols exposed to execution. The private bridge replaces that access.
+The proposed public EntryBatch/CommitReceipt values remain separate work.
 
 ### Selected bridge refinement
 
 The [private execution bridge](design.md#selected-private-execution-bridge)
-now defines the selected scope. Implementation is pending. Prerequisite seam
-04 supplies safe execution positions, while seam 06 retains core Plugin,
-commit, and process ownership. The private batch format stays unchanged;
-public EntryBatch/CommitReceipt types and durable attempt history remain open.
+is implemented. Prerequisite seam 04 supplies safe execution positions, and
+seam 06 retains core Plugin, commit, and process ownership. The private batch
+format is unchanged. Completion remains a core Exec result.
 
-Migration preserves progress ordering first, then entry commits, input, and
-checkpoint control. Completion remains a core Exec result. The final check
-removes the old private helpers and ownership context fields. Tests belong in
-the existing execution/orchestration suites and existing examples, not a new
-architecture test tree.
+[ExecutionBridge](../../../lib/jido_ai/orchestration/execution_bridge.ex)
+stages entries with Coordinator, then calls AgentServer from the worker.
+Coordinator stays responsive to core Plugin admission and Directive calls.
+[Transcript](../../../lib/jido_ai/orchestration/transcript.ex) extends the local
+history delta only after commit success. Unknown storage results, call
+timeouts, and process exits are not retried.
 
-| Requirement | Evidence state | Required acceptance outcome |
+The [bridge tests](../../../test/jido_ai/orchestration/execution_bridge_test.exs)
+use a real AgentServer, Coordinator, core Plugin gate, and persistence adapter.
+They do not replace the core commit with a successful mock.
+A recovery defect found by these checks is fixed: recovered jobs can emit
+terminal observations without live output-event or observation configuration.
+Recovered output metadata is marked failed before settlement, not left started.
+
+| Requirement | Evidence state | Acceptance evidence |
 | --- | --- | --- |
-| `SES-REQ-049` | Proposed; not implemented | Caller-supplied bindings cannot replace the binding made from committed admission data. |
-| `SES-REQ-050` | Proposed; not implemented | Progress acknowledgment cannot be mistaken for an entry commit; stale reports do not alter terminal state. |
-| `SES-REQ-051` | Proposed; not implemented | A held entry commit prevents the next model/tool step; committed entries keep their order. |
-| `SES-REQ-052` | Proposed; not implemented | Commit timeout/exit is reported as unknown and the same batch is not replayed. |
-| `SES-REQ-053` | Proposed; not implemented | Missing/invalid managed binding and owner loss fail explicitly; a new request is not affected by old messages. |
-| `SES-REQ-054` | Proposed; not implemented | Checkpoint acknowledgment permits continuation without a storage claim; stale acknowledgment cannot replace a terminal outcome. |
-| `SES-REQ-055` | Proposed; not implemented | Direct Actions run without a Coordinator; managed requests cannot use that fallback. |
+| `SES-REQ-049` | Implemented and evidenced | Caller binding is replaced; the real worker receives trusted identity; portable state rejects the binding. |
+| `SES-REQ-050` | Implemented and evidenced | Progress increments sequence without committing entries; late and wrong-run reports are ignored. |
+| `SES-REQ-051` | Implemented and evidenced | Core admission gate holds the entry caller while Coordinator accepts progress; successful commit precedes the returned history delta. |
+| `SES-REQ-052` | Implemented and evidenced | Core call timeout and storage lost-reply/exception tests return unknown; each stored marker is written once. |
+| `SES-REQ-053` | Implemented and evidenced | Missing/invalid binding and dead owner fail; stale commits/control fail; late observations cannot alter a terminal request. |
+| `SES-REQ-054` | Implemented and evidenced | Pause replies use acknowledged, not committed; existing standalone checkpoint/resume tests and stale-ack checks pass. |
+| `SES-REQ-055` | Implemented and evidenced | Direct Model.Generate runs buffered and streamed without ownership; malformed managed bindings fail before provider I/O. |
+
+Additional checks remain in the existing
+[request inspection](../../../test/examples/02_requests/02_22_request_inspection/02_22_request_inspection_test.exs),
+[steering](../../../test/examples/02_requests/02_02_steering/02_02_steering_test.exs),
+[standalone resume](../../../test/examples/14_resume), and
+[quota](../../../test/examples/13_policy/13_01_quota/13_01_quota_test.exs)
+suites. Quota tickets remain the charge authority; bridge usage reports only
+update observation. Missing provider usage remains valid and does not imply
+known zero usage. No new architecture-test tree or public receipt API is added.
 
 ## Selected context policy: gaps and acceptance
 

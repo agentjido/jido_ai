@@ -160,6 +160,11 @@ not forwarded. Use `ToolAdapter.to_action_map/1` for module lookup maps and
 
 ## Evidence and limits
 
+The private execution bridge checkpoint `bc920e4b` passed 2,877 tests with
+one existing flaky exclusion and no new skips, including authoring and MockLLM
+examples. Format, forced compile with warnings as errors, and inventory checks
+passed. Public request and Profile contracts did not change.
+
 The JSON inventory uses schema version 2 and indexes every current `lib/**/*.ex`
 file. It records hashes, source declarations, default arities, callbacks,
 structs, protocol implementations, and quoted templates. It does not evaluate

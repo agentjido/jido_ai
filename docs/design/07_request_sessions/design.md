@@ -124,6 +124,23 @@ the current synchronous ordering before any later performance changes.
 | Pause at a checkpoint | The existing consumer acknowledgment permits continuation. It is not a durable-storage receipt. |
 | Complete execution | The existing core Exec result reaches Coordinator settlement. There is no bridge completion channel. |
 
+The implemented private replies are:
+
+- Progress: `{:ok, :observed}`, `{:ok, :ignored}`, or `{:ok, :unmanaged}`.
+- Entry commit: `{:ok, :committed}`. An ownerless Action returns
+  `{:ok, :unmanaged}`; a Profile without history returns `{:ok, :not_retained}`.
+- Commit failure: `{:error, {:execution_commit_rejected, reason}}` or
+  `{:error, {:execution_commit_unknown, reason}}`. Stage/owner failures return
+  their own error before core is called.
+- Input: drain returns `{:ok, items}`; seal returns `:ok`; atomic seal-if-empty
+  returns `:sealed` or `:pending`. Errors are not empty input.
+- Checkpoint pause: `{:ok, :acknowledged}` permits continuation. The consumer's
+  acknowledgment call returns `:ok`; a stale acknowledgment is rejected.
+
+These tags are internal contracts, not new public receipts. Read-only bridge
+views supply request identity, checkpoint data, and the existing transformer
+queue field. Execution steps do not read Coordinator messages or process fields.
+
 Core commits remain outside Coordinator callbacks. The bridge can stage data
 with the Coordinator and invoke core from the execution caller, preserving
 the existing reentry-safe handoff. Only known pre-execution refusals can be

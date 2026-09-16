@@ -16,6 +16,31 @@ Run the full package test suite after repairs. Earlier deferrals and test
 counts below describe earlier checkpoints, not current permission or proof
 that the full suite passes.
 
+### Execution boundary completed
+
+Checkpoint `bc920e4b` puts request-local live access in
+`Orchestration.ExecutionBinding` and owner operations in
+`Orchestration.ExecutionBridge`. The bridge is a function module. Progress,
+entry commits, and checkpoint continuation have distinct reply meanings.
+Core commit calls remain outside Coordinator callbacks. Input operations use
+the active request/run check. Core Exec remains the completion path.
+
+The old ownership fields and root execution helpers are removed. Public APIs,
+Profile, all reasoning methods, standalone ReAct, and process ownership remain
+unchanged. Recovery now handles missing live observation data and marks
+interrupted output failed before settlement.
+
+Verification on 2026-09-15: 2,877 tests passed, one existing flaky exclusion,
+no new skips. This includes unit, authoring, and MockLLM examples, with seed 0
+and warnings as errors. Format, forced compile, inventory, and diff checks
+passed. Fourteen new focused boundary tests passed separately. No dependency
+pin changed. No runtime compile cycle was added.
+
+The architecture map and seam 04/07 evidence are updated. All 417 requirement
+IDs remain. Document review remains Pending approval. Method-neutral callback
+values, public receipts, durable replay, live-provider verification, and load
+testing remain separate work.
+
 ### Consumer migration completed
 
 `087afb8c` updates callable examples and tests to the Profile-bound API.

@@ -5,10 +5,11 @@
 ## Status
 
 - Reviewed: 2026-09-15.
-- Code baseline: `v3-spike`, HEAD `4ed6402f`, plus uncommitted runtime, test, example, and documentation refinement. Dependency pins are unchanged.
+- Code baseline: `v3-spike`, implementation checkpoint `bc920e4b`; source and tests are committed. The current changes update documentation only. Dependency pins are unchanged.
 - Prerequisite alignments used: [02 Model integration and request preparation](../02_model_gateway/alignment.md), [03 Tools, sources, and effect policy](../03_tool_bridge/alignment.md).
 - Alignment state: Draft. Current ownership is mapped; target decisions and full acceptance proof remain.
 - Verification: the example-driven review below adds fresh MockLLM runs to the earlier source review. Earlier statements that no tests ran refer to that prior review, not this follow-up.
+- Bridge verification: 2,877 tests passed, one existing flaky exclusion, no new skips; full unit/authoring/MockLLM suite, seed 0, warnings as errors. Format, forced compile, inventory, and diff checks passed.
 
 ## Current architecture
 
@@ -48,7 +49,7 @@ proof is still incomplete. Inert declaration support is not runtime support.
 Keep one bounded execution path for all authoring forms and methods. Preserve advanced streaming, cancellation, retry, and effect contracts without making temporary execution state a portable context value.
 
 Preserve current public behavior unless an approved decision includes a
-migration. This follow-up changes examples and their tests, not runtime implementation.
+migration. The initial audit changed examples and tests. The bridge follow-up changes the runtime and its tests.
 Advanced requirements remain in the target even when they are not implemented.
 
 ## Gap register
@@ -80,38 +81,44 @@ State construction; method-state validation rejects invalid state. ReAct
 adapter and token tests cover compatibility. No such checks were run here.
 Seams 02, 05, 06, and 11 depend on this boundary. Callback migration is open.
 
-## Request adapter review gap
+## Request adapter boundary
 
-The [boundary proposal](design.md#proposed-execution-to-orchestration-boundary)
-is not implemented. Runtime uses multiple Orchestration helpers and direct
-Coordinator messages. [PendingInput](../../../lib/jido_ai/execution/pending_input.ex)
-reads the queue from context and calls it directly.
-[Checkpoint](../../../lib/jido_ai/execution/checkpoint.ex) calls Coordinator.
-
-Future evidence covers tagged request/run identity, stale messages, safe
-boundary positions, input order, commit waits, and unknown commit results.
-Resolve seam 01 batch data and seam 07 replies before implementation planning.
-No generic adapter framework is needed by this proposal.
+The earlier review found scattered owner helpers and direct process calls.
+The selected private bridge is now implemented. The broader public
+batch/receipt proposal remains open; it is not required by this private API.
 
 ### Selected bridge refinement
 
-The user has selected the private bridge scope in
 [EXE-REQ-031/032](design.md#proposed-execution-to-orchestration-boundary) and
-[SES-REQ-049 through 055](../07_request_sessions/design.md#selected-private-execution-bridge).
-The current source still uses the old helper/context interface; migration is
-not yet complete. Existing model/tool contracts from prerequisite seams 02/03
-are preserved. No public batch/receipt or transformer API is required here.
+[SES-REQ-049 through 055](../07_request_sessions/design.md#selected-private-execution-bridge)
+define the implemented scope. Model/tool contracts from prerequisite seams
+02/03 are unchanged. There is no new process or completion channel.
 
-The acceptance evidence will cover one trusted binding, progress ordering,
-required commit waits, rejection versus unknown outcomes, input sealing,
-checkpoint continuation, owner loss, and ownerless direct Actions. Existing
-method, standalone, and MockLLM examples remain the compatibility checks.
-The bridge does not implement EXE-GAP-007's method-state changes.
+Execution, Model.Generate, and the standalone Runner now use
+[ExecutionBridge](../../../lib/jido_ai/orchestration/execution_bridge.ex).
+[ExecutionBinding](../../../lib/jido_ai/orchestration/execution_binding.ex)
+carries one trusted request/run identity and its live resources. Old owner
+fields and root progress/commit helpers are removed.
 
-| Requirement | Evidence state | Required acceptance outcome |
+The [14 focused bridge tests](../../../test/jido_ai/orchestration/execution_bridge_test.exs)
+cover trusted admission, observation order, commit waits, rejection, persisted
+but unknown outcomes, call timeout without replay, queue sealing, owner loss,
+and direct ownerless model Actions. The source check rejects direct Coordinator
+calls and the old ownership keys in execution steps. Existing method, stream,
+and resume tests cover the unchanged caller paths.
+
+| Requirement | Evidence state | Acceptance evidence |
 | --- | --- | --- |
-| `EXE-REQ-031` | Proposed; not implemented | Execution and model streaming use the bridge; no direct owner messages or queue access remain in execution steps. |
-| `EXE-REQ-032` | Implemented; evidence incomplete | Core Exec remains the only completion path after the migration; completion/cancellation tests pass unchanged. |
+| `EXE-REQ-031` | Implemented and evidenced | Bridge tests and source check; no execution step calls Coordinator or PendingInputServer directly. |
+| `EXE-REQ-032` | Implemented and evidenced | Coordinator retains run_async/handle_message/cancel; lifecycle and cancellation tests use that core completion path. |
+
+This does not implement EXE-GAP-007. RequestTransform still constructs the
+existing ReAct callback Config/State. Its input-queue field is preserved through
+a narrow bridge view. A method-neutral callback contract remains separate work.
+No load, durable replay, or general slow-consumer guarantee is claimed.
+The standalone Runner still seals its caller-supplied queue when the stream
+ends, including failed admission. This adapter cleanup does not consume input
+or control a live Flow; it must work when no execution binding exists.
 
 ## Decisions and dependency gates
 

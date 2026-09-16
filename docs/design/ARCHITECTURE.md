@@ -1,8 +1,8 @@
 # Jido AI architecture
 
 > Start here for the package architecture.
-> Review status: Pending approval. Code baseline: `4ed6402f` on `v3-spike`,
-> plus the uncommitted runtime refinement described below.
+> Review status: Pending approval. Code baseline: `bc920e4b` on `v3-spike`.
+> The execution bridge implementation and tests are committed.
 > This overview consolidates the former `architecture-seams.md`.
 > Detailed requirements and evidence remain in the numbered seam folders.
 
@@ -59,6 +59,8 @@ See [boundary design](00_boundary_invariants/design.md) and
 | `Request.Handle` / `Stream` | Local access to admitted work and events | Durable identity or stored context |
 | `Request.Record` | Request status and outcome retained in Agent state | Worker state |
 | `Orchestration.Coordinator` | Worker lifetime, ordered commits, cancellation, and completion | Core validation or a general scheduler |
+| `Orchestration.ExecutionBinding` | Private live resources and identity for one admitted execution | Portable value or second request record |
+| `Orchestration.ExecutionBridge` | Private function interface for progress, commit, input, and checkpoint control | Process, public extension point, or completion channel |
 | ReAct `State` / `Token` | Standalone adapter state and resume encoding | The shared execution model for all methods |
 | AI resource owner — selected target | AgentServer-scoped catalogs/providers; Session-scoped activations | A global lazy registry or request-scoped activation store |
 
@@ -111,8 +113,8 @@ Standalone ReAct uses the same execution through its adapter.
 Runtime produces execution results and evidence. Orchestration coordinates
 their commits. Core performs validation and commit. Receiving an event is not
 proof that its entries committed; acknowledging a checkpoint is not proof of
-durable storage. The proposed batch/receipt boundary makes these distinctions
-explicit without creating another context store.
+durable storage. The private execution bridge makes these distinctions
+explicit. Public batch/receipt values remain a separate proposal.
 
 Coordinator lifetime and ordered commit work remain together. Extracting helper
 functions does not create new process owners.
@@ -152,12 +154,19 @@ sequenceDiagram
     loop model and tool rounds
       Exec->>Provider: model Context or validated tool call
       Provider-->>Exec: Model.Response or tool result
-      Exec->>Coordinator: events / entry batch
-      Coordinator->>Server: commit entry batch through a core Turn
-      Server-->>Coordinator: commit result
+      Exec->>Coordinator: bridge report(progress)
+      Coordinator-->>Exec: observed (not committed)
+      Exec->>Coordinator: bridge stages entry batch
+      Coordinator-->>Exec: private batch ID
+      Exec->>Server: bridge calls entry-commit Turn
+      Server->>Coordinator: Plugin reads staged batch
+      Coordinator-->>Server: batch
+      Server->>Server: validate candidate and commit
+      Server-->>Exec: committed, rejected, or unknown
+      Note over Exec: Extend local history only after commit success
     end
     Exec-->>Coordinator: execution result
-    Coordinator->>Server: settlement Turn
+    Coordinator->>Server: settlement Turn via short-lived Task
     Server->>Server: validate result and commit terminal record
     Server-->>Coordinator: committed outcome
     Coordinator-->>Caller: terminal event, if requested
@@ -205,9 +214,9 @@ tool side effects.
 
 ### Selected refinement: one private execution bridge
 
-Implementation scope is selected; the migration is not yet complete.
-`Orchestration.ExecutionBinding` will carry trusted, request-local ownership
-data. `Orchestration.ExecutionBridge` will own the internal calls for progress,
+The migration is implemented.
+`Orchestration.ExecutionBinding` carries trusted, request-local ownership
+data. `Orchestration.ExecutionBridge` owns the internal calls for progress,
 ordered entry commits, input, and checkpoint acknowledgment. Neither is a
 process, public extension point, or portable Context value.
 
@@ -216,6 +225,13 @@ meanings. Core Exec remains the completion path; Coordinator remains the
 lifetime and settlement owner. See the
 [detailed contract](07_request_sessions/design.md#selected-private-execution-bridge)
 and [migration evidence](07_request_sessions/alignment.md#selected-bridge-refinement).
+
+The bridge calls core from the execution worker after staging with Coordinator.
+Coordinator can therefore answer core Plugin calls during the commit. Queue
+operations use the active request/run check. Checkpoint pauses retain the
+existing consumer acknowledgment. No new process or compatibility helper is
+added. The public transformer Config still exposes its existing input queue;
+method-neutral callback values remain a separate change.
 
 ### Flow mechanics versus AI meaning
 
@@ -361,7 +377,8 @@ integration-layer consolidation. Core continues to own topology and commits.
 `Thread.Control.*`, `Thread.Operation`.
 
 **Current:** live admission, steering, cancellation, transcript commits,
-settlement, inspection, and delivery. Session itself is a value.
+settlement, inspection, and delivery. The private binding/bridge centralizes
+execution access to these owners. Session itself is a value.
 
 **Direction:** keep lifetime and ordered commit coordination together. Preserve
 logical request identity across retry/resume, but give restarted execution a
@@ -369,7 +386,7 @@ new attempt identity. Retain earlier outcomes. Distinguish execution, commit,
 delivery, and uncertain failure. Accept linked delegated results once while the
 parent request is active.
 
-**Open:** validated private messages, batch/receipt details, safe points,
+**Open:** public batch/receipt values, combined safe-point control,
 context transfer, cancellation propagation, and result admission rules.
 Cancellation does not prove that external effects stopped.
 
@@ -508,6 +525,8 @@ lib/
 ├── jido_ai/
 │   ├── agent/ + dsl/ + profile/ authoring and validation
 │   ├── orchestration/          live request ownership
+│   │   ├── execution_binding.ex private request-local resources
+│   │   └── execution_bridge.ex  function calls; no process
 │   ├── execution/              shared Flow work; no GenServer
 │   ├── configuration/          portable overrides and state-only Plugin
 │   ├── request/                handles, retained records, streams
@@ -566,6 +585,13 @@ not override today's document review table.
 
 ## 9. Evidence and the next review
 
+Bridge verification at `bc920e4b`: 2,877 tests passed, with one existing flaky
+exclusion and no new skips. This includes unit, authoring, and MockLLM example
+tests. Format, forced compile with warnings as errors, API inventory checks,
+and diff checks passed. The compile graph retains only the existing DSL/macro
+cycle; no runtime compile cycle was added. Live providers and load were not
+tested in this refinement.
+
 Start with [values](01_ai_values/README.md) and
 [Orchestration](07_request_sessions/README.md) to settle context promotion,
 request/attempt meaning, and commit acknowledgement. Then review explicit
@@ -584,14 +610,15 @@ An example proves its stated case, not the complete architecture.
 | [Request lifecycle example](../../test/examples/02_requests/02_01_session/02_01_session_test.exs) | Admission, failure, cancellation, and runtime cleanup |
 | [Core Plugin tests](../../test/jido_ai/plugin_facets_test.exs) | Integration facets |
 | [Checkpoint tests](../../test/jido_ai/execution/checkpoint_test.exs) | Shared recovery boundary |
+| [Execution bridge tests](../../test/jido_ai/orchestration/execution_bridge_test.exs) | Trusted ownership, observation versus commit, rejected/unknown commits, input sealing, owner loss, and ownerless Actions |
 | [Observation tests](../../test/jido_ai/observe_test.exs) | Safe output projections |
 
-Current request transcript commits can retain failed query/tool work for
-the next model projection even when the last successful reply stays unchanged.
-That is a design gap, not an accepted failure policy. See
+Current transcript commits retain pending and failed evidence in the Thread.
+The default Context projection excludes it until successful settlement. The
+bridge preserves that distinction; it does not change promotion policy. See
 [transcript integration](../../lib/jido_ai/orchestration/transcript.ex) and
 [projection](../../lib/jido_ai/thread/projection.ex); the owning value and
-Orchestration alignment files track success-only context promotion.
+Orchestration alignment files track the remaining policy and delegation cases.
 
 Foundation verification at `53d19f77`: formatting, forced compilation with
 warnings as errors, API inventory validation, and the full unit, authoring,

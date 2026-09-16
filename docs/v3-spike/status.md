@@ -1,6 +1,29 @@
 # Jido AI V3 status — 2026-09-15
 
-## Current simplification checkpoint
+## Execution boundary checkpoint
+
+Commit `bc920e4b` implements one private execution binding and bridge. Execution
+uses it for progress, ordered entry commits, pending input, and checkpoint
+pause/acknowledgment. The old owner fields and root execution helpers are
+removed. Core Flow/Exec, public APIs, reasoning methods, and the process tree
+are unchanged. No new process or adapter framework was added.
+
+The full unit, authoring, and MockLLM example suite passed: 2,877 tests, one
+existing flaky exclusion, no new skips. Fourteen new boundary tests cover
+trusted admission, ownerless Actions, stale data, commit waits, rejection,
+unknown commits without replay, queue sealing, and owner loss.
+
+The fault checks found and fixed recovery paths that required missing live
+observation data or left interrupted output metadata marked started. Missing
+provider usage remains valid; report validation does not invent zero usage.
+
+The remaining method-neutral callback values, public batch/receipt types,
+durable replay, and load guarantees are separate work. No live-provider or
+load test was run for this checkpoint. See the
+[architecture map](../design/ARCHITECTURE.md) and
+[boundary evidence](../design/07_request_sessions/alignment.md#selected-bridge-refinement).
+
+## Earlier simplification checkpoints
 
 Conversation consolidation now uses one canonical Session per declared field,
 with Thread values for standalone checkpoints and controls. The old Context
@@ -61,6 +84,7 @@ The earlier authoring and coverage runs below used sibling path dependencies.
 
 | Check | Recorded result | Scope |
 | --- | --- | --- |
+| Private execution bridge (`bc920e4b`) | 2,877 passed; 1 existing flaky exclusion; no skips | Full unit/authoring/MockLLM suite; seed 0; warnings as errors; 133.7 seconds. Format, forced compile, inventory, and diff checks passed. Only the existing DSL/macro compile cycle remains. |
 | Current API inventory reconciliation | 2,861 passed; 1 existing flaky exclusion; no skips | Full suite with authoring/examples and four inventory checks; seed 0; warnings as errors; 125.0 seconds; format, forced compile, and generator drift check passed |
 | Profile-bound consumer migration (`087afb8c`) | 2,857 passed; 1 existing flaky exclusion; no skips | Full suite with authoring and examples; seed 0; warnings as errors; 126.8 seconds |
 | Profile-bound example suite | 658 passed; no skips | Includes catalog checks and final context-forwarding cleanup; seed 0; warnings as errors; 81.3 seconds |

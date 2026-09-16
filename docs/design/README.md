@@ -233,6 +233,10 @@ unchanged. These checks do not certify the advanced target design or a release.
 The selected Execution–Orchestration refinement adds nine private-boundary
 requirements: EXE-REQ-031/032 and SES-REQ-049 through 055. The owning alignment
 files track their evidence separately from the initial 408-requirement audit.
+The private bridge is implemented. Its focused tests cover trusted binding,
+commit waits and uncertainty, stale data, input sealing, owner loss, and direct
+ownerless Actions. Public batch/receipt types and method-neutral callback
+values remain separate work.
 All earlier identifiers and advanced targets remain. Document approval is
 still pending. See the
 [private bridge contract](07_request_sessions/design.md#selected-private-execution-bridge).
