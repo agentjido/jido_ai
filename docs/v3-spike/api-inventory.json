@@ -6,7 +6,7 @@
       "modules": [
         "Jido.AI"
       ],
-      "sha256": "7de2f2e68b06be48ae749591c92bfc2d413ffd5448c9120f85cedde7180503d6",
+      "sha256": "bda5ccb13f80caf68d370f0f65cad9adb0c6219b38a6a86eef20da0ef002073a",
       "declarations": [
         {
           "line": 1,
@@ -252,29 +252,7 @@
           "quoted": false
         },
         {
-          "line": 142,
-          "module": "Jido.AI",
-          "name": "set_tool_context_direct",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2,
-            3
-          ],
-          "clause_lines": [
-            142
-          ]
-        },
-        {
-          "line": 145,
-          "module": "Jido.AI",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 148,
+          "line": 143,
           "module": "Jido.AI",
           "name": "steer",
           "kind": "def",
@@ -284,11 +262,11 @@
             3
           ],
           "clause_lines": [
-            148
+            143
           ]
         },
         {
-          "line": 157,
+          "line": 152,
           "module": "Jido.AI",
           "name": "doc",
           "status": "documented",
@@ -296,7 +274,7 @@
           "quoted": false
         },
         {
-          "line": 160,
+          "line": 155,
           "module": "Jido.AI",
           "name": "inject",
           "kind": "def",
@@ -306,11 +284,11 @@
             3
           ],
           "clause_lines": [
-            160
+            155
           ]
         },
         {
-          "line": 169,
+          "line": 164,
           "module": "Jido.AI",
           "name": "doc",
           "status": "documented",
@@ -318,7 +296,7 @@
           "quoted": false
         },
         {
-          "line": 172,
+          "line": 167,
           "module": "Jido.AI",
           "name": "list_tools",
           "kind": "def",
@@ -327,12 +305,12 @@
             1
           ],
           "clause_lines": [
-            172,
-            179
+            167,
+            174
           ]
         },
         {
-          "line": 181,
+          "line": 176,
           "module": "Jido.AI",
           "name": "doc",
           "status": "documented",
@@ -340,7 +318,7 @@
           "quoted": false
         },
         {
-          "line": 184,
+          "line": 179,
           "module": "Jido.AI",
           "name": "has_tool?",
           "kind": "def",
@@ -349,72 +327,8 @@
             2
           ],
           "clause_lines": [
-            184,
-            191
-          ]
-        },
-        {
-          "line": 194,
-          "module": "Jido.AI",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 197,
-          "module": "Jido.AI",
-          "name": "register_tool_direct",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2,
-            3
-          ],
-          "clause_lines": [
-            197
-          ]
-        },
-        {
-          "line": 202,
-          "module": "Jido.AI",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 205,
-          "module": "Jido.AI",
-          "name": "unregister_tool_direct",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            205
-          ]
-        },
-        {
-          "line": 208,
-          "module": "Jido.AI",
-          "name": "doc",
-          "status": "documented",
-          "kind": "attribute",
-          "quoted": false
-        },
-        {
-          "line": 210,
-          "module": "Jido.AI",
-          "name": "set_system_prompt_direct",
-          "kind": "def",
-          "quoted": false,
-          "arities": [
-            2
-          ],
-          "clause_lines": [
-            210
+            179,
+            186
           ]
         }
       ]
@@ -31713,7 +31627,7 @@
   ],
   "historical_inventory": "api-inventory-v2.json",
   "contract_map": "public-api-map.md",
-  "source_digest": "f4692cf1d43796db85b6d7c589e77cf6255cf123c0c585d80622367f7fb4287f",
+  "source_digest": "92414c077848f4663c4a407512af99dd1062322b17aeb7737fdb78d439b874e7",
   "file_count": 257,
   "ownership": {
     "Jido.Session": "jido_ai",

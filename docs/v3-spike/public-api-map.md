@@ -76,6 +76,7 @@ See the [boundary tests](../../test/jido_ai/orchestration/execution_bridge_test.
 | `requests.streaming` | Per-call `ask_stream/3` or `stream: true`; buffered calls are the default |
 | `requests.steering`, `requests.idle_timeout`, `requests.tool_heartbeat` | Same keys under `controls` |
 | `requests.max_requests`, `requests.max_retained_requests` | Host setting `config :jido_ai, :max_retained_requests, 100`, captured at Coordinator startup |
+| `Jido.AI.*_direct` configuration helpers | Removed. Define initial behavior in the AI DSL; use the corresponding server helper for later requests. |
 | `details.conversation` | `details.context` |
 | `jido.ai.session.*` internal routes | `jido.ai.request.*`; use public helpers |
 
@@ -128,7 +129,7 @@ not forwarded. Use `ToolAdapter.to_action_map/1` for module lookup maps and
 | Surface | Current contract | Source and acceptance tests |
 | --- | --- | --- |
 | `Jido.AI.Models.aliases/0`, `resolve/1` | Resolve aliases and native ReqLLM model inputs. Use ReqLLM directly for provider calls; there is no second root generation facade. | [Models](../../lib/jido_ai/models.ex), [model example tests](../../test/examples/01_authoring/01_08_model_helpers/01_08_model_helpers_test.exs) |
-| Root tool and prompt helpers | `register_tool`, `unregister_tool`, `set_system_prompt`, `set_tool_context`, their direct variants, `list_tools`, and `has_tool?` remain. Server and direct Agent forms have different result shapes; use their documented contracts. | [root API](../../lib/jido_ai.ex), [tool API tests](../../test/jido_ai/tool_api_test.exs) |
+| Root tool and prompt helpers | `register_tool`, `unregister_tool`, `set_system_prompt`, and `set_tool_context` configure a running AgentServer for later requests and return `{:ok, agent}` or `{:error, reason}`. `list_tools` and `has_tool?` also inspect Agent values. The public `*_direct` configuration helpers were removed; internal initial-state import still uses `Configuration.direct/4`. | [root API](../../lib/jido_ai.ex), [tool API tests](../../test/jido_ai/tool_api_test.exs) |
 | `Jido.AI.Actions.*` | Reusable LLM, planning, reasoning, retrieval, quota, skill, and tool Actions run through core execution. Action schemas define input; source-level helper functions are not additional user inputs. | [Actions](../../lib/jido_ai/actions), [Action tests](../../test/jido_ai/skills) |
 | `Actions.Reasoning.RunStrategy` | Input is exactly one nonempty `prompt`. Host context binds a resolved Profile at `:jido_ai_callable_profile`. The Profile must select one of the seven callable methods. No flat strategy/model/options input remains. | [Action](../../lib/jido_ai/actions/reasoning/run_strategy.ex), [contract](callable-v3-contract.md), [binding tests](../../test/jido_ai/skills/reasoning/actions/run_strategy_profile_test.exs) |
 | `Plugins.Reasoning.*` | Seven fixed-method Plugins accept `[profile: profile]`. Profile controls result destination and policy. A private Agent isolates callable execution. Direct callable ReAct is not provided; Adaptive can select ReAct. | [Plugins](../../lib/jido_ai/plugins/reasoning), [callable authoring tests](../../test/authoring/agents/callable_profiles_test.exs), [lifecycle tests](../../test/jido_ai/skills/reasoning/actions/run_strategy_lifecycle_test.exs) |

@@ -60,6 +60,20 @@ defmodule Jido.AI.ToolApiTest do
     end
   end
 
+  defmodule EmptyToolsAgent do
+    use Jido.AI.Agent, name: "empty_tool_api_agent", description: "Agent without tools"
+
+    agent do
+      schema Zoi.object(%{answer: Zoi.any() |> Zoi.default(nil)})
+
+      ai :assistant do
+        model(:fast)
+        reasoning(:react)
+        result(into: :answer)
+      end
+    end
+  end
+
   # Not a tool - for validation tests
   defmodule NotATool do
     def some_function, do: :ok
@@ -102,14 +116,7 @@ defmodule Jido.AI.ToolApiTest do
     end
 
     test "returns empty list for agent without tools" do
-      # Test with a manually constructed agent state
-      agent = TestAgent.new!()
-      # Manually clear tools from strategy state for testing
-      {:ok, agent} = Jido.AI.unregister_tool_direct(agent, "calculator")
-      {:ok, agent} = Jido.AI.unregister_tool_direct(agent, "search")
-      tools = AI.list_tools(agent)
-
-      assert tools == []
+      assert AI.list_tools(EmptyToolsAgent.new!()) == []
     end
   end
 

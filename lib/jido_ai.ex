@@ -137,11 +137,6 @@ defmodule Jido.AI do
   def set_tool_context(server, context, opts \\ []),
     do: Configuration.live(server, :tool_context, context, opts)
 
-  @doc "Replaces the base tool context on an Agent value without a Server call."
-  @spec set_tool_context_direct(Jido.Agent.t(), map(), keyword()) :: {:ok, Jido.Agent.t()} | {:error, term()}
-  def set_tool_context_direct(%Jido.Agent{} = agent, context, opts \\ []),
-    do: Configuration.direct(agent, :tool_context, context, opts)
-
   @doc "Queues visible input for an active request and returns the Agent."
   @spec steer(GenServer.server(), String.t(), keyword()) ::
           {:ok, Jido.Agent.t()} | {:error, term()}
@@ -190,30 +185,6 @@ defmodule Jido.AI do
 
   def has_tool?(server, name) when is_binary(name),
     do: {:ok, has_tool?(Jido.AgentServer.agent(server), name)}
-
-  @doc "Registers an Action on an Agent value without a Server call."
-  @spec register_tool_direct(Jido.Agent.t(), module(), keyword()) ::
-          {:ok, Jido.Agent.t()} | {:error, term()}
-  def register_tool_direct(%Jido.Agent{} = agent, module, opts \\ []) when is_atom(module) do
-    with :ok <- validate_registration(module, opts),
-         do: Configuration.direct(agent, :register, module, opts)
-  end
-
-  @doc "Removes a public tool name on an Agent value without a Server call."
-  @spec unregister_tool_direct(Jido.Agent.t(), String.t()) ::
-          {:ok, Jido.Agent.t()} | {:error, term()}
-  def unregister_tool_direct(%Jido.Agent{} = agent, name) when is_binary(name),
-    do: Configuration.direct(agent, :unregister, name)
-
-  @doc "Changes the prompt on an Agent value without a Server call."
-  @spec set_system_prompt_direct(Jido.Agent.t(), String.t()) :: Jido.Agent.t()
-  def set_system_prompt_direct(%Jido.Agent{} = agent, text) when is_binary(text) do
-    case Configuration.direct(agent, :prompt, text) do
-      {:ok, next} -> next
-      {:error, error} when is_exception(error) -> raise error
-      {:error, error} -> raise ArgumentError, Kernel.inspect(error)
-    end
-  end
 
   defp validate_registration(module, opts) do
     if Keyword.get(opts, :validate, true), do: Configuration.validate_tool(module), else: :ok

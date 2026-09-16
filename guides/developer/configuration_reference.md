@@ -69,6 +69,12 @@ end
 Agent construction validates and lowers this data. It does not call a model or
 a tool.
 
+To change tools, instructions, or base tool context after startup, call
+`Jido.AI.register_tool/3`, `unregister_tool/3`, `set_system_prompt/3`, or
+`set_tool_context/3` with the running AgentServer. Each returns `{:ok, agent}`
+or `{:error, reason}`. The former public `*_direct` helpers for Agent values
+are removed; define initial behavior in the `ai` block.
+
 There is no `requests` block or Profile field. Steering and activity timers
 belong in `controls`. `steering` defaults to `false`. Timer values are
 nonnegative milliseconds: `idle_timeout: 0` selects the automatic inactivity
