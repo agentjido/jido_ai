@@ -2,6 +2,21 @@ defmodule Jido.AI.HistoryTest do
   use ExUnit.Case, async: true
   alias ReqLLM.{Context, Message, Response, ToolCall}
 
+  defp owner(extra_refs) do
+    {:ok, binding} =
+      Jido.AI.Orchestration.ExecutionBinding.new(%{
+        coordinator: self(),
+        agent_server: self(),
+        request_id: "request",
+        run_id: "run",
+        source: "/test",
+        extra_refs: extra_refs,
+        retain_history?: false
+      })
+
+    %{jido_ai_execution: binding}
+  end
+
   test "atom and string message maps retain refs while provider metadata stays separate" do
     refs = %{document: "case-1"}
 
@@ -53,10 +68,7 @@ defmodule Jido.AI.HistoryTest do
       context: Context.new([previous, answer])
     }
 
-    owner = %{
-      jido_ai_request_record: %{id: "request", run_id: "run", extra_refs: %{document: "case-1"}},
-      jido_ai_input_source: "/test"
-    }
+    owner = owner(%{document: "case-1"})
 
     bound = Jido.AI.Model.Messages.bind_response(response, Jido.AI.Orchestration.Transcript.request_refs(owner))
     assert bound.context.messages == [previous, bound.message]
@@ -87,10 +99,7 @@ defmodule Jido.AI.HistoryTest do
       context: Context.new([Context.user("Work"), other])
     }
 
-    owner = %{
-      jido_ai_request_record: %{id: "request", run_id: "run", extra_refs: %{}},
-      jido_ai_input_source: "/test"
-    }
+    owner = owner(%{})
 
     bound = Jido.AI.Model.Messages.bind_response(response, Jido.AI.Orchestration.Transcript.request_refs(owner))
     assert bound.context == response.context

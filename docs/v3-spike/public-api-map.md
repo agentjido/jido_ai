@@ -24,7 +24,7 @@ The [old migration map](public-api-map-history.md) is historical evidence only.
 `Jido.AI.Thread.Projection` interprets AI entries; it does not own state.
 Thread controls and operation encoding live under `Jido.AI.Thread`.
 The top-level `Context` and `History` modules are removed. Internal
-`Orchestration.Transcript` owns Agent field access and commits. Internal
+`Orchestration.Transcript` owns Agent field access and entry preparation. Internal
 `Model.Messages` owns provider-message normalization and private metadata.
 No forwarding compatibility modules remain.
 
@@ -50,6 +50,15 @@ wait for the AI answer. Each Agent rejects concurrent requests with `:busy`.
 The Coordinator remains a core-managed Plugin runtime. It owns a core async
 Exec handle, not a wrapper Task around blocking Flow execution. Configuration
 has a separate state-only Plugin. Session/Thread retention remains optional.
+
+`Orchestration.ExecutionBinding` and `Orchestration.ExecutionBridge` are private
+implementation modules. Coordinator builds one live binding from trusted
+admission. Execution uses the bridge for progress, entry commits, pending input,
+and checkpoint pause/acknowledgment. The bridge adds no process. A progress
+reply is not a commit receipt; an uncertain core commit is not retried. Old
+private owner fields and root Orchestration execution helpers are removed.
+Public request, Profile, method, and standalone ReAct APIs stay unchanged.
+See the [boundary tests](../../test/jido_ai/orchestration/execution_bridge_test.exs).
 
 ### Migration from the previous V3 draft
 
@@ -134,7 +143,7 @@ not forwarded. Use `ToolAdapter.to_action_map/1` for module lookup maps and
   These do not restore private V2 strategy state. See [import](../../lib/jido_ai/agent/initial_state.ex)
   and [boundary tests](../../test/authoring/agents/boundaries_test.exs).
 - Internal implementation: `Agent.Definition`, `Agent.Interface`, DSL compiler,
-  `Profile.References`, Runtime steps, and Orchestration process/commit helpers support
+  `Profile.References`, Execution steps, and Orchestration process/commit helpers support
   the public entry points. Do not infer a stable user API from their exports.
 - Public testing support remains: [Test](../../lib/jido_ai/test.ex),
   [TestCase](../../lib/jido_ai/test_case.ex), and

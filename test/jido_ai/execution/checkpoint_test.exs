@@ -32,14 +32,23 @@ defmodule Jido.AI.Execution.CheckpointTest do
   end
 
   defp context(checkpoint \\ nil) do
-    %{
-      jido_ai_checkpoint: %{
-        adapter: Format,
-        result_key: :saved,
-        config: %{},
-        state: %{checkpoint: checkpoint, request_id: "request", run_id: "run"}
-      }
-    }
+    {:ok, binding} =
+      Jido.AI.Orchestration.ExecutionBinding.new(%{
+        coordinator: self(),
+        agent_server: self(),
+        request_id: "request",
+        run_id: "run",
+        source: "/test",
+        retain_history?: true,
+        checkpoint: %{
+          adapter: Format,
+          result_key: :saved,
+          config: %{},
+          state: %{checkpoint: checkpoint, request_id: "request", run_id: "run"}
+        }
+      })
+
+    %{jido_ai_execution: binding}
   end
 
   test "ordinary requests do not allocate checkpoint state" do
@@ -84,6 +93,7 @@ defmodule Jido.AI.Execution.CheckpointTest do
              Checkpoint.validate_data(%{data | runtime: Map.put(data.runtime, :worker, self())})
 
     assert {:error, :invalid_runtime_checkpoint} = Checkpoint.validate_data(%{data | phase: :unknown})
-    assert {:error, :invalid_checkpoint_binding} = Checkpoint.admission(context(data), "other", "run")
+    input = context(data).jido_ai_execution.checkpoint
+    assert {:error, :invalid_checkpoint_binding} = Checkpoint.admission(%{jido_ai_checkpoint: input}, "other", "run")
   end
 end

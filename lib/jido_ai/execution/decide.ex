@@ -30,7 +30,11 @@ defmodule Jido.AI.Execution.Decide do
             {:continue, next, Jido.AI.Execution.ModelFlow}
 
           {:done, next} ->
-            with :ok <- Jido.AI.Orchestration.inspect_reasoning(context, Jido.AI.Reasoning.inspection(next)),
+            with {:ok, _} <-
+                   Jido.AI.Orchestration.ExecutionBridge.report(
+                     context,
+                     {:reasoning, Jido.AI.Reasoning.inspection(next)}
+                   ),
                  do: finish(next, context)
 
           {:error, reason} ->

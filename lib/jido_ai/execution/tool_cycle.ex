@@ -1,6 +1,6 @@
 defmodule Jido.AI.Execution.ToolCycle do
   @moduledoc false
-  alias Jido.AI.Orchestration
+  alias Jido.AI.Orchestration.ExecutionBridge
 
   @warning "You already called the same tool(s) with identical parameters in the previous iteration. Do NOT repeat the same calls. Either use the results you already have to form a final answer, or try a different approach."
 
@@ -23,7 +23,7 @@ defmodule Jido.AI.Execution.ToolCycle do
     repeated? = meta[:prev_tool_signature] == signature
     state = Map.put(state, :tool_meta, Map.put(meta, :prev_tool_signature, signature))
 
-    with :ok <- Orchestration.tool_signature(context, signature) do
+    with {:ok, _} <- ExecutionBridge.report(context, {:tool_signature, signature}) do
       if repeated? do
         message = ReqLLM.Context.user(@warning)
 

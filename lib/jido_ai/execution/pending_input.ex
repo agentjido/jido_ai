@@ -1,40 +1,25 @@
 defmodule Jido.AI.Execution.PendingInput do
   @moduledoc false
-  alias Jido.AI.PendingInputServer
-  alias Jido.AI.Orchestration
+  alias Jido.AI.Orchestration.ExecutionBridge
 
-  def seal(context) do
-    case context[:jido_ai_input_queue] do
-      nil -> :ok
-      queue -> PendingInputServer.seal(queue)
-    end
-  end
+  def seal(context), do: ExecutionBridge.input(context, :seal)
 
   def seal_if_empty(context) do
-    case context[:jido_ai_input_queue] do
-      nil -> :sealed
-      queue -> PendingInputServer.seal_if_empty(queue) |> queue_result(context)
-    end
+    ExecutionBridge.input(context, :seal_if_empty) |> queue_result(context)
   end
 
   def drain(state, context) do
     result =
-      case context[:jido_ai_input_queue] do
-        nil ->
-          {:ok, []}
-
-        queue ->
-          case PendingInputServer.drain_result(queue) |> queue_result(context) do
-            {:ok, _} = result -> result
-            {:error, reason} -> {:error, {:pending_input_server, reason}}
-          end
+      case ExecutionBridge.input(context, :drain) |> queue_result(context) do
+        {:ok, _} = result -> result
+        {:error, reason} -> {:error, {:pending_input_server, reason}}
       end
 
     with {:ok, items} <- result, do: consume(state, items, context)
   end
 
   defp queue_result({:error, _} = error, context) do
-    :ok = Orchestration.failure_type(context, :runtime)
+    {:ok, _} = ExecutionBridge.report(context, {:failure_type, :runtime})
     error
   end
 
@@ -43,7 +28,7 @@ defmodule Jido.AI.Execution.PendingInput do
   defp consume(state, [], _context), do: {:ok, state}
 
   defp consume(state, items, context) do
-    {_, id, run_id} = context.jido_ai_events
+    {:ok, %{request_id: id, run_id: run_id}} = ExecutionBridge.request(context)
 
     entries =
       Enum.flat_map(items, fn item ->
@@ -57,14 +42,18 @@ defmodule Jido.AI.Execution.PendingInput do
 
     with {:ok, state} <- Jido.AI.Orchestration.Transcript.record(state, entries, context) do
       Enum.reduce_while(Enum.zip(items, entries), {:ok, state}, fn {item, entry}, {:ok, state} ->
-        case Orchestration.emit(context, :input_injected, %{
-               input_id: item.id,
-               content: item.content,
-               source: item.source,
-               refs: item.refs,
-               at_ms: item.at_ms
-             }) do
-          :ok ->
+        case ExecutionBridge.report(
+               context,
+               {:event, :input_injected,
+                %{
+                  input_id: item.id,
+                  content: item.content,
+                  source: item.source,
+                  refs: item.refs,
+                  at_ms: item.at_ms
+                }}
+             ) do
+          {:ok, _} ->
             message =
               Jido.AI.Model.Messages.put_refs(
                 ReqLLM.Context.user(item.content),

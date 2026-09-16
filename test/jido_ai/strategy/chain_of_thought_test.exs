@@ -315,10 +315,11 @@ defmodule Jido.AI.Reasoning.ChainOfThought.StrategyTest do
     assert {:ok, view} = Orchestration.snapshot(server)
 
     for n <- 1..2_010 do
-      assert :ok =
+      assert {:ok, _} =
                GenServer.call(
                  owner(server),
-                 {:event, handle.id, view.request.run_id, :llm_delta, %{delta: "x", chunk_type: :content, n: n}}
+                 {:execution, handle.id, view.request.run_id,
+                  {:report, {:event, :llm_delta, %{delta: "x", chunk_type: :content, n: n}}}}
                )
     end
 

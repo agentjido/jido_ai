@@ -6,7 +6,7 @@ defmodule Jido.AI.Execution.Preflight do
       :ok
     else
       {:error, _} = error ->
-        Jido.AI.Orchestration.failure_type(context, :tool_guardrail)
+        Jido.AI.Orchestration.ExecutionBridge.report(context, {:failure_type, :tool_guardrail})
         error
     end
   end

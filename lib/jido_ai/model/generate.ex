@@ -9,12 +9,14 @@ defmodule Jido.AI.Model.Generate do
         original = params.messages
         provider = Jido.AI.Model.Messages.provider_context(original)
 
-        Jido.AI.Quota.track(context, fn progress ->
-          with {:ok, result} <- execute(%{params | messages: provider}, context, progress) do
-            response = Jido.AI.Model.Messages.restore_response_context(result.response, provider, original)
-            {:ok, %{result | response: response}}
-          end
-        end)
+        with {:ok, _} <- Jido.AI.Orchestration.ExecutionBridge.report(context, {:activity, :progress}) do
+          Jido.AI.Quota.track(context, fn progress ->
+            with {:ok, result} <- execute(%{params | messages: provider}, context, progress) do
+              response = Jido.AI.Model.Messages.restore_response_context(result.response, provider, original)
+              {:ok, %{result | response: response}}
+            end
+          end)
+        end
       end)
 
   defp execute(
@@ -29,7 +31,7 @@ defmodule Jido.AI.Model.Generate do
         callbacks = [
           on_chunk: fn chunk ->
             progress.(Map.get(chunk.metadata, :usage, %{}))
-            Jido.AI.Orchestration.activity(context)
+            {:ok, _} = Jido.AI.Orchestration.ExecutionBridge.report(context, {:activity, :progress})
 
             case Jido.AI.Model.Response.stream_content_part(chunk) do
               {:ok, part} -> delta(context, model, :content_part, part)
@@ -58,11 +60,18 @@ defmodule Jido.AI.Model.Generate do
 
   defp delta(_, _, _, text) when text in [nil, ""], do: :ok
 
-  defp delta(context, model, kind, text),
-    do:
-      Jido.AI.Orchestration.emit(context, :llm_delta, %{
-        chunk_type: kind,
-        delta: text,
-        model: Jido.AI.Models.label(model)
-      })
+  defp delta(context, model, kind, text) do
+    {:ok, _} =
+      Jido.AI.Orchestration.ExecutionBridge.report(
+        context,
+        {:event, :llm_delta,
+         %{
+           chunk_type: kind,
+           delta: text,
+           model: Jido.AI.Models.label(model)
+         }}
+      )
+
+    :ok
+  end
 end

@@ -1042,8 +1042,11 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       replay = Enum.find(before.details.trace.events, &(&1.kind == :tool_completed and &1.tool_call_id == "call_calc"))
       assert replay != nil
 
-      assert :ok =
-               GenServer.call(owner(server), {:event, handle.id, before.request.run_id, :tool_completed, replay.data})
+      assert {:ok, _} =
+               GenServer.call(
+                 owner(server),
+                 {:execution, handle.id, before.request.run_id, {:report, {:event, :tool_completed, replay.data}}}
+               )
 
       assert {:ok, replayed} = Orchestration.snapshot(server, include_content: true)
       assert replayed.details.phase == :awaiting_llm
@@ -1079,8 +1082,11 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       [_, final_wire] = MockLLM.report(mock).requests
       assert Enum.count(final_wire.body["messages"], &(&1["role"] == "tool")) == 2
 
-      assert :ok =
-               GenServer.call(owner(server), {:event, handle.id, before.request.run_id, :tool_completed, replay.data})
+      assert {:ok, _} =
+               GenServer.call(
+                 owner(server),
+                 {:execution, handle.id, before.request.run_id, {:report, {:event, :tool_completed, replay.data}}}
+               )
 
       assert {:ok, retained} = Orchestration.snapshot(server, include_content: true, request_id: handle.id)
       assert retained.request == done.request
@@ -1261,10 +1267,11 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       assert {:ok, view} = Orchestration.snapshot(server, include_content: true)
 
       for n <- 1..2_010 do
-        assert :ok =
+        assert {:ok, _} =
                  GenServer.call(
                    owner(server),
-                   {:event, handle.id, view.request.run_id, :llm_delta, %{delta: "x", chunk_type: :content, n: n}}
+                   {:execution, handle.id, view.request.run_id,
+                    {:report, {:event, :llm_delta, %{delta: "x", chunk_type: :content, n: n}}}}
                  )
       end
 

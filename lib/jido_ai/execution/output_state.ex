@@ -1,7 +1,7 @@
 defmodule Jido.AI.Execution.OutputState do
   @moduledoc false
   alias Jido.AI.Output
-  alias Jido.AI.Orchestration
+  alias Jido.AI.Orchestration.ExecutionBridge
 
   def start(%{output: nil} = state, _value, _context), do: state
   def start(%{output_meta: _} = state, _value, _context), do: state
@@ -25,7 +25,7 @@ defmodule Jido.AI.Execution.OutputState do
     status = if state.repairs > 0, do: :repaired, else: :validated
     meta = Output.meta(state.output, status, state.output_raw, opts)
     data = event_data(state.output, :validated, answer, attempt: state.repairs)
-    :ok = Orchestration.output(event_context(state, context), :output_validated, meta, data)
+    {:ok, _} = ExecutionBridge.report(event_context(state, context), {:output, :output_validated, meta, data})
     Map.put(state, :output_meta, meta)
   end
 
@@ -43,7 +43,7 @@ defmodule Jido.AI.Execution.OutputState do
     if Map.has_key?(state, :output_meta) do
       meta = Output.mark_failed(state.output_meta, reason)
       data = Map.put(meta, :schema_summary, schema_summary(state.output))
-      :ok = Orchestration.output(event_context(state, context), :output_failed, meta, data)
+      {:ok, _} = ExecutionBridge.report(event_context(state, context), {:output, :output_failed, meta, data})
     end
 
     {:error, Jido.AI.Reasoning.failure(state, reason)}
@@ -52,12 +52,10 @@ defmodule Jido.AI.Execution.OutputState do
   defp report(state, context, kind, status, value, opts) do
     meta = Output.meta(state.output, status, value, opts)
 
-    :ok =
-      Orchestration.output(
+    {:ok, _} =
+      ExecutionBridge.report(
         event_context(state, context),
-        kind,
-        meta,
-        Map.put(meta, :schema_summary, schema_summary(state.output))
+        {:output, kind, meta, Map.put(meta, :schema_summary, schema_summary(state.output))}
       )
 
     Map.put(state, :output_meta, meta)

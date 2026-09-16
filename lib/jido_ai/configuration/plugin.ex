@@ -155,7 +155,7 @@ defmodule Jido.AI.Configuration.Plugin do
           if(opts[:standalone_checkpoints?], do: command.context[:jido_ai_checkpoint])
         )
         |> Map.put(:jido_ai_agent_id, command.agent.id)
-        |> Map.delete(:jido_ai_managed)
+        |> Map.delete(:jido_ai_execution)
         |> Map.put(:jido_ai_profiles, profiles)
         |> Map.put(
           :jido_ai_iteration_limit_result,

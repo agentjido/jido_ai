@@ -43,7 +43,7 @@ defmodule JidoAI.Examples.Session.ObserveOwner do
   @moduledoc "Exposes the resource owner to the example's failure checks."
   @behaviour Jido.AI.Control
   def check(_, context) do
-    {owner, id, _} = context.jido_ai_events
+    %{coordinator: owner, request_id: id} = context.jido_ai_execution
     send(context.observer, {:session_owner, owner, id})
     :ok
   end
@@ -53,7 +53,7 @@ defmodule JidoAI.Examples.Steering.ObserveQueue do
   @moduledoc "Exposes the owned queue for failure checks."
   @behaviour Jido.AI.Control
   def check(_, context) do
-    send(context.observer, {:input_queue, context.jido_ai_input_queue})
+    send(context.observer, {:input_queue, context.jido_ai_execution.input_queue})
     :ok
   end
 end

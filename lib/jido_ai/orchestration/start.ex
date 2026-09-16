@@ -104,7 +104,7 @@ defmodule Jido.AI.Orchestration.Start do
   end
 
   defp start_history(context, profile, record) do
-    if Jido.AI.Execution.Checkpoint.resumed?(context),
+    if Jido.AI.Execution.Checkpoint.resuming?(context[:jido_ai_checkpoint]),
       do: {:ok, context.agent_state},
       else: Jido.AI.Orchestration.Transcript.start(context.agent_state, profile, record, context.signal.source)
   end

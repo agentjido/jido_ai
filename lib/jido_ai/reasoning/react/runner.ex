@@ -300,12 +300,11 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         fail(owner, ref, state, config, {:standalone_agent_stopped, reason})
 
       {:react_checkpoint_ack, ^ref, event_id} ->
-        case Server.children(request.server)[{:plugin, Jido.AI.Orchestration.Plugin}] do
-          %{pid: runtime} ->
+        case Jido.AI.Orchestration.ExecutionBridge.acknowledge(request.server, id, event_id) do
+          result when result in [:ok, {:error, :stale_checkpoint}] ->
             # Completion can win the race with the consumer's next pull.
             # Its terminal event is already queued; a stale ack must not
             # replace that outcome with a second failure event.
-            GenServer.call(runtime, {:checkpoint_ack, id, event_id})
             relay(owner, monitor, ref, state, config, request, server_monitor)
 
           _ ->

@@ -146,10 +146,10 @@ defmodule JidoAI.Examples.RequestInspectionTest do
       assert replay != nil
 
       for _ <- 1..2 do
-        assert :ok =
+        assert {:ok, _} =
                  GenServer.call(
                    owner(server),
-                   {:event, request.id, before.request.run_id, :tool_completed, replay.data}
+                   {:execution, request.id, before.request.run_id, {:report, {:event, :tool_completed, replay.data}}}
                  )
 
         assert {:ok, view} = Orchestration.snapshot(server, include_content: true)
@@ -173,8 +173,11 @@ defmodule JidoAI.Examples.RequestInspectionTest do
                retryable?: true
              }
 
-      assert :ok =
-               GenServer.call(owner(server), {:event, request.id, before.request.run_id, :tool_completed, replay.data})
+      assert {:ok, _} =
+               GenServer.call(
+                 owner(server),
+                 {:execution, request.id, before.request.run_id, {:report, {:event, :tool_completed, replay.data}}}
+               )
 
       assert {:ok, retained} = Orchestration.snapshot(server, include_content: true, request_id: request.id)
       assert retained.request == done.request
@@ -299,7 +302,8 @@ defmodule JidoAI.Examples.RequestInspectionTest do
         do:
           GenServer.call(
             runtime,
-            {:event, request.id, view.request.run_id, :llm_delta, %{delta: "x", chunk_type: :content, n: n}}
+            {:execution, request.id, view.request.run_id,
+             {:report, {:event, :llm_delta, %{delta: "x", chunk_type: :content, n: n}}}}
           )
 
     {:ok, active} = Orchestration.snapshot(server, include_content: true)
@@ -325,10 +329,10 @@ defmodule JidoAI.Examples.RequestInspectionTest do
     assert_receive {:mock_llm_waiting, ^mock, :wrong_run, _}, 2_000
     {:ok, before} = Orchestration.snapshot(server, include_content: true)
 
-    assert :ok =
+    assert {:ok, _} =
              GenServer.call(
                owner(server),
-               {:event, request.id, "wrong", :llm_delta, %{delta: "forged"}}
+               {:execution, request.id, "wrong", {:report, {:event, :llm_delta, %{delta: "forged"}}}}
              )
 
     {:ok, after_view} = Orchestration.snapshot(server, include_content: true)
@@ -449,10 +453,11 @@ defmodule JidoAI.Examples.RequestInspectionTest do
     task = Task.async(fn -> Orchestration.cancel(request) end)
     assert_receive {:cancel_admission, gate}, 2_000
 
-    assert :ok =
+    assert {:ok, _} =
              GenServer.call(
                runtime,
-               {:event, request.id, before.request.run_id, :llm_delta, %{delta: "late", chunk_type: :content}}
+               {:execution, request.id, before.request.run_id,
+                {:report, {:event, :llm_delta, %{delta: "late", chunk_type: :content}}}}
              )
 
     send(gate, :release)

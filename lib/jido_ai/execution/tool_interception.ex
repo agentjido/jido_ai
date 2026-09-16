@@ -13,11 +13,11 @@ defmodule Jido.AI.Execution.ToolInterception do
   end
 
   def identity(state, context) do
-    record = context[:jido_ai_request_record]
+    {:ok, request} = Jido.AI.Orchestration.ExecutionBridge.request(context)
 
     %{
-      request_id: if(record, do: record.id, else: state.request_id),
-      run_id: if(record, do: record.run_id, else: state.run_id),
+      request_id: if(request, do: request.request_id, else: state.request_id),
+      run_id: if(request, do: request.run_id, else: state.run_id),
       agent_id: context.jido_ai_agent.id,
       agent_module: context.jido_ai_agent.module
     }
@@ -67,16 +67,20 @@ defmodule Jido.AI.Execution.ToolInterception do
         Jido.AI.ToolResult.completed(call, result, attempts, duration)
         |> Map.put(:effects, Map.take(stats, [:received_count, :allowed_count, :dropped_count]))
 
-      :ok =
-        Jido.AI.Orchestration.emit(context, :tool_completed, %{
-          tool_call_id: call.id,
-          tool_name: call.name,
-          result: result,
-          attempts: attempts,
-          duration_ms: duration,
-          completed: completed,
-          refs: refs
-        })
+      {:ok, _} =
+        Jido.AI.Orchestration.ExecutionBridge.report(
+          context,
+          {:event, :tool_completed,
+           %{
+             tool_call_id: call.id,
+             tool_name: call.name,
+             result: result,
+             attempts: attempts,
+             duration_ms: duration,
+             completed: completed,
+             refs: refs
+           }}
+        )
 
       {:ok,
        %{

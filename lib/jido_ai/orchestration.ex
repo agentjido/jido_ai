@@ -150,27 +150,6 @@ defmodule Jido.AI.Orchestration do
   def progress_type, do: @progress
 
   @doc false
-  def publish_selection(_, nil, _), do: :ok
-
-  def publish_selection(
-        %{jido_ai_events: {runtime, id, run_id}, jido_ai_server: server} = context,
-        selection,
-        deadline
-      ) do
-    with {:ok, ticket} <- GenServer.call(runtime, {:stage_selection, id, run_id, selection}),
-         signal =
-           Jido.Signal.new!(@progress, %{request_id: id, run_id: run_id, ticket: ticket}, source: "/jido/ai/request"),
-         {:ok, _} <- commit_progress(server, signal, caller_context(context), deadline) do
-      :ok
-    end
-  catch
-    :exit, {:timeout, _} -> {:error, :progress_commit_timeout}
-    :exit, _ -> {:error, :progress_owner_unavailable}
-  end
-
-  def publish_selection(_, _, _), do: :ok
-
-  @doc false
   def caller_context(context) do
     # A fresh core Turn owns these fields. Keep caller policy/context, but do
     # not carry the old Turn's state snapshot or private AI runtime bindings.
@@ -179,24 +158,6 @@ defmodule Jido.AI.Orchestration do
     |> Map.reject(fn {key, _} ->
       is_atom(key) and String.starts_with?(Atom.to_string(key), "jido_ai_")
     end)
-  end
-
-  defp commit_progress(server, signal, context, deadline) do
-    remaining = deadline - System.monotonic_time(:millisecond)
-
-    if remaining > 0 do
-      case Jido.AgentServer.call(server, signal, context: context, timeout: remaining) do
-        {:error, reason}
-        when reason in [:busy, :reentrant_turn, :reentrant_admission, :reentrant_directive] ->
-          Process.sleep(min(10, remaining))
-          commit_progress(server, signal, context, deadline)
-
-        result ->
-          result
-      end
-    else
-      {:error, :progress_commit_timeout}
-    end
   end
 
   @doc "Queues visible user text for the active request. A queued result does not prove consumption."
@@ -246,37 +207,6 @@ defmodule Jido.AI.Orchestration do
   end
 
   defp control(_, _, _, _, _), do: {:error, :invalid_content}
-
-  @doc false
-  def publish_history(%{jido_ai_events: {runtime, id, run_id}, jido_ai_server: server}, entries) do
-    with {:ok, batch_id} <- GenServer.call(runtime, {:stage_history, id, run_id, entries}),
-         signal =
-           Jido.Signal.new!(@history, %{request_id: id, batch_id: batch_id}, source: "/jido/ai/request"),
-         {:ok, _} <- commit_history(server, signal, System.monotonic_time(:millisecond) + 5_000),
-         do: :ok
-  end
-
-  # History comes from an independent session task. The core's monitor-graph
-  # reentry guard can relate that task to an unrelated active Turn. These three
-  # errors reject before execution, so the same history batch can be retried.
-  # A timeout has an unknown commit result and must not be retried here.
-  defp commit_history(server, signal, deadline) do
-    remaining = deadline - System.monotonic_time(:millisecond)
-
-    if remaining > 0 do
-      case Jido.AgentServer.call(server, signal, remaining) do
-        {:error, reason}
-        when reason in [:reentrant_turn, :reentrant_admission, :reentrant_directive] ->
-          Process.sleep(min(10, remaining))
-          commit_history(server, signal, deadline)
-
-        result ->
-          result
-      end
-    else
-      {:error, :history_commit_timeout}
-    end
-  end
 
   @doc false
   def admission_target(profile) do
@@ -435,96 +365,9 @@ defmodule Jido.AI.Orchestration do
   end
 
   @doc false
-  def inspect_reasoning(_context, nil), do: :ok
-
-  def inspect_reasoning(context, data) do
-    case context[:jido_ai_events] do
-      {runtime, id, run_id} -> GenServer.call(runtime, {:inspect_reasoning, id, run_id, data})
-      _ -> :ok
-    end
-  end
-
-  @doc false
-  def reasoning_iteration(context, iteration) do
-    case context[:jido_ai_events] do
-      {runtime, id, run_id} ->
-        GenServer.call(runtime, {:reasoning_iteration, id, run_id, iteration})
-
-      _ ->
-        :ok
-    end
-  end
-
-  @doc false
-  def failure_type(context, type) do
-    case context[:jido_ai_events] do
-      {runtime, id, run_id} -> GenServer.call(runtime, {:failure_type, id, run_id, type})
-      _ -> :ok
-    end
-  end
-
-  @doc false
-  def account(context, usage) do
-    case Map.get(context, :jido_ai_events) do
-      {runtime, id, run_id} -> GenServer.call(runtime, {:usage, id, run_id, usage})
-      nil -> :ok
-    end
-  end
-
-  @doc false
   def failed_metadata(meta, error) do
     if Map.has_key?(meta, :output),
       do: Map.update!(meta, :output, &Jido.AI.Output.mark_failed(&1, error)),
       else: meta
-  end
-
-  @doc false
-  def output(context, kind, meta, data) do
-    case Map.get(context, :jido_ai_events) do
-      {runtime, id, run_id} ->
-        GenServer.call(runtime, {:output, id, run_id, kind, meta, data})
-
-      nil ->
-        event = Map.merge(context.jido_ai_output_event, %{kind: kind, data: data})
-
-        Jido.AI.Observe.Telemetry.emit(
-          event,
-          event.observability,
-          context[:jido_ai_agent_id],
-          event.model
-        )
-    end
-  end
-
-  @doc false
-  def event_state(context) do
-    case Map.get(context, :jido_ai_events) do
-      {runtime, id, run_id} -> GenServer.call(runtime, {:event_state, id, run_id})
-      nil -> %{}
-    end
-  end
-
-  @doc false
-  def activity(context, value \\ :progress) do
-    case Map.get(context, :jido_ai_events) do
-      {runtime, id, run_id} -> GenServer.call(runtime, {:activity, id, run_id, value})
-      nil -> :ok
-    end
-  end
-
-  @doc false
-  def tool_signature(context, signature) do
-    case Map.get(context, :jido_ai_events) do
-      {runtime, id, run_id} -> GenServer.call(runtime, {:tool_signature, id, run_id, signature})
-      nil -> :ok
-    end
-  end
-
-  @doc false
-  def emit(context, kind, data \\ %{}) do
-    case Map.get(context, :jido_ai_events) do
-      {runtime, id, run_id} -> GenServer.call(runtime, {:event, id, run_id, kind, data})
-      nil -> :ok
-    end
   end
 end

@@ -43,7 +43,7 @@ defmodule Jido.AI.Orchestration.Coordinator do
                inspection: record.inspection,
                iteration: Map.get(record.meta, :model_calls, 0),
                llm_call_id: record.inspection[:llm_call_id],
-               meta: record.meta,
+               meta: Orchestration.failed_metadata(record.meta, reason),
                usage: Map.get(record.meta, :usage, %{}),
                outcome: {:error, reason}
              }}
@@ -62,6 +62,13 @@ defmodule Jido.AI.Orchestration.Coordinator do
   def handle_call(:agent_server, _, state), do: {:reply, state.init.agent_server, state}
   def handle_call(:skill_catalogs, _, state), do: {:reply, state.skills, state}
   def handle_call(:retention_limit, _, state), do: {:reply, state.retention_limit, state}
+
+  def handle_call({:execution, id, run_id, command}, from, state) do
+    case state.jobs[id] do
+      %{record: %{run_id: ^run_id}, outcome: nil} -> execution_call(command, id, run_id, from, state)
+      _ -> {:reply, stale_execution_reply(command), state}
+    end
+  end
 
   def handle_call({:delivery_status, id}, _, state),
     do: {:reply, Jido.AI.Orchestration.Delivery.status(state.delivery, id), state}
@@ -114,25 +121,6 @@ defmodule Jido.AI.Orchestration.Coordinator do
     {:reply, %{meta: metadata(job || %{}), inspection: Map.get(job || %{}, :inspection, %{})}, state}
   end
 
-  def handle_call({:stage_selection, id, run_id, selection}, _, state) do
-    case state.jobs[id] do
-      %{record: %{run_id: ^run_id, method: :adaptive}, outcome: nil} = job ->
-        ticket = Jido.Signal.ID.generate!()
-        grant = %{request_id: id, run_id: run_id, adaptive: selection}
-
-        with :ok <- Jido.Action.validate_static_data(grant) do
-          job = Map.put(job, :selection_grant, {ticket, grant})
-          job = Map.put(job, :meta, Map.put(Map.get(job, :meta, %{}), :adaptive, selection))
-          {:reply, {:ok, ticket}, put_in(state.jobs[id], job)}
-        else
-          _ -> {:reply, {:error, :invalid_selection}, state}
-        end
-
-      _ ->
-        {:reply, {:error, :stale_request}, state}
-    end
-  end
-
   def handle_call({:claim_selection, id, run_id, ticket}, _, state) do
     case state.jobs[id] do
       %{record: %{run_id: ^run_id}, selection_grant: {^ticket, grant}, outcome: nil} = job ->
@@ -169,12 +157,8 @@ defmodule Jido.AI.Orchestration.Coordinator do
         _,
         state
       ) do
-    context =
-      Map.put(
-        directive_context.turn_context,
-        :jido_ai_input_source,
-        directive_context.effective_signal.source
-      )
+    context = directive_context.turn_context
+    source = directive_context.effective_signal.source
 
     resources = Map.get(context, :jido_ai_request, %{})
     {:ok, sink} = Stream.normalize_sink(resources[:stream_to])
@@ -187,7 +171,7 @@ defmodule Jido.AI.Orchestration.Coordinator do
     enabled = Map.get(profile.observability, :emit_signals?, true)
     :ok = Jido.AI.Orchestration.Delivery.register(state.delivery, record, enabled)
     saved = if checkpoint, do: checkpoint.state
-    resumed? = Jido.AI.Execution.Checkpoint.resumed?(context)
+    resumed? = Jido.AI.Execution.Checkpoint.resuming?(checkpoint)
 
     job =
       %{
@@ -222,7 +206,7 @@ defmodule Jido.AI.Orchestration.Coordinator do
 
     server = state.init.agent_server
 
-    case start_execution(record, context, resources, runtime, queue, server) do
+    case start_execution(record, context, resources, runtime, queue, server, source) do
       {:ok, execution} ->
         {:reply, :ok, put_in(state.jobs[record.id], %{job | task: execution})}
 
@@ -343,186 +327,19 @@ defmodule Jido.AI.Orchestration.Coordinator do
     {:reply, result, state}
   end
 
-  def handle_call({:stage_history, id, run_id, entries}, _, state) do
-    case state.jobs[id] do
-      %{record: %{run_id: ^run_id}} = job ->
-        batch_id = Jido.Signal.ID.generate!()
-
-        batch = %{
-          run_id: run_id,
-          entries: entries,
-          inspection: Map.get(job, :inspection, %{}),
-          meta: metadata(job)
-        }
-
-        {:reply, {:ok, batch_id},
-         put_in(state.jobs[id], %{
-           job
-           | history_batches: Map.put(job.history_batches, batch_id, batch)
-         })}
-
-      _ ->
-        {:reply, {:error, :stale_history}, state}
-    end
-  end
-
   def handle_call({:history_batch, id, batch_id}, _, state) do
     batch = get_in(state, [:jobs, id, :history_batches, batch_id])
     {:reply, batch, state}
   end
 
-  def handle_call({:output, id, run_id, kind, meta, data}, _, state) do
-    case state.jobs[id] do
-      %{record: %{run_id: ^run_id}} = job ->
-        job =
-          job
-          |> Map.put(:meta, Map.put(Map.get(job, :meta, %{}), :output, meta))
-          |> Map.put(:output_event, data)
-          |> emit(kind, data)
-
-        {:reply, :ok, put_in(state.jobs[id], job)}
-
-      _ ->
-        {:reply, :ok, state}
-    end
-  end
-
-  def handle_call({:checkpoint, id, run_id, phase, saved}, from, state) do
-    case state.jobs[id] do
-      %{record: %{run_id: ^run_id}, outcome: nil, checkpoint: %{config: config, adapter: adapter}} = job ->
-        saved = %{saved | seq: job.seq + 1}
-
-        case Jido.AI.Error.capture(fn ->
-               token =
-                 if Jido.AI.Observe.Content.retainable?(saved, config.observability), do: adapter.issue(saved, config)
-
-               {:ok, token}
-             end) do
-          {:ok, token} ->
-            event_id = Jido.Signal.ID.generate!()
-
-            job =
-              job
-              |> put_in([:meta, :reasoning_iteration], saved.iteration)
-              |> emit(:checkpoint, %{reason: phase, token: token}, event_id)
-              |> Map.put(:checkpoint_waiter, {from, event_id})
-
-            {:noreply, put_in(state.jobs[id], job)}
-
-          {:error, _} = error ->
-            {:reply, error, state}
-        end
-
-      _ ->
-        {:reply, {:error, :stale_checkpoint}, state}
-    end
-  end
-
   def handle_call({:checkpoint_ack, id, event_id}, {caller, _}, state) do
     case state.jobs[id] do
       %{sink: {:pid, ^caller}, checkpoint_waiter: {waiter, ^event_id}, outcome: nil} = job ->
-        GenServer.reply(waiter, :ok)
+        GenServer.reply(waiter, {:ok, :acknowledged})
         {:reply, :ok, put_in(state.jobs[id], Map.delete(job, :checkpoint_waiter))}
 
       _ ->
         {:reply, {:error, :stale_checkpoint}, state}
-    end
-  end
-
-  def handle_call({:event_state, id, run_id}, _, state) do
-    snapshot =
-      case state.jobs[id] do
-        %{record: %{run_id: ^run_id}} = job -> Map.take(job, [:seq])
-        _ -> %{}
-      end
-
-    {:reply, snapshot, state}
-  end
-
-  def handle_call({:event, id, run_id, kind, data}, _, state) do
-    case state.jobs[id] do
-      %{record: %{run_id: ^run_id}, capture_deltas: false} when kind == :llm_delta ->
-        {:reply, :ok, state}
-
-      %{record: %{run_id: ^run_id}, outcome: nil} = job ->
-        {:reply, :ok, put_in(state.jobs[id], emit(job, kind, data))}
-
-      _ ->
-        {:reply, :ok, state}
-    end
-  end
-
-  def handle_call({:activity, id, run_id, value}, _, state) do
-    case state.jobs[id] do
-      %{record: %{run_id: ^run_id}, outcome: nil} = job ->
-        job =
-          case value do
-            :progress -> Activity.touch(job)
-            {:tool_finished, call_id} -> Activity.tool_finished(job, call_id)
-          end
-
-        {:reply, :ok, put_in(state.jobs[id], job)}
-
-      _ ->
-        {:reply, :ok, state}
-    end
-  end
-
-  def handle_call({:tool_signature, id, run_id, signature}, _, state) do
-    case state.jobs[id] do
-      %{record: %{run_id: ^run_id}, outcome: nil} = job ->
-        job = put_in(job.meta[:prev_tool_signature], signature)
-        {:reply, :ok, put_in(state.jobs[id], job)}
-
-      _ ->
-        {:reply, :ok, state}
-    end
-  end
-
-  def handle_call({:inspect_reasoning, id, run_id, data}, _, state) do
-    case state.jobs[id] do
-      %{record: %{run_id: ^run_id}, outcome: nil} = job ->
-        case Jido.Action.validate_static_data(data) do
-          :ok -> {:reply, :ok, put_in(state.jobs[id], Map.put(job, :reasoning, data))}
-          error -> {:reply, error, state}
-        end
-
-      _ ->
-        {:reply, :ok, state}
-    end
-  end
-
-  def handle_call({:reasoning_iteration, id, run_id, iteration}, _, state) do
-    case state.jobs[id] do
-      %{record: %{run_id: ^run_id}, outcome: nil} = job
-      when is_integer(iteration) and iteration > 0 ->
-        job = put_in(job.meta.reasoning_iteration, iteration)
-        {:reply, :ok, put_in(state.jobs[id], job)}
-
-      _ ->
-        {:reply, :ok, state}
-    end
-  end
-
-  def handle_call({:failure_type, id, run_id, type}, _, state) do
-    case state.jobs[id] do
-      %{record: %{run_id: ^run_id}} = job ->
-        job = Map.put(job, :meta, Map.put(Map.get(job, :meta, %{}), :error_type, type))
-        {:reply, :ok, put_in(state.jobs[id], job)}
-
-      _ ->
-        {:reply, :ok, state}
-    end
-  end
-
-  def handle_call({:usage, id, run_id, usage}, _, state) do
-    case state.jobs[id] do
-      %{record: %{run_id: ^run_id}} = job ->
-        job = Map.put(job, :usage, Jido.AI.Usage.merge(Map.get(job, :usage, %{}), usage))
-        {:reply, :ok, put_in(state.jobs[id], job)}
-
-      _ ->
-        {:reply, :ok, state}
     end
   end
 
@@ -773,7 +590,7 @@ defmodule Jido.AI.Orchestration.Coordinator do
     case get_in(job, [:meta, :output]) do
       %{status: status} = output when status != :error ->
         meta = Jido.AI.Output.mark_failed(output, error)
-        data = Map.put(meta, :schema_summary, job.output_event.schema_summary)
+        data = Map.merge(meta, Map.take(Map.get(job, :output_event, %{}), [:schema_summary]))
 
         job
         |> put_in([:meta, :output], meta)
@@ -785,7 +602,7 @@ defmodule Jido.AI.Orchestration.Coordinator do
     end
   end
 
-  defp start_execution(record, context, resources, runtime, queue, server) do
+  defp start_execution(record, context, resources, runtime, queue, server, source) do
     profile = context.jido_ai_profiles[record.profile_id]
     options = get_in(context, [:ai, record.profile_id, :options]) || []
     model = profile.models[profile.reasoning.model].model
@@ -811,13 +628,21 @@ defmodule Jido.AI.Orchestration.Coordinator do
       |> Map.put(:agent_state, context.jido_ai_snapshot)
       |> Map.put(:state, context.jido_ai_snapshot)
       |> Map.put(:jido_ai_profiles, context.jido_ai_profiles)
-      |> Map.put(:jido_ai_managed, true)
-      |> Map.put(:jido_ai_events, {runtime, record.id, record.run_id})
-      |> Map.put(:jido_ai_server, server)
-      |> Map.put(:jido_ai_input_queue, queue)
-      |> Map.put(:jido_ai_request_record, record)
 
-    with {:ok, context} <- Jido.AI.Skill.Runtime.bind(context, profile, runtime),
+    with {:ok, binding} <-
+           Jido.AI.Orchestration.ExecutionBinding.new(%{
+             coordinator: runtime,
+             agent_server: server,
+             request_id: record.id,
+             run_id: record.run_id,
+             extra_refs: record.extra_refs,
+             source: source,
+             retain_history?: profile.memory.history != nil,
+             input_queue: queue,
+             checkpoint: context[:jido_ai_checkpoint]
+           }),
+         context = context |> Map.put(:jido_ai_execution, binding) |> Map.delete(:jido_ai_checkpoint),
+         {:ok, context} <- Jido.AI.Skill.Runtime.bind(context, profile, runtime),
          {:ok, flow} <- Jido.AI.Execution.Flow.build(profile) do
       {:ok, Jido.Exec.run_async(flow, %{query: record.query}, context, timeout: profile.controls.timeout)}
     end
@@ -830,6 +655,133 @@ defmodule Jido.AI.Orchestration.Coordinator do
     |> Map.get(:tool_context, %{})
     |> Jido.AI.ToolContext.runtime()
   end
+
+  defp execution_call(:snapshot, id, _, _, state),
+    do: {:reply, {:ok, Map.take(state.jobs[id], [:seq])}, state}
+
+  defp execution_call({:stage_selection, selection}, id, run_id, _, state) do
+    case state.jobs[id] do
+      %{record: %{run_id: ^run_id, method: :adaptive}, outcome: nil} = job ->
+        ticket = Jido.Signal.ID.generate!()
+        grant = %{request_id: id, run_id: run_id, adaptive: selection}
+
+        with :ok <- Jido.Action.validate_static_data(grant) do
+          job = Map.put(job, :selection_grant, {ticket, grant})
+          job = Map.put(job, :meta, Map.put(Map.get(job, :meta, %{}), :adaptive, selection))
+          {:reply, {:ok, ticket}, put_in(state.jobs[id], job)}
+        else
+          _ -> {:reply, {:error, :invalid_selection}, state}
+        end
+
+      _ ->
+        {:reply, {:error, :stale_request}, state}
+    end
+  end
+
+  defp execution_call({:stage_entries, entries}, id, run_id, _, state) do
+    case state.jobs[id] do
+      %{record: %{run_id: ^run_id}} = job ->
+        batch_id = Jido.Signal.ID.generate!()
+
+        batch = %{
+          run_id: run_id,
+          entries: entries,
+          inspection: Map.get(job, :inspection, %{}),
+          meta: metadata(job)
+        }
+
+        {:reply, {:ok, batch_id},
+         put_in(state.jobs[id], %{
+           job
+           | history_batches: Map.put(job.history_batches, batch_id, batch)
+         })}
+
+      _ ->
+        {:reply, {:error, :stale_history}, state}
+    end
+  end
+
+  defp execution_call({:checkpoint, phase, saved}, id, run_id, from, state) do
+    case state.jobs[id] do
+      %{record: %{run_id: ^run_id}, outcome: nil, checkpoint: %{config: config, adapter: adapter}} = job ->
+        saved = %{saved | seq: job.seq + 1}
+
+        case Jido.AI.Error.capture(fn ->
+               token =
+                 if Jido.AI.Observe.Content.retainable?(saved, config.observability), do: adapter.issue(saved, config)
+
+               {:ok, token}
+             end) do
+          {:ok, token} ->
+            event_id = Jido.Signal.ID.generate!()
+
+            job =
+              job
+              |> put_in([:meta, :reasoning_iteration], saved.iteration)
+              |> emit(:checkpoint, %{reason: phase, token: token}, event_id)
+              |> Map.put(:checkpoint_waiter, {from, event_id})
+
+            {:noreply, put_in(state.jobs[id], job)}
+
+          {:error, _} = error ->
+            {:reply, error, state}
+        end
+
+      _ ->
+        {:reply, {:error, :stale_checkpoint}, state}
+    end
+  end
+
+  defp execution_call({:input, operation}, id, _, _, state) do
+    queue = state.jobs[id].queue
+
+    reply =
+      case {operation, queue} do
+        {:drain, nil} -> {:ok, []}
+        {:seal, nil} -> :ok
+        {:seal_if_empty, nil} -> :sealed
+        {:drain, queue} -> InputQueue.drain_result(queue)
+        {:seal, queue} -> InputQueue.seal(queue)
+        {:seal_if_empty, queue} -> InputQueue.seal_if_empty(queue)
+        _ -> {:error, :invalid_execution_command}
+      end
+
+    {:reply, reply, state}
+  end
+
+  defp execution_call({:report, fact}, id, _, _, state) do
+    case observe(state.jobs[id], fact) do
+      {:ok, job} -> {:reply, {:ok, :observed}, put_in(state.jobs[id], job)}
+      {:ignored, job} -> {:reply, {:ok, :ignored}, put_in(state.jobs[id], job)}
+      {:error, _} = error -> {:reply, error, state}
+    end
+  end
+
+  defp execution_call(_, _, _, _, state), do: {:reply, {:error, :invalid_execution_command}, state}
+
+  defp observe(%{capture_deltas: false} = job, {:event, :llm_delta, _}), do: {:ignored, job}
+  defp observe(job, {:event, kind, data}), do: {:ok, emit(job, kind, data)}
+  defp observe(job, {:activity, :progress}), do: {:ok, Activity.touch(job)}
+  defp observe(job, {:activity, {:tool_finished, id}}), do: {:ok, Activity.tool_finished(job, id)}
+  defp observe(job, {:tool_signature, signature}), do: {:ok, put_in(job.meta[:prev_tool_signature], signature)}
+  defp observe(job, {:reasoning, nil}), do: {:ok, job}
+
+  defp observe(job, {:reasoning, data}) do
+    with :ok <- Jido.Action.validate_static_data(data), do: {:ok, Map.put(job, :reasoning, data)}
+  end
+
+  defp observe(job, {:reasoning_iteration, iteration}), do: {:ok, put_in(job.meta.reasoning_iteration, iteration)}
+  defp observe(job, {:failure_type, type}), do: {:ok, put_in(job.meta[:error_type], type)}
+  defp observe(job, {:usage, usage}), do: {:ok, Map.put(job, :usage, Jido.AI.Usage.merge(job.usage, usage))}
+
+  defp observe(job, {:output, kind, meta, data}) do
+    {:ok, job |> put_in([:meta, :output], meta) |> Map.put(:output_event, data) |> emit(kind, data)}
+  end
+
+  defp observe(_, _), do: {:error, :invalid_execution_report}
+
+  defp stale_execution_reply({:report, _}), do: {:ok, :ignored}
+  defp stale_execution_reply(_), do: {:error, :stale_execution}
 
   defp emit(job, kind, data, event_id \\ nil) do
     now = System.monotonic_time(:millisecond)
@@ -918,7 +870,7 @@ defmodule Jido.AI.Orchestration.Coordinator do
   defp deliver(job, event) do
     %{kind: kind, data: data, iteration: iteration, llm_call_id: call_id, seq: seq} = event
     job = Map.put(job, :inspection, Inspection.record(Map.get(job, :inspection, %{}), event))
-    projected = Jido.AI.Observe.Content.event(event, job.observability, :stream)
+    projected = Jido.AI.Observe.Content.event(event, Map.get(job, :observability, %{}), :stream)
     # The private standalone Runner consumes native state before it projects
     # its public stream. Ordinary request sinks only receive projected data.
     Stream.send_event(job.sink, if(job[:checkpoint], do: event, else: projected))

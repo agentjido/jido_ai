@@ -35,7 +35,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyPolicyTest do
       observer: self(),
       tenant_id: "review-team",
       hidden: "secret",
-      jido_ai_events: :parent_events,
+      jido_ai_execution: :parent_events,
       jido_ai_request: :parent_request,
       state: %{parent_secret: true},
       signal: :parent_signal
@@ -52,7 +52,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyPolicyTest do
     refute Map.has_key?(tool_context, :hidden)
     refute Map.has_key?(tool_context, :jido_ai_callable_profile)
     refute tool_context[:jido_ai_request] == :parent_request
-    refute tool_context[:jido_ai_events] == :parent_events
+    refute tool_context[:jido_ai_execution] == :parent_events
     refute tool_context[:signal] == :parent_signal
     refute tool_context[:state] == %{parent_secret: true}
   end
@@ -190,7 +190,7 @@ defmodule Jido.AI.Actions.Reasoning.RunStrategyPolicyTest do
             :tenant_id,
             :jido_ai_callable_profile,
             :jido_ai_request,
-            :jido_ai_events,
+            :jido_ai_execution,
             :state,
             :signal
           ]

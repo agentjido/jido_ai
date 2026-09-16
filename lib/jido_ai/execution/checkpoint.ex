@@ -1,6 +1,7 @@
 defmodule Jido.AI.Execution.Checkpoint do
   @moduledoc false
   alias Jido.AI.Execution
+  alias Jido.AI.Orchestration.ExecutionBridge
 
   # An internal adapter supplies the standalone value and token format.
   # The runtime owns execution position, deadlines, effects and pause/ack.
@@ -42,16 +43,26 @@ defmodule Jido.AI.Execution.Checkpoint do
   ]
   @keys [:version, :phase, :runtime, :domain, :effects, :remaining_ms, :binding]
 
-  def enabled?(context),
+  def enabled?(context), do: valid_binding?(checkpoint_plan(context))
+
+  defp valid_binding?(binding),
     do:
       match?(
         %{adapter: adapter, result_key: key, config: _, state: %{checkpoint: _}}
         when is_atom(adapter) and not is_nil(adapter) and is_atom(key),
-        context[:jido_ai_checkpoint]
+        binding
       )
 
   def resumed?(context),
-    do: enabled?(context) and is_map(context.jido_ai_checkpoint.state.checkpoint)
+    do: resuming?(checkpoint_plan(context))
+
+  # Admission uses the validated standalone input before an execution exists.
+  def resuming?(binding), do: valid_binding?(binding) and is_map(binding.state.checkpoint)
+
+  defp checkpoint_plan(context) do
+    {:ok, binding} = ExecutionBridge.checkpoint(context)
+    binding
+  end
 
   def admission(context, id, run_id) do
     case context[:jido_ai_checkpoint] do
@@ -59,7 +70,9 @@ defmodule Jido.AI.Execution.Checkpoint do
         :ok
 
       %{adapter: adapter, state: %{request_id: ^id, run_id: ^run_id} = state, config: config} ->
-        if enabled?(context), do: adapter.verify(state, config), else: {:error, :invalid_checkpoint_binding}
+        if valid_binding?(context.jido_ai_checkpoint),
+          do: adapter.verify(state, config),
+          else: {:error, :invalid_checkpoint_binding}
 
       _ ->
         {:error, :invalid_checkpoint_binding}
@@ -95,8 +108,7 @@ defmodule Jido.AI.Execution.Checkpoint do
   def pause(native, phase, context) do
     if enabled?(context) do
       with {:ok, saved} <- capture(native, phase, context),
-           {runtime, id, run_id} = context.jido_ai_events,
-           :ok <- GenServer.call(runtime, {:checkpoint, id, run_id, phase, saved}, :infinity) do
+           {:ok, :acknowledged} <- ExecutionBridge.pause(context, phase, saved) do
         {:ok, native}
       end
     else
@@ -105,7 +117,7 @@ defmodule Jido.AI.Execution.Checkpoint do
   end
 
   defp capture(native, phase, context) do
-    %{adapter: adapter, config: config} = binding = context.jido_ai_checkpoint
+    %{adapter: adapter, config: config} = binding = checkpoint_plan(context)
     runtime = native |> Map.take(@runtime_keys) |> responses()
 
     domain =
@@ -133,7 +145,7 @@ defmodule Jido.AI.Execution.Checkpoint do
 
   def restore(native, context) do
     if resumed?(context) do
-      %{state: saved, config: config, adapter: adapter} = context.jido_ai_checkpoint
+      %{state: saved, config: config, adapter: adapter} = checkpoint_plan(context)
       data = saved.checkpoint
 
       with :ok <- adapter.verify(saved, config),
@@ -169,7 +181,7 @@ defmodule Jido.AI.Execution.Checkpoint do
   def terminal(native, meta, context) do
     if enabled?(context) do
       with {:ok, saved} <- capture(native, :terminal, context),
-           do: {:ok, Map.put(meta, context.jido_ai_checkpoint.result_key, saved.checkpoint)}
+           do: {:ok, Map.put(meta, checkpoint_plan(context).result_key, saved.checkpoint)}
     else
       {:ok, meta}
     end

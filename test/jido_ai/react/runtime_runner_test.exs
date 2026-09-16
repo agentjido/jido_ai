@@ -1319,6 +1319,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     events = ReAct.stream("Load review", config) |> Enum.to_list()
     tool_completed = Enum.find(events, &(&1.kind == :tool_completed))
 
+    assert tool_completed, inspect(events)
     assert tool_completed.data.refs == %{}
 
     :persistent_term.erase({__MODULE__, :llm_call_count})

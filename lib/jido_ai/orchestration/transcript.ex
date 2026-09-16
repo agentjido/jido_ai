@@ -4,6 +4,7 @@ defmodule Jido.AI.Orchestration.Transcript do
   alias Jido.AI.Profile
   alias Jido.AI.Thread.Projection
   alias Jido.AI.Model.Messages
+  alias Jido.AI.Orchestration.ExecutionBridge
 
   def query(query, refs),
     do: Messages.entries([%{role: :user, content: query, refs: Jido.AI.Skill.Runtime.untrusted_refs(refs)}])
@@ -38,9 +39,17 @@ defmodule Jido.AI.Orchestration.Transcript do
   def read(_, _), do: Profile.error("memory.history", "Expected initialized Agent state")
 
   def request_refs(context, extra_refs \\ %{}) do
-    case context[:jido_ai_request_record] do
-      nil -> extra_refs
-      record -> Map.merge(refs(record, context.jido_ai_input_source), extra_refs)
+    {:ok, request} = ExecutionBridge.request(context)
+
+    case request do
+      nil ->
+        extra_refs
+
+      request ->
+        Map.merge(
+          refs(%{id: request.request_id, run_id: request.run_id, extra_refs: request.extra_refs}, request.source),
+          extra_refs
+        )
     end
   end
 
@@ -82,13 +91,15 @@ defmodule Jido.AI.Orchestration.Transcript do
   end
 
   def record(state, entries, context) do
+    {:ok, request} = ExecutionBridge.request(context)
+
     entries =
-      case context[:jido_ai_request_record] do
+      case request do
         nil ->
           entries
 
-        record ->
-          refs = refs(record, context.jido_ai_input_source)
+        request ->
+          refs = request_refs(context)
 
           Enum.map(
             entries,
@@ -96,16 +107,12 @@ defmodule Jido.AI.Orchestration.Transcript do
               refs
               |> Map.merge(existing || %{})
               |> Map.drop([:signal_id, "request_id", "run_id", "signal_id"])
-              |> Map.merge(%{request_id: record.id, run_id: record.run_id, context: :pending})
+              |> Map.merge(%{request_id: request.request_id, run_id: request.run_id, context: :pending})
             end)
           )
       end
 
-    result =
-      if Map.get(context, :jido_ai_managed, false) and state.profile.memory.history != nil,
-        do: Jido.AI.Orchestration.publish_history(context, entries),
-        else: :ok
-
-    with :ok <- result, do: {:ok, %{state | history_delta: state.history_delta ++ entries}}
+    with {:ok, _} <- ExecutionBridge.commit_entries(context, entries),
+         do: {:ok, %{state | history_delta: state.history_delta ++ entries}}
   end
 end

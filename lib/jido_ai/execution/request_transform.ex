@@ -16,7 +16,7 @@ defmodule Jido.AI.Execution.RequestTransform do
       module ->
         case transform(module, state, request, catalog, context) do
           {:error, _} = error ->
-            :ok = Jido.AI.Orchestration.failure_type(context, :request_transform)
+            {:ok, _} = Jido.AI.Orchestration.ExecutionBridge.report(context, {:failure_type, :request_transform})
             error
 
           result ->
@@ -136,6 +136,7 @@ defmodule Jido.AI.Execution.RequestTransform do
 
   defp config(state, context) do
     defaults = Map.get(context, :jido_ai_tool_defaults, %{})
+    {:ok, input_queue} = Jido.AI.Orchestration.ExecutionBridge.pending_input_server(context)
 
     config =
       Config.new(%{
@@ -146,7 +147,7 @@ defmodule Jido.AI.Execution.RequestTransform do
         output: state.output,
         request_transformer: state.profile.reasoning[:request_transformer],
         llm_opts: state.options,
-        pending_input_server: context[:jido_ai_input_queue],
+        pending_input_server: input_queue,
         tool_timeout_ms: defaults[:timeout] || 5_000,
         tool_max_retries: defaults[:max_retries] || 0,
         tool_retry_backoff_ms: defaults[:retry_backoff] || 0,
@@ -160,16 +161,16 @@ defmodule Jido.AI.Execution.RequestTransform do
   end
 
   def state_view(state, context) do
-    record = context[:jido_ai_request_record]
+    {:ok, request} = Jido.AI.Orchestration.ExecutionBridge.request(context)
     conversation = Map.get(state, :repair_data, %{})[:context] || state.messages
     original = Map.get(state, :repair_data, %{})[:original] || state
     response = original[:response]
-    events = Jido.AI.Orchestration.event_state(context)
-    run_id = if record, do: record.run_id, else: state.run_id
+    {:ok, events} = Jido.AI.Orchestration.ExecutionBridge.snapshot(context)
+    run_id = if request, do: request.run_id, else: state.run_id
 
     %State{
       run_id: run_id,
-      request_id: if(record, do: record.id, else: state.request_id),
+      request_id: if(request, do: request.request_id, else: state.request_id),
       context: State.context(Jido.AI.Model.Messages.entries(conversation.messages), nil),
       iteration: Jido.AI.Execution.State.model_iteration(state),
       llm_call_id: original[:llm_call_id],

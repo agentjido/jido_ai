@@ -46,11 +46,7 @@ defmodule Jido.AI.Execution.Prepare do
             )
           ]
 
-      refs =
-        case context[:jido_ai_request_record] do
-          nil -> %{}
-          record -> Jido.AI.Orchestration.Transcript.refs(record, context.jido_ai_input_source)
-        end
+      refs = Jido.AI.Orchestration.Transcript.request_refs(context)
 
       state = %{
         profile: profile,
@@ -70,7 +66,7 @@ defmodule Jido.AI.Execution.Prepare do
            {:ok, state} <- Jido.AI.Execution.Checkpoint.restore(state, context),
            {:ok, state} <- Jido.AI.Reasoning.prepare(state, query),
            {:ok, state} <- Jido.AI.Execution.State.validate(state),
-           :ok <- Jido.AI.Orchestration.publish_selection(context, adaptive, deadline),
+           {:ok, _} <- Jido.AI.Orchestration.ExecutionBridge.commit_selection(context, adaptive, deadline),
            do: {:ok, state}
     else
       {:error, _} = error -> error

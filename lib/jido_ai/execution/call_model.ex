@@ -5,14 +5,15 @@ defmodule Jido.AI.Execution.CallModel do
   alias Jido.AI.Profile
   alias Jido.AI.ToolCatalog
   alias Jido.AI.Usage
+  alias Jido.AI.Orchestration.ExecutionBridge
 
   @impl Jido.Action
   def run(params, context) do
     Jido.AI.Error.capture(fn ->
       position = Jido.AI.Execution.State.model_iteration(params)
 
-      with :ok <- Jido.AI.Orchestration.reasoning_iteration(context, position),
-           :ok <- Jido.AI.Orchestration.inspect_reasoning(context, Jido.AI.Reasoning.inspection(params)),
+      with {:ok, _} <- ExecutionBridge.report(context, {:reasoning_iteration, position}),
+           {:ok, _} <- ExecutionBridge.report(context, {:reasoning, Jido.AI.Reasoning.inspection(params)}),
            do: execute(params, context)
     end)
   end
@@ -67,18 +68,18 @@ defmodule Jido.AI.Execution.CallModel do
   end
 
   defp generate(state, request, active_tools, context, remaining) do
-    with :ok <-
-           Jido.AI.Orchestration.emit(
+    with {:ok, _} <-
+           ExecutionBridge.report(
              context,
-             :llm_started,
-             Map.merge(
-               %{
-                 model_call: state.model_calls + 1,
-                 call_id: state.llm_call_id,
-                 model: Jido.AI.Models.label(request.model)
-               },
-               Jido.AI.Reasoning.event(state)
-             )
+             {:event, :llm_started,
+              Map.merge(
+                %{
+                  model_call: state.model_calls + 1,
+                  call_id: state.llm_call_id,
+                  model: Jido.AI.Models.label(request.model)
+                },
+                Jido.AI.Reasoning.event(state)
+              )}
            ),
          {:model_result, {:ok, %{response: response}}} <-
            {:model_result,
@@ -86,20 +87,20 @@ defmodule Jido.AI.Execution.CallModel do
               Jido.AI.Model.Generate,
               request,
               context
-              |> Map.take([:jido_ai_events, :jido_ai_quota])
+              |> Map.take([:jido_ai_execution, :jido_ai_admission_profile, :jido_ai_quota])
               |> Map.put(:jido_ai_quota_call_id, state.llm_call_id),
               timeout: remaining
             )},
          :ok <- Control.check(state.profile, :model, response, context, state.deadline),
          response =
            Jido.AI.Model.Messages.bind_response(response, Jido.AI.Orchestration.Transcript.request_refs(context)),
-         :ok <- Jido.AI.Orchestration.account(context, response.usage),
+         {:ok, _} <- ExecutionBridge.report(context, {:usage, response.usage}),
          :ok <- terminal_response(response, request, state, context),
          {:ok, state} <-
            Jido.AI.Orchestration.Transcript.record(state, Jido.AI.Model.Messages.entries([response.message]), context),
          true <- System.monotonic_time(:millisecond) < state.deadline do
       event = Jido.AI.Observe.Event.model_response(response, state, request)
-      :ok = Jido.AI.Orchestration.emit(context, :llm_completed, event)
+      {:ok, _} = ExecutionBridge.report(context, {:event, :llm_completed, event})
 
       response_meta =
         Jido.AI.Request.Metadata.record_turn(Map.get(state, :response_meta, %{}), event)
@@ -136,7 +137,7 @@ defmodule Jido.AI.Execution.CallModel do
 
   defp repair_callback(state, request, context) do
     data = state.repair_data
-    record = context[:jido_ai_request_record]
+    {:ok, request_data} = ExecutionBridge.request(context)
 
     callback_context =
       Map.merge(context, %{
@@ -144,8 +145,8 @@ defmodule Jido.AI.Execution.CallModel do
         messages: Map.get(request, :public_messages, request.messages.messages),
         llm_opts: Keyword.drop(request.options, [:tools, :tool_choice]),
         user_message: data.user_message,
-        request_id: if(record, do: record.id, else: state.request_id),
-        run_id: if(record, do: record.run_id, else: state.run_id)
+        request_id: if(request_data, do: request_data.request_id, else: state.request_id),
+        run_id: if(request_data, do: request_data.run_id, else: state.run_id)
       })
 
     result = Jido.AI.Output.repair(state.output, data.raw, data.reason, callback_context)
@@ -170,7 +171,7 @@ defmodule Jido.AI.Execution.CallModel do
 
     case result do
       {:error, reason} ->
-        :ok = Jido.AI.Orchestration.failure_type(context, :llm_response)
+        {:ok, _} = ExecutionBridge.report(context, {:failure_type, :llm_response})
 
         received =
           state
