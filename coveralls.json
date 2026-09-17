@@ -4,7 +4,6 @@
   },
   "skip_files": [
     "^examples/",
-    "^lib/mix/tasks/",
     "^test/support/"
   ]
 }

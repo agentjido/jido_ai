@@ -31,7 +31,7 @@ defmodule JidoAi.MixProject do
 
       # Dialyzer
       dialyzer: [
-        plt_add_apps: [:mix, :ex_unit, :llm_db, :jsv],
+        plt_add_apps: [:ex_unit, :llm_db, :jsv],
         ignore_warnings: "dialyzer.ignore-warnings"
       ]
     ]
@@ -88,8 +88,7 @@ defmodule JidoAi.MixProject do
       {:excoveralls, "~> 0.18", only: [:dev, :test]},
       {:git_hooks, "~> 0.8", only: [:dev, :test], runtime: false},
       {:git_ops, "~> 2.9", only: :dev, runtime: false},
-      {:mimic, "~> 2.0", only: :test},
-      {:igniter, "~> 0.7", optional: true}
+      {:mimic, "~> 2.0", only: :test}
     ]
   end
 
@@ -258,12 +257,8 @@ defmodule JidoAi.MixProject do
           Jido.AI.Skill,
           ~r/Jido\.AI\.Skill\..*/
         ],
-        "Quality & Quota": [
-          Jido.AI.Quality.Checkpoint,
+        Quota: [
           Jido.AI.Quota.Store
-        ],
-        "Mix Tasks": [
-          ~r/Mix\.Tasks\..*/
         ]
       ]
     ]

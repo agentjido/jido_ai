@@ -483,9 +483,10 @@ enforcement across projections. Stream permission never grants storage permissio
 
 ### 90 — Migration and delivery
 
-**Modules:** `Test.*`, `TestCase`, `Quality.Checkpoint`, package Mix tasks.
+**Modules:** `Test.*`, `TestCase`, package metadata, and documentation.
 
-**Current:** execution CLI removed; install, skill, and quality tasks remain.
+**Current:** package Mix tasks and Igniter are removed. Repository-local Mix
+aliases still run development checks.
 Package metadata still declares 2.3.0 while using V3 beta dependencies.
 
 **Direction:** release evidence tied to specific contracts and supported consumer
@@ -538,13 +539,13 @@ lib/
 │   ├── actions/ + plugins/     callable and core integration adapters
 │   ├── skill/                  optional skills and resources
 │   └── ...                     values, policy, observation, support
-└── mix/tasks/                  consumer and development tools
 ```
 
 This is not an exhaustive inventory. Root tool files still coexist with
 `tools/`; standalone ReAct adapters share the method directory. These are
 organization questions, not proof of duplicate engines. The
-[source API inventory](../v3-spike/api-inventory.json) lists the full surface.
+[dated source snapshot](../v3-spike/api-inventory.json) records the surface at
+its last generation. Use current code for the live surface.
 
 ## 8. Retained migration rationale
 

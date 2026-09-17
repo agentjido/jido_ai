@@ -18,17 +18,16 @@ the port map. Use Jido v3 Actions, Flows, and Plugins for their execution.
 - [Feature map](feature-map.md): current supported behavior, ownership, and test evidence.
 - [Public API map](public-api-map.md): entry points, generated wrappers and
   current contracts, removals, and declared-source inventory for all production files.
-- [Current source inventory](api-inventory.json): generated from `lib`, with source hashes and declaration locations.
+- [V3 source snapshot](api-inventory.json): last generated on 2026-09-16, with source hashes and declaration locations.
 - [V2 source inventory](api-inventory-v2.json): unchanged September 6 baseline;
   not the current package API.
 - [Commit and PR audit](history-audit.md): every post-2.0 commit, user feedback,
   regression examples and required migration evidence.
 
-Regenerate the current inventory with `mix run scripts/api_inventory.exs`.
-Check it with `mix run scripts/api_inventory.exs --check`. The regular unit
-suite checks drift. Source declarations include internal exports and quoted
-templates; use the public API map to choose supported application contracts.
-No generator result establishes feature parity or release readiness.
+The V3 source snapshot is not a live inventory. Its generator and drift test
+are removed. Source declarations include internal exports and quoted templates;
+use the public API map and current code to choose supported application
+contracts. The snapshot does not establish feature parity or release readiness.
 
 ## Historical migration preparation
 
@@ -123,8 +122,8 @@ Use [the core Agent API](../../../jido/lib/jido/agent.ex)
 and source as the API baseline. Documents under core `docs/design` are pending
 proposals. In particular, do not assume that the proposed Ref facade, isolated
 Plugin preparation, or definition revision checks already exist. Core's
-[feature probes](../../../jido/docs/examples/feature-acceptance-results.md)
-record these differences. This task did not rerun those probes.
+earlier feature probes recorded these differences. This task did not rerun
+those probes.
 
 ## Proposed execution model
 

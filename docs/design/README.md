@@ -419,9 +419,9 @@ inherited by this package.
 ## Delivery evidence
 
 [Delivery alignment](90_migration_delivery/alignment.md) owns release readiness.
-The [source API inventory](../v3-spike/api-inventory.json) and
+[dated source snapshot](../v3-spike/api-inventory.json) and
 [current API map](../v3-spike/public-api-map.md) help locate current contracts.
-Neither an API inventory nor a passing example proves the complete target.
+Neither a static source snapshot nor a passing example proves the complete target.
 
 The [architecture overview](ARCHITECTURE.md) consolidates the former seam
 research and retains its migration rationale. Detailed advanced proposals stay

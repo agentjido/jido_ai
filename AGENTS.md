@@ -64,9 +64,8 @@ for verified results and the remaining repairs.
 - Use Conventional Commits
 - Do not modify `CHANGELOG.md`; release notes are generated from Git history during release, so keep changes focused on proper Conventional Commits.
 - Update guides and migration notes for behavior/API changes
-- After `lib/` changes, regenerate `docs/v3-spike/api-inventory.json` with
-  `mix run scripts/api_inventory.exs` and review the current public API map.
-  `mix run scripts/api_inventory.exs --check` and the unit suite detect drift.
+- Review the current public API map after `lib/` changes. The V3 source
+  inventory is a static snapshot; its generator and drift test are retired.
   Preserve `api-inventory-v2.json` and historical maps as baseline evidence.
 
 ## References

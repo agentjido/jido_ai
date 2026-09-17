@@ -3,7 +3,7 @@
 Checked against the source on 2026-09-15, after `a59eb23c`.
 This is the current V3 branch feature map, not a migration wish list or release
 announcement. See the [public API map](public-api-map.md) for entry points,
-the [source inventory](api-inventory.json) for declarations, and the
+the [dated source snapshot](api-inventory.json) for declarations at that point, and the
 [verification record](simplification.md) for test results.
 The [old feature map](feature-map-history.md) remains as historical evidence.
 
@@ -39,7 +39,7 @@ The [old feature map](feature-map-history.md) remains as historical evidence.
   and commit work stays together. Internal modules are not extra authoring APIs.
 - Removed features: the execution CLI and adapters, CLI arithmetic tools, root
   strategy inspection helpers, old method-specific Agent macros, and flat
-  callable configuration. Install, skill, and quality Mix tasks remain.
+  callable configuration. Package Mix tasks and Igniter are removed.
 - Dynamic tool-source expansion remains on hold. Existing static/source
   declarations follow [ToolSource](../../lib/jido_ai/tool_source.ex).
 

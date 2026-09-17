@@ -4,17 +4,17 @@
 
 ## Status
 
-- Reviewed: 2026-09-15.
-- Code baseline: `v3-spike`, HEAD `4ed6402f`, plus uncommitted runtime, test, example, and documentation refinement. Dependency pins are unchanged.
+- Reviewed: 2026-09-16.
+- Code baseline: `v3-spike`, HEAD `87630835`, plus uncommitted Mix-task and API-inventory cleanup. Dependency pins other than Igniter are unchanged.
 - Prerequisite alignments used: [12 Observation and diagnostics](../12_observation_diagnostics/alignment.md).
 - Alignment state: Draft. Current ownership is mapped; target decisions and full acceptance proof remain.
-- Verification: the example-driven review below adds fresh MockLLM runs to the earlier source review. Earlier statements that no tests ran refer to that prior review, not this follow-up.
+- Verification: format, forced compile, Doctor, and docs pass. The full unit, authoring, and example suite passes 2,834 tests with one existing exclusion.
 
 ## Current architecture
 
-The execution CLI is removed. Install, skill, and quality Mix tasks and consumer test helpers remain. The package is version 2.3.0 using V3 beta Hex dependencies and a pinned ReqLLM Git source. Current guides/examples use V3 authoring. The preceding full verification passed 2,809 tests with one existing exclusion; it is not a complete stable-release rehearsal.
+Package Mix tasks, Igniter, and the API-inventory generator are removed. Consumer test helpers remain. The package is version 2.3.0 using V3 beta Hex dependencies and a pinned ReqLLM Git source. Current guides/examples use V3 authoring. The full suite passed 2,834 tests with one existing exclusion. This is not a stable-release rehearsal.
 
-- Current owner: Package metadata, guides, examples, public test helpers, Mix tasks, and release evidence.
+- Current owner: Package metadata, guides, examples, public test helpers, and release evidence.
 - Cross-package ownership: core Jido owns Agent commit and topology; Flow/Exec and Signal internals remain in their respective packages.
 - Overall placement: [architecture overview](../ARCHITECTURE.md).
 - Full target: [design](design.md). Preserve the complete capability/disposition inventory, migrations, compatibility decisions, deterministic consumer support, and release/security/performance/operational gates.
@@ -28,15 +28,13 @@ The execution CLI is removed. Install, skill, and quality Mix tasks and consumer
 | [mix.exs](../../../mix.exs) | Version, dependencies, and package metadata |
 | [lib/jido_ai/test/mock_llm.ex](../../../lib/jido_ai/test/mock_llm.ex) | Deterministic model support |
 | [lib/jido_ai/test/react_script.ex](../../../lib/jido_ai/test/react_script.ex) | Standalone scripting support |
-| [lib/mix/tasks/jido_ai.install.ex](../../../lib/mix/tasks/jido_ai.install.ex) | Retained installer |
-| [lib/mix/tasks/jido_ai.quality.ex](../../../lib/mix/tasks/jido_ai.quality.ex) | Quality tooling |
+| [lib/jido_ai/skill/loader.ex](../../../lib/jido_ai/skill/loader.ex) | Skill file validation without a package Mix task |
 
 ### Examples and tests
 
 - [Example briefing](../../../examples/01_authoring/01_02_tool_flow/README.md): public behavior and documented limits.
 - [Matching example tests](../../../test/examples/01_authoring/01_02_tool_flow): deterministic example evidence.
 - [test/examples/support/catalog_test.exs](../../../test/examples/support/catalog_test.exs): detailed boundary evidence.
-- [test/jido_ai/api_inventory_test.exs](../../../test/jido_ai/api_inventory_test.exs): detailed boundary evidence.
 
 These are evidence entry points, not blanket acceptance claims. The requirement
 matrix below separates target decisions from implemented behavior whose full

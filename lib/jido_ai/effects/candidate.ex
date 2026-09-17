@@ -27,17 +27,13 @@ defmodule Jido.AI.Effects.Candidate do
   end
 
   def validate_directive(directive, agent) do
-    with {:ok, specs} <- Jido.Plugin.normalize_all(agent.plugins) do
+    with {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(agent.plugins) do
       cond do
         Jido.Agent.Directive.built_in?(directive) ->
           Jido.Agent.Directive.validate(directive)
 
-        owner = Jido.Plugin.directive_owner(specs, directive) ->
-          if owner.agent.legacy? do
-            Jido.Plugin.validate_directive(owner, directive)
-          else
-            Jido.Agent.Directive.validate(directive)
-          end
+        Jido.Plugin.directive_owner(specs, directive) ->
+          Jido.Agent.Directive.validate(directive)
 
         true ->
           {:error, {:unowned_tool_directive, directive}}
@@ -47,7 +43,7 @@ defmodule Jido.AI.Effects.Candidate do
 
   defp merge(base, current, proposed, agent) when is_map(proposed) and not is_struct(proposed) do
     with :ok <- Jido.Action.validate_static_data(proposed),
-         {:ok, specs} <- Jido.Plugin.normalize_all(agent.plugins),
+         {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(agent.plugins),
          agent_specs = Jido.Agent.Plugin.specs(specs),
          :ok <- protect_plugin_state(base, proposed, agent_specs) do
       changed =

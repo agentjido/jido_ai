@@ -69,7 +69,7 @@ requirement associations are not carried forward as proof.
 | `AUT-GAP-001` | `AUT-REQ-010` | The V2 option-based authoring path is removed; the current Agent/DSL path and rejection tests remain. | Implemented and evidenced | Preserve the current single authoring form. |
 | `AUT-GAP-002` | `AUT-REQ-013` | Inline Action authoring is supported; boundary tests exist. Full input/output/context permutations need explicit mapping. | Implemented; evidence incomplete | Retain complete inline authoring conformance. |
 | `AUT-GAP-003` | `AUT-REQ-020`, `AUT-REQ-021` | Boundary tests cover duplicate routes, result fields, managed Plugins, initialized hosts, and trusted defaults. | Implemented; evidence incomplete | Complete the broader Plugin/directive collision matrix. |
-| `AUT-GAP-004` | `AUT-REQ-026`, `AUT-REQ-027`, `AUT-REQ-028`, `AUT-REQ-029` | A generated API inventory and current map exist. They are not approval of every public contract. | Partially implemented | Use actual exported APIs and distinguish static sources from execution support. |
+| `AUT-GAP-004` | `AUT-REQ-026`, `AUT-REQ-027`, `AUT-REQ-028`, `AUT-REQ-029` | A dated source snapshot and current map exist. The snapshot is not kept in sync and does not approve every public contract. | Partially implemented | Use actual exported APIs and distinguish static sources from execution support. |
 | `AUT-GAP-005` | Package compile and test gate | The preceding code run passed compile and the full authoring/example-inclusive suite. | Implemented and evidenced | Keep the same checks; this documentation task does not rerun them. |
 
 ## Decisions and dependency gates

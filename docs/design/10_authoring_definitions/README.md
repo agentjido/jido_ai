@@ -31,7 +31,7 @@ and stable requirement IDs are in [design](design.md).
 | [AUT-GAP-001](alignment.md#gap-register) | The V2 option-based authoring path is removed; the current Agent/DSL path and rejection tests remain. | Preserve the current single authoring form. | 10; dependencies below |
 | [AUT-GAP-002](alignment.md#gap-register) | Inline Action authoring is supported; boundary tests exist. Full input/output/context permutations need explicit mapping. | Retain complete inline authoring conformance. | 10; dependencies below |
 | [AUT-GAP-003](alignment.md#gap-register) | Boundary tests cover duplicate routes, result fields, managed Plugins, initialized hosts, and trusted defaults. | Complete the broader Plugin/directive collision matrix. | 10; dependencies below |
-| [AUT-GAP-004](alignment.md#gap-register) | A generated API inventory and current map exist. They are not approval of every public contract. | Use actual exported APIs and distinguish static sources from execution support. | 10; dependencies below |
+| [AUT-GAP-004](alignment.md#gap-register) | A dated source snapshot and current map exist. They do not approve every public contract. | Use actual exported APIs and distinguish static sources from execution support. | 10; dependencies below |
 | [AUT-GAP-005](alignment.md#gap-register) | The preceding code run passed compile and the full authoring/example-inclusive suite. | Keep the same checks; this documentation task does not rerun them. | 10; dependencies below |
 
 ## Decisions requested

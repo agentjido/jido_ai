@@ -4,7 +4,7 @@
 
 ## Briefing
 
-The execution CLI is removed. Install, skill, and quality Mix tasks and consumer test helpers remain. The package is version 2.3.0 using V3 beta Hex dependencies and a pinned ReqLLM Git source. Current guides/examples use V3 authoring. The preceding full verification passed 2,809 tests with one existing exclusion; it is not a complete stable-release rehearsal.
+Package Mix tasks, Igniter, and the API-inventory generator are removed. Consumer test helpers remain. The package is version 2.3.0 using V3 beta Hex dependencies and a pinned ReqLLM Git source. Current guides/examples use V3 authoring. The full unit, authoring, and example suite passed 2,834 tests with one existing exclusion.
 
 This seam retains the complete target, not only current functionality. Detailed
 current evidence and gaps are in [alignment](alignment.md); proposed contracts
@@ -12,7 +12,7 @@ and stable requirement IDs are in [design](design.md).
 
 ## Why this seam exists
 
-- Owner: Package metadata, guides, examples, public test helpers, Mix tasks, and release evidence.
+- Owner: Package metadata, guides, examples, public test helpers, and release evidence.
 - Owns: migration and delivery within [the package architecture](../ARCHITECTURE.md).
 - Does not own: contracts assigned to other seams or private lower-package internals.
 

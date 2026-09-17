@@ -17,7 +17,6 @@ use session-scoped activation, validate skill files, and bound custom discovery.
 - `Jido.AI.Skill.Prompt`
 - `Jido.AI.Actions.Skill.LoadSkill`
 - `Jido.AI.Actions.Skill.LoadResource`
-- `mix jido_ai.skill`
 
 ## Agent integration
 
@@ -417,22 +416,19 @@ skill name. `discover_from_with_diagnostics/2` returns a `:shadowed_skill`
 warning that names the selected and shadowed files. Agent integration also
 returns these diagnostics.
 
-## CLI Surface + Error Handling
+## Validation API
 
-```bash
-mix jido_ai.skill list priv/skills
-mix jido_ai.skill show priv/skills/code-review/SKILL.md --body
-mix jido_ai.skill validate priv/skills --strict
-mix jido_ai.skill validate priv/skills --json
+Use the loader in application code or tests to validate a trusted skill file:
+
+```elixir
+case Jido.AI.Skill.Loader.load("priv/skills/code-review/SKILL.md") do
+  {:ok, spec} -> {:ok, spec}
+  {:error, reason} -> {:error, reason}
+end
 ```
 
-CLI failure behaviors:
-
-- `mix jido_ai.skill list` with no paths prints usage help
-- `mix jido_ai.skill validate` with no paths prints usage help
-- unknown commands print `mix jido_ai.skill` help guidance
-- validation prints collected warnings and errors
-- `--strict` raises when any skill has a warning or error (non-zero exit)
+`load/1` applies strict validation. Use `load_with_diagnostics/2` when you
+also need warnings. The package does not provide a skill Mix task.
 
 ## Failure Modes
 
@@ -445,7 +441,7 @@ Symptom:
 Fix:
 
 - ensure YAML frontmatter contains required fields
-- validate with `mix jido_ai.skill validate ...` before loading in runtime
+- validate the file with `Jido.AI.Skill.Loader.load/1` before loading it in runtime
 
 ### Lookup failure after registration workflow
 

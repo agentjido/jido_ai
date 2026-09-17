@@ -5,7 +5,7 @@
 ## Architecture and contract status
 
 - Architecture category: [Migration and delivery](../ARCHITECTURE.md).
-- Owning subsystem: Package metadata, guides, examples, public test helpers, Mix tasks, and release evidence.
+- Owning subsystem: Package metadata, guides, examples, public test helpers, and release evidence.
 - Complete target: Preserve the complete capability/disposition inventory, migrations, compatibility decisions, deterministic consumer support, and release/security/performance/operational gates.
 - Decision boundary: Reconcile old CLI and reduced-method release recommendations explicitly. Separate current tested functionality from an approved stable release surface.
 - Current implementation, module links, example proof, and exact differences:

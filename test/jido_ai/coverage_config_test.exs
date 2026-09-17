@@ -1,4 +1,4 @@
-defmodule Jido.AI.Quality.CoverageConfigTest do
+defmodule Jido.AI.CoverageConfigTest do
   use ExUnit.Case, async: true
 
   test "mix project enforces 90 percent coverage threshold" do
@@ -14,7 +14,7 @@ defmodule Jido.AI.Quality.CoverageConfigTest do
     assert config["coverage_options"]["minimum_coverage"] == 90
 
     assert "^examples/" in config["skip_files"]
-    assert "^lib/mix/tasks/" in config["skip_files"]
+    refute "^lib/mix/tasks/" in config["skip_files"]
     assert "^test/support/" in config["skip_files"]
   end
 end

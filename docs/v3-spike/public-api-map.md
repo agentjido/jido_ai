@@ -13,8 +13,9 @@ reverse-order history replacement API are removed. Verification is recorded in
 
 Checked against the source on 2026-09-15 during runtime refinement.
 This map describes the current V3 branch, not a released V3 package.
-The [source inventory](api-inventory.json) records declarations; an exported
-function in that inventory is not, by itself, a supported application API.
+The [dated source snapshot](api-inventory.json) records declarations from its
+last generation; it is not kept in sync with later source changes. An exported
+function in that snapshot is not, by itself, a supported application API.
 The [feature map](feature-map.md) groups the behavior and test evidence.
 The [old migration map](public-api-map-history.md) is historical evidence only.
 
@@ -166,16 +167,14 @@ one existing flaky exclusion and no new skips, including authoring and MockLLM
 examples. Format, forced compile with warnings as errors, and inventory checks
 passed. Public request and Profile contracts did not change.
 
-The JSON inventory uses schema version 2 and indexes every current `lib/**/*.ex`
-file. It records hashes, source declarations, default arities, callbacks,
+The JSON snapshot uses schema version 2 and indexed every `lib/**/*.ex` file
+when it was last generated on 2026-09-16. It records hashes, source declarations, default arities, callbacks,
 structs, protocol implementations, and quoted templates. It does not evaluate
 macros or treat each exported helper as a supported application API. The
 unchanged [schema version 1 snapshot](api-inventory-v2.json) is the V2 baseline.
 
-Run `mix run scripts/api_inventory.exs` to regenerate it, or add `--check` to
-verify it without writing. The regular unit suite checks source drift and the
-local links in the current maps. Review the contract map when changing source;
-automatic source indexing cannot decide API support.
+The generator and drift test are retired. Review the contract map and current
+source when changing APIs; this static snapshot cannot decide API support.
 
 The reconciliation run passed 2,861 tests with one existing flaky exclusion,
 including authoring, examples, and four inventory checks. Format, forced
