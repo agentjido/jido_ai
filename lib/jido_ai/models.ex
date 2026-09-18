@@ -121,11 +121,7 @@ defmodule Jido.AI.Models do
   end
 
   defp format_label(%LLMDB.Model{} = model) do
-    model_id = model.model || model.id
-
-    if (is_atom(model.provider) or is_binary(model.provider)) and is_binary(model_id),
-      do: "#{model.provider}:#{model_id}",
-      else: inspect(model)
+    "#{model.provider}:#{model.model || model.id}"
   end
 
   defp normalized_fingerprint_term(model) do

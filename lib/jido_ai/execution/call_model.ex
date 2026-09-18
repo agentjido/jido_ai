@@ -56,8 +56,9 @@ defmodule Jido.AI.Execution.CallModel do
            Jido.AI.Execution.RequestTransform.prepare(state, request, context),
          :ok <- Control.check(state.profile, :model, request, context, state.deadline),
          remaining = state.deadline - System.monotonic_time(:millisecond),
-         true <- remaining > 0,
-         options = Keyword.update!(request.options, :receive_timeout, &min(&1, remaining)) do
+         true <- remaining > 0 do
+      options = Keyword.update!(request.options, :receive_timeout, &min(&1, remaining))
+
       if callback?,
         do: repair_callback(state, %{request | options: options}, context),
         else: generate(state, %{request | options: options}, active_tools, context, remaining)

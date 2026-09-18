@@ -12,7 +12,17 @@ config :jido_ai,
   }
 
 config :logger, :default_formatter,
-  metadata: [:jido_ai, :tool_name, :exception_message, :exception_type, :stacktrace, :reason]
+  metadata: [
+    :jido_ai,
+    :request_id,
+    :run_id,
+    :tool_call_id,
+    :tool_name,
+    :exception_message,
+    :exception_type,
+    :stacktrace,
+    :reason
+  ]
 
 if config_env() == :dev do
   config :git_hooks,

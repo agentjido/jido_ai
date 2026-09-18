@@ -77,6 +77,12 @@ defmodule Jido.AI.CoreTest do
       assert Models.resolve(struct_model) == struct_model
     end
 
+    test "label/1 uses the model ID when the optional model field is absent" do
+      model = LLMDB.Model.new!(%{provider: :openai, id: "gpt-4.1"})
+
+      assert Models.label(model) == "openai:gpt-4.1"
+    end
+
     test "resolve/1 raises for invalid configured alias specs" do
       with_model_aliases(%{capable: [:invalid]}, fn ->
         assert_raise ArgumentError, ~r/Invalid model configured for alias :capable/, fn ->

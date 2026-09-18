@@ -60,8 +60,6 @@ defmodule Jido.AI.Profile.References do
   defp resolve_tools(values, registries) when is_list(values),
     do: traverse(values, &resolve_tool(&1, registries))
 
-  defp resolve_tools(value, _), do: {:ok, value}
-
   defp resolve_tool(%{} = value, registries) when not is_struct(value) do
     ref = Map.get(value, :ref, Map.get(value, "ref"))
     kind = Map.get(value, :kind, Map.get(value, "kind", "action"))

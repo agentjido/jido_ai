@@ -300,7 +300,7 @@ defmodule Jido.AI.Thread.Control do
         call <- List.wrap(field(entry, :tool_calls)),
         id = field(call, :id),
         is_binary(id),
-        is_nil(name) or tool_name(call) == name,
+        tool_name(call) == name,
         into: MapSet.new(),
         do: id
   end

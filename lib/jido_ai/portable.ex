@@ -48,9 +48,8 @@ defmodule Jido.AI.Portable do
   def export(source, format, opts) when format in [:map, :json, :yaml] do
     registries = Keyword.get(opts, :registries, %{})
 
-    with {:ok, document} <- document(source, registries),
-         {:ok, encoded} <- encode(document, format) do
-      {:ok, encoded}
+    with {:ok, document} <- document(source, registries) do
+      encode(document, format)
     end
   end
 
@@ -59,8 +58,8 @@ defmodule Jido.AI.Portable do
 
   def import(input, opts \\ []) do
     with {:ok, document} <- decode(input),
-         :ok <- version(document),
-         registries = Keyword.get(opts, :registries, %{}) do
+         :ok <- version(document) do
+      registries = Keyword.get(opts, :registries, %{})
       import_document(document, registries)
     end
   end

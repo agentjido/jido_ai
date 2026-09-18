@@ -42,3 +42,9 @@ missing specification for function to_unicode/2
 missing specification for function to_utf16be/1
 missing specification for function to_utf16le/1
 missing specification for function to_utf8/1
+lib/jido_ai/models.ex:124: Guard test
+lib/jido_ai/orchestration/plugin/agent.ex:8:7: Function state_spec/1 has no local return
+lib/jido_ai/reasoning/tree_of_thoughts/machine.ex:1: The pattern 'false'
+lib/jido_ai/reasoning/trm/machine.ex:583: Guard test
+lib/jido_ai/request/record.ex:35:7: Function records_schema/0 has no local return
+lib/jido_ai/tool_catalog.ex:1: The pattern 'false'

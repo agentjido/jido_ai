@@ -28,3 +28,4 @@ jobs:
       credo_command: mix credo --min-priority high --all
       docs_command: mix docs -f html
       test_command: mix test
+      validate_hex_package: ${{ github.base_ref == 'main' || github.ref == 'refs/heads/main' || github.event.merge_group.base_ref == 'refs/heads/main' }}
