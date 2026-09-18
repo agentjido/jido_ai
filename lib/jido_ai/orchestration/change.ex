@@ -1,7 +1,5 @@
 defmodule Jido.AI.Orchestration.Change do
   @moduledoc false
-  use Jido.Agent.Directive
-
   @schema Zoi.struct(
             __MODULE__,
             %{
@@ -12,5 +10,6 @@ defmodule Jido.AI.Orchestration.Change do
             coerce: true
           )
   defstruct Zoi.Struct.struct_fields(@schema)
+  use Jido.Agent.Directive
   def schema, do: @schema
 end

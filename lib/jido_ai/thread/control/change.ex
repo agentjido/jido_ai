@@ -1,7 +1,7 @@
 defmodule Jido.AI.Thread.Control.Change do
   @moduledoc false
-  use Jido.Agent.Directive
   defstruct [:profile_id, :value]
+  use Jido.Agent.Directive
 
   @impl Jido.Agent.Directive
   def validate(%__MODULE__{profile_id: id, value: value} = change)

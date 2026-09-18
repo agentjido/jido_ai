@@ -1,7 +1,7 @@
 defmodule Jido.AI.Configuration.Change do
   @moduledoc "A validated tool, prompt or base context change for one declared AI profile."
-  use Jido.Agent.Directive
   defstruct [:profile_id, :operation, :value]
+  use Jido.Agent.Directive
 
   @impl Jido.Agent.Directive
   def validate(%__MODULE__{profile_id: id, operation: operation, value: value} = change) do
