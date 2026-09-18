@@ -57,7 +57,7 @@ for verified results and the remaining repairs.
   changes. Use the current Profile contract and remove obsolete configuration.
 
 ## Release Hygiene
-- Work on `v3-spike` for this cleanup. `mix.exs` currently declares package
+- Work on `release/v3` for this cleanup. `mix.exs` currently declares package
   version `2.3.0`, V3 beta ecosystem dependencies, and a pinned ReqLLM Git ref.
   These values do not declare a completed V3 release. Keep dependency versions
   and pins unchanged unless the task requires a dependency change.
