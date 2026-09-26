@@ -49,10 +49,10 @@ defmodule Jido.AI.Authoring.RegressionsTest do
   defmodule SizedAgent do
     use Jido.AI.Agent,
       name: "authoring_regression_sized",
-      metadata: %{"owner" => "support"},
       max_state_size: 4096
 
     agent do
+      metadata %{"owner" => "support"}
       schema Zoi.object(%{reply: Zoi.string() |> Zoi.default("")})
 
       ai :assistant do

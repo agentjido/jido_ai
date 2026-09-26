@@ -144,7 +144,7 @@ defmodule Jido.AI.Authoring.ResolvedFindingsTest do
     test "#{format}: rich model export is a structured error for both Profile and Agent", %{format: format} do
       for source <- [SizedBlock.definition(), SizedBlock.ai_profile(:assistant)] do
         assert {:error, %Jido.AI.Error.Validation.Invalid{field: "models.default.model"} = error} =
-                 Jido.AI.export(source, format, registries: %{schemas: %{"state" => SizedBlock.schema()}})
+                 Jido.AI.export(source, format, registries: %{schemas: %{"state" => SizedBlock.domain_schema()}})
 
         assert Exception.message(error) =~ "core Agent Codec"
       end

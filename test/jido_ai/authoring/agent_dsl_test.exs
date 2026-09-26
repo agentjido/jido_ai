@@ -102,7 +102,7 @@ defmodule Jido.AI.Authoring.AgentDSLTest do
     assert Enum.map(profile.tools, & &1.name) == ["search_cases", "case_link"]
     assert [%{module: Control, when: %{"name" => "search_cases"}}] = profile.controls.operation
 
-    assert Enum.any?(CanonicalAgent.routes(), fn route ->
+    assert Enum.any?(CanonicalAgent.definition().routes, fn route ->
              route.path == "support.ask" and
                route.target == {Jido.AI.Orchestration.Start, %{profile_id: :support}}
            end)

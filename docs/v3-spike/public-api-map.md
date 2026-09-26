@@ -34,11 +34,18 @@ No forwarding compatibility modules remain.
 Use **Agent + DSL + Profile** for new AI agents. Other entry points reuse this
 contract; they are not separate authoring models.
 
+Core Agent module options accept only `name`, `description`, `vsn`, and
+`extensions`. `Jido.AI.Agent` also consumes its own `max_state_size` option.
+Put schema, metadata, Plugins, and Profiles in `agent do`; put routes in
+`routes do`. Read fields through `definition/0`, including `definition().routes`.
+Use `domain_schema/0` for the authored schema. The former core getters `name/0`,
+`description/0`, `schema/0`, `routes/0`, `plugins/0`, and `metadata/0` are removed.
+
 | Surface | Current contract | Source and acceptance tests |
 | --- | --- | --- |
 | `Jido.AI.Agent`, `Jido.AI.DSL` | Declare AI Profiles on a core Agent, bind routes to Profiles, and declare result/history fields. Core owns Agent construction and route execution. | [Agent](../../lib/jido_ai/agent.ex), [DSL](../../lib/jido_ai/dsl.ex), [authoring tests](../../test/authoring/agents/authoring_test.exs) |
 | `Jido.AI.Profile.new/1,2`, `new!/1,2`, `validate/1` | Validate model, reasoning, request, result, memory, tool, and control policy. `Jido.AI.profile/1,2` and `profile!/1,2` are short entry points to the same validator. | [Profile](../../lib/jido_ai/profile.ex), [validation tests](../../test/jido_ai/authoring/profile_validation_test.exs), [model tests](../../test/jido_ai/profile/model_input_test.exs) |
-| `Jido.AI.Authoring.ai/1`, `lower/2` | Bind a declared Profile or lower a neutral Agent definition through canonical Profile validation. Core Builder remains in core Jido; there is no `Jido.AI.Builder` module. | [Authoring](../../lib/jido_ai/authoring.ex), [parity tests](../../test/jido_ai/authoring/full_spec_parity_test.exs) |
+| `Jido.AI.Authoring.ai/1`, `lower/2` | Bind a declared Profile or lower a neutral Agent definition through canonical Profile validation. Use direct core definitions for programmatic authoring; there is no Agent Builder. | [Authoring](../../lib/jido_ai/authoring.ex), [parity tests](../../test/jido_ai/authoring/full_spec_parity_test.exs) |
 | `Jido.AI.inspect/1,2`, `preflight/2,3`, `export/2,3`, `import/1,2` | Portable inspection, preflight, and map/JSON/YAML exchange. Registry references are explicit. In-memory model support does not imply that every native model value can be exported. | [Portable](../../lib/jido_ai/portable.ex), [Codec](../../lib/jido_ai/authoring/codec.ex), [portable tests](../../test/jido_ai/authoring/portable_test.exs) |
 
 ## Requests and state
