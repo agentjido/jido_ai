@@ -1,45 +1,56 @@
 defmodule JidoAI.Examples.Completion.Apply do
   @moduledoc false
   defstruct [:mode, :observer]
+  use Jido.Agent.Directive
 end
 
 defmodule JidoAI.Examples.Completion.Ledger do
   @moduledoc "A real Plugin can reject final reduction or fail after commit."
-  use Jido.Plugin
-  alias JidoAI.Examples.Completion.Apply
+  use Jido.Plugin, agent: __MODULE__.Agent, agent_server: __MODULE__.AgentServer
 
-  def state_spec(_),
-    do: {:ledger, Zoi.object(%{value: Zoi.string() |> Zoi.default("")}) |> Zoi.default(%{value: ""})}
+  defmodule Agent do
+    use Jido.Agent.Plugin
+    alias JidoAI.Examples.Completion.Apply
 
-  def directives(_), do: [Apply]
-  def validate_directive(%Apply{} = directive, _), do: {:ok, directive}
+    def state_spec(_),
+      do: {:ledger, Zoi.object(%{value: Zoi.string() |> Zoi.default("")}) |> Zoi.default(%{value: ""})}
 
-  def prepare(command, opts) do
-    if opts[:deny_settle] == true and command.signal.type == Jido.AI.Orchestration.settle_type(),
-      do: {:error, :fixture_settlement_denied},
-      else: {:ok, command}
-  end
+    def directives(_), do: [Apply]
 
-  def update_state(state, [], _), do: {:ok, state}
+    def prepare(preparation, opts) do
+      if opts[:deny_settle] == true and preparation.signal.type == Jido.AI.Orchestration.settle_type(),
+        do: {:error, :fixture_settlement_denied},
+        else: {:ok, nil}
+    end
 
-  def update_state(state, directives, _) do
-    Enum.each(directives, &send(&1.observer, {:ledger_reduce, &1.mode}))
+    def reduce(reduction, opts),
+      do: update_state(reduction.plugin_state, Enum.filter(reduction.directives, &is_struct(&1, Apply)), opts)
 
-    cond do
-      Enum.any?(directives, &(&1.mode == "reject")) ->
-        {:error, :fixture_reducer_rejected}
+    defp update_state(state, [], _), do: {:ok, state}
 
-      Enum.any?(directives, &(&1.mode == "inflate")) ->
-        {:ok, %{value: String.duplicate("x", 20_000)}}
+    defp update_state(state, directives, _) do
+      Enum.each(directives, &send(&1.observer, {:ledger_reduce, &1.mode}))
 
-      true ->
-        {:ok, state}
+      cond do
+        Enum.any?(directives, &(&1.mode == "reject")) ->
+          {:error, :fixture_reducer_rejected}
+
+        Enum.any?(directives, &(&1.mode == "inflate")) ->
+          {:ok, %{value: String.duplicate("x", 20_000)}}
+
+        true ->
+          {:ok, state}
+      end
     end
   end
 
-  def dispatch(nil, directive, _, _) do
-    send(directive.observer, {:ledger_dispatch, directive.mode})
-    if directive.mode == "dispatch_fail", do: {:error, :fixture_dispatch_failed}, else: :ok
+  defmodule AgentServer do
+    use Jido.AgentServer.Plugin
+
+    def dispatch(nil, directive, _, _) do
+      send(directive.observer, {:ledger_dispatch, directive.mode})
+      if directive.mode == "dispatch_fail", do: {:error, :fixture_dispatch_failed}, else: :ok
+    end
   end
 end
 

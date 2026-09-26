@@ -46,9 +46,8 @@ defmodule Jido.AI.PluginFacetsTest do
           []
         end
 
-      assert {:ok, [%Jido.Plugin.Spec{} = spec]} = Jido.Plugin.normalize_all([{package, opts}])
+      assert {:ok, [%Jido.Plugin.Spec{} = spec]} = Jido.Plugin.Normalizer.normalize_all([{package, opts}])
       assert spec.module == package
-      refute spec.legacy?
       assert %Jido.Plugin.Manifest{module: ^package} = spec.manifest
       assert spec.agent != nil or spec.agent_server != nil
     end

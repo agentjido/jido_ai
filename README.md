@@ -7,7 +7,7 @@ Jido AI adds model calls, tool use, reasoning methods, and request control to
 Jido Agents. You author one Agent with `use Jido.AI.Agent`. The AI DSL states
 what it can do; Jido AgentServer and Jido Flow run the work.
 
-This `v3-spike` branch is active V3 work, not a stable V3 release. The Hex
+This `release/v3` branch is active V3 work, not a stable V3 release. The Hex
 package can be on a different version. Use this checkout and the compatible
 sibling V3 packages to run these guides and Livebooks.
 
@@ -80,6 +80,15 @@ and [Tool access and effects](guides/v3/14_tool_policy.md).
 
 ## Work on this checkout
 
+This checkout uses sibling path dependencies for `jido`, `jido_action`, and
+`jido_signal`. Keep all three on compatible `release/v3` branches. ReqLLM uses
+the Hex `~> 1.25` requirement. Before publishing, replace the sibling paths
+with compatible published V3 versions and run the package checks.
+
+Current core Plugins use explicit `agent:` and `agent_server:` facets.
+Custom Directives implement `Jido.Agent.Directive.validate/1`; validation no
+longer belongs to the Plugin. Examples and test fixtures use these contracts.
+
 Run commands inside `jido_ai/`, not the parent folder of separate Git
 repositories:
 
@@ -87,7 +96,7 @@ repositories:
 mix deps.get
 mix compile
 mix test
-mix examples --seed 0
+mix test --include authoring --include example --warnings-as-errors --seed 0
 mix docs
 ```
 

@@ -12,18 +12,22 @@ defmodule Jido.AI.Orchestration.ExecutionBridgeTest do
   end
 
   defmodule HistoryGate do
-    use Jido.Plugin
+    use Jido.Plugin, agent: __MODULE__.Agent
 
-    def prepare(command, opts) do
-      if command.signal.type == Jido.AI.Orchestration.history_type() do
-        send(opts[:observer], {:history_gate, self()})
+    defmodule Agent do
+      use Jido.Agent.Plugin
 
-        receive do
-          :release -> {:ok, command}
-          :reject -> {:error, :entry_denied}
+      def prepare(preparation, opts) do
+        if preparation.signal.type == Jido.AI.Orchestration.history_type() do
+          send(opts[:observer], {:history_gate, self()})
+
+          receive do
+            :release -> {:ok, nil}
+            :reject -> {:error, :entry_denied}
+          end
+        else
+          {:ok, nil}
         end
-      else
-        {:ok, command}
       end
     end
   end
@@ -111,6 +115,7 @@ defmodule Jido.AI.Orchestration.ExecutionBridgeTest do
   end
 
   setup do
+    Process.register(self(), __MODULE__)
     jido = :"bridge_#{System.unique_integer([:positive])}"
     start_supervised!({Jido, name: jido})
     {:ok, jido: jido}
@@ -121,7 +126,7 @@ defmodule Jido.AI.Orchestration.ExecutionBridgeTest do
 
     definition =
       if opts[:gate],
-        do: %{definition | plugins: definition.plugins ++ [{HistoryGate, observer: self()}]},
+        do: %{definition | plugins: definition.plugins ++ [{HistoryGate, observer: __MODULE__}]},
         else: definition
 
     instance = Jido.Agent.instantiate!(definition)

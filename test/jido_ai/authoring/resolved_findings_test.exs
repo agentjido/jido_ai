@@ -5,7 +5,7 @@ defmodule Jido.AI.Authoring.ResolvedFindingsTest do
   alias Jido.AI.Test.MockLLM
 
   defmodule SizedBlock do
-    use Jido.AI.Agent, name: "sized_block_regression", max_state_size: 4096
+    use Jido.AI.Agent, name: "sized_block_regression", max_state_size: 8192
 
     agent do
       metadata %{owner: "author"}
@@ -24,7 +24,7 @@ defmodule Jido.AI.Authoring.ResolvedFindingsTest do
 
   test "block metadata and the size limit survive Builder and Codec" do
     original = SizedBlock.definition()
-    assert original.metadata == %{owner: "author", jido_ai_max_state_size: 4096}
+    assert original.metadata == %{owner: "author", jido_ai_max_state_size: 8192}
     {:ok, document, registry} = Jido.Agent.Codec.encode(original)
     {:ok, decoded} = Jido.Agent.Codec.decode(Jason.decode!(Jason.encode!(document)), registry)
     built = Jido.Agent.Builder.new(SizedBlock) |> Jido.Agent.Builder.build!()
@@ -32,7 +32,7 @@ defmodule Jido.AI.Authoring.ResolvedFindingsTest do
     for source <- [original, built, decoded] do
       assert source === original
       assert {:ok, _} = Jido.Agent.instantiate(source)
-      assert {:error, error} = Jido.Agent.instantiate(source, state: %{reply: String.duplicate("x", 5000)})
+      assert {:error, error} = Jido.Agent.instantiate(source, state: %{reply: String.duplicate("x", 10_000)})
       assert Authoring.state_size_error?(error)
     end
   end
@@ -53,13 +53,13 @@ defmodule Jido.AI.Authoring.ResolvedFindingsTest do
           [Profile.new!(id: :assistant, model: MockLLM.model(), result: %{into: :reply})]
         )
 
-      # Use a plain field schema so the fixture's existing 4096-byte refinement
+      # Use a plain field schema so the fixture's existing 8192-byte refinement
       # cannot account for the exact boundary under test.
       result = Jido.Agent.instantiate(source)
       if valid?, do: assert({:ok, _} = result), else: assert({:error, _} = result)
     end
 
-    assert {:error, error} = Jido.Agent.set(agent, %{reply: String.duplicate("x", 5000)})
+    assert {:error, error} = Jido.Agent.set(agent, %{reply: String.duplicate("x", 10_000)})
     assert Authoring.state_size_error?(error)
     assert agent.state.reply == ""
   end
@@ -68,8 +68,12 @@ defmodule Jido.AI.Authoring.ResolvedFindingsTest do
     jido = :"sized_runtime_#{System.unique_integer([:positive])}"
     start_supervised!({Jido, name: jido})
 
+    # The budget includes two retained records and ReqLLM's full usage metadata.
+    # Keep the large output above the complete state limit.
     mock =
-      start_supervised!({MockLLM, script: [%{reply: {:text, String.duplicate("x", 5000)}}, %{reply: {:text, "Next"}}]})
+      start_supervised!(
+        {MockLLM, script: [%{reply: {:text, String.duplicate("x", 10_000)}}, %{reply: {:text, "Next"}}]}
+      )
 
     {:ok, server} = Jido.start_agent(jido, SizedBlock)
     before = Jido.AgentServer.snapshot(server)
@@ -79,6 +83,7 @@ defmodule Jido.AI.Authoring.ResolvedFindingsTest do
     assert Map.delete(state, :requests) === Map.delete(before.agent.state, :requests)
     assert [{_, %{status: :failed}}] = Map.to_list(state.requests)
     assert {:ok, "Next"} = SizedBlock.ask_sync(server, "Small", context: context)
+    assert :erlang.external_size(Jido.AgentServer.agent(server).state) <= 8192
     assert %{remaining: [], unexpected: [], requests: [_, _]} = MockLLM.report(mock)
   end
 

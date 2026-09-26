@@ -442,7 +442,8 @@ defmodule JidoAI.Examples.RequestInspectionTest do
   } do
     alias JidoAI.Examples.RequestInspection.CancelGate
     definition = Agent.definition()
-    definition = %{definition | plugins: definition.plugins ++ [{CancelGate, observer: self()}]}
+    Process.register(self(), __MODULE__)
+    definition = %{definition | plugins: definition.plugins ++ [{CancelGate, observer: __MODULE__}]}
     {mock, context} = mock([%{reply: {:wait, :cancel_race, {:text, "Unused"}}}])
     server = start_agent(jido, Jido.Agent.instantiate!(definition))
     {:ok, request} = submit(server, context, stream_to: self())

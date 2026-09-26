@@ -68,10 +68,10 @@ defmodule JidoAi.MixProject do
   defp deps do
     [
       # Jido ecosystem
-      {:jido, "~> 3.0.0-beta.1", override: true},
-      {:jido_action, "~> 3.0.0-beta.11", override: true},
-      {:jido_signal, "~> 3.0.0-beta.4", override: true},
-      {:req_llm, github: "agentjido/req_llm", ref: "888fca022fea50785e2a54f7eabfcc47d289ae41", override: true},
+      {:jido, path: "../jido", override: true},
+      {:jido_action, path: "../jido_action", override: true},
+      {:jido_signal, path: "../jido_signal", override: true},
+      {:req_llm, "~> 1.25"},
 
       # Runtime
       {:fsmx, "~> 0.5"},

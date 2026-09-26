@@ -16,7 +16,7 @@ defmodule Jido.AI.Plugins.ModelRoutingTest do
   end
 
   defp prepare(command) do
-    with {:ok, specs} <- Jido.Plugin.normalize_all(command.agent.plugins),
+    with {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(command.agent.plugins),
          do: Jido.Agent.Plugin.prepare(command.agent, command.signal, specs)
   end
 

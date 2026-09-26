@@ -11,18 +11,22 @@ defmodule JidoAI.Examples.RequestInspection.Hold do
 end
 
 defmodule JidoAI.Examples.RequestInspection.CancelGate do
-  use Jido.Plugin
+  use Jido.Plugin, agent_server: __MODULE__.AgentServer
 
-  def admit(nil, command, opts) do
-    if command.signal.type == Jido.AI.Orchestration.cancel_type() do
-      send(opts[:observer], {:cancel_admission, self()})
+  defmodule AgentServer do
+    use Jido.AgentServer.Plugin
 
-      receive do
-        :release -> :ok
+    def admit(nil, admission, opts) do
+      if admission.signal.type == Jido.AI.Orchestration.cancel_type() do
+        send(opts[:observer], {:cancel_admission, self()})
+
+        receive do
+          :release -> :ok
+        end
       end
-    end
 
-    {:ok, command}
+      {:ok, nil}
+    end
   end
 end
 
