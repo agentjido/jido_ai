@@ -12,9 +12,7 @@ defmodule Jido.AI.Plugins.Retrieval do
   reads for Chat, reasoning and native AI requests. Pure preparation only binds
   capability input; direct Agent commands do not implicitly read memory.
   """
-  use Jido.Plugin,
-    agent: Jido.AI.Plugins.Retrieval.Agent,
-    agent_server: Jido.AI.Plugins.Retrieval.AgentServer
+  use Jido.Plugin, roles: [:agent, :agent_server]
 
   alias Jido.AI.Retrieval.Store
   alias Jido.AI.Actions.Retrieval.{UpsertMemory, RecallMemory, ClearMemory}
@@ -52,7 +50,8 @@ defmodule Jido.AI.Plugins.Retrieval do
   def schema, do: state_schema(@defaults)
 
   @doc false
-  def agent_state_spec(opts) do
+  @impl Jido.Agent.Plugin
+  def state_spec(opts) do
     Jido.AI.PluginConfig.validate!(opts, Map.keys(@defaults) ++ [:into, :store], "Retrieval")
     into = Keyword.get(opts, :into, :result)
     store = Keyword.get(opts, :store, Store)
@@ -80,7 +79,8 @@ defmodule Jido.AI.Plugins.Retrieval do
   end
 
   @doc false
-  def prepare_input(preparation, opts) do
+  @impl Jido.Agent.Plugin
+  def prepare(preparation, opts) do
     state = effective_state(preparation.plugin_state, preparation.agent_id)
     store = Keyword.get(opts, :store, Store)
 
@@ -99,7 +99,8 @@ defmodule Jido.AI.Plugins.Retrieval do
   end
 
   @doc false
-  def admit_input(admission) do
+  @impl Jido.AgentServer.Plugin
+  def admit(_runtime, admission, _opts) do
     %{state: state, store: store} = admission.prepared_input
     signal = admission.signal
     data = signal.data

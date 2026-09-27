@@ -94,3 +94,11 @@ plugins: [
   {Jido.AI.Plugins.Reasoning.ChainOfThought, %{default_model: :reasoning}}
 ]
 ```
+
+## Retrieval local roles
+
+Retrieval now uses the explicit core roles `[:agent, :agent_server]` in one
+module. The separate facets remain compatible adapters. Keep existing Agent
+Plugin declarations and stored definitions. No state or options migration is
+required. The callback module in diagnostics and Telemetry is now
+`Jido.AI.Plugins.Retrieval`. This change requires agentjido/jido#382.

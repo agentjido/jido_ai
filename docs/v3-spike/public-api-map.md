@@ -184,3 +184,9 @@ migration also ran the 658-test example suite separately. See the
 This does not establish live-provider quality, load behavior, fresh line
 coverage, or release readiness. Historical maps and audits do not override
 the current source and tested contracts above.
+
+Retrieval implements its Agent and Server callbacks in the package module with
+explicit core `roles`. Its former facet modules remain compatible adapters.
+This source layout change preserves package identity, options, and stored
+Agent definitions. It requires the core Plugin authoring change in
+agentjido/jido#382.

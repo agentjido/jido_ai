@@ -4,6 +4,15 @@ defmodule Jido.AI.Plugins.RetrievalTest do
   alias Jido.AI.Retrieval.Store
   alias ReqLLM.Message.ContentPart
 
+  test "Retrieval implements its explicit Agent and Server roles in one module" do
+    assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([Retrieval])
+    assert spec.module == Retrieval
+    assert spec.agent.module == Retrieval
+    assert spec.agent_server.module == Retrieval
+    assert spec.manifest.vsn == 1
+    refute spec.agent_server.runtime?
+  end
+
   setup do
     start_supervised!({Store, []})
     :ok
@@ -40,7 +49,7 @@ defmodule Jido.AI.Plugins.RetrievalTest do
         state_version: 0
       }
 
-      Retrieval.AgentServer.admit(nil, admission, [])
+      Retrieval.admit(nil, admission, [])
     end
   end
 

@@ -3,8 +3,8 @@ defmodule Jido.AI.Plugins.Retrieval.Agent do
   use Jido.Agent.Plugin
 
   @impl Jido.Agent.Plugin
-  def state_spec(opts), do: Jido.AI.Plugins.Retrieval.agent_state_spec(opts)
+  def state_spec(opts), do: Jido.AI.Plugins.Retrieval.state_spec(opts)
 
   @impl Jido.Agent.Plugin
-  def prepare(preparation, opts), do: Jido.AI.Plugins.Retrieval.prepare_input(preparation, opts)
+  def prepare(preparation, opts), do: Jido.AI.Plugins.Retrieval.prepare(preparation, opts)
 end

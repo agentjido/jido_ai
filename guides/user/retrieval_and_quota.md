@@ -172,3 +172,14 @@ Do not use this path when:
 - [Tool Calling With Actions](tool_calling_with_actions.md)
 - [Request Lifecycle And Concurrency](request_lifecycle_and_concurrency.md)
 - [Actions Catalog](../developer/actions_catalog.md)
+
+## Retrieval authoring
+
+`Jido.AI.Plugins.Retrieval` declares `roles: [:agent, :agent_server]` and
+implements `state_spec/1`, `prepare/2`, and `admit/3` in the package module.
+Its Agent and Server facet modules remain available as compatible adapters.
+The package identity, options, state key, version, and stored declarations do
+not change. Pure preparation binds capability input. Live admission reads the
+application-supervised Store. The Store keeps its independent lifetime.
+
+This form requires the core Plugin authoring change in agentjido/jido#382.

@@ -3,5 +3,5 @@ defmodule Jido.AI.Plugins.Retrieval.AgentServer do
   use Jido.AgentServer.Plugin
 
   @impl Jido.AgentServer.Plugin
-  def admit(_runtime, admission, _opts), do: Jido.AI.Plugins.Retrieval.admit_input(admission)
+  defdelegate admit(runtime, admission, opts), to: Jido.AI.Plugins.Retrieval
 end
