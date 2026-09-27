@@ -83,7 +83,8 @@ defmodule JidoAI.Examples.SessionTest do
 
     # Observation batches also pass through the core commit and Plugin path.
     assert admission_commits >= 1
-    assert {:ok, %{state: %{commits: close_commits}}} = Agent.close(server, "closed")
+    {:ok, close_signal} = Agent.close_signal(%{reason: "closed"})
+    assert {:ok, %{state: %{commits: close_commits}}} = Jido.AgentServer.call(server, close_signal)
     assert close_commits > admission_commits
     assert :ok = MockLLM.release(mock, :answer)
     assert {:ok, "Done"} = Request.await(request)
@@ -452,14 +453,14 @@ defmodule JidoAI.Examples.SessionTest do
              Zoi.parse(schema, %{"different" => Map.put(record, :extra_refs, %{resource: self()})})
   end
 
-  test "DSL, source profiles, source JSON and Builder use the same session targets", %{jido: jido} do
+  test "DSL, source profiles, source JSON and core data construction use the same session targets", %{jido: jido} do
     {definition, base, profile} =
       session_definition(Jido.AI.Agent.profile(Agent, :assistant) |> Map.from_struct())
 
     assert definition.plugins == Agent.definition().plugins
     assert definition.routes == Agent.definition().routes
     attrs = definition |> Map.from_struct() |> Map.drop([:id, :state])
-    assert {:ok, ^definition} = attrs |> Jido.Agent.Builder.new() |> Jido.Agent.Builder.build()
+    assert {:ok, ^definition} = Jido.Agent.new(attrs)
 
     atoms = [
       :id,

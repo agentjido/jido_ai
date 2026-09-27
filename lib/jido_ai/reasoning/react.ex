@@ -251,7 +251,9 @@ defmodule Jido.AI.Reasoning.ReAct do
   defp terminal_collect_usage(existing, _incoming), do: existing
 
   defp decode_termination_reason(%State{status: :completed, termination_reason: reason})
-       when not is_nil(reason), do: reason
+       when not is_nil(reason) do
+    reason
+  end
 
   defp decode_termination_reason(%State{status: :completed}), do: :completed
   defp decode_termination_reason(%State{status: :failed}), do: :failed

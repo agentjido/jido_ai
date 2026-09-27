@@ -465,14 +465,14 @@ defmodule JidoAI.Examples.GoTTest do
     assert_script_done(mock)
   end
 
-  test "DSL data Builder source JSON direct Flow and ordinary turns use the same graph contract",
+  test "DSL data core data construction source JSON direct Flow and ordinary turns use the same graph contract",
        %{jido: jido} do
     {mock, context} = mock(List.duplicate(GoT.script(), 6) |> List.flatten())
     source = GoT.source()
     assert {:ok, definition} = GoT.definition()
     assert definition == GoT.Agent.definition()
     attrs = definition |> Map.from_struct() |> Map.drop([:id, :state])
-    assert {:ok, built} = attrs |> Jido.Agent.Builder.new() |> Jido.Agent.Builder.build()
+    assert {:ok, built} = Jido.Agent.new(attrs)
 
     registry =
       source

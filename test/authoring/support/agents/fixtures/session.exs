@@ -1,7 +1,9 @@
 defmodule JidoAITest.Authoring.Agents.Fixtures.Session do
-  use Jido.AI.Agent, name: "authoring_ai_session", metadata: %{"case" => "session"}
+  use Jido.AI.Agent, name: "authoring_ai_session"
 
   agent do
+    metadata %{"case" => "session"}
+
     schema Zoi.object(%{
              reply: Zoi.string() |> Zoi.default(""),
              case_id: Zoi.string() |> Zoi.default("case-17"),

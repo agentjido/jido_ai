@@ -94,3 +94,16 @@ plugins: [
   {Jido.AI.Plugins.Reasoning.ChainOfThought, %{default_model: :reasoning}}
 ]
 ```
+
+## One Plugin authoring form
+
+Core now accepts one `use Jido.Plugin` module with optional callbacks. Role
+lists and separate facet selectors are removed. All AI Plugin entry points use
+this form. Large Plugins delegate callbacks to ordinary helper modules.
+Reasoning capabilities generate their callbacks in the Plugin module.
+
+Retrieval defines `state_spec/1`, `prepare/2`, and `admit/3` directly. Its
+redundant facet adapters are removed. Keep existing Plugin declarations,
+options, versions, and state keys. No stored definition or state migration is
+required when these values stay unchanged. Diagnostics and Telemetry now name
+the Plugin module as the callback module. This change requires agentjido/jido#382.

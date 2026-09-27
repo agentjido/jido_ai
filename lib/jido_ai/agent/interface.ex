@@ -44,7 +44,7 @@ defmodule Jido.AI.Agent.Interface do
 
     route =
       if profile do
-        Enum.find(module.routes(), fn route ->
+        Enum.find(module.definition().routes, fn route ->
           {target, defaults} = Jido.Agent.Authoring.split_target(route.target)
 
           target == Jido.AI.Orchestration.Start and

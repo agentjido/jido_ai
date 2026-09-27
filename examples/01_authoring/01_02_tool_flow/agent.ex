@@ -35,8 +35,6 @@ defmodule JidoAI.Examples.ToolFlow.Agent do
   routes do
     signal_source "/examples/ai/01_authoring/01_02"
 
-    route "examples.ai.01_02.calculate", ai: :assistant do
-      define :calculate, args: [:query]
-    end
+    route "examples.ai.01_02.calculate", ai: :assistant, as: :calculate
   end
 end

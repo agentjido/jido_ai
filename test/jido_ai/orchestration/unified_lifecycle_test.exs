@@ -23,9 +23,7 @@ defmodule Jido.AI.Orchestration.UnifiedLifecycleTest do
     routes do
       signal_source "/test/unified"
 
-      route "test.ask", ai: :assistant do
-        define :admit, args: [:query]
-      end
+      route "test.ask", ai: :assistant, as: :admit
     end
   end
 
@@ -69,7 +67,8 @@ defmodule Jido.AI.Orchestration.UnifiedLifecycleTest do
     context = %{ai: %{assistant: %{options: MockLLM.options(mock)}}}
     owner = Jido.AgentServer.children(server)[{:plugin, Jido.AI.Orchestration.Plugin}].pid
 
-    {:ok, admitted} = Assistant.admit(server, "First", context: context)
+    {:ok, signal} = Assistant.admit_signal(%{query: "First"})
+    {:ok, admitted} = Jido.AgentServer.call(server, signal, context: context)
     assert [{id, %{status: :pending}}] = Map.to_list(admitted.state.requests)
     assert admitted.state.answer == ""
     assert {:ok, "First"} = Request.await(Request.Handle.new(id, server, "First"))

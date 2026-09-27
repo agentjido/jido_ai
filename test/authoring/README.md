@@ -52,14 +52,14 @@ Each saved case runs through:
 2. Independent Agent attribute and profile maps passed to `Authoring.lower/2`.
 3. Keyword Agent attributes with profile maps.
 4. Validated `Profile` structs.
-5. Incremental core Builder calls on lowered attributes.
-6. A core Builder seeded from the authored module.
+5. Core `Jido.Agent.new/1` construction from lowered attribute maps.
+6. Core `Jido.Agent.new/1` construction from lowered keyword attributes.
 7. Saved source-profile JSON.
 8. Saved lowered-Agent JSON.
 
-There is no AI-specific Builder setter. The incremental path verifies that
-lowered AI declarations survive the existing core Builder. Separate regression
-tests check raw keyword profiles and map model shorthand at source boundaries.
+The core data forms validate lowered AI declarations with the same constructor.
+Separate regression tests check raw keyword profiles and map model shorthand
+at source boundaries.
 
 Definition tests compare complete definitions and complete initial and override
 state. They also check neutral identity, profile accessors, invalid state, and
@@ -79,7 +79,7 @@ requests, selected models, state, rejected input, and recovery. Session
 observations use request completion and explicit provider barriers, not sleeps.
 
 The interface tests also compile inline instructions and a tool, then execute
-the authored, Builder, and Codec forms. Invalid-source tests cover duplicate
+the authored, core data construction, and Codec forms. Invalid-source tests cover duplicate
 profiles and models, missing results, unknown routes, wrong state fields,
 history/result overlap, and invalid limits.
 
@@ -133,13 +133,13 @@ and update the catalog.
 
 ## Extended coverage
 
-- Callable reasoning Plugins preserve their bound Profile through core Builder
+- Callable reasoning Plugins preserve their bound Profile through core core data construction
   and Codec. The receiving host must supply its Profile Registry value. Tests
   reject wrong methods and invalid configuration, then execute prompt-only
   Signals into the selected result field without changing unrelated state.
 - Provider errors and invalid tool arguments across all eight corpus forms,
   with domain-state checks and a successful later request.
-- Mixed turn/session profiles through module, Builder, and Codec forms,
+- Mixed turn/session profiles through module, core data construction, and Codec forms,
   separate provider endpoints, runtime prompt changes, empty prompts, and
   isolation between two instances.
 - Generated cancellation, steering, waiting, disabled streaming, invalid
@@ -149,7 +149,7 @@ and update the catalog.
 - Invalid DSL fixtures reject mixed model declaration forms, duplicate routers,
   conflicting skill paths, non-list extensions, and non-module extension entries.
 - Custom stateful Plugin ordering and conditional operation controls through
-  lowered, Builder, and Codec forms. Tool errors are checked separately from
+  lowered, core data construction, and Codec forms. Tool errors are checked separately from
   invalid tool input: tool errors can return to the model; invalid input fails
   before the Action runs.
 - Structured output repair success and exhaustion, model-call limits, and

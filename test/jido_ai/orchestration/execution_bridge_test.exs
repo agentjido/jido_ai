@@ -19,11 +19,11 @@ defmodule Jido.AI.Orchestration.ExecutionBridgeTest do
         send(opts[:observer], {:history_gate, self()})
 
         receive do
-          :release -> {:ok, command}
+          :release -> {:ok, nil}
           :reject -> {:error, :entry_denied}
         end
       else
-        {:ok, command}
+        {:ok, nil}
       end
     end
   end
@@ -111,8 +111,9 @@ defmodule Jido.AI.Orchestration.ExecutionBridgeTest do
   end
 
   setup do
+    Process.register(self(), __MODULE__)
     jido = :"bridge_#{System.unique_integer([:positive])}"
-    start_supervised!({Jido, name: jido})
+    start_supervised!({Jido, name: jido, namespace: "execution-bridge-test"})
     {:ok, jido: jido}
   end
 
@@ -121,7 +122,7 @@ defmodule Jido.AI.Orchestration.ExecutionBridgeTest do
 
     definition =
       if opts[:gate],
-        do: %{definition | plugins: definition.plugins ++ [{HistoryGate, observer: self()}]},
+        do: %{definition | plugins: definition.plugins ++ [{HistoryGate, observer: __MODULE__}]},
         else: definition
 
     instance = Jido.Agent.instantiate!(definition)

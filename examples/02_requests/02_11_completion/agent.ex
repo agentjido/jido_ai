@@ -36,8 +36,6 @@ defmodule JidoAI.Examples.Completion.Agent do
   routes do
     signal_source "/examples/ai/02_requests/02_11"
 
-    route "examples.ai.02_11.complete", ai: :assistant do
-      define :complete, args: [:query]
-    end
+    route "examples.ai.02_11.complete", ai: :assistant, as: :complete
   end
 end

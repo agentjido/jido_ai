@@ -1,7 +1,8 @@
 defmodule JidoAITest.Authoring.Agents.Fixtures.Structured do
-  use Jido.AI.Agent, name: "authoring_ai_structured", metadata: %{"case" => "structured"}
+  use Jido.AI.Agent, name: "authoring_ai_structured"
 
   agent do
+    metadata %{"case" => "structured"}
     schema Zoi.object(%{reply: Zoi.map() |> Zoi.default(%{}), case_id: Zoi.string() |> Zoi.default("case-17")})
 
     ai :assistant do

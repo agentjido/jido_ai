@@ -30,9 +30,7 @@ agent do
 end
 
 routes do
-  route "support.ask", ai: :assistant do
-    define :ask_case, args: [:query]
-  end
+  route "support.ask", ai: :assistant, as: :ask_case
 end
 ```
 

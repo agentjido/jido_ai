@@ -41,8 +41,6 @@ defmodule JidoAI.Examples.Session.Agent do
     signal_source "/examples/ai/session"
     route "ai.ask", ai(:assistant)
 
-    route "case.close", JidoAI.Examples.Support.CloseCase do
-      define :close, args: [:reason]
-    end
+    route "case.close", JidoAI.Examples.Support.CloseCase, as: :close
   end
 end

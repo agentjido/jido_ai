@@ -128,7 +128,7 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
     assert_script_done(mock)
   end
 
-  test "source data Builder and JSON retain automatic skill behavior", %{jido: jido} do
+  test "source data core data construction and JSON retain automatic skill behavior", %{jido: jido} do
     source =
       profile(%{
         specs: [spec()],
@@ -139,8 +139,7 @@ defmodule JidoAI.Examples.SkillAuthoringTest do
     assert {:ok, direct} = Authoring.lower(base(), [source])
 
     built =
-      Jido.Agent.Builder.new(Map.from_struct(direct) |> Map.drop([:id, :state]))
-      |> Jido.Agent.Builder.build!()
+      Jido.Agent.new!(Map.from_struct(direct) |> Map.drop([:id, :state]))
 
     assert {:ok, document, registry} = Jido.Agent.Codec.encode(direct)
 

@@ -18,8 +18,8 @@ After this guide, you will use request handles (`ask/await`) and collect multipl
 
 All AI Agent requests use admission, Flow execution, and settlement. A request
 can last much longer than an individual core Turn. There is no request mode.
-`ask_sync/3` combines `ask/3` and `await/2`. Core generated route helpers return
-the admission Agent revision, not a completed answer.
+`ask_sync/3` combines `ask/3` and `await/2`. Core `as:` route helpers build
+Signals. `Jido.AgentServer.call/3` returns the admission Agent revision.
 
 The host setting `config :jido_ai, :max_retained_requests, 100` bounds retained
 request records. Each Coordinator captures this limit at startup. Pending records

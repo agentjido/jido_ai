@@ -4,6 +4,15 @@ defmodule Jido.AI.Plugins.RetrievalTest do
   alias Jido.AI.Retrieval.Store
   alias ReqLLM.Message.ContentPart
 
+  test "Retrieval implements its explicit Agent and Server roles in one module" do
+    assert {:ok, [spec]} = Jido.Plugin.Normalizer.normalize_all([Retrieval])
+    assert spec.module == Retrieval
+    assert spec.agent.module == Retrieval
+    assert spec.agent_server.module == Retrieval
+    assert spec.manifest.vsn == 1
+    refute spec.agent_server.runtime?
+  end
+
   setup do
     start_supervised!({Store, []})
     :ok
@@ -27,7 +36,7 @@ defmodule Jido.AI.Plugins.RetrievalTest do
   end
 
   defp admit(command) do
-    with {:ok, specs} <- Jido.Plugin.normalize_all(command.agent.plugins),
+    with {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(command.agent.plugins),
          {:ok, inputs} <- Jido.Agent.Plugin.prepare(command.agent, command.signal, specs) do
       admission = %Jido.AgentServer.Plugin.Admission{
         plugin: Retrieval,
@@ -40,7 +49,7 @@ defmodule Jido.AI.Plugins.RetrievalTest do
         state_version: 0
       }
 
-      Retrieval.AgentServer.admit(nil, admission, [])
+      Retrieval.admit(nil, admission, [])
     end
   end
 
@@ -75,7 +84,7 @@ defmodule Jido.AI.Plugins.RetrievalTest do
     test "live admission keeps the request when #{key |> inspect()} is true" do
       cmd = command(Map.put(%{prompt: "Tokyo weather"}, unquote(key), true))
       assert {:ok, nil} = admit(cmd)
-      assert {:ok, specs} = Jido.Plugin.normalize_all(cmd.agent.plugins)
+      assert {:ok, specs} = Jido.Plugin.Normalizer.normalize_all(cmd.agent.plugins)
 
       assert {:ok, %{Retrieval => %{prepared: %{store: Store, capability: nil}}}} =
                Jido.Agent.Plugin.prepare(cmd.agent, cmd.signal, specs)

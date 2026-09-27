@@ -47,12 +47,8 @@ defmodule JidoAI.Examples.AIRuntime.Agent do
   routes do
     signal_source "/examples/ai/runtime"
 
-    route "ai.ask", ai(:assistant) do
-      define :answer, args: [:query]
-    end
+    route "ai.ask", ai(:assistant), as: :answer
 
-    route "case.close", JidoAI.Examples.Support.CloseCase do
-      define :close, args: [:reason]
-    end
+    route "case.close", JidoAI.Examples.Support.CloseCase, as: :close
   end
 end

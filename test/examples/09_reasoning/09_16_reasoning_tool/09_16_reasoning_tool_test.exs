@@ -3,10 +3,10 @@ defmodule JidoAI.Examples.ReasoningToolTest do
   alias Jido.AI.Request
   alias JidoAI.Examples.ReasoningTool, as: Example
 
-  test "Builder and source JSON retain the raw tool and live behavior", %{jido: jido} do
+  test "core data construction and source JSON retain the raw tool and live behavior", %{jido: jido} do
     definition = Example.Agent.definition()
     attrs = definition |> Map.from_struct() |> Map.drop([:id, :state])
-    assert {:ok, built} = attrs |> Jido.Agent.Builder.new() |> Jido.Agent.Builder.build()
+    assert {:ok, built} = Jido.Agent.new(attrs)
     source = Example.source()
 
     registry =

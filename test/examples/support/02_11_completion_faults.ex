@@ -1,6 +1,7 @@
 defmodule JidoAI.Examples.Completion.Apply do
   @moduledoc false
   defstruct [:mode, :observer]
+  use Jido.Agent.Directive
 end
 
 defmodule JidoAI.Examples.Completion.Ledger do
@@ -12,17 +13,19 @@ defmodule JidoAI.Examples.Completion.Ledger do
     do: {:ledger, Zoi.object(%{value: Zoi.string() |> Zoi.default("")}) |> Zoi.default(%{value: ""})}
 
   def directives(_), do: [Apply]
-  def validate_directive(%Apply{} = directive, _), do: {:ok, directive}
 
   def prepare(command, opts) do
     if opts[:deny_settle] == true and command.signal.type == Jido.AI.Orchestration.settle_type(),
       do: {:error, :fixture_settlement_denied},
-      else: {:ok, command}
+      else: {:ok, nil}
   end
 
-  def update_state(state, [], _), do: {:ok, state}
+  def reduce(reduction, opts),
+    do: update_state(reduction.plugin_state, Enum.filter(reduction.directives, &is_struct(&1, Apply)), opts)
 
-  def update_state(state, directives, _) do
+  defp update_state(state, [], _), do: {:ok, state}
+
+  defp update_state(state, directives, _) do
     Enum.each(directives, &send(&1.observer, {:ledger_reduce, &1.mode}))
 
     cond do

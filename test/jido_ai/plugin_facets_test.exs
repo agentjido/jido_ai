@@ -20,7 +20,7 @@ defmodule Jido.AI.PluginFacetsTest do
     Jido.AI.Plugins.Reasoning.Adaptive
   ]
 
-  test "AI Plugin packages use owner-specific facets" do
+  test "AI Plugins use one callback module" do
     for package <- @packages do
       methods = %{
         Jido.AI.Plugins.Reasoning.ChainOfThought => :chain_of_thought,
@@ -46,11 +46,15 @@ defmodule Jido.AI.PluginFacetsTest do
           []
         end
 
-      assert {:ok, [%Jido.Plugin.Spec{} = spec]} = Jido.Plugin.normalize_all([{package, opts}])
-      assert spec.module == package
-      refute spec.legacy?
-      assert %Jido.Plugin.Manifest{module: ^package} = spec.manifest
-      assert spec.agent != nil or spec.agent_server != nil
+      assert {:ok, %Jido.Plugin.Manifest{} = manifest} = Jido.Plugin.manifest({package, opts})
+      assert manifest.module == package
+      assert manifest.agent != nil or manifest.agent_server != nil
+
+      for owner <- [:agent, :agent_server, :persistence, :topology],
+          callback_module = Map.fetch!(manifest, owner),
+          not is_nil(callback_module) do
+        assert callback_module == package
+      end
     end
   end
 

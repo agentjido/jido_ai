@@ -5,7 +5,7 @@ defmodule JidoAITest.Authoring.Agents.BoundariesTest do
   @moduletag :authoring
   alias Jido.AI.Authoring
   alias Jido.AI.Profile
-  alias Jido.Agent.{Builder, Codec}
+  alias Jido.Agent.Codec
   alias JidoAITest.Authoring.{Compiler, Agents.Corpus}
 
   for {file, message} <- [
@@ -100,16 +100,14 @@ defmodule JidoAITest.Authoring.Agents.BoundariesTest do
     assert {:error, _} = Codec.decode(bad, registry)
   end
 
-  test "Builder branches preserve AI profiles and retain their first error" do
-    spec = Corpus.load!(:multi)
-    builder = Builder.new(spec.module)
-    original = Builder.build!(builder)
-    renamed = builder |> Builder.name("renamed") |> Builder.build!()
+  test "core data construction preserves AI profiles and validates each changed definition" do
+    original = Corpus.load!(:multi).module.definition()
+    renamed = Jido.Agent.new!(%{original | name: "renamed"})
     assert renamed === %{original | name: "renamed"}
-    assert Builder.build!(builder) === original
-    invalid = Builder.name(builder, false)
-    assert {:error, error} = Builder.build(invalid)
-    assert {:error, ^error} = invalid |> Builder.name("valid") |> Builder.build()
+    assert Jido.Agent.new!(original) === original
+    assert {:error, %Jido.Error.ValidationError{}} = Jido.Agent.new(%{original | name: false})
+    assert {:ok, corrected} = Jido.Agent.new(%{original | name: "valid"})
+    assert corrected.plugins === original.plugins
   end
 
   test "route defaults cannot replace a trusted profile and explicit input wins" do

@@ -14,7 +14,7 @@ defmodule JidoAITest.Authoring.Agents.CallableProfilesTest do
     {:ok, jido: jido}
   end
 
-  for form <- [:definition, :builder, :codec] do
+  for form <- [:definition, :core_data, :codec] do
     @tag form: form
     test "#{form}: bound Profile runs prompt-only input into its selected field", %{jido: jido, form: form} do
       profile = profile()
@@ -58,7 +58,7 @@ defmodule JidoAITest.Authoring.Agents.CallableProfilesTest do
     refute Jason.encode!(document) =~ "max_model_calls"
   end
 
-  test "core definition and Builder reject wrong methods and invalid callable configuration" do
+  test "core definition and core data construction reject wrong methods and invalid callable configuration" do
     profile = profile()
 
     for options <- [
@@ -70,7 +70,7 @@ defmodule JidoAITest.Authoring.Agents.CallableProfilesTest do
       assert {:error, %Jido.Error.ExecutionError{}} = Jido.Agent.new(attributes(options))
 
       assert {:error, %Jido.Error.ExecutionError{}} =
-               attributes(options) |> Jido.Agent.Builder.new() |> Jido.Agent.Builder.build()
+               attributes(options) |> Map.to_list() |> Jido.Agent.new()
     end
   end
 
@@ -100,9 +100,8 @@ defmodule JidoAITest.Authoring.Agents.CallableProfilesTest do
   defp signal(data), do: Jido.Signal.new!("reasoning.cot.run", data, source: "/authoring")
   defp transport(source, :definition), do: source
 
-  defp transport(source, :builder),
-    do:
-      source |> Map.from_struct() |> Map.drop([:id, :state]) |> Jido.Agent.Builder.new() |> Jido.Agent.Builder.build!()
+  defp transport(source, :core_data),
+    do: source |> Map.from_struct() |> Map.drop([:id, :state]) |> Jido.Agent.new!()
 
   defp transport(source, :codec) do
     {:ok, document, registry} = Jido.Agent.Codec.encode(source)

@@ -13,7 +13,7 @@ defmodule JidoAI.Examples.AuthoringFormatsTest do
     assert List.last(request.body["input"])["content"] ==
              [%{"type" => "input_text", "text" => "Help with this case"}]
 
-    assert {:ok, signal} = Agent.answer_signal("Next question")
+    assert {:ok, signal} = Agent.answer_signal(%{query: "Next question"})
     assert signal.type == "examples.ai.01_01.answer"
     assert signal.source == "/examples/ai/01_authoring/01_01"
     assert_script_done(mock)

@@ -118,7 +118,9 @@ defmodule Jido.AI.Reasoning do
   def tools_disabled?(%{recursive: _}), do: true
 
   def tools_disabled?(%{profile: %{reasoning: %{method: method}}})
-      when method not in [:react, :tree_of_thoughts], do: true
+      when method not in [:react, :tree_of_thoughts] do
+    true
+  end
 
   def tools_disabled?(_), do: false
 

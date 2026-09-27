@@ -65,9 +65,7 @@ end
 routes do
   signal_source "/examples/ai/basic"
 
-  route "examples.ai.basic.answer", ai: :assistant do
-    define :answer, args: [:query]
-  end
+  route "examples.ai.basic.answer", ai: :assistant, as: :answer
 end
 ```
 
@@ -103,11 +101,11 @@ Follow these rules:
    is a first-class extension point, or is the subject of the example. A named
    model-callable Action is valid when its stable tool identity or reuse is part
    of the lesson; do not replace it mechanically with an inline Action.
-9. Use Builder, JSON, or direct definition forms only when the example teaches
-   those forms.
+9. Use core data construction or JSON only when the example teaches those forms.
 10. Use the generated `ask`, `ask_sync`, and `ask_stream` API for AI work.
-    Use core `define` for domain commands or an explicit admission lesson.
-    A core route helper returns the admission Agent, not the AI answer.
+    Use core route `as:` for domain commands or an explicit admission lesson.
+    A core route helper builds a Signal. `Jido.AgentServer.call/3` returns
+    the admission Agent.
 11. Use static Zoi schemas at Agent, Action, and Flow boundaries.
 12. Use Action or Signal input for requested work. Use execution context for
     runtime services and execution metadata. Use Agent state for durable domain
@@ -179,7 +177,7 @@ required public contract does not yet exist.
   name for modules.
 - Scope Signal types to the section, example, and command.
 - Scope Signal sources to the example.
-- Use exact routes for commands exposed with `define`.
+- Use exact routes for commands exposed with `as:`.
 - Keep names stable after an example becomes part of the published learning
   path.
 

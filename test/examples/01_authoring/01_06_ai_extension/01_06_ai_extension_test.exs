@@ -33,7 +33,7 @@ defmodule JidoAI.Examples.AIExtensionTest do
     assert_script_done(mock)
   end
 
-  test "common AI lowering composes with core data, Builder and JSON", %{jido: jido} do
+  test "common AI lowering composes with core data, core data construction and JSON", %{jido: jido} do
     base =
       Jido.Agent.new!(
         name: "data_ai_assistant",
@@ -56,7 +56,7 @@ defmodule JidoAI.Examples.AIExtensionTest do
 
     assert {:ok, lowered} = apply(Jido.AI.Authoring, :lower, [base, [profile]])
     attrs = lowered |> Map.from_struct() |> Map.drop([:id, :state])
-    built = Jido.Agent.Builder.new(attrs) |> Jido.Agent.Builder.build!()
+    built = Jido.Agent.new!(attrs)
     direct = Jido.Agent.new!(attrs)
     {:ok, document, registry} = Jido.Agent.Codec.encode(lowered)
 

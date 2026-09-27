@@ -1,9 +1,22 @@
 defmodule Jido.AI.Configuration.Plugin do
   @moduledoc "Binds host AI profiles and owns portable tool and prompt overrides."
 
-  use Jido.Plugin,
-    agent: Jido.AI.Configuration.Plugin.Agent,
-    agent_server: Jido.AI.Configuration.Plugin.AgentServer
+  use Jido.Plugin
+
+  @impl true
+  defdelegate state_spec(opts), to: Jido.AI.Configuration.Plugin.Agent
+
+  @impl true
+  defdelegate prepare(preparation, opts), to: Jido.AI.Configuration.Plugin.Agent
+
+  @impl true
+  defdelegate directives(opts), to: Jido.AI.Configuration.Plugin.Agent
+
+  @impl true
+  defdelegate reduce(reduction, opts), to: Jido.AI.Configuration.Plugin.Agent
+
+  @impl true
+  defdelegate admit(runtime, admission, opts), to: Jido.AI.Configuration.Plugin.AgentServer
 
   @doc false
   def agent_state_spec(opts) do

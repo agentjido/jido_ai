@@ -1,7 +1,9 @@
 defmodule JidoAITest.Authoring.Agents.Fixtures.Multi do
-  use Jido.AI.Agent, name: "authoring_ai_multi", metadata: %{"case" => "multi"}
+  use Jido.AI.Agent, name: "authoring_ai_multi"
 
   agent do
+    metadata %{"case" => "multi"}
+
     schema Zoi.object(%{
              reply: Zoi.string() |> Zoi.default(""),
              case_id: Zoi.string() |> Zoi.default("case-17"),

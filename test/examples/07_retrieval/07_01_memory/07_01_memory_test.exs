@@ -443,7 +443,7 @@ defmodule JidoAI.Examples.RetrievalTest do
     end
 
     {:retrieval, schema} =
-      Jido.AI.Plugins.Retrieval.Agent.state_spec(
+      Jido.AI.Plugins.Retrieval.state_spec(
         enabled: false,
         namespace: "saved",
         top_k: 5,
