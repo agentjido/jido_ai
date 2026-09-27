@@ -34,6 +34,11 @@ defmodule Jido.AI.Request.Stream do
 
   The enumerable halts after receiving `:request_completed`,
   `:request_failed`, or `:request_cancelled`.
+
+  ReAct worker events retain runtime order. The final runtime checkpoint is
+  delivered before the terminal event, while the request sink is still active.
+  Synthetic rejection and caller cancellation events use `seq: 0` and can stop
+  a request before its worker finishes.
   """
   @spec events(Handle.t(), keyword()) :: Enumerable.t()
   def events(%Handle{id: request_id}, opts \\ []) do

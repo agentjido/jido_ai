@@ -425,6 +425,11 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert Enum.any?(events, &(&1.kind == :request_completed))
     assert Enum.any?(events, &(&1.kind == :checkpoint and &1.data.reason == :terminal))
 
+    assert List.last(events).kind == :request_completed
+    assert Enum.at(events, -2).kind == :checkpoint
+    assert Enum.at(events, -2).data.reason == :terminal
+    assert seqs == Enum.to_list(1..List.last(events).seq)
+
     llm_completed = Enum.find(events, &(&1.kind == :llm_completed))
     assert Map.take(llm_completed.data.usage, [:input_tokens, :output_tokens]) == %{input_tokens: 3, output_tokens: 2}
 
@@ -1333,6 +1338,8 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
 
     terminal_checkpoint = Enum.find(events, &(&1.kind == :checkpoint and &1.data.reason == :terminal))
     assert is_binary(terminal_checkpoint.data.token)
+    assert List.last(events).kind == :request_failed
+    assert Enum.at(events, -2) == terminal_checkpoint
 
     assert {:ok, failed_state, _payload} =
              Jido.AI.Reasoning.ReAct.Token.decode_state(terminal_checkpoint.data.token, config)
@@ -2515,6 +2522,103 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
 
     request_completed = Enum.find(events, &(&1.kind == :request_completed))
     assert request_completed.data.result == "Selected code 8409.91.01"
+  end
+
+  for failure_kind <- [:error, :exit, :throw] do
+    test "provider #{failure_kind} preserves event sequence and checkpoint state after a tool round" do
+      Mimic.stub(ReqLLM.Generation, :stream_text, fn model, messages, _opts ->
+        if Enum.any?(messages, &(&1.role == :tool)) do
+          :erlang.raise(unquote(failure_kind), :provider_crashed, [])
+        else
+          {:ok,
+           responses_stream_response(
+             [ReqLLM.StreamChunk.tool_call("calculator", %{a: 1, b: 2}, %{id: "tc_before_crash"})],
+             %{finish_reason: :tool_calls, usage: %{input_tokens: 3, output_tokens: 2}},
+             model
+           )}
+        end
+      end)
+
+      config = Config.new(%{model: :capable, tools: %{"calculator" => CalculatorTool}})
+      events = ReAct.stream("calculate then fail", config) |> Enum.to_list()
+
+      assert Enum.any?(events, &(&1.kind == :tool_completed))
+      assert Enum.map(events, & &1.seq) == Enum.to_list(1..List.last(events).seq)
+      assert %{kind: :request_failed, data: %{error_type: :runtime}} = List.last(events)
+      assert %{kind: :checkpoint, data: %{reason: :terminal, token: token}} = Enum.at(events, -2)
+      assert {:ok, state, _payload} = Jido.AI.Reasoning.ReAct.Token.decode_state(token, config)
+      assert state.status == :failed
+      assert state.iteration == 2
+      assert Map.take(state.usage, [:input_tokens, :output_tokens]) == %{input_tokens: 3, output_tokens: 2}
+      assert Enum.any?(AIContext.to_messages(state.context), &(&1.role == :tool))
+    end
+  end
+
+  test "a stream throw preserves delta sequence and partial text in the failure checkpoint" do
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      chunks =
+        Stream.concat(
+          [ReqLLM.StreamChunk.text("partial answer")],
+          Stream.map([:fail], fn _ -> throw(:stream_crashed) end)
+        )
+
+      {:ok, responses_stream_response(chunks, %{finish_reason: :stop}, model)}
+    end)
+
+    config = Config.new(%{model: :capable, tools: %{}})
+    events = ReAct.stream("fail during stream", config) |> Enum.to_list()
+
+    assert Enum.any?(events, &(&1.kind == :llm_delta))
+    assert Enum.map(events, & &1.seq) == Enum.to_list(1..List.last(events).seq)
+    assert %{kind: :request_failed, data: %{error_type: :runtime}} = List.last(events)
+    assert %{kind: :checkpoint, data: %{reason: :terminal, token: token}} = Enum.at(events, -2)
+    assert {:ok, state, _payload} = Jido.AI.Reasoning.ReAct.Token.decode_state(token, config)
+    assert state.status == :failed
+    assert state.streaming_text == "partial answer"
+  end
+
+  test "continuing a terminal state still returns its checkpoint" do
+    config = Config.new(%{model: :capable, tools: %{}})
+
+    state =
+      Jido.AI.Reasoning.ReAct.State.new("done", nil)
+      |> Jido.AI.Reasoning.ReAct.State.put_status(:completed)
+      |> Jido.AI.Reasoning.ReAct.State.put_result("answer")
+
+    assert [%{kind: :checkpoint, data: %{reason: :terminal, token: token}}] =
+             ReAct.stream_from_state(state, config) |> Enum.to_list()
+
+    assert {:ok, restored, _payload} = Jido.AI.Reasoning.ReAct.Token.decode_state(token, config)
+    assert restored.status == :completed
+    assert restored.result == "answer"
+  end
+
+  test "runtime cancellation emits the final checkpoint before the terminal event" do
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      chunks =
+        Stream.repeatedly(fn ->
+          Process.sleep(5)
+          ReqLLM.StreamChunk.text("x")
+        end)
+
+      {:ok, responses_stream_response(chunks, %{finish_reason: :stop}, model)}
+    end)
+
+    config = Config.new(%{model: :capable, tools: %{}})
+
+    events =
+      ReAct.stream("cancel me", config)
+      |> Stream.each(fn
+        %{kind: :llm_delta} -> send(self(), {:react_stream_cancel, :user_cancelled})
+        _ -> :ok
+      end)
+      |> Enum.to_list()
+
+    assert List.last(events).kind == :request_cancelled
+    assert %{kind: :checkpoint, data: %{reason: :terminal, token: token}} = Enum.at(events, -2)
+    assert Enum.map(events, & &1.seq) == Enum.to_list(1..List.last(events).seq)
+    assert {:ok, state, _payload} = Jido.AI.Reasoning.ReAct.Token.decode_state(token, config)
+    assert state.status == :cancelled
   end
 
   test "halting event consumption cancels active runner task" do

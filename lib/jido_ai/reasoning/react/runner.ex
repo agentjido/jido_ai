@@ -124,7 +124,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     try do
       state
       |> run_loop(owner, ref, config, context)
-      |> finalize(owner, ref, config)
+      |> finalize(owner, ref)
     catch
       {:cancelled, %State{} = current_state, reason} ->
         seal_pending_input_server(config)
@@ -134,29 +134,27 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
           |> State.put_status(:cancelled)
           |> State.put_result("Request cancelled (reason: #{inspect(reason)})")
 
-        {cancelled_state, _} =
-          emit_event(cancelled_state, owner, ref, :request_cancelled, %{reason: reason})
-
-        {_cancelled_state, _token} = emit_checkpoint(cancelled_state, owner, ref, config, :terminal)
+        emit_terminal_event(cancelled_state, owner, ref, config, :request_cancelled, %{reason: reason})
         send(owner, {:react_runner, ref, :done})
 
       kind, reason ->
         seal_pending_input_server(config)
 
         failed_state =
-          state
+          ref
+          |> runtime_state_key()
+          |> Process.get(state)
           |> State.put_status(:failed)
           |> State.put_error(%{kind: kind, reason: inspect(reason)})
 
-        {failed_state, _} =
-          emit_event(failed_state, owner, ref, :request_failed, %{
-            error: %{kind: kind, reason: inspect(reason)},
-            error_type: :runtime
-          })
+        emit_terminal_event(failed_state, owner, ref, config, :request_failed, %{
+          error: %{kind: kind, reason: inspect(reason)},
+          error_type: :runtime
+        })
 
-        {_failed_state, _token} = emit_checkpoint(failed_state, owner, ref, config, :terminal)
         send(owner, {:react_runner, ref, :done})
     after
+      Process.delete(runtime_state_key(ref))
       close_openai_websocket_session()
     end
   end
@@ -166,6 +164,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
     cond do
       state.status in [:completed, :failed, :cancelled] ->
+        # A continuation of an already terminal state still returns a checkpoint.
+        {state, _token} = emit_checkpoint(state, owner, ref, config, :terminal)
         state
 
       state.status == :awaiting_tools and state.pending_tool_calls != [] ->
@@ -1080,8 +1080,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     end
   end
 
-  defp finalize(%State{} = state, owner, ref, %Config{} = config) do
-    {state, _token} = emit_checkpoint(state, owner, ref, config, :terminal)
+  defp finalize(%State{} = state, owner, ref) do
     send(owner, {:react_runner, ref, :done})
     state
   end
@@ -1089,7 +1088,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp complete_run(%State{} = state, owner, ref, %Config{} = config, termination_reason, runtime_context) do
     with {:ok, state} <- finalize_output(state, owner, ref, config, runtime_context) do
       {state, _} =
-        emit_event(state, owner, ref, :request_completed, %{
+        emit_terminal_event(state, owner, ref, config, :request_completed, %{
           result: state.result,
           termination_reason: termination_reason,
           usage: state.usage,
@@ -1245,6 +1244,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   defp emit_checkpoint(%State{} = state, owner, ref, %Config{} = config, reason)
        when reason in [:after_llm, :after_tools, :terminal] do
+    Process.put(runtime_state_key(ref), state)
     token = Token.issue(state, config)
 
     emit_event(state, owner, ref, :checkpoint, %{
@@ -1252,6 +1252,13 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       reason: reason
     })
     |> then(fn {updated, _event} -> {updated, token} end)
+  end
+
+  defp emit_terminal_event(state, owner, ref, config, kind, data) do
+    # Request streams stop at the terminal event. Send the final checkpoint
+    # first so it reaches the consumer before the request drops its sink.
+    {state, _token} = emit_checkpoint(state, owner, ref, config, :terminal)
+    emit_event(state, owner, ref, kind, data)
   end
 
   defp emit_event(%State{} = state, owner, ref, kind, data, extra \\ %{}) do
@@ -1270,6 +1277,10 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         data: data
       })
 
+    # The coordinator's catch clause cannot see state passed through nested
+    # calls. Retain the latest event state so an exception does not restart
+    # sequence numbers or discard completed turns in the failure checkpoint.
+    Process.put(runtime_state_key(ref), state)
     send(owner, {:react_runner, ref, :event, event})
     {state, event}
   end
@@ -1612,6 +1623,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   defp append_stream_delta(%State{} = state, _chunk_type, _text), do: state
 
+  defp runtime_state_key(ref), do: {__MODULE__, :runtime_state, ref}
   defp stream_state_key(ref), do: {__MODULE__, :stream_state, ref}
   defp stream_usage_key(ref), do: {__MODULE__, :stream_usage, ref}
   defp stream_signal_key(ref), do: {__MODULE__, :stream_signal, ref}
@@ -1795,7 +1807,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     |> State.put_error(reason)
     |> then(fn failed ->
       {failed, _} =
-        emit_event(failed, owner, ref, :request_failed, %{
+        emit_terminal_event(failed, owner, ref, config, :request_failed, %{
           error: reason,
           error_type: error_type,
           usage: failed.usage

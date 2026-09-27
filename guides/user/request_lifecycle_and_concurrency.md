@@ -42,8 +42,21 @@ end
 {:ok, result} = MyApp.MathAgent.await(request)
 ```
 
-The enumerable yields `%Jido.AI.Reasoning.ReAct.Event{}` values and stops after
+The enumerable yields `%Jido.AI.Runtime.Event{}` values and stops after
 `:request_completed`, `:request_failed`, or `:request_cancelled`.
+
+ReAct worker events arrive in runtime order. For a new run, the runtime assigns
+sequence numbers from `1`. The final runtime checkpoint arrives before the
+terminal event, while the stream sink is still active. You can read its token
+from `event.data.token` when `event.kind == :checkpoint` and
+`event.data.reason == :terminal`.
+
+If a provider raises during a run, the failure events continue the sequence.
+The failure checkpoint retains completed turns and partial streamed text.
+
+Synthetic rejection and caller cancellation events use `seq: 0`. These events
+can close the request stream before its worker finishes. An explicit
+`stream_event_timeout_ms` can also stop the enumerable before a terminal event.
 
 For mailbox-oriented integrations, pass a pid sink directly:
 
@@ -54,7 +67,7 @@ For mailbox-oriented integrations, pass a pid sink directly:
   )
 
 receive do
-  {:jido_ai_request_event, %Jido.AI.Reasoning.ReAct.Event{} = event} ->
+  {:jido_ai_request_event, %Jido.AI.Runtime.Event{} = event} ->
     IO.inspect(event.kind)
 end
 ```
