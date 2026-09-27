@@ -58,7 +58,7 @@ defmodule JidoAI.Examples.AdaptiveTest do
       calls = Enum.filter(events(handle), &(&1.kind == :llm_completed))
       assert Enum.all?(calls, &(&1.method == :adaptive and &1.data.selected_method == selected))
 
-      if method not in [:react, :tot] do
+      if unquote(method not in [:react, :tot]) do
         for wire <- MockLLM.report(mock).requests, do: refute(Map.has_key?(wire.body, "tools"))
       end
 
@@ -465,14 +465,14 @@ defmodule JidoAI.Examples.AdaptiveTest do
     assert_script_done(mock)
   end
 
-  test "DSL data Builder source JSON direct Flow and ordinary turns use the same adaptive contract",
+  test "DSL data core data construction source JSON direct Flow and ordinary turns use the same adaptive contract",
        %{jido: jido} do
     {mock, context} = mock(List.duplicate(Adaptive.script(:trm), 6) |> List.flatten())
     source = Adaptive.source()
     assert {:ok, definition} = Adaptive.definition()
     assert definition == Adaptive.Agent.definition()
     attrs = definition |> Map.from_struct() |> Map.drop([:id, :state])
-    assert {:ok, built} = attrs |> Jido.Agent.Builder.new() |> Jido.Agent.Builder.build()
+    assert {:ok, built} = Jido.Agent.new(attrs)
 
     registry =
       source

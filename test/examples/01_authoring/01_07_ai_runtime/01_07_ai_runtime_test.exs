@@ -54,8 +54,10 @@ defmodule JidoAI.Examples.AIRuntimeTest do
     assert_receive {:example_tool_started, "multiply"}
     assert_receive {:example_tool_started, "quote"}
 
+    {:ok, close_signal} = AIRuntime.Agent.close_signal(%{reason: "closed"})
+
     assert {:ok, %{state: %{case_id: "closed", commits: next_commits}}} =
-             AIRuntime.Agent.close(server, "closed")
+             Jido.AgentServer.call(server, close_signal)
 
     assert next_commits > commits
 

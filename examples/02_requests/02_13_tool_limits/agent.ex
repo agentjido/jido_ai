@@ -34,8 +34,6 @@ defmodule JidoAI.Examples.ToolLimits.Agent do
   routes do
     signal_source "/examples/ai/02_requests/02_13"
 
-    route "examples.ai.02_13.calculate", ai: :assistant do
-      define :calculate, args: [:query]
-    end
+    route "examples.ai.02_13.calculate", ai: :assistant, as: :calculate
   end
 end

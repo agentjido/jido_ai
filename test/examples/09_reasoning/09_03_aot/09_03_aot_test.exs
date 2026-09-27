@@ -176,13 +176,13 @@ defmodule JidoAI.Examples.AoTTest do
     assert_script_done(mock)
   end
 
-  test "DSL data Builder source JSON and direct Flow keep the AoT result contract", %{jido: jido} do
+  test "DSL data core data construction source JSON and direct Flow keep the AoT result contract", %{jido: jido} do
     {mock, context} = mock(List.duplicate(%{reply: {:text, AoT.puzzle()}}, 5))
     source = AoT.source()
     assert {:ok, definition} = AoT.definition()
     assert AoT.Agent.definition() == definition
     attrs = definition |> Map.from_struct() |> Map.drop([:id, :state])
-    assert {:ok, built} = attrs |> Jido.Agent.Builder.new() |> Jido.Agent.Builder.build()
+    assert {:ok, built} = Jido.Agent.new(attrs)
 
     registry =
       source

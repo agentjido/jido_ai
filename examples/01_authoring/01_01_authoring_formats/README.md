@@ -6,7 +6,8 @@ Use an AI profile and a generated command to write one answer into Agent state.
 
 Read [the Agent](agent.ex), then the tests. The `ai` block owns the model,
 limits, and result destination. Call `Agent.ask_sync/3` to wait for the answer.
-The core `Agent.answer/3` helper returns the admission Agent revision only.
+The core `Agent.answer_signal/2` helper builds a Signal. Pass it to
+`Jido.AgentServer.call/3` to get the admission Agent revision.
 
 ## Run it
 

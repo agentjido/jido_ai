@@ -24,8 +24,6 @@ defmodule JidoAI.Examples.AuthoringFormats.Agent do
   routes do
     signal_source "/examples/ai/01_authoring/01_01"
 
-    route "examples.ai.01_01.answer", ai: :assistant do
-      define :answer, args: [:query]
-    end
+    route "examples.ai.01_01.answer", ai: :assistant, as: :answer
   end
 end

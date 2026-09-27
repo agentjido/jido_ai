@@ -9,7 +9,9 @@ defmodule Jido.AI.ToolResult do
   def normalize({:error, reason}, call), do: normalize({:error, reason, []}, call)
 
   def normalize({:ok, %Jido.Action.Output{kind: kind, value: value}, effects}, _call)
-      when kind in [:raw, :batch], do: {:ok, value, List.wrap(effects)}
+      when kind in [:raw, :batch] do
+    {:ok, value, List.wrap(effects)}
+  end
 
   def normalize({:ok, %Jido.Action.Output{kind: kind}, effects}, call),
     do:

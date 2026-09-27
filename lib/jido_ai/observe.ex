@@ -269,7 +269,9 @@ defmodule Jido.AI.Observe do
   defp feature_gate_enabled?(_obs_cfg, _unknown), do: true
 
   defp valid_event?([:jido, :ai, :llm, event])
-       when event in [:span, :start, :delta, :complete, :error], do: true
+       when event in [:span, :start, :delta, :complete, :error] do
+    true
+  end
 
   defp valid_event?([:jido, :ai, :tool, event])
        when event in [:span, :start, :retry, :complete, :error, :timeout],
@@ -280,13 +282,19 @@ defmodule Jido.AI.Observe do
        do: true
 
   defp valid_event?([:jido, :ai, :output, event])
-       when event in [:start, :validated, :repair, :error], do: true
+       when event in [:start, :validated, :repair, :error] do
+    true
+  end
 
   defp valid_event?([:jido, :ai, :strategy, strategy, event])
-       when is_atom(strategy) and is_atom(event), do: true
+       when is_atom(strategy) and is_atom(event) do
+    true
+  end
 
   defp valid_event?([:jido, :ai, :tool, :execute, event])
-       when event in [:start, :stop, :exception], do: true
+       when event in [:start, :stop, :exception] do
+    true
+  end
 
   defp valid_event?(event) do
     Logger.warning("Jido.AI.Observe ignored invalid AI telemetry event: #{inspect(event)}")

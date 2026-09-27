@@ -49,7 +49,7 @@ defmodule JidoAI.Examples.CompletionTest do
           %{reply: {:text, "Next"}}
         ])
 
-      server = start(jido, 5_000)
+      server = start(jido)
       assert {:ok, request} = request(server, context)
       assert {:error, {:completion_failed, _}} = Request.await(request, timeout: 1_500)
       assert_receive {:ledger_tool, unquote(mode)}

@@ -6,9 +6,11 @@ defmodule Jido.AI.Effects.ApplierTest do
   alias Jido.AI.Effects.State
 
   defmodule EffectsApplierAgent do
-    use Jido.Agent,
-      name: "effects_applier_agent",
-      schema: Zoi.object(%{status: Zoi.atom() |> Zoi.default(:idle)})
+    use Jido.Agent, name: "effects_applier_agent"
+
+    agent do
+      schema Zoi.object(%{status: Zoi.atom() |> Zoi.default(:idle)})
+    end
   end
 
   test "normalize_result supports both 2-tuple and 3-tuple envelopes" do

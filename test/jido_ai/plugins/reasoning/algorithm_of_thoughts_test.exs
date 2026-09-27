@@ -20,7 +20,7 @@ defmodule Jido.AI.Plugins.Reasoning.AlgorithmOfThoughtsTest do
 
   test "construction validates the Profile and fixed method" do
     profile = profile()
-    {:reasoning_aot, schema} = Capability.Agent.state_spec(profile: profile)
+    {:reasoning_aot, schema} = Capability.state_spec(profile: profile)
     assert {:ok, %{}} = Zoi.parse(schema, %{})
     assert {:error, _} = Zoi.parse(schema, %{timeout: 0})
     wrong = put_in(profile.reasoning.method, :react)

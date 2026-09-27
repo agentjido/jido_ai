@@ -34,7 +34,7 @@ defmodule Jido.AI.Request.Record do
 
   def records_schema,
     do:
-      Zoi.map(Zoi.string() |> Zoi.min(1), @schema)
+      Zoi.map(Zoi.string() |> Zoi.min(1), @schema, [])
       |> Zoi.refine({__MODULE__, :portable_records, []})
       |> Zoi.default(%{})
 

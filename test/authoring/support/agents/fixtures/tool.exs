@@ -1,7 +1,8 @@
 defmodule JidoAITest.Authoring.Agents.Fixtures.Tool do
-  use Jido.AI.Agent, name: "authoring_ai_tool", metadata: %{"case" => "tool"}
+  use Jido.AI.Agent, name: "authoring_ai_tool"
 
   agent do
+    metadata %{"case" => "tool"}
     schema Zoi.object(%{reply: Zoi.string() |> Zoi.default(""), case_id: Zoi.string() |> Zoi.default("case-17")})
 
     ai :assistant do

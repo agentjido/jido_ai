@@ -16,8 +16,8 @@ defmodule JidoAITest.Authoring.Agents.InterfacesTest do
 
   test "generated route Signal helpers retain input, source, and fresh IDs" do
     spec = Corpus.load!(:simple)
-    assert {:ok, first} = spec.module.submit_signal("Help")
-    assert {:ok, second} = spec.module.submit_signal("Help")
+    assert {:ok, first} = spec.module.submit_signal(%{query: "Help"})
+    assert {:ok, second} = spec.module.submit_signal(%{query: "Help"})
     assert first.type == "case.assistant"
     assert first.data == %{query: "Help"}
     assert first.source == "/authoring/ai"
@@ -26,7 +26,8 @@ defmodule JidoAITest.Authoring.Agents.InterfacesTest do
 
   test "generated core route helper runs the AI route with caller context", %{jido: jido} do
     {spec, server, mock, context} = start_case(jido, :simple, [{:text, "Ready"}])
-    assert {:ok, agent} = spec.module.submit(server, "Help", context: context)
+    assert {:ok, signal} = spec.module.submit_signal(%{query: "Help"})
+    assert {:ok, agent} = Server.call(server, signal, context: context)
     assert agent.state.reply == ""
     assert [{_, %{status: :pending}}] = Map.to_list(agent.state.requests)
     assert {:ok, completed} = Jido.AI.Test.Requests.await_agent(server, agent)
@@ -87,7 +88,7 @@ defmodule JidoAITest.Authoring.Agents.InterfacesTest do
     {spec, server, mock, context}
   end
 
-  test "inline instructions and tools survive Builder and Codec and execute", %{jido: jido} do
+  test "inline instructions and tools survive core data construction and Codec and execute", %{jido: jido} do
     JidoAITest.Authoring.Compiler.require_file!(Corpus.fixture("inline.exs"))
     module = JidoAITest.Authoring.Agents.Fixtures.Inline
     definition = apply(module, :definition, [])
@@ -98,7 +99,7 @@ defmodule JidoAITest.Authoring.Agents.InterfacesTest do
 
     {:ok, doc, registry} = Jido.Agent.Codec.encode(definition)
     {:ok, decoded} = Jido.Agent.Codec.decode(Jason.decode!(Jason.encode!(doc)), registry)
-    built = Jido.Agent.Builder.new(module) |> Jido.Agent.Builder.build!()
+    built = Jido.Agent.new!(definition)
     assert decoded === definition
     assert built === definition
 

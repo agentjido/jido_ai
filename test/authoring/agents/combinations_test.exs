@@ -17,7 +17,7 @@ defmodule JidoAITest.Authoring.Agents.CombinationsTest do
     {:ok, jido: jido}
   end
 
-  for form <- [:module, :builder, :codec] do
+  for form <- [:module, :core_data, :codec] do
     @tag form: form
     test "#{form}: turn/session profiles and two instances keep model, prompt and state separate", %{
       jido: jido,
@@ -117,7 +117,7 @@ defmodule JidoAITest.Authoring.Agents.CombinationsTest do
     do: request.body["messages"] |> Enum.filter(&(&1["role"] == "system")) |> Enum.map(& &1["content"])
 
   defp definition(:module), do: Mixed.definition()
-  defp definition(:builder), do: Jido.Agent.Builder.new(Mixed) |> Jido.Agent.Builder.build!()
+  defp definition(:core_data), do: Mixed.definition() |> Jido.Agent.new!()
 
   defp definition(:codec) do
     {:ok, doc, registry} = Jido.Agent.Codec.encode(Mixed.definition())

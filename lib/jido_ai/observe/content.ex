@@ -45,6 +45,14 @@ defmodule Jido.AI.Observe.Content do
     walk(value, %{rich: rich, reasoning: reasoning, text: text, tools: rich}, 0)
   end
 
+  # The issuer checks content permissions before it signs a checkpoint.
+  # A signed token must keep its exact bytes to remain usable for resume.
+  def event(%{kind: :checkpoint, data: %{token: token} = data} = event, policy, destination)
+      when is_binary(token) do
+    projected = project(%{event | data: Map.delete(data, :token)}, policy, destination)
+    put_in(projected.data[:token], if(destination in [:storage, :stream], do: token))
+  end
+
   def event(event, policy, destination) do
     event =
       case event do

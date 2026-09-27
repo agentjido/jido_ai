@@ -12,7 +12,7 @@ defmodule JidoAI.Examples.Case do
 
   setup do
     name = :"ai_v3_example_#{System.unique_integer([:positive])}"
-    start_supervised!({Jido, name: name})
+    start_supervised!({Jido, name: name, namespace: "ai-example-tests"})
     {:ok, jido: name}
   end
 

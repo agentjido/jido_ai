@@ -40,7 +40,7 @@ context = %{
 ```
 
 The tests consume the complete local script. They also prove that the nested
-call uses the outer quota and survives Builder and source JSON construction.
+call uses the outer quota and survives core data construction and source JSON construction.
 
 ## Expected result and failure behavior
 

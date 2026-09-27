@@ -26,9 +26,7 @@ defmodule MyApp.AnswerAgent do
   end
 
   routes do
-    route "my_app.answer", ai: :assistant do
-      define :answer, args: [:query]
-    end
+    route "my_app.answer", ai: :assistant, as: :answer
   end
 end
 ```
@@ -43,8 +41,9 @@ Start Jido, start one AgentServer, and use the generated AI helper:
 
 `ask_sync/3` waits for the AI request to finish. `ask/3` returns a request
 handle when the caller must do other work while the model runs. A core
-`define` helper such as `answer/3` reports admission of the Signal. It is not
-the model's final answer. Use the generated `ask` helpers for AI work.
+`as: :answer` route generates `answer_signal/2`, which builds a Signal.
+`Jido.AgentServer.call/3` admits that Signal and returns the admission Agent
+revision. Use the generated `ask` helpers to wait for AI work.
 
 The first change to make is an instruction, not a custom runtime. Keep one
 profile and one route until you have a reason for more. Set a timeout and a

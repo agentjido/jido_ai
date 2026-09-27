@@ -12,7 +12,7 @@ defmodule JidoAITest.Authoring.Agents.OutputLimitsTest do
     {:ok, jido: jido}
   end
 
-  for form <- [:lowered, :builder, :codec], repair? <- [true, false] do
+  for form <- [:lowered, :core_data, :codec], repair? <- [true, false] do
     @tag form: form, repair?: repair?
     test "#{form}/repair=#{repair?}: invalid structured output respects the repair budget", ctx do
       spec = Corpus.load!(:structured)
@@ -119,8 +119,8 @@ defmodule JidoAITest.Authoring.Agents.OutputLimitsTest do
 
   defp transport(value, :lowered), do: value
 
-  defp transport(value, :builder),
-    do: value |> Map.from_struct() |> Map.drop([:id, :state]) |> Jido.Agent.Builder.new() |> Jido.Agent.Builder.build!()
+  defp transport(value, :core_data),
+    do: value |> Map.from_struct() |> Map.drop([:id, :state]) |> Jido.Agent.new!()
 
   defp transport(value, :codec) do
     {:ok, doc, registry} = Jido.Agent.Codec.encode(value)

@@ -536,14 +536,14 @@ defmodule JidoAI.Examples.TRMTest do
     assert_receive {:linear_telemetry, [:jido, :ai, :trm, :error], _, %{error: :provider_down}}
   end
 
-  test "DSL data Builder source JSON direct Flow and ordinary turns use the same recursive contract",
+  test "DSL data core data construction source JSON direct Flow and ordinary turns use the same recursive contract",
        %{jido: jido} do
     {mock, context} = mock(List.duplicate(TRM.script(), 6) |> List.flatten())
     source = TRM.source()
     assert {:ok, definition} = TRM.definition()
     assert definition == TRM.Agent.definition()
     attrs = definition |> Map.from_struct() |> Map.drop([:id, :state])
-    assert {:ok, built} = attrs |> Jido.Agent.Builder.new() |> Jido.Agent.Builder.build()
+    assert {:ok, built} = Jido.Agent.new(attrs)
 
     registry =
       source

@@ -27,7 +27,7 @@ defmodule Jido.AI.Plugins.QuotaTest do
   end
 
   defp admit(command) do
-    with {:ok, specs} <- Jido.Plugin.normalize_all(command.agent.plugins),
+    with {:ok, specs} <- Jido.Plugin.Normalizer.normalize_all(command.agent.plugins),
          {:ok, inputs} <- Jido.Agent.Plugin.prepare(command.agent, command.signal, specs) do
       admission = %Jido.AgentServer.Plugin.Admission{
         plugin: Quota,

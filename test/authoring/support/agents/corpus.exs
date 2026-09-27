@@ -3,7 +3,7 @@ Code.require_file("cases.exs", __DIR__)
 
 defmodule JidoAITest.Authoring.Agents.Corpus do
   @moduledoc false
-  alias Jido.Agent.{Builder, Codec}
+  alias Jido.Agent.Codec
   alias Jido.AI.Authoring
   alias Jido.AI.Profile
   alias Jido.Codec.Registry
@@ -11,7 +11,7 @@ defmodule JidoAITest.Authoring.Agents.Corpus do
   @fixtures Path.expand("fixtures", __DIR__)
 
   def variants, do: Cases.variants()
-  def forms, do: [:module, :map, :keyword, :profiles, :builder, :module_builder, :source_json, :agent_json]
+  def forms, do: [:module, :map, :keyword, :profiles, :core_map, :core_keyword, :source_json, :agent_json]
   def fixture(path), do: Path.join(@fixtures, path)
 
   def load!(id) do
@@ -24,22 +24,13 @@ defmodule JidoAITest.Authoring.Agents.Corpus do
   def definition(spec, :map), do: lower!(spec.attrs, spec.profiles)
   def definition(spec, :keyword), do: lower!(Map.to_list(spec.attrs), spec.profiles)
   def definition(spec, :profiles), do: lower!(spec.attrs, Enum.map(spec.profiles, &Profile.new!/1))
-  def definition(spec, :module_builder), do: Builder.new(spec.module) |> Builder.build!()
 
-  def definition(spec, :builder) do
-    # Builder consumes lowered core attributes. It has no AI profile setter.
-    lowered = definition(spec, :map)
-    attrs = lowered |> Map.from_struct() |> Map.drop([:id, :state, :plugins, :routes])
+  def definition(spec, :core_map) do
+    spec |> definition(:map) |> Map.from_struct() |> Map.drop([:id, :state]) |> Jido.Agent.new!()
+  end
 
-    builder =
-      Enum.reduce(lowered.plugins, Builder.new(attrs), fn {module, opts}, acc ->
-        Builder.plugin(acc, module, opts)
-      end)
-
-    Enum.reduce(lowered.routes, builder, fn route, acc ->
-      Builder.route(acc, route.path, route.target, priority: route.priority, match: route.match)
-    end)
-    |> Builder.build!()
+  def definition(spec, :core_keyword) do
+    spec |> definition(:core_map) |> Map.from_struct() |> Map.drop([:id, :state]) |> Map.to_list() |> Jido.Agent.new!()
   end
 
   def definition(spec, :source_json) do

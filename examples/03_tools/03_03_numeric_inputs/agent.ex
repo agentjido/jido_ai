@@ -32,8 +32,6 @@ defmodule JidoAI.Examples.NumericInputs.Agent do
   routes do
     signal_source "/examples/ai/03_tools/03_03"
 
-    route "ai.numeric", ai(:assistant) do
-      define :read_numbers, args: [:query]
-    end
+    route "ai.numeric", ai(:assistant), as: :read_numbers
   end
 end

@@ -341,14 +341,14 @@ defmodule JidoAI.Examples.ToTTest do
     assert_script_done(mock)
   end
 
-  test "DSL data Builder source JSON and direct Flow use the same search result contract", %{
+  test "DSL data core data construction source JSON and direct Flow use the same search result contract", %{
     jido: jido
   } do
     {mock, context} = mock(ToT.script() ++ ToT.script())
     assert {:ok, definition} = ToT.definition()
     assert definition == ToT.Agent.definition()
     attrs = definition |> Map.from_struct() |> Map.drop([:id, :state])
-    assert {:ok, built} = attrs |> Jido.Agent.Builder.new() |> Jido.Agent.Builder.build()
+    assert {:ok, built} = Jido.Agent.new(attrs)
     source = ToT.source()
 
     registry =

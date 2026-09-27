@@ -1,7 +1,8 @@
 defmodule JidoAITest.Authoring.Agents.Fixtures.Policy do
-  use Jido.AI.Agent, name: "authoring_ai_policy", metadata: %{"case" => "policy"}
+  use Jido.AI.Agent, name: "authoring_ai_policy"
 
   agent do
+    metadata %{"case" => "policy"}
     schema Zoi.object(%{reply: Zoi.string() |> Zoi.default(""), case_id: Zoi.string() |> Zoi.default("case-17")})
     plugin Jido.AI.Plugins.Policy, config: [mode: :enforce]
     plugin Jido.AI.Plugins.ModelRouting, config: [routes: %{"case.assistant" => Jido.AI.Test.MockLLM.model("gpt-4o")}]

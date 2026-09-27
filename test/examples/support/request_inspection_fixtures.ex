@@ -22,7 +22,7 @@ defmodule JidoAI.Examples.RequestInspection.CancelGate do
       end
     end
 
-    {:ok, command}
+    {:ok, nil}
   end
 end
 

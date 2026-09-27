@@ -49,10 +49,10 @@ defmodule Jido.AI.Authoring.RegressionsTest do
   defmodule SizedAgent do
     use Jido.AI.Agent,
       name: "authoring_regression_sized",
-      metadata: %{"owner" => "support"},
       max_state_size: 4096
 
     agent do
+      metadata %{"owner" => "support"}
       schema Zoi.object(%{reply: Zoi.string() |> Zoi.default("")})
 
       ai :assistant do
@@ -77,8 +77,8 @@ defmodule Jido.AI.Authoring.RegressionsTest do
     assert Authoring.state_size_error?(error)
   end
 
-  test "explicit keyword and block metadata still conflict" do
-    assert_raise CompileError, ~r/Fields declared in both keyword and block form/, fn ->
+  test "keyword metadata is rejected in Agent declarations" do
+    assert_raise CompileError, ~r/Unknown authoring fields/, fn ->
       Code.compile_string("""
       defmodule Jido.AI.Authoring.RegressionsTest.ConflictingMetadata do
         use Jido.AI.Agent, name: "conflicting_metadata", metadata: %{owner: "first"}

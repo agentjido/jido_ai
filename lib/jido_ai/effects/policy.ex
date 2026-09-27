@@ -5,7 +5,6 @@ defmodule Jido.AI.Effects.Policy do
 
   alias Jido.Agent.Directive
   alias Jido.AI.Effects.State
-  alias Jido.Plugin.Dispatch.Send
   alias Jido.Plugin.Scheduler.Schedule
 
   @type mode :: :deny_all | :allow_all | :allow_list
@@ -20,7 +19,7 @@ defmodule Jido.AI.Effects.Policy do
           constraints: constraints()
         }
 
-  @default_allowed [State, Directive.Emit, Send, Schedule]
+  @default_allowed [State, Directive.Emit, Schedule]
 
   @default_denied [
     Directive.SpawnProcess,
@@ -44,7 +43,9 @@ defmodule Jido.AI.Effects.Policy do
   Builds a policy from map/keyword input.
   """
   @spec new(t() | map() | keyword() | nil) :: t()
-  def new(%__MODULE__{} = policy), do: policy
+  def new(%__MODULE__{} = policy),
+    do: %{policy | allow: normalize_matchers(policy.allow), deny: normalize_matchers(policy.deny)}
+
   def new(nil), do: default()
 
   def new(input) when is_list(input) do
@@ -113,6 +114,8 @@ defmodule Jido.AI.Effects.Policy do
   @doc "Returns true when an effect is permitted by the policy."
   @spec allowed?(t(), term()) :: boolean()
   def allowed?(%__MODULE__{} = policy, %struct{} = effect) when is_atom(struct) do
+    policy = new(policy)
+
     if MapSet.member?(policy.deny, struct) do
       false
     else
@@ -148,14 +151,26 @@ defmodule Jido.AI.Effects.Policy do
     |> MapSet.new()
   end
 
-  defp normalize_matchers(%MapSet{} = set), do: set
+  defp normalize_matchers(%MapSet{} = set) do
+    Enum.reduce(set, set, fn value, result ->
+      case normalize_matcher(value) do
+        nil -> MapSet.delete(result, value)
+        ^value -> result
+        normalized -> result |> MapSet.delete(value) |> MapSet.put(normalized)
+      end
+    end)
+  end
+
   defp normalize_matchers(value), do: normalize_matchers(List.wrap(value))
 
+  # The former Send effect is now Emit. Migrate both lists so an old deny
+  # entry still blocks delivery after the Directive source migration.
+  defp normalize_matcher(Jido.Plugin.Dispatch.Send), do: Directive.Emit
   defp normalize_matcher(module) when is_atom(module), do: module
 
   defp normalize_matcher(module) when is_binary(module) do
     try do
-      String.to_existing_atom(module)
+      module |> String.to_existing_atom() |> normalize_matcher()
     rescue
       ArgumentError -> nil
     end
@@ -315,11 +330,6 @@ defmodule Jido.AI.Effects.Policy do
   defp constrained_allowed?(constraints, %Directive.Emit{} = emit) when is_map(constraints) do
     emit_constraints = fetch(constraints, :emit, %{})
     emit_type_allowed?(emit, emit_constraints) and emit_dispatch_allowed?(emit, emit_constraints)
-  end
-
-  defp constrained_allowed?(constraints, %Send{signal: signal, target: target})
-       when is_map(constraints) do
-    constrained_allowed?(constraints, %Directive.Emit{signal: signal, dispatch: target})
   end
 
   defp constrained_allowed?(constraints, %Schedule{} = schedule) when is_map(constraints) do
