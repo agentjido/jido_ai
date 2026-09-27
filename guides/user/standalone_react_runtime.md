@@ -250,13 +250,13 @@ result = ReAct.run("What is 19 + 23?", config)
 #   termination_reason: :final_answer,
 #   usage: %{input_tokens: 120, output_tokens: 45},
 #   final_token: "rt2.eyJhbGci...",
-#   trace: [%Jido.AI.Reasoning.ReAct.Event{...}, ...]
+#   trace: [%Jido.AI.Runtime.Event{...}, ...]
 # }
 ```
 
 ## Streaming
 
-`stream/3` returns a lazy `Enumerable` of `Jido.AI.Reasoning.ReAct.Event` structs. Process events as they arrive, then reduce the stream with `collect_stream/1` if you need the terminal result.
+`stream/3` returns a lazy `Enumerable` of `Jido.AI.Runtime.Event` structs. Process events as they arrive, then reduce the stream with `collect_stream/1` if you need the terminal result.
 
 ```elixir
 alias Jido.AI.Reasoning.ReAct
@@ -348,10 +348,10 @@ Attempting to `continue/3` a cancelled token will restore a state with `status: 
 
 ## Event Stream Item Shapes
 
-Every event is a `Jido.AI.Reasoning.ReAct.Event` struct:
+Every event is a `Jido.AI.Runtime.Event` struct:
 
 ```elixir
-%Jido.AI.Reasoning.ReAct.Event{
+%Jido.AI.Runtime.Event{
   id: "evt_abc123",
   seq: 1,
   at_ms: 1740268800000,
@@ -380,6 +380,10 @@ Every event is a `Jido.AI.Reasoning.ReAct.Event` struct:
 | `:request_completed` | Run finished successfully | `%{result: ..., termination_reason: ..., usage: ...}` |
 | `:request_failed` | Run failed | `%{error: ...}` |
 | `:request_cancelled` | Run was cancelled | — |
+
+The final `:checkpoint` event has `data.reason == :terminal`. It now arrives
+before `:request_completed`, `:request_failed`, or `:request_cancelled`. Consumers
+that stop at the terminal event can retain the final checkpoint token.
 
 `collect_stream/1` reduces the full event list into:
 

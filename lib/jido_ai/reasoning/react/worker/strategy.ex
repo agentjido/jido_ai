@@ -4,10 +4,11 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
   use Jido.Agent.Strategy
 
   alias Jido.Agent
-  alias Jido.Agent.Directive, as: AgentDirective
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AgentServer.ParentRef
   alias Jido.AI.Query
   alias Jido.AI.Reasoning.ReAct.{Config, Runner, Signal}
+  alias Jido.AI.Reasoning.ReAct.Worker.EmitEvent
   alias Jido.AI.Runtime.Event
 
   @start :react_worker_start
@@ -369,7 +370,8 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
     |> Map.put(:runtime_task, nil)
   end
 
-  defp emit_parent_event(agent, request_id, event) do
+  defp emit_parent_event(%{state: %{__parent__: %ParentRef{pid: pid}}}, request_id, event)
+       when is_pid(pid) do
     signal =
       Signal.new!(
         %{
@@ -379,8 +381,10 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
         source: @source
       )
 
-    AgentDirective.emit_to_parent(agent, signal)
+    %EmitEvent{parent: pid, signal: signal}
   end
+
+  defp emit_parent_event(_agent, _request_id, _event), do: nil
 
   defp normalize_event(%Event{} = event), do: Map.from_struct(event)
   defp normalize_event(event) when is_map(event), do: event
