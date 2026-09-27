@@ -8,6 +8,7 @@ defmodule Jido.AI.Reasoning.ReAct.WorkerEventDeliveryTest do
   alias Jido.AI.Request
   alias Jido.AI.Request.Handle
   alias Jido.AI.Runtime.Event
+  alias Jido.Tracing.{Context, Trace}
 
   defmodule ParentAgent do
     use Jido.AI.Agent, name: "ordered_worker_events", tools: []
@@ -101,6 +102,46 @@ defmodule Jido.AI.Reasoning.ReAct.WorkerEventDeliveryTest do
     }
 
     assert {_worker, []} = Worker.Strategy.cmd(worker, [instruction], %{})
+  end
+
+  test "ordered delivery preserves trace and causation data" do
+    input = Jido.Signal.new!("ai.react.worker.runtime.event", %{}, source: "/test")
+    {input, trace} = Context.ensure_from_signal(input)
+    signal = Jido.Signal.new!("ai.react.worker.event", %{}, source: "/test")
+    directive = %Worker.EmitEvent{parent: self(), signal: signal}
+
+    try do
+      assert {:ok, %{}} = DirectiveExec.exec(directive, input, %{})
+      delivered = receive_worker_event()
+      delivered_trace = Trace.get(delivered)
+      assert delivered_trace.trace_id == trace.trace_id
+      assert delivered_trace.parent_span_id == trace.span_id
+      assert delivered_trace.causation_id == input.id
+      refute delivered_trace.span_id == trace.span_id
+    after
+      Context.clear()
+    end
+  end
+
+  test "ordered delivery does not wait for the parent to process a signal" do
+    caller = self()
+
+    parent =
+      spawn(fn ->
+        receive do
+          :drain -> send(caller, {:delivered, receive_worker_event()})
+        end
+      end)
+
+    on_exit(fn -> if Process.alive?(parent), do: Process.exit(parent, :kill) end)
+    input = Jido.Signal.new!("ai.react.worker.runtime.event", %{}, source: "/test")
+    signal = Jido.Signal.new!("ai.react.worker.event", %{}, source: "/test")
+    directive = %Worker.EmitEvent{parent: parent, signal: signal}
+
+    task = Task.async(fn -> DirectiveExec.exec(directive, input, %{}) end)
+    assert {:ok, %{}} = Task.await(task, 1_000)
+    send(parent, :drain)
+    assert_receive {:delivered, ^signal}, 1_000
   end
 
   defp receive_worker_event do

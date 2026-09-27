@@ -2,6 +2,7 @@ defmodule Jido.AI.Integration.RequestStreamOrderTest do
   use Jido.AI.TestCase, async: false
 
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.AI.Context
   alias Jido.AI.Request
 
   defmodule EchoTool do
@@ -16,8 +17,7 @@ defmodule Jido.AI.Integration.RequestStreamOrderTest do
   defmodule StreamAgent do
     use Jido.AI.Agent,
       name: "request_stream_order",
-      tools: [EchoTool],
-      token_secret: "stream-order-test-secret-long-enough"
+      tools: [EchoTool]
   end
 
   setup do
@@ -29,9 +29,11 @@ defmodule Jido.AI.Integration.RequestStreamOrderTest do
     %{pid: pid}
   end
 
-  test "a tool request and later requests deliver all events before completion", %{pid: pid} do
+  test "repeated tool requests deliver all events before completion", %{pid: pid} do
     # Reuse the worker to cover the transition from a finished request to a new one.
     for run <- 1..3 do
+      reset_context(pid, run)
+
       script =
         expect_react do
           user("echo hello")
@@ -44,8 +46,7 @@ defmodule Jido.AI.Integration.RequestStreamOrderTest do
 
       events = Enum.to_list(events)
       assert_complete_stream(events, :request_completed)
-      # The script uses the tool result in conversation history on later requests.
-      if run == 1, do: assert(Enum.any?(events, &(&1.kind == :tool_completed)))
+      assert Enum.any?(events, &(&1.kind == :tool_completed))
       assert Enum.any?(events, &(&1.kind == :llm_completed and is_binary(&1.data.model)))
       assert {:ok, "hello"} = StreamAgent.await(request, timeout: 5_000)
       assert_parent_state(pid, request.id, events, :completed)
@@ -75,6 +76,20 @@ defmodule Jido.AI.Integration.RequestStreamOrderTest do
     assert Enum.map(events, & &1.seq) == Enum.to_list(1..List.last(events).seq)
     assert %{kind: :checkpoint, data: %{reason: :terminal, token: token}} = Enum.at(events, -2)
     assert is_binary(token)
+  end
+
+  defp reset_context(pid, run) do
+    signal =
+      Jido.Signal.new!(
+        "ai.react.context.modify",
+        %{
+          op_id: "reset_#{run}",
+          operation: %{type: :replace, reason: :manual, result_context: Context.new()}
+        },
+        source: "/test/request_stream_order"
+      )
+
+    assert {:ok, _agent} = Jido.AgentServer.call(pid, signal, 5_000)
   end
 
   defp assert_parent_state(pid, request_id, events, status) do

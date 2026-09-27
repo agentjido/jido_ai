@@ -51,6 +51,9 @@ terminal event, while the stream sink is still active. You can read its token
 from `event.data.token` when `event.kind == :checkpoint` and
 `event.data.reason == :terminal`.
 
+If a provider raises during a run, the failure events continue the sequence.
+The failure checkpoint retains completed turns and partial streamed text.
+
 Synthetic rejection and caller cancellation events use `seq: 0`. These events
 can close the request stream before its worker finishes. An explicit
 `stream_event_timeout_ms` can also stop the enumerable before a terminal event.
