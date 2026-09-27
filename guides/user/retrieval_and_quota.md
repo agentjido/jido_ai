@@ -175,9 +175,9 @@ Do not use this path when:
 
 ## Retrieval authoring
 
-`Jido.AI.Plugins.Retrieval` declares `roles: [:agent, :agent_server]` and
+`Jido.AI.Plugins.Retrieval` uses `Jido.Plugin` and
 implements `state_spec/1`, `prepare/2`, and `admit/3` in the package module.
-Its Agent and Server facet modules remain available as compatible adapters.
+Its callbacks form one public contract. The redundant facet adapters are removed.
 The package identity, options, state key, version, and stored declarations do
 not change. Pure preparation binds capability input. Live admission reads the
 application-supervised Store. The Store keeps its independent lifetime.

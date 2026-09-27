@@ -185,8 +185,9 @@ This does not establish live-provider quality, load behavior, fresh line
 coverage, or release readiness. Historical maps and audits do not override
 the current source and tested contracts above.
 
-Retrieval implements its Agent and Server callbacks in the package module with
-explicit core `roles`. Its former facet modules remain compatible adapters.
-This source layout change preserves package identity, options, and stored
-Agent definitions. It requires the core Plugin authoring change in
-agentjido/jido#382.
+All AI Plugins now use one core `Jido.Plugin` behaviour with optional
+callbacks. Large implementations delegate to ordinary helper modules.
+Retrieval implements its callbacks directly; its redundant facet adapters are
+removed. Reasoning capabilities generate callbacks in their Plugin module.
+Plugin identity, options, versions, state keys, and stored definitions remain
+unchanged. This requires the core authoring change in agentjido/jido#382.

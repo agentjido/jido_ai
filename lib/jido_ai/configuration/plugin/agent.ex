@@ -1,17 +1,17 @@
 defmodule Jido.AI.Configuration.Plugin.Agent do
   @moduledoc false
-  use Jido.Agent.Plugin
+  @behaviour Jido.Plugin
 
-  @impl Jido.Agent.Plugin
+  @impl Jido.Plugin
   def state_spec(opts), do: Jido.AI.Configuration.Plugin.agent_state_spec(opts)
 
-  @impl Jido.Agent.Plugin
+  @impl Jido.Plugin
   def prepare(_preparation, _opts), do: {:ok, :requires_agent_server}
 
-  @impl Jido.Agent.Plugin
+  @impl Jido.Plugin
   def directives(_opts), do: [Jido.AI.Configuration.Change]
 
-  @impl Jido.Agent.Plugin
+  @impl Jido.Plugin
   def reduce(reduction, opts) do
     changes = Enum.filter(reduction.directives, &match?(%Jido.AI.Configuration.Change{}, &1))
     Jido.AI.Configuration.reduce(reduction.plugin_state, changes, opts)

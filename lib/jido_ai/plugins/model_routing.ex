@@ -30,7 +30,13 @@ defmodule Jido.AI.Plugins.ModelRouting do
   patterns use lexical order. The Plugin prepares a model choice for the Action.
   """
 
-  use Jido.Plugin, agent: Jido.AI.Plugins.ModelRouting.Agent
+  use Jido.Plugin
+
+  @impl true
+  defdelegate state_spec(opts), to: Jido.AI.Plugins.ModelRouting.Agent
+
+  @impl true
+  defdelegate prepare(preparation, opts), to: Jido.AI.Plugins.ModelRouting.Agent
 
   @doc "Returns the Plugin name."
   def name, do: "model_routing"
