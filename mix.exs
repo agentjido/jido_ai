@@ -69,7 +69,7 @@ defmodule JidoAi.MixProject do
     [
       # Jido ecosystem
       {:jido,
-       git: "https://github.com/agentjido/jido.git", ref: "c8241c8b3c349f1de6368aac0bc8044c88b3674a", override: true},
+       git: "https://github.com/agentjido/jido.git", ref: "8c75f94958cad682834af787cb164536c5b513ea", override: true},
       {:jido_action,
        git: "https://github.com/agentjido/jido_action.git",
        ref: "af16008f79e8b76d3f3995935b1366bb2a0d7031",
