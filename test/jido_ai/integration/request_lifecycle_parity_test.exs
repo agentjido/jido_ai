@@ -242,7 +242,10 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
       assert request_completed.data.request_id == request_id
       assert request_completed.data.result.answer == "(4 + (8 - 6)) * 4 = 24"
 
-      assert_receive {:telemetry_event, [:jido, :ai, :request, :complete], measurements, metadata}, 200
+      assert_receive {:telemetry_event, [:jido, :ai, :request, :complete], measurements,
+                      %{request_id: ^request_id} = metadata},
+                     200
+
       assert metadata.request_id == request_id
       assert measurements.total_tokens == 13
     end
@@ -281,7 +284,10 @@ defmodule Jido.AI.Integration.RequestLifecycleParityTest do
       assert request_completed.data.request_id == request_id
       assert request_completed.data.result == "Thought 1: compare tradeoffs"
 
-      assert_receive {:telemetry_event, [:jido, :ai, :request, :complete], measurements, metadata}, 200
+      assert_receive {:telemetry_event, [:jido, :ai, :request, :complete], measurements,
+                      %{request_id: ^request_id} = metadata},
+                     200
+
       assert metadata.request_id == request_id
       assert measurements.total_tokens == 5
     end

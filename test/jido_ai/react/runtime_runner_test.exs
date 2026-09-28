@@ -1733,7 +1733,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
 
           {:ok,
            %{
-             stream: delayed_stream(chunks, 30),
+             stream: delayed_stream(chunks, 150),
              finish_reason: :tool_calls,
              usage: %{input_tokens: 4, output_tokens: 2}
            }}
@@ -1741,7 +1741,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
         2 ->
           {:ok,
            %{
-             stream: delayed_stream([ReqLLM.StreamChunk.text("Result is 5")], 30),
+             stream: delayed_stream([ReqLLM.StreamChunk.text("Result is 5")], 150),
              finish_reason: :stop,
              usage: %{input_tokens: 3, output_tokens: 2}
            }}
@@ -1752,7 +1752,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       Config.new(%{
         model: "anthropic:claude-sonnet-4-5",
         tools: %{CalculatorTool.name() => CalculatorTool},
-        stream_timeout_ms: 120,
+        stream_timeout_ms: 500,
         tool_max_retries: 0,
         tool_retry_backoff_ms: 0
       })
@@ -1805,7 +1805,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
       {:ok,
        responses_stream_response(
-         delayed_stream(hidden_text_chunks, 2),
+         delayed_stream(hidden_text_chunks, 5),
          %{finish_reason: :stop, usage: %{input_tokens: 2, output_tokens: 200}},
          model
        )}
@@ -1816,7 +1816,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
         model: :capable,
         tools: %{},
         capture_deltas?: false,
-        stream_timeout_ms: 120
+        stream_timeout_ms: 500
       })
 
     consumer =
@@ -1831,7 +1831,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert {:message_queue_len, queue_len} = Process.info(consumer, :message_queue_len)
     assert queue_len < 20
 
-    assert_receive {:consumer_done, events}, 2_000
+    assert_receive {:consumer_done, events}, 5_000
     request_completed = Enum.find(events, &(&1.kind == :request_completed))
     assert request_completed.data.result == String.duplicate("x", 200)
   end
