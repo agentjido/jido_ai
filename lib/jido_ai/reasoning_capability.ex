@@ -7,7 +7,9 @@ defmodule Jido.AI.ReasoningCapability do
     state_key = :"reasoning_#{strategy}"
 
     quote do
-      use Jido.Plugin, agent: unquote(facet)
+      use Jido.Plugin
+      defdelegate state_spec(opts), to: unquote(facet)
+      defdelegate prepare(preparation, opts), to: unquote(facet)
       @strategy unquote(strategy)
       def name, do: unquote(Keyword.fetch!(opts, :name))
       def description, do: unquote(Keyword.fetch!(opts, :description))
@@ -25,13 +27,10 @@ defmodule Jido.AI.ReasoningCapability do
 
       defmodule unquote(facet) do
         @moduledoc false
-        use Jido.Agent.Plugin
 
-        @impl Jido.Agent.Plugin
         def state_spec(opts),
           do: {unquote(state_key), Jido.AI.ReasoningCapability.schema(unquote(strategy), opts)}
 
-        @impl Jido.Agent.Plugin
         def prepare(preparation, opts),
           do:
             Jido.AI.ReasoningCapability.prepare_input(

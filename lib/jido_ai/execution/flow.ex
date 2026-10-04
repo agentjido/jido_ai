@@ -2,20 +2,25 @@ defmodule Jido.AI.Execution.Flow do
   @moduledoc false
 
   def build(profile) do
-    alias Jido.Flow.Builder, as: B
+    alias Jido.Flow.{Dispatch, Ref, Step}
 
-    B.new(name: "ai_#{profile.id}", schema: Zoi.object(%{query: Jido.AI.Query.schema()}))
-    |> B.step("prepare", Jido.AI.Execution.Prepare, %{
-      profile_id: profile.id,
-      query: B.input(:query)
-    })
-    |> B.dispatch(
-      "reason",
-      Jido.AI.Execution.CallModel,
-      Jido.AI.Execution.Decide,
-      B.result("prepare")
+    Jido.Flow.new!(
+      name: "ai_#{profile.id}",
+      schema: Zoi.object(%{query: Jido.AI.Query.schema()}),
+      components: [
+        Step.new!(
+          name: "prepare",
+          action: Jido.AI.Execution.Prepare,
+          params: %{profile_id: profile.id, query: Ref.input(:query)}
+        ),
+        Dispatch.new!(
+          name: "reason",
+          decision: Jido.AI.Execution.CallModel,
+          expander: Jido.AI.Execution.Decide,
+          params: Ref.result("prepare")
+        )
+      ],
+      output: Ref.result("reason")
     )
-    |> B.output(B.result("reason"))
-    |> B.build()
   end
 end

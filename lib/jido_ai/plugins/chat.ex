@@ -7,7 +7,10 @@ defmodule Jido.AI.Plugins.Chat do
   Tools may be supplied by name or as Action modules. `tool_policy` is retained
   as descriptive state; it is not an execution authorization rule.
   """
-  use Jido.Plugin, agent: Jido.AI.Plugins.Chat.Agent
+  use Jido.Plugin
+
+  defdelegate state_spec(opts), to: Jido.AI.Plugins.Chat.Agent
+  defdelegate prepare(preparation, opts), to: Jido.AI.Plugins.Chat.Agent
 
   alias Jido.AI.Actions.LLM.{Chat, Complete, Embed, GenerateObject}
   alias Jido.AI.Actions.ToolCalling.{CallWithTools, ExecuteTool, ListTools}

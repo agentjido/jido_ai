@@ -9,9 +9,11 @@ defmodule Jido.AI.Plugins.Quota do
   records known usage before the Agent commit. Failed or cancelled calls with no
   usage remain explicit unknown records. Transport retries are part of one call.
   """
-  use Jido.Plugin,
-    agent: Jido.AI.Plugins.Quota.Agent,
-    agent_server: Jido.AI.Plugins.Quota.AgentServer
+  use Jido.Plugin
+
+  defdelegate state_spec(opts), to: Jido.AI.Plugins.Quota.Agent
+  defdelegate prepare(preparation, opts), to: Jido.AI.Plugins.Quota.Agent
+  defdelegate admit(runtime_ref, admission, opts), to: Jido.AI.Plugins.Quota.AgentServer
 
   alias Jido.AI.Quota.Store
   alias Jido.AI.Actions.Quota.{GetStatus, Reset}

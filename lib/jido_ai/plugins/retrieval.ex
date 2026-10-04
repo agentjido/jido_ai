@@ -12,9 +12,11 @@ defmodule Jido.AI.Plugins.Retrieval do
   reads for Chat, reasoning and native AI requests. Pure preparation only binds
   capability input; direct Agent commands do not implicitly read memory.
   """
-  use Jido.Plugin,
-    agent: Jido.AI.Plugins.Retrieval.Agent,
-    agent_server: Jido.AI.Plugins.Retrieval.AgentServer
+  use Jido.Plugin
+
+  defdelegate state_spec(opts), to: Jido.AI.Plugins.Retrieval.Agent
+  defdelegate prepare(preparation, opts), to: Jido.AI.Plugins.Retrieval.Agent
+  defdelegate admit(runtime_ref, admission, opts), to: Jido.AI.Plugins.Retrieval.AgentServer
 
   alias Jido.AI.Retrieval.Store
   alias Jido.AI.Actions.Retrieval.{UpsertMemory, RecallMemory, ClearMemory}

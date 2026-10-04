@@ -5,7 +5,6 @@ defmodule Jido.AI.Effects.Policy do
 
   alias Jido.Agent.Directive
   alias Jido.AI.Effects.State
-  alias Jido.Plugin.Dispatch.Send
   alias Jido.Plugin.Scheduler.Schedule
 
   @type mode :: :deny_all | :allow_all | :allow_list
@@ -20,7 +19,7 @@ defmodule Jido.AI.Effects.Policy do
           constraints: constraints()
         }
 
-  @default_allowed [State, Directive.Emit, Send, Schedule]
+  @default_allowed [State, Directive.Emit, Schedule]
 
   @default_denied [
     Directive.SpawnProcess,
@@ -315,11 +314,6 @@ defmodule Jido.AI.Effects.Policy do
   defp constrained_allowed?(constraints, %Directive.Emit{} = emit) when is_map(constraints) do
     emit_constraints = fetch(constraints, :emit, %{})
     emit_type_allowed?(emit, emit_constraints) and emit_dispatch_allowed?(emit, emit_constraints)
-  end
-
-  defp constrained_allowed?(constraints, %Send{signal: signal, target: target})
-       when is_map(constraints) do
-    constrained_allowed?(constraints, %Directive.Emit{signal: signal, dispatch: target})
   end
 
   defp constrained_allowed?(constraints, %Schedule{} = schedule) when is_map(constraints) do

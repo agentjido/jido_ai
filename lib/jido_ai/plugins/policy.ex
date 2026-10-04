@@ -8,9 +8,14 @@ defmodule Jido.AI.Plugins.Policy do
   Native AI bindings and declared request routes share this policy. Model/tool
   results and text deltas retain the existing normalization rules.
   """
-  use Jido.Plugin,
-    agent: Jido.AI.Plugins.Policy.Agent,
-    agent_server: Jido.AI.Plugins.Policy.AgentServer
+  use Jido.Plugin
+
+  defdelegate state_spec(opts), to: Jido.AI.Plugins.Policy.Agent
+  defdelegate prepare(preparation, opts), to: Jido.AI.Plugins.Policy.Agent
+  defdelegate admit(runtime_ref, admission, opts), to: Jido.AI.Plugins.Policy.AgentServer
+
+  defdelegate prepare_dispatch(runtime_ref, signal, context, opts),
+    to: Jido.AI.Plugins.Policy.AgentServer
 
   alias Jido.AI.Error
   alias Jido.AI.Validation

@@ -8,7 +8,10 @@ defmodule Jido.AI.Plugins.Planning do
   map. Direct Actions keep their result maps. The route Action stores that result
   in the declared domain field and returns the complete Agent state.
   """
-  use Jido.Plugin, agent: Jido.AI.Plugins.Planning.Agent
+  use Jido.Plugin
+
+  defdelegate state_spec(opts), to: Jido.AI.Plugins.Planning.Agent
+  defdelegate prepare(preparation, opts), to: Jido.AI.Plugins.Planning.Agent
 
   alias Jido.AI.Actions.Planning.{Plan, Decompose, Prioritize}
 

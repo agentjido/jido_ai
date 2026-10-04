@@ -1,17 +1,12 @@
 defmodule Jido.AI.Thread.Control.Plugin.Agent do
   @moduledoc false
-  use Jido.Agent.Plugin
-
   alias Jido.AI.Thread.Control, as: Ops
 
-  @impl Jido.Agent.Plugin
   def state_spec(opts),
     do: {Ops.key(), Zoi.map() |> Zoi.refine({Ops, :validate_state, [opts[:profiles]]}) |> Zoi.default(%{})}
 
-  @impl Jido.Agent.Plugin
   def directives(_opts), do: [Ops.Change]
 
-  @impl Jido.Agent.Plugin
   def reduce(reduction, opts) do
     reduction.directives
     |> Enum.filter(&match?(%Ops.Change{}, &1))
