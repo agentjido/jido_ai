@@ -4,7 +4,6 @@ defmodule Jido.AI.Effects.PolicyTest do
   alias Jido.AI.Effects.Policy
   alias Jido.Agent.Directive
   alias Jido.AI.Effects.State
-  alias Jido.Plugin.Dispatch.Send
   alias Jido.Plugin.Scheduler.Schedule
 
   defp signal(type \\ "ai.test"),
@@ -33,6 +32,21 @@ defmodule Jido.AI.Effects.PolicyTest do
 
     assert Policy.allowed?(policy, %Directive.Emit{signal: %{type: "ai.test"}, dispatch: :pubsub})
     refute Policy.allowed?(policy, %Directive.Emit{signal: %{type: "ai.test"}, dispatch: :bus})
+  end
+
+  test "legacy Send policy entries retain allow, deny, and dispatch restrictions for Emit" do
+    legacy = Jido.Plugin.Dispatch.Send
+    emit = Directive.emit_to_pid(signal(), self())
+
+    for matcher <- [legacy, Atom.to_string(legacy)], collection <- [[matcher], MapSet.new([matcher])] do
+      allowed = Policy.new(allow: collection, deny: [], constraints: %{emit: %{allowed_dispatches: [:pid]}})
+      assert Policy.allowed?(allowed, emit)
+      refute Policy.allowed?(allowed, %{emit | dispatch: :bus})
+      refute Policy.allowed?(Policy.new(deny: collection), emit)
+      refute Policy.allowed?(Policy.intersect(allowed, %{deny: collection}), emit)
+    end
+
+    refute Policy.allowed?(%Policy{deny: MapSet.new([legacy])}, emit)
   end
 
   test "accepts keyword constraints and enforces them" do
@@ -190,10 +204,10 @@ defmodule Jido.AI.Effects.PolicyTest do
     refute Policy.allowed?(policy, %Directive.Emit{signal: %{value: "missing"}})
   end
 
-  test "normalizes dispatch targets and applies the same constraints to Send" do
+  test "normalizes Emit dispatch targets without widening the allowed adapters" do
     policy =
       Policy.new(
-        allow: [Directive.Emit, Send],
+        allow: [Directive.Emit],
         deny: [],
         constraints: %{emit: %{allowed_dispatches: [:default, :pid, "pubsub", " ", 17]}}
       )
@@ -206,8 +220,8 @@ defmodule Jido.AI.Effects.PolicyTest do
     refute Policy.allowed?(policy, emit.([:pid, :bus]))
     refute Policy.allowed?(policy, emit.(%{adapter: :pid}))
 
-    assert Policy.allowed?(policy, %Send{signal: signal(), target: :pid})
-    refute Policy.allowed?(policy, %Send{signal: signal(), target: :bus})
+    assert Policy.allowed?(policy, %Directive.Emit{signal: signal(), dispatch: :pid})
+    refute Policy.allowed?(policy, %Directive.Emit{signal: signal(), dispatch: :bus})
   end
 
   test "normalizes malformed constraints without widening explicit empty constraints" do

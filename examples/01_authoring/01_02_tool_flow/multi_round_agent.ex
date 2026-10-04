@@ -41,9 +41,7 @@ defmodule JidoAI.Examples.ToolFlow.MultiRoundAgent do
   routes do
     signal_source "/examples/ai/01_authoring/01_02/multi_round"
 
-    route "examples.ai.01_02.multi_round", ai: :assistant do
-      define :calculate, args: [:query]
-    end
+    route "examples.ai.01_02.multi_round", ai: :assistant, as: :calculate
   end
 
   def prompt do

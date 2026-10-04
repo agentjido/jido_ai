@@ -4,7 +4,7 @@ defmodule Jido.AI.Execution.Flow do
   def build(profile) do
     alias Jido.Flow.{Dispatch, Ref, Step}
 
-    Jido.Flow.new!(
+    Jido.Flow.new(
       name: "ai_#{profile.id}",
       schema: Zoi.object(%{query: Jido.AI.Query.schema()}),
       components: [

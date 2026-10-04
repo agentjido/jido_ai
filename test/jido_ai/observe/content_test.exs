@@ -80,6 +80,29 @@ defmodule Jido.AI.Observe.ContentTest do
     refute Content.retainable?(%{api_key: "private"}, %{store_content: true, stream_content: true})
   end
 
+  test "large signed checkpoint tokens survive projection while diagnostics and credentials stay protected" do
+    alias Jido.AI.Reasoning.ReAct.{Config, State, Token}
+
+    config = Config.new(model: :fast, token_secret: "checkpoint-test", token_compress?: false)
+    state = State.new(String.duplicate("q", 30_000), String.duplicate("s", 30_000))
+    policy = %{store_content: true, stream_content: true}
+    assert Content.retainable?(state, policy)
+    token = Token.issue(state, config)
+    assert byte_size(token) > 65_536
+    event = %{kind: :checkpoint, data: %{reason: :terminal, token: token, api_key: "private"}}
+
+    for destination <- [:stream, :storage] do
+      projected = Content.event(event, policy, destination)
+      assert projected.data.token == token
+      assert projected.data.api_key == "[REDACTED]"
+      assert {:ok, saved, _} = Token.decode_state(projected.data.token, config)
+      assert saved.context == state.context
+    end
+
+    assert Content.event(event, policy, :diagnostics).data.token == nil
+    assert Content.event(event, %{policy | store_content: false}, :diagnostics).data.token == nil
+  end
+
   test "projection bounds collections and accepts malformed tool-result collections" do
     assert length(Content.project(Enum.to_list(1..3_000), %{}, :storage)) == 2_000
     assert map_size(Content.project(Map.new(1..3_000, &{&1, &1}), %{}, :storage)) == 2_000

@@ -145,7 +145,7 @@ defmodule JidoAI.Examples.ToolLimitsTest do
     assert_script_done(mock)
   end
 
-  test "DSL data Builder and source JSON retain tool timeout and retry settings", %{jido: jido} do
+  test "DSL data core data construction and source JSON retain tool timeout and retry settings", %{jido: jido} do
     source = source()
     assert Enum.find(source.tools, &(&1.name == "timed_probe")).max_retries == 1
     assert Enum.find(source.tools, &(&1.name == "timed_probe")).retry_backoff == 150
@@ -153,7 +153,7 @@ defmodule JidoAI.Examples.ToolLimitsTest do
     assert {:ok, definition} = Authoring.lower(base(), [source])
     assert definition == Agent.definition()
     attrs = definition |> Map.from_struct() |> Map.drop([:id, :state])
-    assert {:ok, built} = attrs |> Jido.Agent.Builder.new() |> Jido.Agent.Builder.build()
+    assert {:ok, built} = Jido.Agent.new(attrs)
 
     registry =
       source

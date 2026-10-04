@@ -7,7 +7,7 @@ defmodule JidoAI.Examples.InitialState.Agent do
         reply: Zoi.string() |> Zoi.default(""),
         count: Zoi.integer(),
         thread: Zoi.map() |> Zoi.default(%{}),
-        messages: Jido.Session.schema()
+        messages: Jido.Session.state_schema()
       })
     )
 

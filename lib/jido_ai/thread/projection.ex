@@ -57,7 +57,7 @@ defmodule Jido.AI.Thread.Projection do
   @parts [:text, :image_url, :video_url, :image, :file, :thinking]
 
   @doc "Schema for an Agent conversation field. Nil means no session has started."
-  def schema, do: Session.schema() |> Zoi.nullable() |> Zoi.default(nil)
+  def schema, do: Session.state_schema() |> Zoi.nullable() |> Zoi.default(nil)
 
   @doc false
   def before_request(%Session{} = session, id) do

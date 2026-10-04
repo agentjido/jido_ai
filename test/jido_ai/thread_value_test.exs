@@ -52,6 +52,26 @@ defmodule Jido.ThreadValueTest do
     assert {:error, :invalid_entry} = Entry.decode(Map.put(base, "kind", ""))
   end
 
+  test "Session state schema preserves canonical values and rejects map coercion" do
+    session = Session.new(now: 10) |> Session.append(%{kind: :note, payload: %{value: 1}})
+    source = Jido.Agent.new!(name: "session_state", schema: Zoi.object(%{session: Session.state_schema()}))
+
+    assert {:ok, agent} = Jido.Agent.instantiate(source, state: %{session: session})
+    assert agent.state.session === session
+    assert {:ok, ^session} = Zoi.parse(Session.schema(), Map.from_struct(session))
+
+    [entry] = session.thread.entries
+
+    for value <- [
+          Map.from_struct(session),
+          %{session | thread: Map.from_struct(session.thread)},
+          %{session | thread: %{session.thread | entries: [Map.from_struct(entry)]}},
+          %{session | created_at: "10"}
+        ] do
+      assert {:error, _} = Jido.Agent.instantiate(source, state: %{session: value})
+    end
+  end
+
   test "Entry normalization fills missing optional fields" do
     entry = %Entry{id: nil, seq: 99, at: nil, kind: nil, payload: nil, refs: nil}
     normalized = Entry.normalize(entry, 3, 20)

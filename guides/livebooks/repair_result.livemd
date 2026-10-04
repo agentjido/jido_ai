@@ -65,9 +65,7 @@ defmodule Guide.RepairResult do
   routes do
     signal_source "/guides/ai/repair_result"
 
-    route "guides.ai.repair_result", ai: :assistant do
-      define :answer, args: [:query]
-    end
+    route "guides.ai.repair_result", ai: :assistant, as: :answer
   end
 end
 ```

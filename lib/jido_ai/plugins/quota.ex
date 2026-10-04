@@ -11,9 +11,14 @@ defmodule Jido.AI.Plugins.Quota do
   """
   use Jido.Plugin
 
+  @impl true
   defdelegate state_spec(opts), to: Jido.AI.Plugins.Quota.Agent
+
+  @impl true
   defdelegate prepare(preparation, opts), to: Jido.AI.Plugins.Quota.Agent
-  defdelegate admit(runtime_ref, admission, opts), to: Jido.AI.Plugins.Quota.AgentServer
+
+  @impl true
+  defdelegate admit(runtime, admission, opts), to: Jido.AI.Plugins.Quota.AgentServer
 
   alias Jido.AI.Quota.Store
   alias Jido.AI.Actions.Quota.{GetStatus, Reset}
@@ -84,10 +89,12 @@ defmodule Jido.AI.Plugins.Quota do
   defp state_schema(defaults) do
     Zoi.object(%{
       enabled: Zoi.boolean() |> Zoi.default(defaults.enabled),
-      scope: Zoi.string() |> Zoi.optional() |> Zoi.default(defaults.scope),
+      scope: Zoi.string() |> Zoi.nullable() |> Zoi.optional() |> Zoi.default(defaults.scope),
       window_ms: Zoi.integer() |> Zoi.min(1) |> Zoi.default(defaults.window_ms),
-      max_requests: Zoi.integer() |> Zoi.min(0) |> Zoi.optional() |> Zoi.default(defaults.max_requests),
-      max_total_tokens: Zoi.integer() |> Zoi.min(0) |> Zoi.optional() |> Zoi.default(defaults.max_total_tokens),
+      max_requests:
+        Zoi.integer() |> Zoi.min(0) |> Zoi.nullable() |> Zoi.optional() |> Zoi.default(defaults.max_requests),
+      max_total_tokens:
+        Zoi.integer() |> Zoi.min(0) |> Zoi.nullable() |> Zoi.optional() |> Zoi.default(defaults.max_total_tokens),
       error_message: Zoi.string() |> Zoi.default(defaults.error_message)
     })
     |> Zoi.default(defaults)

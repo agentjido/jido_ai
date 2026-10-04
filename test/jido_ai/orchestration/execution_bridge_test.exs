@@ -12,22 +12,18 @@ defmodule Jido.AI.Orchestration.ExecutionBridgeTest do
   end
 
   defmodule HistoryGate do
-    use Jido.Plugin, agent: __MODULE__.Agent
+    use Jido.Plugin
 
-    defmodule Agent do
-      use Jido.Agent.Plugin
+    def prepare(command, opts) do
+      if command.signal.type == Jido.AI.Orchestration.history_type() do
+        send(opts[:observer], {:history_gate, self()})
 
-      def prepare(preparation, opts) do
-        if preparation.signal.type == Jido.AI.Orchestration.history_type() do
-          send(opts[:observer], {:history_gate, self()})
-
-          receive do
-            :release -> {:ok, nil}
-            :reject -> {:error, :entry_denied}
-          end
-        else
-          {:ok, nil}
+        receive do
+          :release -> {:ok, nil}
+          :reject -> {:error, :entry_denied}
         end
+      else
+        {:ok, nil}
       end
     end
   end
@@ -38,7 +34,7 @@ defmodule Jido.AI.Orchestration.ExecutionBridgeTest do
     agent do
       schema Zoi.object(%{
                answer: Zoi.string() |> Zoi.default(""),
-               context: Jido.Session.schema() |> Zoi.default(Jido.Session.new())
+               context: Jido.Session.state_schema() |> Zoi.default(Jido.Session.new())
              })
 
       ai :assistant do
@@ -117,7 +113,7 @@ defmodule Jido.AI.Orchestration.ExecutionBridgeTest do
   setup do
     Process.register(self(), __MODULE__)
     jido = :"bridge_#{System.unique_integer([:positive])}"
-    start_supervised!({Jido, name: jido})
+    start_supervised!({Jido, name: jido, namespace: "execution-bridge-test"})
     {:ok, jido: jido}
   end
 

@@ -77,8 +77,8 @@ defmodule Jido.AI.Authoring.RegressionsTest do
     assert Authoring.state_size_error?(error)
   end
 
-  test "explicit keyword and block metadata still conflict" do
-    assert_raise CompileError, ~r/Fields declared in both keyword and block form/, fn ->
+  test "keyword metadata is rejected in Agent declarations" do
+    assert_raise CompileError, ~r/Unknown authoring fields/, fn ->
       Code.compile_string("""
       defmodule Jido.AI.Authoring.RegressionsTest.ConflictingMetadata do
         use Jido.AI.Agent, name: "conflicting_metadata", metadata: %{owner: "first"}

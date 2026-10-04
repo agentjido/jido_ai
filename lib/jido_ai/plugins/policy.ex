@@ -10,12 +10,17 @@ defmodule Jido.AI.Plugins.Policy do
   """
   use Jido.Plugin
 
+  @impl true
   defdelegate state_spec(opts), to: Jido.AI.Plugins.Policy.Agent
-  defdelegate prepare(preparation, opts), to: Jido.AI.Plugins.Policy.Agent
-  defdelegate admit(runtime_ref, admission, opts), to: Jido.AI.Plugins.Policy.AgentServer
 
-  defdelegate prepare_dispatch(runtime_ref, signal, context, opts),
-    to: Jido.AI.Plugins.Policy.AgentServer
+  @impl true
+  defdelegate prepare(preparation, opts), to: Jido.AI.Plugins.Policy.Agent
+
+  @impl true
+  defdelegate admit(runtime, admission, opts), to: Jido.AI.Plugins.Policy.AgentServer
+
+  @impl true
+  defdelegate prepare_dispatch(runtime, signal, context, opts), to: Jido.AI.Plugins.Policy.AgentServer
 
   alias Jido.AI.Error
   alias Jido.AI.Validation

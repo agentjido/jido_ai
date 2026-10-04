@@ -10,7 +10,10 @@ defmodule Jido.AI.Plugins.Planning do
   """
   use Jido.Plugin
 
+  @impl true
   defdelegate state_spec(opts), to: Jido.AI.Plugins.Planning.Agent
+
+  @impl true
   defdelegate prepare(preparation, opts), to: Jido.AI.Plugins.Planning.Agent
 
   alias Jido.AI.Actions.Planning.{Plan, Decompose, Prioritize}

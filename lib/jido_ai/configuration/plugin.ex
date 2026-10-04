@@ -3,11 +3,20 @@ defmodule Jido.AI.Configuration.Plugin do
 
   use Jido.Plugin
 
+  @impl true
   defdelegate state_spec(opts), to: Jido.AI.Configuration.Plugin.Agent
+
+  @impl true
   defdelegate prepare(preparation, opts), to: Jido.AI.Configuration.Plugin.Agent
+
+  @impl true
   defdelegate directives(opts), to: Jido.AI.Configuration.Plugin.Agent
+
+  @impl true
   defdelegate reduce(reduction, opts), to: Jido.AI.Configuration.Plugin.Agent
-  defdelegate admit(runtime_ref, admission, opts), to: Jido.AI.Configuration.Plugin.AgentServer
+
+  @impl true
+  defdelegate admit(runtime, admission, opts), to: Jido.AI.Configuration.Plugin.AgentServer
 
   @doc false
   def agent_state_spec(opts) do

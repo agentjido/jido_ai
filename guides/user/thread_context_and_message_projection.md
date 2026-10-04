@@ -11,6 +11,10 @@ one `Jido.Session`, or `nil` before the first request. Declare it with
 Thread holds ordered `Jido.Thread.Entry` values, including AI messages,
 context operations, and application entries.
 
+Use `Jido.Session.state_schema()` when the field requires a Session value.
+Both Agent state schemas validate canonical values without input conversion.
+Use `Jido.Session.decode/1` to import an encoded Session before storing it.
+
 The context-control Plugin holds lane and pending-operation state. It does not
 hold a second Session or copy of the messages. `Jido.AI.Orchestration` is the separate
 live API for request control and inspection; it is not the portable value.

@@ -1,7 +1,8 @@
 defmodule JidoAITest.Authoring.Agents.Fixtures.Simple do
-  use Jido.AI.Agent, name: "authoring_ai_simple", metadata: %{"case" => "simple"}
+  use Jido.AI.Agent, name: "authoring_ai_simple"
 
   agent do
+    metadata %{"case" => "simple"}
     schema Zoi.object(%{reply: Zoi.string() |> Zoi.default(""), case_id: Zoi.string() |> Zoi.default("case-17")})
 
     ai :assistant do
@@ -19,8 +20,6 @@ defmodule JidoAITest.Authoring.Agents.Fixtures.Simple do
   routes do
     signal_source "/authoring/ai"
 
-    route "case.assistant", ai: :assistant do
-      define :submit, args: [:query]
-    end
+    route "case.assistant", ai: :assistant, as: :submit
   end
 end

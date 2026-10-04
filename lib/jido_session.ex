@@ -30,9 +30,20 @@ defmodule Jido.Session do
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
 
+  @state_schema @schema
+                |> Zoi.Schema.traverse(fn
+                  %{coerce: _} = schema -> %{schema | coerce: false}
+                  schema -> schema
+                end)
+                |> Map.put(:coerce, false)
+
   @doc "Returns the Session schema."
   @spec schema() :: Zoi.schema()
   def schema, do: @schema
+
+  @doc "Returns a validation-only schema for canonical Session values in Agent state."
+  @spec state_schema() :: Zoi.schema()
+  def state_schema, do: @state_schema
 
   @doc "Creates an open session with one thread."
   @spec new(keyword()) :: t()

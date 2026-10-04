@@ -13,7 +13,7 @@ defmodule JidoAITest.Authoring.Agents.PluginsControlsTest do
     {:ok, jido: jido}
   end
 
-  for form <- [:lowered, :builder, :codec], reverse? <- [false, true] do
+  for form <- [:lowered, :core_data, :codec], reverse? <- [false, true] do
     @tag form: form, reverse?: reverse?
     test "#{form}/reverse=#{reverse?}: custom Plugin order remains visible after AI execution", ctx do
       spec = Corpus.load!(:simple)
@@ -34,7 +34,7 @@ defmodule JidoAITest.Authoring.Agents.PluginsControlsTest do
     end
   end
 
-  for form <- [:lowered, :builder, :codec] do
+  for form <- [:lowered, :core_data, :codec] do
     @tag form: form
     test "#{form}: operation control blocks an authored tool before its Action runs", %{jido: jido, form: form} do
       spec = Corpus.load!(:tool)
@@ -105,8 +105,8 @@ defmodule JidoAITest.Authoring.Agents.PluginsControlsTest do
 
   defp transport(value, :lowered), do: value
 
-  defp transport(value, :builder),
-    do: value |> Map.from_struct() |> Map.drop([:id, :state]) |> Jido.Agent.Builder.new() |> Jido.Agent.Builder.build!()
+  defp transport(value, :core_data),
+    do: value |> Map.from_struct() |> Map.drop([:id, :state]) |> Jido.Agent.new!()
 
   defp transport(value, :codec) do
     {:ok, doc, registry} = Jido.Agent.Codec.encode(value)

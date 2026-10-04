@@ -9,7 +9,10 @@ defmodule Jido.AI.Plugins.Chat do
   """
   use Jido.Plugin
 
+  @impl true
   defdelegate state_spec(opts), to: Jido.AI.Plugins.Chat.Agent
+
+  @impl true
   defdelegate prepare(preparation, opts), to: Jido.AI.Plugins.Chat.Agent
 
   alias Jido.AI.Actions.LLM.{Chat, Complete, Embed, GenerateObject}

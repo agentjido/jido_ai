@@ -14,10 +14,6 @@ defmodule Jido.AI.Plugins.Retrieval do
   """
   use Jido.Plugin
 
-  defdelegate state_spec(opts), to: Jido.AI.Plugins.Retrieval.Agent
-  defdelegate prepare(preparation, opts), to: Jido.AI.Plugins.Retrieval.Agent
-  defdelegate admit(runtime_ref, admission, opts), to: Jido.AI.Plugins.Retrieval.AgentServer
-
   alias Jido.AI.Retrieval.Store
   alias Jido.AI.Actions.Retrieval.{UpsertMemory, RecallMemory, ClearMemory}
   @defaults %{enabled: true, namespace: nil, top_k: 3, max_snippet_chars: 280}
@@ -54,7 +50,8 @@ defmodule Jido.AI.Plugins.Retrieval do
   def schema, do: state_schema(@defaults)
 
   @doc false
-  def agent_state_spec(opts) do
+  @impl Jido.Plugin
+  def state_spec(opts) do
     Jido.AI.PluginConfig.validate!(opts, Map.keys(@defaults) ++ [:into, :store], "Retrieval")
     into = Keyword.get(opts, :into, :result)
     store = Keyword.get(opts, :store, Store)
@@ -74,7 +71,7 @@ defmodule Jido.AI.Plugins.Retrieval do
   defp state_schema(defaults) do
     Zoi.object(%{
       enabled: Zoi.boolean() |> Zoi.default(defaults.enabled),
-      namespace: Zoi.string() |> Zoi.optional() |> Zoi.default(defaults.namespace),
+      namespace: Zoi.string() |> Zoi.nullable() |> Zoi.optional() |> Zoi.default(defaults.namespace),
       top_k: Zoi.integer() |> Zoi.default(defaults.top_k),
       max_snippet_chars: Zoi.integer() |> Zoi.min(1) |> Zoi.default(defaults.max_snippet_chars)
     })
@@ -82,7 +79,8 @@ defmodule Jido.AI.Plugins.Retrieval do
   end
 
   @doc false
-  def prepare_input(preparation, opts) do
+  @impl Jido.Plugin
+  def prepare(preparation, opts) do
     state = effective_state(preparation.plugin_state, preparation.agent_id)
     store = Keyword.get(opts, :store, Store)
 
@@ -101,7 +99,8 @@ defmodule Jido.AI.Plugins.Retrieval do
   end
 
   @doc false
-  def admit_input(admission) do
+  @impl Jido.Plugin
+  def admit(_runtime, admission, _opts) do
     %{state: state, store: store} = admission.prepared_input
     signal = admission.signal
     data = signal.data

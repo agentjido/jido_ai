@@ -2,16 +2,29 @@ defmodule Jido.AI.Orchestration.Plugin do
   @moduledoc "Owns portable request records and starts work only after an admission commit."
   use Jido.Plugin
 
+  @impl true
   defdelegate state_spec(opts), to: Jido.AI.Orchestration.Plugin.Agent
+
+  @impl true
   defdelegate directives(opts), to: Jido.AI.Orchestration.Plugin.Agent
+
+  @impl true
   defdelegate prepare(preparation, opts), to: Jido.AI.Orchestration.Plugin.Agent
+
+  @impl true
   defdelegate reduce(reduction, opts), to: Jido.AI.Orchestration.Plugin.Agent
+
+  @impl true
   defdelegate child_spec(init), to: Jido.AI.Orchestration.Plugin.AgentServer
+
+  @impl true
   defdelegate await_ready(runtime, opts), to: Jido.AI.Orchestration.Plugin.AgentServer
+
+  @impl true
   defdelegate admit(runtime, admission, opts), to: Jido.AI.Orchestration.Plugin.AgentServer
 
-  defdelegate dispatch(runtime, directive, context, opts),
-    to: Jido.AI.Orchestration.Plugin.AgentServer
+  @impl true
+  defdelegate dispatch(runtime, directive, context, opts), to: Jido.AI.Orchestration.Plugin.AgentServer
 
   alias Jido.AI.Orchestration.Change
 

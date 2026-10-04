@@ -203,7 +203,7 @@ then allowed the size comparison against a map to succeed.
 Expected: the authored limit holds across supported construction paths.
 Resolution: new schemas use a distinct `check` callback. The old `validate` MFA
 also accepts the correct protocol argument order for stored schemas. Tests
-cover exact byte limits, Plugin-owned state, core construction, Builder and
+cover exact byte limits, Plugin-owned state, core construction, core data construction and
 Codec, direct state updates, and rejection of oversized model output without a
 commit. No core Jido change was required.
 

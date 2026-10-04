@@ -32,7 +32,10 @@ defmodule Jido.AI.Plugins.ModelRouting do
 
   use Jido.Plugin
 
+  @impl true
   defdelegate state_spec(opts), to: Jido.AI.Plugins.ModelRouting.Agent
+
+  @impl true
   defdelegate prepare(preparation, opts), to: Jido.AI.Plugins.ModelRouting.Agent
 
   @doc "Returns the Plugin name."

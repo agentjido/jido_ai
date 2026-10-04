@@ -82,10 +82,12 @@ and [Tool access and effects](guides/v3/14_tool_policy.md).
 
 This checkout uses sibling path dependencies for `jido`, `jido_action`, and
 `jido_signal`. Keep all three on compatible `release/v3` branches. ReqLLM uses
-the Hex `~> 1.25` requirement. Before publishing, replace the sibling paths
-with compatible published V3 versions and run the package checks.
+the Hex `~> 1.25` requirement. Zoi uses the local `../zoi` worktree at the
+revision required by core Jido.
+Before publishing, replace the sibling paths with compatible
+published V3 versions and run the package checks.
 
-Current core Plugins use explicit `agent:` and `agent_server:` facets.
+Current core Plugins define callbacks through `Jido.Plugin`.
 Custom Directives implement `Jido.Agent.Directive.validate/1`; validation no
 longer belongs to the Plugin. Examples and test fixtures use these contracts.
 

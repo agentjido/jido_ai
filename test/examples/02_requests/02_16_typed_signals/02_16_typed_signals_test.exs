@@ -372,7 +372,7 @@ defmodule JidoAI.Examples.TypedSignalsTest do
     assert_script_done(mock)
   end
 
-  test "DSL data Builder and source JSON produce the same projected model and completion Signals",
+  test "DSL data core data construction and source JSON produce the same projected model and completion Signals",
        %{jido: jido} do
     {_, options} = Enum.find(Chat.definition().plugins, &(elem(&1, 0) == Jido.AI.Configuration.Plugin))
     source = Map.from_struct(options[:profiles].assistant)
@@ -387,7 +387,7 @@ defmodule JidoAI.Examples.TypedSignalsTest do
 
     assert {:ok, data} = Jido.AI.Authoring.lower(base, [source])
     attrs = data |> Map.from_struct() |> Map.drop([:id, :state])
-    assert {:ok, built} = attrs |> Jido.Agent.Builder.new() |> Jido.Agent.Builder.build()
+    assert {:ok, built} = Jido.Agent.new(attrs)
 
     registry =
       source

@@ -92,13 +92,13 @@ defmodule JidoAI.Examples.StandaloneAuthoringTest do
     assert_script_done(mock)
   end
 
-  test "native Builder and Codec forms run the same lowered standalone configuration", %{
+  test "native core data construction and Codec forms run the same lowered standalone configuration", %{
     jido: jido
   } do
     {mock, _} = mock(List.duplicate(%{reply: {:text, "Same"}}, 3))
     assert {:ok, definition, context} = Agent.build(config(mock))
     attrs = definition |> Map.from_struct() |> Map.drop([:id, :state])
-    assert {:ok, built} = attrs |> Jido.Agent.Builder.new() |> Jido.Agent.Builder.build()
+    assert {:ok, built} = Jido.Agent.new(attrs)
     assert {:ok, document, registry} = Jido.Agent.Codec.encode(definition)
 
     assert {:ok, decoded} =

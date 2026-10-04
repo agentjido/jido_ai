@@ -10,7 +10,7 @@ defmodule Jido.AI.Execution.ModelCallTest do
   for kind <- [:text, :object, :stream, :stream_object] do
     test "the default #{kind} call uses ReqLLM and its HTTP transport" do
       kind = unquote(kind)
-      object? = kind in [:object, :stream_object]
+      object? = unquote(kind in [:object, :stream_object])
       reply = if object?, do: {:object, %{name: "Ada"}}, else: {:text, "Hello"}
       server = start_supervised!({MockLLM, script: [%{reply: reply}]})
       options = MockLLM.options(server)
@@ -21,7 +21,7 @@ defmodule Jido.AI.Execution.ModelCallTest do
       assert {:ok, response} = ModelCall.request(kind, MockLLM.model(), messages, options, schema)
 
       response =
-        if kind in [:stream, :stream_object] do
+        if unquote(kind in [:stream, :stream_object]) do
           try do
             assert {:ok, materialized} = Jido.AI.Usage.Stream.process(response, [])
             materialized

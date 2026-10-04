@@ -80,9 +80,7 @@ defmodule Guide.ThreeRounds do
   routes do
     signal_source "/guides/ai/three_tool_rounds"
 
-    route "guides.ai.three_rounds", ai: :assistant do
-      define :calculate, args: [:query]
-    end
+    route "guides.ai.three_rounds", ai: :assistant, as: :calculate
   end
 end
 ```

@@ -70,9 +70,7 @@ defmodule Guide.FirstAnswer do
   routes do
     signal_source "/guides/ai/first_answer"
 
-    route "guides.ai.first_answer", ai: :assistant do
-      define :answer, args: [:query]
-    end
+    route "guides.ai.first_answer", ai: :assistant, as: :answer
   end
 end
 ```

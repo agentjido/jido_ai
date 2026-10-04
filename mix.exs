@@ -78,7 +78,7 @@ defmodule JidoAi.MixProject do
       {:jason, "~> 1.4"},
       {:splode, "~> 0.3.0"},
       {:yaml_elixir, "~> 2.12"},
-      {:zoi, "~> 0.18"},
+      {:zoi, path: "../zoi", override: true},
 
       # Dev/Test
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},

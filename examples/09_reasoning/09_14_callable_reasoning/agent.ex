@@ -12,14 +12,12 @@ defmodule JidoAI.Examples.CallableReasoning.Agent do
   routes do
     signal_source "/examples/ai/09_reasoning/09_14"
 
-    route "reasoning.run" do
+    route "reasoning.run", as: :reason do
       action params, schema: Jido.AI.Actions.Reasoning.RunStrategy.schema(), context: context do
         with {:ok, result} <- Jido.Exec.run(Jido.AI.Actions.Reasoning.RunStrategy, params, context) do
           {:ok, %{context.agent_state | result: result, calls: context.agent_state.calls + 1}}
         end
       end
-
-      define :reason, args: [:prompt]
     end
   end
 end

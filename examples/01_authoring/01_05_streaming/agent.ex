@@ -24,8 +24,6 @@ defmodule JidoAI.Examples.Streaming.Agent do
   routes do
     signal_source "/examples/ai/01_authoring/01_05"
 
-    route "examples.ai.01_05.answer", ai: :assistant do
-      define :answer, args: [:query]
-    end
+    route "examples.ai.01_05.answer", ai: :assistant, as: :answer
   end
 end

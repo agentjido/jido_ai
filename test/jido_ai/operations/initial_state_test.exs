@@ -14,7 +14,10 @@ defmodule Jido.AI.InitialStateTest do
 
   test "import preserves the canonical value and required domain fields" do
     source = source()
-    fields = source.schema.fields |> Keyword.put(:messages, Jido.Session.schema()) |> Keyword.put(:count, Zoi.integer())
+
+    fields =
+      source.schema.fields |> Keyword.put(:messages, Jido.Session.state_schema()) |> Keyword.put(:count, Zoi.integer())
+
     source = %{source | schema: %{source.schema | fields: fields}}
     session = saved()
     assert {:ok, agent} = Agent.from_initial_state(source, %{messages: session, count: 7}, id: "restored")

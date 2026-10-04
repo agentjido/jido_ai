@@ -58,7 +58,8 @@ for verified results and the remaining repairs.
 
 ## Release Hygiene
 - Work on `release/v3` for this cleanup. `mix.exs` currently declares package
-  version `2.3.0`, sibling V3 path dependencies, and ReqLLM `~> 1.25` from Hex.
+  version `2.3.0`, sibling V3 path dependencies, ReqLLM `~> 1.25` from Hex,
+  and the local Zoi path dependency.
   These values do not declare a completed V3 release. Keep dependency versions
   and sources unchanged unless the task requires a dependency change. Restore
   compatible published V3 requirements before publishing this package.

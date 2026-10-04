@@ -22,12 +22,12 @@ defmodule Jido.AI.Authoring.ResolvedFindingsTest do
     end
   end
 
-  test "block metadata and the size limit survive Builder and Codec" do
+  test "block metadata and the size limit survive core data construction and Codec" do
     original = SizedBlock.definition()
     assert original.metadata == %{owner: "author", jido_ai_max_state_size: 8192}
     {:ok, document, registry} = Jido.Agent.Codec.encode(original)
     {:ok, decoded} = Jido.Agent.Codec.decode(Jason.decode!(Jason.encode!(document)), registry)
-    built = Jido.Agent.Builder.new(SizedBlock) |> Jido.Agent.Builder.build!()
+    built = SizedBlock.definition() |> Jido.Agent.new!()
 
     for source <- [original, built, decoded] do
       assert source === original
@@ -94,8 +94,8 @@ defmodule Jido.AI.Authoring.ResolvedFindingsTest do
     assert Authoring.state_size_error?(errors)
   end
 
-  test "explicit metadata conflicts remain errors with max_state_size" do
-    assert_raise CompileError, ~r/Fields declared in both keyword and block form/, fn ->
+  test "keyword metadata is rejected with max_state_size" do
+    assert_raise CompileError, ~r/Unknown authoring fields/, fn ->
       Code.compile_string("""
       defmodule Jido.AI.Authoring.ResolvedFindingsTest.MetadataConflict do
         use Jido.AI.Agent, name: "conflict", max_state_size: 4096, metadata: %{owner: "first"}

@@ -45,15 +45,15 @@ Use `domain_schema/0` for the authored schema. The former core getters `name/0`,
 | --- | --- | --- |
 | `Jido.AI.Agent`, `Jido.AI.DSL` | Declare AI Profiles on a core Agent, bind routes to Profiles, and declare result/history fields. Core owns Agent construction and route execution. | [Agent](../../lib/jido_ai/agent.ex), [DSL](../../lib/jido_ai/dsl.ex), [authoring tests](../../test/authoring/agents/authoring_test.exs) |
 | `Jido.AI.Profile.new/1,2`, `new!/1,2`, `validate/1` | Validate model, reasoning, request, result, memory, tool, and control policy. `Jido.AI.profile/1,2` and `profile!/1,2` are short entry points to the same validator. | [Profile](../../lib/jido_ai/profile.ex), [validation tests](../../test/jido_ai/authoring/profile_validation_test.exs), [model tests](../../test/jido_ai/profile/model_input_test.exs) |
-| `Jido.AI.Authoring.ai/1`, `lower/2` | Bind a declared Profile or lower a neutral Agent definition through canonical Profile validation. Use direct core definitions for programmatic authoring; there is no Agent Builder. | [Authoring](../../lib/jido_ai/authoring.ex), [parity tests](../../test/jido_ai/authoring/full_spec_parity_test.exs) |
+| `Jido.AI.Authoring.ai/1`, `lower/2` | Bind a declared Profile or lower a neutral Agent definition through canonical Profile validation. Core `Jido.Agent.new/1` accepts lowered maps or keyword lists. | [Authoring](../../lib/jido_ai/authoring.ex), [parity tests](../../test/jido_ai/authoring/full_spec_parity_test.exs) |
 | `Jido.AI.inspect/1,2`, `preflight/2,3`, `export/2,3`, `import/1,2` | Portable inspection, preflight, and map/JSON/YAML exchange. Registry references are explicit. In-memory model support does not imply that every native model value can be exported. | [Portable](../../lib/jido_ai/portable.ex), [Codec](../../lib/jido_ai/authoring/codec.ex), [portable tests](../../test/jido_ai/authoring/portable_test.exs) |
 
 ## Requests and state
 
 All AI Agent requests use admission, Flow execution, and settlement. `ask`
 returns a handle; `ask_sync` waits on that handle; `ask_stream` adds events.
-Core generated route helpers return the admission Agent revision. They do not
-wait for the AI answer. Each Agent rejects concurrent requests with `:busy`.
+Core `as:` route helpers build Signals. `Jido.AgentServer.call/3` returns
+the admission Agent revision. Each Agent rejects concurrent requests with `:busy`.
 
 The Coordinator remains a core-managed Plugin runtime. It owns a core async
 Exec handle, not a wrapper Task around blocking Flow execution. Configuration
@@ -106,12 +106,12 @@ This separation does not add resume support to other reasoning methods.
 
 | Surface | Current contract | Source and acceptance tests |
 | --- | --- | --- |
-| Generated `ask/2,3`, `ask_sync/2,3`, `ask_stream/2,3` | `ask` always returns a request handle. `ask_sync` waits for the answer; `ask_stream` selects streaming and adds events for this call. No Profile flag is needed. Core route helpers return the admission Agent. | [generated definitions](../../lib/jido_ai/agent/definition.ex), [interface](../../lib/jido_ai/agent/interface.ex), [interface tests](../../test/authoring/agents/interfaces_test.exs) |
+| Generated `ask/2,3`, `ask_sync/2,3`, `ask_stream/2,3` | `ask` always returns a request handle. `ask_sync` waits for the answer; `ask_stream` selects streaming and adds events for this call. No Profile flag is needed. Core route helpers build Signals; `Jido.AgentServer.call/3` returns the admission Agent. | [generated definitions](../../lib/jido_ai/agent/definition.ex), [interface](../../lib/jido_ai/agent/interface.ex), [interface tests](../../test/authoring/agents/interfaces_test.exs) |
 | Generated `await/1,2`, `cancel/1,2`, `steer/2,3` | Retained convenience helpers. Generated cancellation targets the Agent server; `Orchestration.cancel` targets a handle. `inject` is not generated. | [definitions](../../lib/jido_ai/agent/definition.ex), [request tests](../../test/authoring/agents/execution_test.exs) |
 | `Jido.AI.Request.await/1,2`, `await_many/1,2` | Wait for admitted requests. `await_many` belongs to Request, not the generated Agent interface. | [Request](../../lib/jido_ai/request.ex), [Session tests](../../test/jido_ai/orchestration/orchestration_test.exs) |
 | `Jido.AI.Orchestration.snapshot/1,2`, `modify_context/2,3`, `cancel/1,2`, `steer/2,3`, `inject/2,3`, `skill_catalog/1,2` | Inspect or control AI requests. Inspection reads selected Profile and committed Session entries, not private strategy state. | [Orchestration](../../lib/jido_ai/orchestration.ex), [inspection tests](../../test/jido_ai/orchestration/inspection_test.exs), [recovery tests](../../test/authoring/agents/recovery_test.exs) |
 | `Jido.AI.Configuration.profile/1,2`, `Jido.AI.Thread.Projection.messages/1` | Read effective configuration and the declared committed history. A request already in progress keeps its admitted input. | [Configuration](../../lib/jido_ai/configuration.ex), [Thread projection](../../lib/jido_ai/thread/projection.ex), [history tests](../../test/jido_ai/operations/history_test.exs) |
-| `Jido.Session`, `Jido.Thread`, `Jido.Thread.Entry` | Value contracts owned by **jido_ai**, despite the module prefix. They remain in this package. `Jido.Session` is distinct from the AI runtime service `Jido.AI.Orchestration`. | [Session value](../../lib/jido_session.ex), [Thread](../../lib/jido_thread.ex), [Entry](../../lib/jido_thread/entry.ex), [value tests](../../test/jido_ai/thread_value_test.exs) |
+| `Jido.Session`, `Jido.Thread`, `Jido.Thread.Entry` | Value contracts owned by **jido_ai**, despite the module prefix. They remain in this package. `Jido.Session` is distinct from the AI runtime service `Jido.AI.Orchestration`. Use `Jido.Session.state_schema/0` for a required canonical Session in Agent state; it validates stored values without map coercion. | [Session value](../../lib/jido_session.ex), [Thread](../../lib/jido_thread.ex), [Entry](../../lib/jido_thread/entry.ex), [value tests](../../test/jido_ai/thread_value_test.exs) |
 
 ## Models, tools, and capabilities
 
@@ -191,3 +191,21 @@ migration also ran the 658-test example suite separately. See the
 This does not establish live-provider quality, load behavior, fresh line
 coverage, or release readiness. Historical maps and audits do not override
 the current source and tested contracts above.
+
+All AI Plugins now use one core `Jido.Plugin` behaviour with optional
+callbacks. Large implementations delegate to ordinary helper modules.
+Retrieval implements its callbacks directly; its redundant facet adapters are
+removed. Reasoning capabilities generate callbacks in their Plugin module.
+Plugin identity, options, versions, state keys, and stored definitions remain
+unchanged. This requires the core authoring change in agentjido/jido#382.
+
+Core Agent metadata and schema belong in the `agent` block. Route `as:`
+settings generate Signal constructors that accept a plain input map. Direct
+core data construction replaces the removed Agent Builder. Effect policies
+use `Jido.Agent.Directive.Emit`; legacy `Jido.Plugin.Dispatch.Send` matcher
+entries are converted in both allow and deny sets. Deny entries and dispatch
+constraints still apply after conversion.
+
+Checkpoint events preserve complete signed resume tokens, including tokens
+above the content display limit. Token issuance still checks content permissions.
+Diagnostic projection still withholds tokens and redacts credentials.

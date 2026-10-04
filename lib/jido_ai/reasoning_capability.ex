@@ -3,13 +3,10 @@ defmodule Jido.AI.ReasoningCapability do
   defmacro __using__(opts) do
     strategy = Keyword.fetch!(opts, :strategy)
     package = __CALLER__.module
-    facet = Module.concat(package, Agent)
     state_key = :"reasoning_#{strategy}"
 
     quote do
       use Jido.Plugin
-      defdelegate state_spec(opts), to: unquote(facet)
-      defdelegate prepare(preparation, opts), to: unquote(facet)
       @strategy unquote(strategy)
       def name, do: unquote(Keyword.fetch!(opts, :name))
       def description, do: unquote(Keyword.fetch!(opts, :description))
@@ -25,22 +22,20 @@ defmodule Jido.AI.ReasoningCapability do
 
       def schema, do: Jido.AI.ReasoningCapability.schema()
 
-      defmodule unquote(facet) do
-        @moduledoc false
+      @impl Jido.Plugin
+      def state_spec(opts),
+        do: {unquote(state_key), Jido.AI.ReasoningCapability.schema(unquote(strategy), opts)}
 
-        def state_spec(opts),
-          do: {unquote(state_key), Jido.AI.ReasoningCapability.schema(unquote(strategy), opts)}
-
-        def prepare(preparation, opts),
-          do:
-            Jido.AI.ReasoningCapability.prepare_input(
-              preparation,
-              unquote(package),
-              unquote(strategy),
-              unquote(state_key),
-              opts
-            )
-      end
+      @impl Jido.Plugin
+      def prepare(preparation, opts),
+        do:
+          Jido.AI.ReasoningCapability.prepare_input(
+            preparation,
+            unquote(package),
+            unquote(strategy),
+            unquote(state_key),
+            opts
+          )
     end
   end
 
