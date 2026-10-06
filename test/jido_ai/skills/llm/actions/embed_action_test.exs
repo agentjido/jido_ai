@@ -40,7 +40,7 @@ defmodule Jido.AI.Actions.LLM.EmbedTest do
         assert model == "openai:text-embedding-3-small"
         assert texts == ["one", "two"]
         assert opts[:dimensions] == 2
-        assert opts[:receive_timeout] == 1_000
+        assert opts[:total_timeout] == 1_000
         assert opts[:return_usage]
         {:ok, %{embedding: [[0.5, 0.4], [0.3, 0.2]], usage: %{input_tokens: 4}}}
       end)

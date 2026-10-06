@@ -369,12 +369,12 @@ defmodule JidoAI.Examples.MockLLMTest do
     done!(server)
   end
 
-  test "a receive timeout closes a held request without consuming a later response" do
+  test "a total timeout closes a held request without consuming a later response" do
     server = server([%{reply: {:wait, :timeout, {:text, "late"}}}])
 
     task =
       Task.async(fn ->
-        opts = MockLLM.options(server) |> Keyword.put(:receive_timeout, 100)
+        opts = MockLLM.options(server) |> Keyword.put(:total_timeout, 100)
         ReqLLM.generate_text(@model, "Wait", opts)
       end)
 

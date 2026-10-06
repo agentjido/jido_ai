@@ -10,36 +10,39 @@ defmodule Jido.AI.Execution.ModelCallTest do
   for kind <- [:text, :object, :stream, :stream_object] do
     test "the default #{kind} call uses ReqLLM and its HTTP transport" do
       kind = unquote(kind)
-      object? = unquote(kind in [:object, :stream_object])
-      reply = if object?, do: {:object, %{name: "Ada"}}, else: {:text, "Hello"}
+      {reply, schema, expected} = fixture(kind)
       server = start_supervised!({MockLLM, script: [%{reply: reply}]})
       options = MockLLM.options(server)
-      schema = if object?, do: @schema
       messages = [%{role: :user, content: "hello"}]
 
       assert ModelCall.bind_options(messages, options) == options
       assert {:ok, response} = ModelCall.request(kind, MockLLM.model(), messages, options, schema)
-
-      response =
-        if unquote(kind in [:stream, :stream_object]) do
-          try do
-            assert {:ok, materialized} = Jido.AI.Usage.Stream.process(response, [])
-            materialized
-          after
-            ReqLLM.StreamResponse.close(response)
-          end
-        else
-          response
-        end
-
-      if object?,
-        do: assert(response.object == %{"name" => "Ada"}),
-        else: assert(ReqLLM.Response.text(response) == "Hello")
+      response = materialize(kind, response)
+      assert response_value(kind, response) == expected
 
       assert %{remaining: [], unexpected: [], requests: [request]} = MockLLM.report(server)
       assert request.body["model"] == "gpt-4o-mini"
     end
   end
+
+  defp fixture(kind) when kind in [:object, :stream_object],
+    do: {{:object, %{name: "Ada"}}, @schema, %{"name" => "Ada"}}
+
+  defp fixture(_kind), do: {{:text, "Hello"}, nil, "Hello"}
+
+  defp materialize(kind, response) when kind in [:stream, :stream_object] do
+    try do
+      assert {:ok, materialized} = Jido.AI.Usage.Stream.process(response, [])
+      materialized
+    after
+      ReqLLM.StreamResponse.close(response)
+    end
+  end
+
+  defp materialize(_kind, response), do: response
+
+  defp response_value(kind, response) when kind in [:object, :stream_object], do: response.object
+  defp response_value(_kind, response), do: ReqLLM.Response.text(response)
 
   test "the default embedding call uses ReqLLM and its HTTP transport" do
     server = start_supervised!({MockLLM, script: [%{reply: {:embeddings, [[0.1, 0.2]]}}]})

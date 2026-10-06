@@ -41,7 +41,7 @@ defmodule Jido.AI.ActionInput do
     provider = Map.get(context, :model_options, [])
 
     if Keyword.keyword?(provider) do
-      generation = Enum.map(keys, &{&1, params[&1]}) ++ [receive_timeout: params[:timeout]]
+      generation = Enum.map(keys, &{&1, params[&1]}) ++ [total_timeout: params[:timeout]]
       {:ok, Keyword.merge(provider, Enum.reject(generation, fn {_, v} -> is_nil(v) end))}
     else
       {:error, :invalid_model_options}

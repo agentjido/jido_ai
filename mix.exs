@@ -68,9 +68,16 @@ defmodule JidoAi.MixProject do
   defp deps do
     [
       # Jido ecosystem
-      {:jido, path: "../jido", override: true},
-      {:jido_action, path: "../jido_action", override: true},
-      {:jido_signal, path: "../jido_signal", override: true},
+      {:jido,
+       git: "https://github.com/agentjido/jido.git", ref: "8322de574c53d5c2096243d230c9de4f14803bda", override: true},
+      {:jido_action,
+       git: "https://github.com/agentjido/jido_action.git",
+       ref: "19c77f94e5c2513b2e684a289857fcd568f7eb29",
+       override: true},
+      {:jido_signal,
+       git: "https://github.com/agentjido/jido_signal.git",
+       ref: "fd8d00555d6a64b4109619f4c26f1b75e8a91d41",
+       override: true},
       {:req_llm, "~> 1.25"},
 
       # Runtime
@@ -78,7 +85,8 @@ defmodule JidoAi.MixProject do
       {:jason, "~> 1.4"},
       {:splode, "~> 0.3.0"},
       {:yaml_elixir, "~> 2.12"},
-      {:zoi, path: "../zoi", override: true},
+      {:zoi,
+       git: "https://github.com/mikehostetler/zoi.git", ref: "2fff2a23e23e7ac0b26f62f49bbc1b12f7818ac9", override: true},
 
       # Dev/Test
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},

@@ -51,17 +51,15 @@ defmodule Jido.AI.Execution.CallModel do
          true <- state.repairs > 0 or state.iterations < state.profile.controls.max_iterations,
          {:ok, state} <- Jido.AI.Execution.PendingInput.drain(state, context),
          state = Map.put(state, :llm_call_id, Jido.Signal.ID.generate!()),
-         request = request(state, remaining),
+         request = request(state),
          {:ok, request, active_tools} <-
            Jido.AI.Execution.RequestTransform.prepare(state, request, context),
          :ok <- Control.check(state.profile, :model, request, context, state.deadline),
          remaining = state.deadline - System.monotonic_time(:millisecond),
          true <- remaining > 0 do
-      options = Keyword.update!(request.options, :receive_timeout, &min(&1, remaining))
-
       if callback?,
-        do: repair_callback(state, %{request | options: options}, context),
-        else: generate(state, %{request | options: options}, active_tools, context, remaining)
+        do: repair_callback(state, request, context),
+        else: generate(state, request, active_tools, context, remaining)
     else
       false -> Profile.error("controls", "AI request limit reached")
       error -> error
@@ -186,15 +184,9 @@ defmodule Jido.AI.Execution.CallModel do
     end
   end
 
-  defp request(state, remaining) do
+  defp request(state) do
     tools = Jido.AI.Reasoning.tools(state)
-
-    options =
-      state.options
-      |> Keyword.put(
-        :receive_timeout,
-        min(remaining, Keyword.get(state.options, :receive_timeout, remaining))
-      )
+    options = state.options
 
     options =
       if tools == [],
