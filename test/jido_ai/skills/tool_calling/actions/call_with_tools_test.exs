@@ -64,10 +64,10 @@ defmodule Jido.AI.Actions.ToolCalling.CallWithToolsTest do
     end
 
     test "has default values" do
-      assert CallWithTools.schema().fields[:max_tokens].value == 4096
-      assert CallWithTools.schema().fields[:temperature].value == 0.7
-      assert CallWithTools.schema().fields[:auto_execute].value == false
-      assert CallWithTools.schema().fields[:max_turns].value == 10
+      assert Zoi.Types.Meta.default(CallWithTools.schema().fields[:max_tokens].meta) == 4096
+      assert Zoi.Types.Meta.default(CallWithTools.schema().fields[:temperature].meta) == 0.7
+      assert Zoi.Types.Meta.default(CallWithTools.schema().fields[:auto_execute].meta) == false
+      assert Zoi.Types.Meta.default(CallWithTools.schema().fields[:max_turns].meta) == 10
     end
   end
 

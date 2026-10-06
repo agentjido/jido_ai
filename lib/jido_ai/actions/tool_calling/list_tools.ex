@@ -21,6 +21,8 @@ defmodule Jido.AI.Actions.ToolCalling.ListTools do
       })
   """
 
+  alias Zoi.Types.Meta
+
   use Jido.Action,
     name: "tool_calling_list_tools",
     description: "List all available tools with their schemas",
@@ -211,13 +213,13 @@ defmodule Jido.AI.Actions.ToolCalling.ListTools do
     schema
     |> extract_schema_fields()
     |> Enum.map(fn {name, field_schema} ->
-      {inner_schema, default} = unwrap_default(field_schema)
+      {inner_schema, default, default?} = unwrap_default(field_schema)
       doc = schema_description(field_schema, inner_schema)
 
       %{
         name: name,
         type: schema_type(inner_schema),
-        required: schema_required?(field_schema, default),
+        required: schema_required?(field_schema, default?),
         default: default,
         doc: doc
       }
@@ -228,16 +230,15 @@ defmodule Jido.AI.Actions.ToolCalling.ListTools do
   defp extract_schema_fields(%{fields: fields}) when is_map(fields), do: Map.to_list(fields)
   defp extract_schema_fields(_), do: []
 
-  defp unwrap_default(%{__struct__: Zoi.Types.Default} = schema) do
-    schema_map = Map.from_struct(schema)
-    {schema_map.inner, schema_map.value}
+  defp unwrap_default(%{meta: %Meta{} = meta} = schema) do
+    {schema, Meta.default(meta), Meta.default?(meta)}
   end
 
-  defp unwrap_default(schema), do: {schema, nil}
+  defp unwrap_default(schema), do: {schema, nil, false}
 
-  defp schema_required?(_schema, default) when not is_nil(default), do: false
+  defp schema_required?(_schema, true), do: false
 
-  defp schema_required?(schema, _default) do
+  defp schema_required?(schema, false) do
     case schema_meta(schema, :required) do
       true -> true
       _ -> false

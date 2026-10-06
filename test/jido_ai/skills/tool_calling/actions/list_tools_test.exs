@@ -57,7 +57,8 @@ defmodule Jido.AI.Actions.ToolCalling.ListToolsTest do
     end
 
     test "has default values" do
-      assert ListTools.schema().fields[:include_schema].value == true
+      assert ListTools.schema().fields[:include_schema].meta
+             |> Zoi.Types.Meta.default() == true
     end
   end
 

@@ -1,6 +1,8 @@
 defmodule Jido.AI.Signal.Definition do
   @moduledoc false
 
+  alias Zoi.Types.Meta
+
   # AI owns input normalization and metadata. Core Signal owns schemas,
   # constructors, errors, and the CloudEvents envelope.
   def validate_data(data, schema) do
@@ -9,8 +11,13 @@ defmodule Jido.AI.Signal.Definition do
       # missing fields. Use the declared inner schema for a present nil.
       fields =
         Enum.map(schema.fields, fn
-          {key, %Zoi.Types.Default{inner: inner} = field} ->
-            {key, if(is_map(data) and Map.fetch(data, key) == {:ok, nil}, do: inner, else: field)}
+          {key, %{meta: %Meta{} = meta} = field} ->
+            field =
+              if Meta.default?(meta) and is_map(data) and Map.fetch(data, key) == {:ok, nil},
+                do: %{field | meta: %{meta | default: nil}},
+                else: field
+
+            {key, field}
 
           field ->
             field

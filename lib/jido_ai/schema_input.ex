@@ -6,9 +6,6 @@ defmodule Jido.AI.SchemaInput do
     schema |> normalize(value) |> then(&normalize_numbers(schema, &1))
   end
 
-  defp normalize_numbers(%Zoi.Types.Default{inner: inner}, value),
-    do: normalize_numbers(inner, value)
-
   defp normalize_numbers(%Zoi.Types.Map{fields: fields}, value)
        when is_map(value) and not is_nil(fields) do
     fields = Map.new(fields)
@@ -55,8 +52,6 @@ defmodule Jido.AI.SchemaInput do
   end
 
   defp numeric_value(_type, value), do: value
-
-  def normalize(%Zoi.Types.Default{inner: inner}, value), do: normalize(inner, value)
 
   def normalize(%Zoi.Types.Map{fields: fields}, value)
       when is_map(value) and not is_nil(fields) do

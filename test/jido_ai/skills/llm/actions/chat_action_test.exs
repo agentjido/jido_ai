@@ -22,8 +22,8 @@ defmodule Jido.AI.Actions.LLM.ChatTest do
     end
 
     test "has expected defaults" do
-      assert Chat.schema().fields[:max_tokens].value == 1024
-      assert Chat.schema().fields[:temperature].value == 0.7
+      assert Zoi.Types.Meta.default(Chat.schema().fields[:max_tokens].meta) == 1024
+      assert Zoi.Types.Meta.default(Chat.schema().fields[:temperature].meta) == 0.7
     end
   end
 

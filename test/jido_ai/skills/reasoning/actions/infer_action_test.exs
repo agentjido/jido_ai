@@ -19,8 +19,8 @@ defmodule Jido.AI.Actions.Reasoning.InferTest do
       assert Infer.schema().fields[:question].meta.required == true
       refute Infer.schema().fields[:model].meta.required
       refute Infer.schema().fields[:context].meta.required
-      assert Infer.schema().fields[:max_tokens].value == 2048
-      assert Infer.schema().fields[:temperature].value == 0.3
+      assert Zoi.Types.Meta.default(Infer.schema().fields[:max_tokens].meta) == 2048
+      assert Zoi.Types.Meta.default(Infer.schema().fields[:temperature].meta) == 0.3
     end
   end
 

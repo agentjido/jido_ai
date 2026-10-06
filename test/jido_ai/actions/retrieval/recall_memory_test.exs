@@ -16,7 +16,7 @@ defmodule Jido.AI.Actions.Retrieval.RecallMemoryTest do
     test "requires query and defines top_k default" do
       assert RecallMemory.schema().fields[:query].meta.required == true
       refute RecallMemory.schema().fields[:namespace].meta.required
-      assert RecallMemory.schema().fields[:top_k].value == 3
+      assert Zoi.Types.Meta.default(RecallMemory.schema().fields[:top_k].meta) == 3
     end
   end
 

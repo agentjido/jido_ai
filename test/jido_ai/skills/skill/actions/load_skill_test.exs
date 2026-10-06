@@ -26,7 +26,7 @@ defmodule Jido.AI.Actions.Skill.LoadSkillTest do
   describe "schema" do
     test "has expected fields" do
       assert LoadSkill.schema().fields[:name].meta.required == true
-      assert LoadSkill.schema().fields[:include_metadata].value == true
+      assert Zoi.Types.Meta.default(LoadSkill.schema().fields[:include_metadata].meta) == true
     end
   end
 

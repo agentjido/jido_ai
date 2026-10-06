@@ -17,7 +17,7 @@ defmodule Jido.AI.Actions.Retrieval.UpsertMemoryTest do
       assert UpsertMemory.schema().fields[:text].meta.required == true
       refute UpsertMemory.schema().fields[:id].meta.required
       refute UpsertMemory.schema().fields[:namespace].meta.required
-      assert UpsertMemory.schema().fields[:metadata].value == %{}
+      assert Zoi.Types.Meta.default(UpsertMemory.schema().fields[:metadata].meta) == %{}
     end
   end
 
