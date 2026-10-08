@@ -22,7 +22,9 @@ defmodule Jido.AI.Actions.ToolCalling.ListToolsTest do
         Zoi.object(%{
           prompt: Zoi.string(description: "Prompt text"),
           max_tokens: Zoi.integer(description: "Maximum output tokens") |> Zoi.default(256),
-          tags: Zoi.list(Zoi.string(), description: "Tags") |> Zoi.optional()
+          tags: Zoi.list(Zoi.string(), description: "Tags") |> Zoi.optional(),
+          enabled: Zoi.boolean() |> Zoi.default(false),
+          result: Zoi.any() |> Zoi.default(nil)
         })
 
     @impl Jido.Action
@@ -56,7 +58,7 @@ defmodule Jido.AI.Actions.ToolCalling.ListToolsTest do
     end
 
     test "has default values" do
-      assert ListTools.schema().fields[:include_schema].value == true
+      assert {:ok, %{include_schema: true}} = Zoi.parse(ListTools.schema(), %{})
     end
   end
 
@@ -138,6 +140,8 @@ defmodule Jido.AI.Actions.ToolCalling.ListToolsTest do
       assert is_list(zoi_tool.schema)
       assert Enum.any?(zoi_tool.schema, &(&1.name == :prompt and &1.type == "string"))
       assert Enum.any?(zoi_tool.schema, &(&1.name == :max_tokens and &1.default == 256))
+      assert Enum.any?(zoi_tool.schema, &(&1.name == :enabled and &1.default == false))
+      assert Enum.any?(zoi_tool.schema, &(&1.name == :result and &1.default == nil and not &1.required))
     end
 
     test "reads tools from plugin_state fallback when context.tools is absent" do

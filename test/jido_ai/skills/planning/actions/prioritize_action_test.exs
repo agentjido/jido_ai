@@ -21,8 +21,8 @@ defmodule Jido.AI.Actions.Planning.PrioritizeTest do
     end
 
     test "has default values" do
-      assert Prioritize.schema().fields[:max_tokens].value == 4096
-      assert Prioritize.schema().fields[:temperature].value == 0.5
+      assert Zoi.parse(Prioritize.schema().fields[:max_tokens], nil) == {:ok, 4096}
+      assert Zoi.parse(Prioritize.schema().fields[:temperature], nil) == {:ok, 0.5}
     end
 
     test "tasks parameter is a list of strings" do

@@ -17,9 +17,9 @@ defmodule Jido.AI.Actions.Reasoning.AnalyzeTest do
     test "defines required fields and defaults" do
       assert Analyze.schema().fields[:input].meta.required == true
       refute Analyze.schema().fields[:model].meta.required
-      assert Analyze.schema().fields[:analysis_type].value == :summary
-      assert Analyze.schema().fields[:max_tokens].value == 2048
-      assert Analyze.schema().fields[:temperature].value == 0.3
+      assert Zoi.parse(Analyze.schema().fields[:analysis_type], nil) == {:ok, :summary}
+      assert Zoi.parse(Analyze.schema().fields[:max_tokens], nil) == {:ok, 2048}
+      assert Zoi.parse(Analyze.schema().fields[:temperature], nil) == {:ok, 0.3}
     end
   end
 

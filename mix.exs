@@ -60,7 +60,8 @@ defmodule JidoAi.MixProject do
   defp deps do
     [
       # Jido ecosystem
-      {:jido, "~> 2.3"},
+      {:jido,
+       git: "https://github.com/agentjido/jido.git", ref: "0c8853bf451a40330b7192c9d2200a06f9c61261", override: true},
       {:jido_action, "~> 2.3"},
       {:req_llm, "~> 1.14"},
 
@@ -69,7 +70,7 @@ defmodule JidoAi.MixProject do
       {:jason, "~> 1.4"},
       {:splode, "~> 0.3.0"},
       {:yaml_elixir, "~> 2.12"},
-      {:zoi, "~> 0.18"},
+      {:zoi, "~> 0.18.11"},
 
       # Dev/Test
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
