@@ -284,6 +284,24 @@ defmodule Jido.AI.Agent do
         line: line
   end
 
+  @doc false
+  @spec raise_invalid_tools!(Macro.t(), Macro.Env.t()) :: no_return()
+  def raise_invalid_tools!(ast, env) do
+    line =
+      case ast do
+        {_, meta, _} when is_list(meta) -> Keyword.get(meta, :line, env.line)
+        _ -> env.line
+      end
+
+    raise CompileError,
+      description:
+        "tools must be a literal list of action modules, got: #{Macro.to_string(ast)}. " <>
+          "use Jido.AI.Agent reads tools at compile time, so function calls and variables are not allowed; " <>
+          "list the modules inline, or pass a request-scoped tools: override to ask/3.",
+      file: env.file,
+      line: line
+  end
+
   defmacro __using__(opts) do
     # Extract all values at compile time (in the calling module's context)
     name = Keyword.fetch!(opts, :name)
@@ -292,10 +310,15 @@ defmodule Jido.AI.Agent do
     # Expand module aliases in the tools list to actual module atoms
     # This handles {:__aliases__, _, [...]} tuples from macro expansion
     tools =
-      Enum.map(tools_ast, fn
-        {:__aliases__, _, _} = alias_ast -> Macro.expand(alias_ast, __CALLER__)
-        mod when is_atom(mod) -> mod
-      end)
+      if is_list(tools_ast) do
+        Enum.map(tools_ast, fn
+          {:__aliases__, _, _} = alias_ast -> Macro.expand(alias_ast, __CALLER__)
+          mod when is_atom(mod) -> mod
+          other -> raise_invalid_tools!(other, __CALLER__)
+        end)
+      else
+        raise_invalid_tools!(tools_ast, __CALLER__)
+      end
 
     agent_skills =
       opts
