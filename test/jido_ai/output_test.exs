@@ -109,6 +109,14 @@ defmodule Jido.AI.OutputTest do
     assert {:ok, %Output{schema_kind: :json_schema}} = Output.new(schema: json_schema)
   end
 
+  test "native mode is opt-in, validated, and part of the output contract fingerprint" do
+    assert {:ok, %Output{mode: :prompt} = prompt} = Output.new(schema: @schema)
+    assert {:ok, %Output{mode: :native} = native} = Output.new(schema: @schema, mode: "native")
+    assert {:error, _reason} = Output.new(schema: @schema, mode: :unsupported)
+    refute Output.fingerprint(prompt) == Output.fingerprint(native)
+    assert Output.instructions(native) =~ Output.native_tool_name()
+  end
+
   test "adds structured output instructions to message lists" do
     {:ok, output} = Output.new(schema: @schema)
 

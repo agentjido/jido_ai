@@ -464,3 +464,33 @@ Fix:
 - [Tool Calling With Actions](tool_calling_with_actions.md)
 - [Request Lifecycle And Concurrency](request_lifecycle_and_concurrency.md)
 - [Strategy Selection Playbook](strategy_selection_playbook.md)
+
+## Native Structured Final Output
+
+Use `output: [schema: schema, mode: :native]` to submit the final object through a
+strict final-answer tool while the ReAct loop can still call its normal action tools:
+
+```elixir
+config = Jido.AI.Reasoning.ReAct.build_config(%{
+  model: :capable,
+  tools: [MyApp.Actions.AddNumbers],
+  output: [schema: Zoi.object(%{sum: Zoi.integer()}), mode: :native]
+})
+```
+
+Native mode adds the reserved `jido_ai_final_answer` tool and requires a tool call
+on each turn. The model can choose an action tool or submit its final answer. The
+final-answer call must be alone; it is consumed by the runtime and validated with
+the output schema, without executing a Jido action. Its response is recorded in
+the conversation so tool-call history remains complete.
+
+Strict enforcement depends on the provider and model. Local schema validation
+always runs. If a model returns prose or an invalid object, the existing
+`on_validation_error` and `retries` options control repair or failure. Repair calls
+receive the full retained conversation, including tool results and the complete
+assistant answer; they do not use a truncated preview as model input. Event and
+error previews remain bounded and redacted.
+
+The default `mode: :prompt` keeps prompt-based output instructions. Use it with
+models that do not support required tool calls. A request transformer can still
+apply policy to repair messages and model options.

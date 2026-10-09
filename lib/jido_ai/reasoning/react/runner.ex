@@ -307,20 +307,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
                 )
                 |> then(&%{state | context: &1})
 
-              {state, _token} = emit_checkpoint(state, owner, ref, config, :after_llm)
-
-              case Turn.needs_tools?(turn) do
-                true ->
-                  {:tool_calls, State.put_status(state, :awaiting_tools), turn.tool_calls}
-
-                _ ->
-                  completed =
-                    state
-                    |> State.put_status(:completed)
-                    |> State.put_result(Turn.result(turn))
-
-                  {:final_answer, completed}
-              end
+              finish_llm_turn(state, owner, ref, config, turn)
 
             {:error, reason} ->
               {:error, state, reason, :llm_response}
@@ -332,6 +319,63 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     else
       {:error, reason} ->
         {:error, state, reason, :request_transform}
+    end
+  end
+
+  defp finish_llm_turn(state, owner, ref, config, turn) do
+    case Output.native_tool_call(config.output, turn.tool_calls) do
+      {:ok, call} ->
+        acknowledgement = {:ok, "Final answer received for schema validation."}
+
+        # The parent agent projects tool responses from runtime events. Emit the
+        # acknowledgement as well as retaining it in the standalone context.
+        {state, _event} =
+          emit_event(
+            state,
+            owner,
+            ref,
+            :tool_completed,
+            %{
+              tool_call_id: call.id,
+              tool_name: call.name,
+              result: acknowledgement,
+              attempts: 0,
+              duration_ms: 0,
+              native_output: true
+            },
+            tool_call_id: call.id,
+            tool_name: call.name
+          )
+
+        context =
+          AIContext.append_tool_result(
+            state.context,
+            call.id,
+            call.name,
+            Turn.format_tool_result_content(acknowledgement)
+          )
+
+        completed =
+          state
+          |> Map.put(:context, context)
+          |> State.put_status(:completed)
+          |> State.put_result(call.arguments)
+
+        {completed, _token} = emit_checkpoint(completed, owner, ref, config, :after_llm)
+        {:final_answer, completed}
+
+      :none ->
+        {state, _token} = emit_checkpoint(state, owner, ref, config, :after_llm)
+
+        if Turn.needs_tools?(turn) do
+          {:tool_calls, State.put_status(state, :awaiting_tools), turn.tool_calls}
+        else
+          completed = state |> State.put_status(:completed) |> State.put_result(Turn.result(turn))
+          {:final_answer, completed}
+        end
+
+      {:error, reason} ->
+        {:error, state, reason, :output_validation}
     end
   end
 
@@ -350,6 +394,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
          effective_model <- Map.get(request, :model, config.model),
          llm_opts <- sync_tools_in_llm_opts(config, request.llm_opts, tools),
          {:ok, llm_opts} <- maybe_transform_tool_definitions(llm_opts, state, config, runtime_context),
+         {:ok, llm_opts} <- Output.prepare_llm_opts(config.output, llm_opts, tools),
          llm_opts <- maybe_put_openai_websocket_session(effective_model, llm_opts) do
       {:ok,
        %{
@@ -1206,6 +1251,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       model: config.model,
       llm_opts: Config.llm_opts(config),
       user_message: latest_query(state),
+      messages: state.context |> AIContext.to_messages() |> Output.repair_messages(reason),
       request_id: state.request_id,
       run_id: state.run_id
     }
