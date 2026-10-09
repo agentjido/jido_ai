@@ -63,6 +63,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- changelog -->
 
+## [v2.4.0](https://github.com/agentjido/jido_ai/compare/v2.3.0...v2.4.0) (2026-10-09)
+
+
+
+
+### Features:
+
+* output: support native schema mode in ReAct by mikehostetler
+
+* react: transform final tool definitions before generation (#366) by Manuel Zubieta
+
+* skills: support binary resource attachments by mikehostetler
+
+* skills: add runtime resource providers by Julien
+
+* skills: add bounded resource loading by mikehostetler
+
+* callbacks: add agent tool call callbacks by Julien
+
+### Bug Fixes:
+
+* zoi: restore tool defaults and AI request state (#376) by mikehostetler
+
+* ci: isolate request telemetry and stabilize stream checks by mikehostetler
+
+* preserve ReAct request stream event order (#370) by mikehostetler
+
+* deps: update mint for security advisory by mikehostetler
+
+* react: route tool started signals to noop (#364) by mikehostetler
+
+* skills: harden SKILL.md conformance by mikehostetler
+
+### Refactoring:
+
+* skills: add trusted lazy catalog by mikehostetler
+
 ## [v2.3.0](https://github.com/agentjido/jido_ai/compare/v2.2.0...v2.3.0) (2026-08-05)
 
 
