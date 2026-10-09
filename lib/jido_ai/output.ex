@@ -13,14 +13,17 @@ defmodule Jido.AI.Output do
   @default_retries 1
   @default_on_validation_error :repair
   @raw_preview_bytes 500
+  @native_tool_name "jido_ai_final_answer"
 
   @type schema_kind :: :zoi | :json_schema
   @type validation_mode :: :repair | :error
+  @type enforcement_mode :: :prompt | :native
   @type repair_callback :: {module(), atom()}
 
   @type t :: %__MODULE__{
           schema: Zoi.schema() | map(),
           schema_kind: schema_kind(),
+          mode: enforcement_mode(),
           retries: non_neg_integer(),
           on_validation_error: validation_mode(),
           repair_fun: repair_callback() | nil
@@ -30,6 +33,7 @@ defmodule Jido.AI.Output do
     :schema,
     :repair_fun,
     schema_kind: :zoi,
+    mode: :prompt,
     retries: @default_retries,
     on_validation_error: @default_on_validation_error
   ]
@@ -48,17 +52,20 @@ defmodule Jido.AI.Output do
 
     retries = Map.get(attrs, :retries, @default_retries)
     mode = Map.get(attrs, :on_validation_error, @default_on_validation_error)
+    enforcement = Map.get(attrs, :mode, :prompt)
     repair_fun = Map.get(attrs, :repair_fun)
 
     with {:ok, schema_kind} <- schema_kind(schema),
          {:ok, retries} <- normalize_retries(retries),
          {:ok, mode} <- normalize_mode(mode),
+         {:ok, enforcement} <- normalize_enforcement(enforcement),
          {:ok, repair_fun} <- normalize_repair_fun(repair_fun),
          :ok <- validate_schema_shape(schema, schema_kind) do
       {:ok,
        %__MODULE__{
          schema: schema,
          schema_kind: schema_kind,
+         mode: enforcement,
          retries: retries,
          on_validation_error: mode,
          repair_fun: repair_fun
@@ -156,6 +163,16 @@ defmodule Jido.AI.Output do
   @spec instructions(t() | nil) :: String.t() | nil
   def instructions(nil), do: nil
 
+  def instructions(%__MODULE__{mode: :native}) do
+    """
+    Structured output:
+    Use your normal tools to complete the task. When ready, submit the final answer
+    with the #{@native_tool_name} tool, by itself. Its arguments must match the
+    configured output schema. Do not submit a final answer as prose.
+    """
+    |> String.trim()
+  end
+
   def instructions(%__MODULE__{} = output) do
     schema_json =
       output
@@ -190,6 +207,61 @@ defmodule Jido.AI.Output do
   def json_schema(%__MODULE__{schema_kind: :zoi, schema: schema}), do: ReqLLM.Schema.to_json(schema)
 
   @doc false
+  @spec native_tool_name() :: String.t()
+  def native_tool_name, do: @native_tool_name
+
+  @doc false
+  @spec prepare_llm_opts(t() | nil, keyword(), map()) :: {:ok, keyword()} | {:error, term()}
+  def prepare_llm_opts(output, opts, action_tools \\ %{})
+
+  def prepare_llm_opts(%__MODULE__{mode: :native} = output, opts, action_tools) do
+    tools = Keyword.get(opts, :tools, [])
+
+    if Map.has_key?(action_tools, @native_tool_name) or Enum.any?(tools, &(&1.name == @native_tool_name)) do
+      {:error, output_error({:reserved_tool_name, @native_tool_name}, nil)}
+    else
+      tool =
+        ReqLLM.Tool.new!(
+          name: @native_tool_name,
+          description: "Submit the final answer when the task is complete.",
+          parameter_schema: json_schema(output),
+          strict: true,
+          callback: fn arguments -> {:ok, arguments} end
+        )
+
+      {:ok, opts |> Keyword.put(:tools, tools ++ [tool]) |> Keyword.put(:tool_choice, :required)}
+    end
+  end
+
+  def prepare_llm_opts(_output, opts, _action_tools), do: {:ok, opts}
+
+  @doc false
+  @spec native_tool_call(t() | nil, [map()]) :: {:ok, map()} | :none | {:error, term()}
+  def native_tool_call(%__MODULE__{mode: :native}, calls) when is_list(calls) do
+    case Enum.filter(calls, &(&1.name == @native_tool_name)) do
+      [] -> :none
+      [call] when length(calls) == 1 -> {:ok, call}
+      _calls -> {:error, output_error(:final_answer_must_be_the_only_tool_call, nil)}
+    end
+  end
+
+  def native_tool_call(_output, _calls), do: :none
+
+  @doc false
+  @spec repair_messages([map()], term()) :: [map()]
+  def repair_messages(messages, reason) do
+    messages ++
+      [
+        %{
+          role: :user,
+          content:
+            "Return the final answer as a JSON object matching the provided schema. " <>
+              "Use the full conversation above and correct this validation error: " <> reason_message(reason)
+        }
+      ]
+  end
+
+  @doc false
   @spec fingerprint(t() | nil) :: String.t()
   def fingerprint(nil), do: ""
 
@@ -201,6 +273,8 @@ defmodule Jido.AI.Output do
       on_validation_error: output.on_validation_error,
       repair_fun: output.repair_fun
     }
+
+    data = if Map.get(output, :mode, :prompt) == :native, do: Map.put(data, :mode, :native), else: data
 
     :crypto.hash(:sha256, :erlang.term_to_binary(data, [:deterministic]))
     |> Base.url_encode64(padding: false)
@@ -416,6 +490,10 @@ defmodule Jido.AI.Output do
   end
 
   defp normalize_retries(_value), do: {:error, "output retries must be a non-negative integer"}
+
+  defp normalize_enforcement(value) when value in [:prompt, "prompt"], do: {:ok, :prompt}
+  defp normalize_enforcement(value) when value in [:native, "native"], do: {:ok, :native}
+  defp normalize_enforcement(_value), do: {:error, "output mode must be :prompt or :native"}
 
   defp normalize_mode(value) when value in [:repair, "repair"], do: {:ok, :repair}
   defp normalize_mode(value) when value in [:error, "error"], do: {:ok, :error}

@@ -6,6 +6,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   alias Jido.AI.Context, as: AIContext
   alias Jido.AI.Actions.Skill.LoadSkill
   alias Jido.AI.PendingInputServer
+  alias Jido.AI.Output
   alias Jido.AI.Reasoning.ReAct
   alias Jido.AI.Reasoning.ReAct.Config
   alias Jido.AI.Reasoning.ReAct.Strategy, as: ReActStrategy
@@ -823,6 +824,198 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert collected.usage == %{input_tokens: 3, output_tokens: 1}
   end
 
+  test "native output preserves action tools and completes through a strict final-answer tool" do
+    calls = :atomics.new(1, [])
+    arguments = %{"category" => "billing", "confidence" => 0.93, "summary" => "Total is 5"}
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, opts ->
+      assert opts[:tool_choice] == :required
+      assert Enum.any?(opts[:tools], &(&1.name == CalculatorTool.name()))
+      final_tool = Enum.find(opts[:tools], &(&1.name == Output.native_tool_name()))
+      assert final_tool.strict
+      assert final_tool.parameter_schema["type"] == "object"
+
+      chunk =
+        case :atomics.add_get(calls, 1, 1) do
+          1 -> ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 2, "b" => 3}, %{id: "calc_native"})
+          2 -> ReqLLM.StreamChunk.tool_call(Output.native_tool_name(), arguments, %{id: "final_native"})
+        end
+
+      {:ok, responses_stream_response([chunk], %{finish_reason: :tool_calls}, model)}
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{CalculatorTool.name() => CalculatorTool},
+        output: [schema: ticket_schema(), mode: :native]
+      })
+
+    events = ReAct.stream("Add 2 and 3 and classify the result", config) |> Enum.to_list()
+    completed = Enum.find(events, &(&1.kind == :request_completed))
+    assert completed.data.result == %{category: :billing, confidence: 0.93, summary: "Total is 5"}
+    assert Enum.count(events, &(&1.kind == :tool_started)) == 1
+    refute Enum.any?(events, &(&1.kind == :output_repair))
+    assert :atomics.get(calls, 1) == 2
+
+    checkpoint = Enum.find(Enum.reverse(events), &(&1.kind == :checkpoint and &1.data.reason == :terminal))
+    assert {:ok, state, _claims} = ReAct.Token.decode_state(checkpoint.data.token, config)
+    messages = AIContext.to_messages(state.context)
+    assert Enum.any?(messages, &(message_role(&1) == :tool and &1[:tool_call_id] == "final_native"))
+  end
+
+  test "native output works with non-streaming generation" do
+    arguments = %{"category" => "account", "confidence" => 1.0, "summary" => "Password reset"}
+
+    Mimic.expect(ReqLLM.Generation, :generate_text, fn _model, _messages, opts ->
+      assert opts[:tool_choice] == :required
+      assert [%ReqLLM.Tool{strict: true}] = opts[:tools]
+
+      {:ok,
+       %{
+         message: %{
+           content: "",
+           tool_calls: [ReqLLM.ToolCall.new("final_generate", Output.native_tool_name(), Jason.encode!(arguments))]
+         },
+         finish_reason: :tool_calls,
+         usage: %{}
+       }}
+    end)
+
+    config =
+      Config.new(%{model: :capable, tools: %{}, streaming: false, output: [schema: ticket_schema(), mode: :native]})
+
+    events = ReAct.stream("Classify this ticket", config) |> Enum.to_list()
+    assert Enum.find(events, &(&1.kind == :request_completed)).data.result.category == :account
+    refute Enum.any?(events, &(&1.kind == :output_repair))
+  end
+
+  test "native arguments are locally validated and repaired with a complete tool-call history" do
+    schema = ticket_schema()
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      {:ok,
+       responses_stream_response(
+         [ReqLLM.StreamChunk.tool_call(Output.native_tool_name(), %{"category" => "invalid"}, %{id: "invalid_final"})],
+         %{finish_reason: :tool_calls},
+         model
+       )}
+    end)
+
+    Mimic.expect(ReqLLM.Generation, :generate_object, fn _model, messages, ^schema, _opts ->
+      assert Enum.any?(messages, &(message_role(&1) == :assistant and &1[:tool_calls] != nil))
+      assert Enum.any?(messages, &(message_role(&1) == :tool and &1[:tool_call_id] == "invalid_final"))
+
+      {:ok,
+       %ReqLLM.Response{
+         id: "native-argument-repair",
+         model: "test",
+         context: nil,
+         object: %{"category" => "billing", "confidence" => 0.88, "summary" => "Validated repair"}
+       }}
+    end)
+
+    config = Config.new(%{model: :capable, tools: %{}, output: [schema: schema, mode: :native]})
+    events = ReAct.stream("Classify this ticket", config) |> Enum.to_list()
+    assert Enum.find(events, &(&1.kind == :request_completed)).data.result.summary == "Validated repair"
+    assert Enum.any?(events, &(&1.kind == :output_repair))
+  end
+
+  test "native output rejects a reserved action name before the provider call" do
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, _opts ->
+      flunk("a reserved action name must fail before a model request")
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{Output.native_tool_name() => CalculatorTool},
+        output: [schema: ticket_schema(), mode: :native]
+      })
+
+    events = ReAct.stream("Classify this ticket", config) |> Enum.to_list()
+    assert Enum.any?(events, &(&1.kind == :request_failed))
+  end
+
+  test "native output rejects mixed final-answer and action calls without executing actions" do
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      chunks = [
+        ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 2, "b" => 3}, %{id: "mixed_calc", index: 0}),
+        ReqLLM.StreamChunk.tool_call(Output.native_tool_name(), %{}, %{id: "mixed_final", index: 1})
+      ]
+
+      {:ok, responses_stream_response(chunks, %{finish_reason: :tool_calls}, model)}
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{CalculatorTool.name() => CalculatorTool},
+        output: [schema: ticket_schema(), mode: :native]
+      })
+
+    events = ReAct.stream("Classify this ticket", config) |> Enum.to_list()
+    assert Enum.any?(events, &(&1.kind == :request_failed))
+    refute Enum.any?(events, &(&1.kind == :tool_started))
+    checkpoint = Enum.find(Enum.reverse(events), &(&1.kind == :checkpoint and &1.data.reason == :terminal))
+    assert {:ok, failed_state, _claims} = ReAct.Token.decode_state(checkpoint.data.token, config)
+    messages = AIContext.to_messages(failed_state.context)
+
+    for id <- ["mixed_calc", "mixed_final"] do
+      assert Enum.any?(messages, &(message_role(&1) == :tool and &1[:tool_call_id] == id))
+    end
+  end
+
+  test "repair receives the full conversation and complete answer when native enforcement is ignored" do
+    schema = ticket_schema()
+    query = String.duplicate("context ", 100) <> "original-user-tail"
+    answer = String.duplicate("prose ", 150) <> "complete-answer-tail"
+    calls = :atomics.new(1, [])
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      case :atomics.add_get(calls, 1, 1) do
+        1 ->
+          {:ok,
+           responses_stream_response(
+             [ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 2, "b" => 3}, %{id: "repair_calc"})],
+             %{finish_reason: :tool_calls},
+             model
+           )}
+
+        2 ->
+          {:ok, responses_stream_response([ReqLLM.StreamChunk.text(answer)], %{finish_reason: :stop}, model)}
+      end
+    end)
+
+    Mimic.expect(ReqLLM.Generation, :generate_object, fn _model, messages, ^schema, opts ->
+      assert query in user_contents(messages)
+      assert answer in assistant_contents(messages)
+      assert Enum.any?(messages, &(message_role(&1) == :tool and &1[:tool_call_id] == "repair_calc"))
+      assert List.last(messages).content =~ "full conversation"
+      refute Keyword.has_key?(opts, :tools)
+      refute Keyword.has_key?(opts, :tool_choice)
+
+      {:ok,
+       %ReqLLM.Response{
+         id: "full-history-repair",
+         model: "test",
+         context: nil,
+         object: %{"category" => "billing", "confidence" => 0.88, "summary" => "Repaired with context"}
+       }}
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{CalculatorTool.name() => CalculatorTool},
+        output: [schema: schema, mode: :native]
+      })
+
+    events = ReAct.stream(query, config) |> Enum.to_list()
+    assert Enum.find(events, &(&1.kind == :request_completed)).data.result.summary == "Repaired with context"
+    assert Enum.any?(events, &(&1.kind == :output_repair))
+  end
+
   test "validates structured output before request completion" do
     schema = ticket_schema()
 
@@ -1137,11 +1330,8 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     refute Keyword.has_key?(repair_request.llm_opts, :tools)
     refute Keyword.has_key?(repair_request.llm_opts, :tool_choice)
 
-    assert Enum.any?(repair_request.messages, fn message ->
-             message.role == :user and
-               message.content =~ "Classify this ticket" and
-               message.content =~ "This is a billing issue with high confidence."
-           end)
+    assert "Classify this ticket" in user_contents(repair_request.messages)
+    assert "This is a billing issue with high confidence." in assistant_contents(repair_request.messages)
   end
 
   test "structured output repair rejects invalid transformed messages before the provider call" do
