@@ -41,8 +41,8 @@ defmodule Jido.AI.Actions.ToolCalling.ExecuteToolTest do
     end
 
     test "has default values" do
-      assert ExecuteTool.schema().fields[:params].value == %{}
-      assert ExecuteTool.schema().fields[:timeout].value == 30_000
+      assert Zoi.parse(ExecuteTool.schema().fields[:params], nil) == {:ok, %{}}
+      assert Zoi.parse(ExecuteTool.schema().fields[:timeout], nil) == {:ok, 30_000}
     end
   end
 

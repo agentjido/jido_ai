@@ -22,9 +22,9 @@ defmodule Jido.AI.Actions.Planning.PlanTest do
     end
 
     test "has default values" do
-      assert Plan.schema().fields[:max_steps].value == 10
-      assert Plan.schema().fields[:max_tokens].value == 4096
-      assert Plan.schema().fields[:temperature].value == 0.7
+      assert Zoi.parse(Plan.schema().fields[:max_steps], nil) == {:ok, 10}
+      assert Zoi.parse(Plan.schema().fields[:max_tokens], nil) == {:ok, 4096}
+      assert Zoi.parse(Plan.schema().fields[:temperature], nil) == {:ok, 0.7}
     end
   end
 

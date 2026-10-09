@@ -21,8 +21,8 @@ defmodule Jido.AI.Actions.LLM.CompleteTest do
     end
 
     test "has expected defaults" do
-      assert Complete.schema().fields[:max_tokens].value == 1024
-      assert Complete.schema().fields[:temperature].value == 0.7
+      assert Zoi.parse(Complete.schema().fields[:max_tokens], nil) == {:ok, 1024}
+      assert Zoi.parse(Complete.schema().fields[:temperature], nil) == {:ok, 0.7}
     end
   end
 

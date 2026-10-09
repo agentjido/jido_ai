@@ -21,9 +21,9 @@ defmodule Jido.AI.Actions.Planning.DecomposeTest do
     end
 
     test "has default values" do
-      assert Decompose.schema().fields[:max_depth].value == 3
-      assert Decompose.schema().fields[:max_tokens].value == 4096
-      assert Decompose.schema().fields[:temperature].value == 0.6
+      assert Zoi.parse(Decompose.schema().fields[:max_depth], nil) == {:ok, 3}
+      assert Zoi.parse(Decompose.schema().fields[:max_tokens], nil) == {:ok, 4096}
+      assert Zoi.parse(Decompose.schema().fields[:temperature], nil) == {:ok, 0.6}
     end
   end
 

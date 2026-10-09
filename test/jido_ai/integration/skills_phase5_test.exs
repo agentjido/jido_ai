@@ -85,7 +85,7 @@ defmodule Jido.AI.Integration.SkillsPhase5Test do
       schema = ChatAction.schema()
       assert schema.fields[:prompt].meta.required == true
       refute schema.fields[:model].meta.required
-      assert schema.fields[:max_tokens].value == 1024
+      assert Zoi.parse(schema.fields[:max_tokens], nil) == {:ok, 1024}
     end
   end
 

@@ -17,10 +17,10 @@ defmodule Jido.AI.Actions.Reasoning.ExplainTest do
     test "defines required fields and defaults" do
       assert Explain.schema().fields[:topic].meta.required == true
       refute Explain.schema().fields[:model].meta.required
-      assert Explain.schema().fields[:detail_level].value == :intermediate
-      assert Explain.schema().fields[:include_examples].value == true
-      assert Explain.schema().fields[:max_tokens].value == 2048
-      assert Explain.schema().fields[:temperature].value == 0.5
+      assert Zoi.parse(Explain.schema().fields[:detail_level], nil) == {:ok, :intermediate}
+      assert Zoi.parse(Explain.schema().fields[:include_examples], nil) == {:ok, true}
+      assert Zoi.parse(Explain.schema().fields[:max_tokens], nil) == {:ok, 2048}
+      assert Zoi.parse(Explain.schema().fields[:temperature], nil) == {:ok, 0.5}
     end
   end
 

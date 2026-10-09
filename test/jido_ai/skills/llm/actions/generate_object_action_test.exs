@@ -23,8 +23,8 @@ defmodule Jido.AI.Actions.LLM.GenerateObjectTest do
     end
 
     test "has expected defaults" do
-      assert GenerateObject.schema().fields[:max_tokens].value == 1024
-      assert GenerateObject.schema().fields[:temperature].value == 0.7
+      assert Zoi.parse(GenerateObject.schema().fields[:max_tokens], nil) == {:ok, 1024}
+      assert Zoi.parse(GenerateObject.schema().fields[:temperature], nil) == {:ok, 0.7}
     end
   end
 
