@@ -325,39 +325,11 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp finish_llm_turn(state, owner, ref, config, turn) do
     case Output.native_tool_call(config.output, turn.tool_calls) do
       {:ok, call} ->
-        acknowledgement = {:ok, "Final answer received for schema validation."}
-
-        # The parent agent projects tool responses from runtime events. Emit the
-        # acknowledgement as well as retaining it in the standalone context.
-        {state, _event} =
-          emit_event(
-            state,
-            owner,
-            ref,
-            :tool_completed,
-            %{
-              tool_call_id: call.id,
-              tool_name: call.name,
-              result: acknowledgement,
-              attempts: 0,
-              duration_ms: 0,
-              native_output: true
-            },
-            tool_call_id: call.id,
-            tool_name: call.name
-          )
-
-        context =
-          AIContext.append_tool_result(
-            state.context,
-            call.id,
-            call.name,
-            Turn.format_tool_result_content(acknowledgement)
-          )
+        state =
+          acknowledge_output_calls(state, owner, ref, [call], {:ok, "Final answer received for schema validation."})
 
         completed =
           state
-          |> Map.put(:context, context)
           |> State.put_status(:completed)
           |> State.put_result(call.arguments)
 
@@ -375,8 +347,44 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         end
 
       {:error, reason} ->
+        state =
+          acknowledge_output_calls(
+            state,
+            owner,
+            ref,
+            turn.tool_calls,
+            {:error, "Final output must be submitted alone. No actions in this batch were executed."}
+          )
+
         {:error, state, reason, :output_validation}
     end
+  end
+
+  defp acknowledge_output_calls(state, owner, ref, calls, result) do
+    Enum.reduce(calls, state, fn call, state ->
+      # The parent agent projects tool responses from runtime events. Retain the
+      # same reply in standalone and parent history, including rejected batches.
+      {state, _event} =
+        emit_event(
+          state,
+          owner,
+          ref,
+          :tool_completed,
+          %{
+            tool_call_id: call.id,
+            tool_name: call.name,
+            result: result,
+            attempts: 0,
+            duration_ms: 0,
+            native_output: true
+          },
+          tool_call_id: call.id,
+          tool_name: call.name
+        )
+
+      context = AIContext.append_tool_result(state.context, call.id, call.name, Turn.format_tool_result_content(result))
+      %{state | context: context}
+    end)
   end
 
   defp build_turn_request(%State{} = state, %Config{} = config, runtime_context) do

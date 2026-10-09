@@ -940,8 +940,8 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   test "native output rejects mixed final-answer and action calls without executing actions" do
     Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
       chunks = [
-        ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 2, "b" => 3}, %{id: "mixed_calc"}),
-        ReqLLM.StreamChunk.tool_call(Output.native_tool_name(), %{}, %{id: "mixed_final"})
+        ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 2, "b" => 3}, %{id: "mixed_calc", index: 0}),
+        ReqLLM.StreamChunk.tool_call(Output.native_tool_name(), %{}, %{id: "mixed_final", index: 1})
       ]
 
       {:ok, responses_stream_response(chunks, %{finish_reason: :tool_calls}, model)}
@@ -957,6 +957,13 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     events = ReAct.stream("Classify this ticket", config) |> Enum.to_list()
     assert Enum.any?(events, &(&1.kind == :request_failed))
     refute Enum.any?(events, &(&1.kind == :tool_started))
+    checkpoint = Enum.find(Enum.reverse(events), &(&1.kind == :checkpoint and &1.data.reason == :terminal))
+    assert {:ok, failed_state, _claims} = ReAct.Token.decode_state(checkpoint.data.token, config)
+    messages = AIContext.to_messages(failed_state.context)
+
+    for id <- ["mixed_calc", "mixed_final"] do
+      assert Enum.any?(messages, &(message_role(&1) == :tool and &1[:tool_call_id] == id))
+    end
   end
 
   test "repair receives the full conversation and complete answer when native enforcement is ignored" do
