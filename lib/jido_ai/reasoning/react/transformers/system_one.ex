@@ -45,14 +45,15 @@ defmodule Jido.AI.Reasoning.ReAct.Transformers.SystemOne do
     * `:depth_thresholds` - `{low, high}` depth cuts between the three models
       (default `{0.75, 1.5}`)
 
-  A request can override `:client_opts` and the other options through the runtime
-  context key `:system_one` (a keyword list), for example per tenant credentials.
+  A request can override `:client`, `:client_opts`, and the other options through
+  the runtime context key `:system_one` (a keyword list), for example per tenant
+  credentials.
 
   ## Failure behaviour
 
   The transformer never fails a request. A client error, a raise, a missing or
-  malformed answer, or more tools than one choice question can hold (254) all return
-  no overrides, so the turn runs exactly as configured.
+  malformed answer, invalid runtime override, or more tools than one choice question
+  can hold (254) all return no overrides, so the turn runs exactly as configured.
 
   ## Telemetry
 
@@ -148,15 +149,28 @@ defmodule Jido.AI.Reasoning.ReAct.Transformers.SystemOne do
   """
   @spec transform(map(), term(), term(), map(), keyword()) :: {:ok, map()}
   def transform(request, state, config, runtime_context, opts) do
-    opts = merge_runtime_opts(Keyword.merge(@defaults, opts), runtime_context)
-    tools = Map.get(request, :tools) || %{}
+    with {:ok, opts} <- merge_runtime_opts(Keyword.merge(@defaults, opts), runtime_context) do
+      tools = Map.get(request, :tools) || %{}
 
-    if map_size(tools) > @max_choice_tools do
-      Logger.warning("Jido.AI SystemOne transformer: #{map_size(tools)} tools exceed one choice question; skipping")
-      {:ok, %{}}
+      cond do
+        map_size(tools) > @max_choice_tools ->
+          Logger.warning("Jido.AI SystemOne transformer: #{map_size(tools)} tools exceed one choice question; skipping")
+
+          {:ok, %{}}
+
+        map_size(tools) == 0 and is_nil(opts[:models]) ->
+          {:ok, %{}}
+
+        true ->
+          decide(request, tools, state, config, runtime_context, opts)
+      end
     else
-      decide(request, tools, state, config, runtime_context, opts)
+      {:error, reason} -> fail_open(reason)
     end
+  rescue
+    error -> fail_open({:transformer_raised, Exception.message(error)})
+  catch
+    kind, reason -> fail_open({kind, reason})
   end
 
   defp decide(request, tools, state, config, runtime_context, opts) do
@@ -169,10 +183,13 @@ defmodule Jido.AI.Reasoning.ReAct.Transformers.SystemOne do
       emit(config, runtime_context, state, meta, needs, probs, depth, overrides)
       {:ok, overrides}
     else
-      {:error, reason} ->
-        Logger.warning("Jido.AI SystemOne transformer: no decision (#{inspect(reason, limit: 5)}); turn unchanged")
-        {:ok, %{}}
+      {:error, reason} -> fail_open(reason)
     end
+  end
+
+  defp fail_open(reason) do
+    Logger.warning("Jido.AI SystemOne transformer: no decision (#{inspect(reason, limit: 5)}); turn unchanged")
+    {:ok, %{}}
   end
 
   defp overrides(tools, needs, probs, depth, opts) do
@@ -258,14 +275,25 @@ defmodule Jido.AI.Reasoning.ReAct.Transformers.SystemOne do
   end
 
   defp read_answers(answers) do
-    with %{noul: needs} when is_number(needs) <- field(answers, "needs_tool"),
+    with %{noul: needs} when is_number(needs) and needs >= 0 and needs <= 1 <- field(answers, "needs_tool"),
          %{probabilities: probs} when is_map(probs) <- field(answers, "tool"),
-         true <- Enum.all?(probs, fn {_, p} -> is_number(p) end),
-         %{score: depth} when is_number(depth) <- field(answers, "depth") do
+         {:ok, probs} <- normalize_probabilities(probs),
+         %{score: depth} when is_number(depth) and depth >= 0 and depth <= 2 <- field(answers, "depth") do
       {:ok, needs, probs, depth}
     else
       _ -> {:error, :incomplete_answers}
     end
+  end
+
+  defp normalize_probabilities(probs) do
+    Enum.reduce_while(probs, {:ok, %{}}, fn
+      {name, probability}, {:ok, normalized}
+      when is_binary(name) and is_number(probability) and probability >= 0 and probability <= 1 ->
+        {:cont, {:ok, Map.put(normalized, name, probability)}}
+
+      _, _acc ->
+        {:halt, {:error, :invalid_probabilities}}
+    end)
   end
 
   defp field(answers, id) do
@@ -282,7 +310,7 @@ defmodule Jido.AI.Reasoning.ReAct.Transformers.SystemOne do
     probs
     |> Enum.reject(fn {name, p} -> name == "none" or p <= 0 end)
     |> Enum.sort_by(fn {_, p} -> -p end)
-    |> Enum.flat_map(fn {name, _} -> List.wrap(Map.get(by_name, to_string(name))) end)
+    |> Enum.flat_map(fn {name, _} -> List.wrap(Map.get(by_name, name)) end)
     |> Enum.take(k)
     |> Map.new()
   end
@@ -329,19 +357,25 @@ defmodule Jido.AI.Reasoning.ReAct.Transformers.SystemOne do
   defp field_or_nil(%{} = map, key), do: Map.get(map, key)
   defp field_or_nil(_, _), do: nil
 
-  defp merge_runtime_opts(opts, runtime_context) do
-    case runtime_context do
-      %{system_one: overrides} when is_list(overrides) ->
-        {client_opts, rest} = Keyword.pop(overrides, :client_opts, [])
+  defp merge_runtime_opts(opts, %{system_one: overrides}) when is_list(overrides) do
+    try do
+      {client_opts, rest} = Keyword.pop(overrides, :client_opts, [])
 
+      merged =
         opts
-        |> Keyword.merge(Keyword.take(rest, [:top_k, :needs_tool_threshold, :models, :depth_thresholds]))
+        |> Keyword.merge(rest)
         |> Keyword.update!(:client_opts, &Keyword.merge(&1, client_opts))
 
-      _ ->
-        opts
+      {:ok, validate_options!(merged)}
+    rescue
+      _error -> {:error, :invalid_runtime_options}
+    catch
+      _kind, _reason -> {:error, :invalid_runtime_options}
     end
   end
+
+  defp merge_runtime_opts(_opts, %{system_one: _overrides}), do: {:error, :invalid_runtime_options}
+  defp merge_runtime_opts(opts, _runtime_context), do: {:ok, opts}
 
   defp description(mod) when is_atom(mod) do
     if Code.ensure_loaded?(mod) and function_exported?(mod, :description, 0),

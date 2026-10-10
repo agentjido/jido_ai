@@ -29,7 +29,11 @@ defmodule Jido.AI.SystemOne.Client do
   """
 
   @type question_id :: String.t()
-  @type answer :: %{optional(:noul) => number(), optional(:probabilities) => map(), optional(:score) => number()}
+  @type answer :: %{
+          optional(:noul) => number(),
+          optional(:probabilities) => %{optional(String.t()) => number()},
+          optional(:score) => number()
+        }
   @type meta :: %{optional(:latency_ms) => non_neg_integer(), optional(:model) => String.t()}
 
   @callback evaluate(state :: term(), questions :: %{question_id() => map()}, opts :: keyword()) ::

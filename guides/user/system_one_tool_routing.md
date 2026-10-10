@@ -27,7 +27,7 @@ Then it overrides that turn:
 - `tools`: the `top_k` most probable tools, never one scored at zero; no tools at all when `needs_tool` is below the threshold, so the model answers directly
 - `model` (only if you configure `:models`): the fast, capable or reasoning alias by depth
 
-Any failure (client error, raise, missing or malformed answer, more than 254 tools) returns no overrides, so the turn runs exactly as configured.
+Any failure (client error, raise, missing or malformed answer, invalid runtime override, or more than 254 tools) returns no overrides, so the turn runs exactly as configured. When a turn has no tools and model routing is off, the transformer skips the decision call.
 
 ## Set It Up
 

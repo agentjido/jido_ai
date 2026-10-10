@@ -127,6 +127,17 @@ defmodule Jido.AI.Reasoning.ReAct.Transformers.SystemOneTest do
     test "when an answer is missing or malformed" do
       assert {:ok, %{}} = transform(%{"needs_tool" => %{noul: 0.9}})
       assert {:ok, %{}} = transform(answers(0.9, %{"gcd" => "high"}, 0.2))
+      assert {:ok, %{}} = transform(answers(0.9, %{{:bad, :key} => 1.0}, 0.2))
+      assert {:ok, %{}} = transform(answers(1.1, %{"gcd" => 1.0}, 0.2))
+      assert {:ok, %{}} = transform(answers(0.9, %{"gcd" => 1.1}, 0.2))
+      assert {:ok, %{}} = transform(answers(0.9, %{"gcd" => 1.0}, 2.1))
+    end
+
+    test "when a runtime override is invalid" do
+      opts = [client: StubClient, client_opts: [answers: answers(0.9, %{"gcd" => 1.0}, 0.2)]]
+      context = %{system_one: [top_k: "two"]}
+
+      assert {:ok, %{}} = SystemOne.transform(@request, %{iteration: 1}, %{}, context, opts)
     end
 
     test "when there are more tools than one Choice question can hold" do
@@ -134,6 +145,23 @@ defmodule Jido.AI.Reasoning.ReAct.Transformers.SystemOneTest do
       request = %{@request | tools: many}
       opts = [client: StubClient, client_opts: [answers: fn _, _ -> flunk("must not call the client") end]]
       assert {:ok, %{}} = SystemOne.transform(request, %{iteration: 1}, %{}, %{}, opts)
+    end
+
+    test "when the turn has no tools and model routing is off" do
+      request = %{@request | tools: %{}}
+      opts = [client: StubClient, client_opts: [answers: fn _, _ -> flunk("must not call the client") end]]
+
+      assert {:ok, %{}} = SystemOne.transform(request, %{iteration: 1}, %{}, %{}, opts)
+    end
+  end
+
+  describe "runtime overrides" do
+    test "can replace the client" do
+      opts = [client: String, client_opts: [answers: answers(0.9, %{"gcd" => 1.0}, 0.2)]]
+      context = %{system_one: [client: StubClient]}
+
+      assert {:ok, %{tools: %{"gcd" => Gcd}}} =
+               SystemOne.transform(@request, %{iteration: 1}, %{}, context, opts)
     end
   end
 
