@@ -211,6 +211,7 @@ Strategy guides:
 - [Strategy Selection Playbook](guides/user/strategy_selection_playbook.md)
 - [Strategy Recipes](guides/user/strategy_recipes.md)
 - [Model Routing And Policy](guides/user/model_routing_and_policy.md)
+- [Tool And Model Routing With A System One Model](guides/user/system_one_tool_routing.md)
 
 Integration and runtime guides:
 - [LLM Facade Quickstart](guides/user/llm_facade_quickstart.md)

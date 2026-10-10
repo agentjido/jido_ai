@@ -154,3 +154,7 @@ Do not use this path when:
 - [Strategy Selection Playbook](strategy_selection_playbook.md)
 - [Retrieval And Quota](retrieval_and_quota.md)
 - [Plugins And Actions Composition](../developer/plugins_and_actions_composition.md)
+
+## Related
+
+- [Tool And Model Routing With A System One Model](system_one_tool_routing.md): narrow tools and pick a model per ReAct turn with a decision model.
