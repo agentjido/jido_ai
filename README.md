@@ -263,6 +263,10 @@ Additional examples:
 
 See [CONTRIBUTING.md](https://github.com/agentjido/jido_ai/blob/main/CONTRIBUTING.md).
 
+## Local Documentation
+
+Run `mix docs` to generate HTML and Markdown documentation in `doc/`, including Markdown pages and `llms.txt`.
+
 ## License
 
 Apache-2.0. See [LICENSE.md](LICENSE.md).
