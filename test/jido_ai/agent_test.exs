@@ -565,6 +565,38 @@ defmodule Jido.AI.AgentTest do
       end
     end
 
+    test "raises a clear CompileError when tools is not a literal list" do
+      module_name = Module.concat(__MODULE__, :"CallToolsAgent#{System.unique_integer([:positive, :monotonic])}")
+
+      source = """
+      defmodule #{inspect(module_name)} do
+        use Jido.AI.Agent,
+          name: "call_tools_agent",
+          tools: MyApp.Tools.all()
+      end
+      """
+
+      assert_raise CompileError, ~r/tools must be a literal list of action modules/, fn ->
+        Code.compile_string(source)
+      end
+    end
+
+    test "raises a clear CompileError when a tools entry is not a module" do
+      module_name = Module.concat(__MODULE__, :"BadEntryAgent#{System.unique_integer([:positive, :monotonic])}")
+
+      source = """
+      defmodule #{inspect(module_name)} do
+        use Jido.AI.Agent,
+          name: "bad_entry_agent",
+          tools: [#{inspect(TestCalculator)}, String.to_atom("Elixir.Other")]
+      end
+      """
+
+      assert_raise CompileError, ~r/tools must be a literal list of action modules/, fn ->
+        Code.compile_string(source)
+      end
+    end
+
     test "tools list resolves module aliases" do
       agent = BasicAgent.new()
       tools = ReAct.list_tools(agent)
