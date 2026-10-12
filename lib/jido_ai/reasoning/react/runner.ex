@@ -1397,8 +1397,6 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
           |> Map.put(:data, %{error: :stream_timeout, error_type: :stream_timeout, timeout_ms: receive_timeout_ms})
           |> Event.new()
 
-        # The consumer owns idle timeout. Cleanup stops the coordinator and
-        # discards its queued events, so it cannot replace this outcome.
         {[event], %{state | done?: true}}
     end
   end
@@ -1950,8 +1948,6 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp request_stream_cancel(%{cancel_sent?: true} = state, _reason), do: state
 
   defp request_stream_cancel(%{pid: pid, ref: ref} = state, reason) when is_pid(pid) do
-    # Queue cancellation before closing HTTP. The provider can report a
-    # cancelled response as soon as its transport closes.
     case Process.alive?(pid) do
       true -> send(pid, {:react_cancel, ref, reason})
       _ -> :ok

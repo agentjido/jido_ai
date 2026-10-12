@@ -85,7 +85,6 @@ defmodule Jido.AI.Integration.ReActStreamTimeoutTest do
       assert worker_state.runtime_task == nil
       assert worker_state.active_request_id == nil
 
-      # A released provider cannot send a late completion after transport cleanup.
       send(provider, :release)
       assert {:ok, %{request: next, events: next_stream}} = agent.ask_stream(parent, "Next", opts)
       next_events = Enum.to_list(next_stream)
