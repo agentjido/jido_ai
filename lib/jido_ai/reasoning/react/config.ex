@@ -208,11 +208,15 @@ defmodule Jido.AI.Reasoning.ReAct.Config do
   end
 
   @doc """
-  Returns the effective stream consumer timeout.
+  Returns the effective runtime event-stream idle timeout.
 
   When `stream_timeout_ms` is 0 (default), auto-derives from
   `tool_exec.timeout_ms + 60_000` to ensure the stream consumer
   outlives the longest possible tool execution plus LLM response time.
+
+  Expiry emits `:request_failed` with `error: :stream_timeout` and closes
+  the active runtime. This timeout is separate from ReqLLM's HTTP
+  `receive_timeout` and a caller's `stream_event_timeout_ms`.
   """
   @spec stream_timeout(t()) :: pos_integer()
   def stream_timeout(%__MODULE__{} = config) do

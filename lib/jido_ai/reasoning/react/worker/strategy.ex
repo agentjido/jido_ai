@@ -267,14 +267,13 @@ defmodule Jido.AI.Reasoning.ReAct.Worker.Strategy do
   defp process_runtime_done(agent, %{request_id: request_id}) do
     state = StratState.get(agent, %{})
 
-    new_state =
-      if state[:active_request_id] == request_id do
-        finish_state(state)
-      else
-        state
-      end
-
-    {put_strategy_state(agent, new_state), []}
+    # A terminal event clears active_request_id before the ordered done
+    # signal arrives. An active request here has lost its terminal event.
+    if state[:active_request_id] == request_id do
+      process_runtime_failed(agent, %{request_id: request_id, error: :missing_terminal_event})
+    else
+      {agent, []}
+    end
   end
 
   defp process_runtime_done(agent, _params), do: {agent, []}

@@ -9,6 +9,62 @@ defmodule Jido.AI.Reasoning.ReAct.WorkerStrategyTest do
 
   setup :set_mimic_from_context
 
+  test "stream exhaustion without a terminal event fails the parent once" do
+    alias Jido.AgentServer.ParentRef
+    alias Jido.AI.Reasoning.ReAct.Worker
+
+    worker = Worker.Agent.new(state: %{__parent__: ParentRef.new!(%{pid: self(), id: "parent", tag: :react_worker})})
+    state = StratState.get(worker)
+    worker = StratState.put(worker, %{state | status: :running, active_request_id: "request", run_id: "run", seq: 7})
+    done = %Jido.Instruction{action: :react_worker_runtime_done, params: %{request_id: "request"}}
+
+    {worker, [%Worker.EmitEvent{signal: signal}]} = Strategy.cmd(worker, [done], %{})
+
+    assert %{
+             request_id: "request",
+             event: %{
+               kind: :request_failed,
+               seq: 8,
+               run_id: "run",
+               data: %{error: :missing_terminal_event, error_type: :worker_task}
+             }
+           } = signal.data
+
+    state = StratState.get(worker)
+    assert state.active_request_id == nil
+    assert state.runtime_task == nil
+    assert state.last_error == :missing_terminal_event
+    assert {^worker, []} = Strategy.cmd(worker, [done], %{})
+  end
+
+  test "done after a terminal event does not send a second failure" do
+    alias Jido.AI.Reasoning.ReAct.Worker
+    alias Jido.AI.Runtime.Event
+
+    worker = Worker.Agent.new()
+    state = StratState.get(worker)
+    worker = StratState.put(worker, %{state | status: :running, active_request_id: "request", run_id: "run"})
+
+    event =
+      Event.new(%{
+        kind: :request_failed,
+        request_id: "request",
+        run_id: "run",
+        seq: 1,
+        iteration: 1,
+        data: %{error: :stream_timeout}
+      })
+
+    instruction = %Jido.Instruction{
+      action: :react_worker_runtime_event,
+      params: %{request_id: "request", event: Map.from_struct(event)}
+    }
+
+    {worker, []} = Strategy.cmd(worker, [instruction], %{})
+    done = %Jido.Instruction{action: :react_worker_runtime_done, params: %{request_id: "request"}}
+    assert {^worker, []} = Strategy.cmd(worker, [done], %{})
+  end
+
   test "starts delegated runtime for multimodal query lists" do
     parent = self()
 

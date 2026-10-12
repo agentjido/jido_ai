@@ -89,6 +89,36 @@ You can also set the token secret globally:
 config :jido_ai, :react_token_secret, System.fetch_env!("REACT_TOKEN_SECRET")
 ```
 
+## Stream Timeouts
+
+`stream_timeout_ms` limits idle time in the native ReAct event stream.
+The default value, `0`, selects the tool timeout plus 60 seconds.
+Model progress and tool heartbeats reset the idle timer.
+
+If the timer expires, Runner emits one `:request_failed` event with
+`error: :stream_timeout`, `error_type: :stream_timeout`, and `timeout_ms`.
+The event keeps the request ID, run ID, active model call ID, and next
+sequence number. Runner stops the coordinator and closes the provider
+transport. In the delegated Agent path, this event also fails the original
+request and permits the worker to accept a new request.
+
+A timeout stops active work before Runner can obtain a consistent final
+checkpoint. This failure does not include a new terminal checkpoint token.
+Previously issued tokens remain subject to the normal continuation policy.
+
+These three timeout settings have separate purposes:
+
+| Setting | Purpose | Result on expiry |
+|---|---|---|
+| `stream_timeout_ms` | Limit idle time in the native runtime stream | Fail the request and stop runtime work |
+| ReqLLM `receive_timeout` | Limit HTTP response wait time | Return a provider transport error |
+| `stream_event_timeout_ms` | Limit the caller's wait for a request event | End the caller's enumerable; runtime work can continue |
+
+Set the HTTP timeout and native timeout to match the required response wait.
+Increasing the caller's event timeout does not change the native timeout.
+An explicit cancellation emits `:request_cancelled`. A consumer halt, such
+as `Enum.take/2`, stops owned work without emitting a timeout failure.
+
 ## Parallel Tool Ordering
 
 ReAct may execute tool calls concurrently (`tool_concurrency > 1`), but runtime output remains deterministic:
