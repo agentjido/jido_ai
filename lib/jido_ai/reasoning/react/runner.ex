@@ -89,6 +89,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
               receive_timeout_ms: receive_timeout_ms,
               stream_cancel: nil,
               stream_cancelled?: false,
+              event_cursor: Map.take(initial_state, [:seq, :run_id, :request_id, :iteration, :llm_call_id]),
               ref: ref
             }
           end,
@@ -265,7 +266,10 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
           llm_call_id: call_id
         )
 
-      case request_turn(state, owner, ref, config, request.messages, request.llm_opts, request.model) do
+      result = request_turn(state, owner, ref, config, request.messages, request.llm_opts, request.model)
+      check_cancel!(current_stream_state(runtime_state_key(ref), state), ref)
+
+      case result do
         {:ok, state, turn, response_id} ->
           state =
             state
@@ -1353,7 +1357,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         next_event(nil, state)
 
       {:react_runner, ^ref, :event, event} ->
-        {[event], state}
+        yield_event(event, state)
 
       {:react_runner, ^ref, :done} ->
         {:halt, %{state | done?: true}}
@@ -1377,7 +1381,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         next_event(nil, state)
 
       {:react_runner, ^ref, :event, event} ->
-        {[event], state}
+        yield_event(event, state)
 
       {:react_runner, ^ref, :done} ->
         {:halt, %{state | done?: true}}
@@ -1386,8 +1390,21 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         next_event(nil, %{state | down?: true})
     after
       receive_timeout_ms ->
-        {:halt, %{state | done?: true}}
+        event =
+          state.event_cursor
+          |> Map.update!(:seq, &(&1 + 1))
+          |> Map.put(:kind, :request_failed)
+          |> Map.put(:data, %{error: :stream_timeout, error_type: :stream_timeout, timeout_ms: receive_timeout_ms})
+          |> Event.new()
+
+        {[event], %{state | done?: true}}
     end
+  end
+
+  defp yield_event(event, state) do
+    cursor = Map.take(event, [:seq, :run_id, :request_id, :iteration, :llm_call_id])
+    terminal? = Jido.AI.Request.Stream.terminal_kind?(event.kind)
+    {[event], %{state | event_cursor: cursor, done?: terminal?}}
   end
 
   defp notify_progress(owner, ref) do
@@ -1480,7 +1497,18 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp cleanup(_owner, %{pid: pid} = state) when is_pid(pid) do
     state = request_stream_cancel(state, :stream_halted)
     await_runner_shutdown(state)
+    Process.demonitor(state.monitor_ref, [:flush])
+    flush_stream_messages(state.ref)
     :ok
+  end
+
+  defp flush_stream_messages(ref) do
+    receive do
+      {:react_runner, ^ref, _, _} -> flush_stream_messages(ref)
+      {:react_runner, ^ref, _} -> flush_stream_messages(ref)
+    after
+      0 -> :ok
+    end
   end
 
   defp start_task(fun, opts) do
@@ -1920,17 +1948,15 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp request_stream_cancel(%{cancel_sent?: true} = state, _reason), do: state
 
   defp request_stream_cancel(%{pid: pid, ref: ref} = state, reason) when is_pid(pid) do
-    state =
-      state
-      |> maybe_capture_stream_control()
-      |> invoke_stream_cancel()
-
     case Process.alive?(pid) do
       true -> send(pid, {:react_cancel, ref, reason})
       _ -> :ok
     end
 
-    Map.put(state, :cancel_sent?, true)
+    state
+    |> maybe_capture_stream_control()
+    |> invoke_stream_cancel()
+    |> Map.put(:cancel_sent?, true)
   end
 
   defp request_stream_cancel(state, _reason) do
@@ -1993,7 +2019,12 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         after
           @cleanup_wait_ms ->
             Process.exit(pid, :kill)
-            :ok
+
+            receive do
+              {:DOWN, ^monitor_ref, :process, ^pid, _reason} -> :ok
+            after
+              @cleanup_wait_ms -> :ok
+            end
         end
 
       _ ->
