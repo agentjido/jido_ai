@@ -274,7 +274,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
           state =
             state
             |> State.merge_usage(turn.usage)
-            |> State.put_llm_response_id(response_id)
+            |> State.put_llm_response_id(response_id, Jido.AI.model_fingerprint_segment(request.model))
 
           case validate_terminal_response(turn) do
             :ok ->
@@ -394,7 +394,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp build_turn_request(%State{} = state, %Config{} = config, runtime_context) do
     base_request = %{
       messages: AIContext.to_messages(state.context),
-      llm_opts: config |> Config.llm_opts() |> maybe_put_previous_response_id(state.llm_response_id),
+      llm_opts: Config.llm_opts(config),
       tools: config.tools,
       model: config.model
     }
@@ -404,7 +404,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
          {:ok, messages} <- normalize_request_messages(request),
          {:ok, tools} <- normalize_request_tools(request),
          effective_model <- Map.get(request, :model, config.model),
-         llm_opts <- sync_tools_in_llm_opts(config, request.llm_opts, tools),
+         llm_opts <- maybe_put_previous_response_id(request.llm_opts, state, effective_model),
+         llm_opts <- sync_tools_in_llm_opts(config, llm_opts, tools),
          {:ok, llm_opts} <- maybe_transform_tool_definitions(llm_opts, state, config, runtime_context),
          {:ok, llm_opts} <- Output.prepare_llm_opts(config.output, llm_opts, tools),
          llm_opts <- maybe_put_openai_websocket_session(effective_model, llm_opts) do
@@ -648,14 +649,22 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   defp extract_response_id(_), do: nil
 
-  defp maybe_put_previous_response_id(llm_opts, nil), do: llm_opts
+  defp maybe_put_previous_response_id(llm_opts, %State{} = state, model) do
+    supports_continuation? = Map.has_key?(Jido.AI.provider_opt_keys(model), "previous_response_id")
+    same_model? = state.llm_response_model == Jido.AI.model_fingerprint_segment(model)
 
-  defp maybe_put_previous_response_id(llm_opts, response_id) when is_list(llm_opts) and is_binary(response_id) do
-    provider_options = llm_opts |> Keyword.get(:provider_options, []) |> normalize_provider_options()
-    Keyword.put(llm_opts, :provider_options, Keyword.put(provider_options, :previous_response_id, response_id))
+    if is_binary(state.llm_response_id) and supports_continuation? and same_model? do
+      provider_options = llm_opts |> Keyword.get(:provider_options, []) |> normalize_provider_options()
+
+      Keyword.put(
+        llm_opts,
+        :provider_options,
+        Keyword.put(provider_options, :previous_response_id, state.llm_response_id)
+      )
+    else
+      llm_opts
+    end
   end
-
-  defp maybe_put_previous_response_id(llm_opts, _response_id), do: llm_opts
 
   defp normalize_provider_options(options) when is_list(options), do: Enum.reject(options, fn {k, _v} -> is_nil(k) end)
 

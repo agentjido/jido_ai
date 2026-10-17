@@ -258,6 +258,12 @@ def transform_request(_request, _state, _config, _runtime_context) do
 end
 ```
 
+The runner adds `previous_response_id` only when the selected provider schema
+supports it and the preceding response came from the same model. This check runs
+after `transform_request/4` selects the model. A model or provider change uses the
+full message history without an automatic continuation ID. Checkpoints retain
+the response model; older checkpoints without that field also use full history.
+
 ### Customizing Generated Tool Definitions
 
 A configured request transformer can optionally implement

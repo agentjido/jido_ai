@@ -316,6 +316,12 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     end
   end
 
+  defmodule ContinuationModelTransformer do
+    def transform_request(_request, state, _config, context) do
+      {:ok, %{model: Enum.at(context.continuation_models, state.iteration - 1)}}
+    end
+  end
+
   defmodule RuntimeAnthropicModelTransformer do
     def transform_request(_request, _state, _config, _runtime_context) do
       {:ok, %{model: "anthropic:claude-sonnet-4-5"}}
@@ -1833,6 +1839,95 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert Enum.any?(events, &(&1.kind == :request_completed))
   end
 
+  for streaming <- [true, false],
+      {scenario, models, expected_ids} <- [
+        {"OpenRouter", ["openrouter:openai/gpt-4o-mini", "openrouter:openai/gpt-4o-mini"], [nil, nil]},
+        {"OpenAI", ["openai:gpt-4o-mini", "openai:gpt-4o-mini"], [nil, "resp_1"]},
+        {"provider switch", ["openai:gpt-4o-mini", "openrouter:openai/gpt-4o-mini"], [nil, nil]},
+        {"model switch", ["openai:gpt-4o-mini", "openai:gpt-4o"], [nil, nil]},
+        {"return to OpenAI", ["openai:gpt-4o-mini", "openrouter:openai/gpt-4o-mini", "openai:gpt-4o-mini"],
+         [nil, nil, nil]},
+        {"runtime OpenAI override", ["openai:gpt-4o-mini", "openai:gpt-4o-mini"], [nil, "resp_1"]}
+      ] do
+    test "continuation for #{scenario}, streaming=#{streaming}" do
+      models = unquote(models)
+      expected_ids = unquote(expected_ids)
+      calls = :atomics.new(1, [])
+
+      respond = fn model, messages, opts ->
+        call = :atomics.add_get(calls, 1, 1)
+        assert model == Enum.at(models, call - 1)
+        provider_options = Keyword.get(opts, :provider_options, [])
+        assert Keyword.get(provider_options, :previous_response_id) == Enum.at(expected_ids, call - 1)
+        if unquote(scenario) == "OpenRouter", do: assert(provider_options[:openrouter_route] == "fallback")
+        # Use the real provider schema so the mock cannot hide rejected options.
+        {:ok, resolved} = ReqLLM.model(model)
+        {:ok, provider} = ReqLLM.provider(resolved.provider)
+        assert {:ok, _} = NimbleOptions.validate(provider_options, provider.provider_schema())
+        if call > 1, do: assert(Enum.any?(messages, &(message_role(&1) == :tool)))
+
+        final? = call == length(models)
+        metadata = %{finish_reason: if(final?, do: :stop, else: :tool_calls), response_id: "resp_#{call}"}
+
+        if unquote(streaming) do
+          chunk =
+            if final?,
+              do: ReqLLM.StreamChunk.text("Result is 5"),
+              else: ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 2, "b" => 3}, %{id: "calc_#{call}"})
+
+          {:ok, responses_stream_response([chunk, ReqLLM.StreamChunk.meta(metadata)], metadata, model)}
+        else
+          tool_calls =
+            if final?,
+              do: nil,
+              else: [ReqLLM.ToolCall.new("calc_#{call}", "calculator", Jason.encode!(%{a: 2, b: 3}))]
+
+          {:ok,
+           %{
+             message: %{content: if(final?, do: "Result is 5", else: ""), tool_calls: tool_calls, metadata: metadata},
+             finish_reason: metadata.finish_reason,
+             usage: %{}
+           }}
+        end
+      end
+
+      if unquote(streaming),
+        do: Mimic.stub(ReqLLM.Generation, :stream_text, respond),
+        else: Mimic.stub(ReqLLM.Generation, :generate_text, respond)
+
+      config =
+        Config.new(%{
+          model:
+            if(unquote(scenario) == "runtime OpenAI override", do: "openrouter:openai/gpt-4o-mini", else: hd(models)),
+          tools: %{CalculatorTool.name() => CalculatorTool},
+          streaming: unquote(streaming),
+          llm_opts:
+            if(unquote(scenario) == "OpenRouter", do: [provider_options: [openrouter_route: "fallback"]], else: []),
+          request_transformer:
+            if(unquote(scenario) in ["OpenRouter", "OpenAI"], do: nil, else: ContinuationModelTransformer),
+          tool_max_retries: 0,
+          tool_retry_backoff_ms: 0
+        })
+
+      events = ReAct.stream("Calculate 2 + 3", config, context: %{continuation_models: models}) |> Enum.to_list()
+      assert %{data: %{result: "Result is 5"}} = Enum.find(events, &(&1.kind == :request_completed))
+      assert :atomics.get(calls, 1) == length(models)
+    end
+  end
+
+  test "continuation model survives checkpoints and old checkpoints remain readable" do
+    alias Jido.AI.Reasoning.ReAct.State
+
+    state = State.new("Calculate", nil) |> State.put_llm_response_id("resp_1", "openai:gpt-4o-mini")
+    checkpoint = State.minimal_checkpoint_map(state)
+    assert {:ok, restored} = State.from_checkpoint_map(checkpoint)
+    assert restored.llm_response_model == "openai:gpt-4o-mini"
+    assert restored.llm_response_id == "resp_1"
+
+    assert {:ok, legacy} = checkpoint |> Map.delete(:llm_response_model) |> State.from_checkpoint_map()
+    assert legacy.llm_response_model == nil
+  end
+
   test "passes previous_response_id between streaming tool rounds for OpenAI Responses models" do
     Mimic.stub(ReqLLM.Generation, :stream_text, fn _model, _messages, opts ->
       count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
@@ -2599,15 +2694,17 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   end
 
   test "resumes from after_llm checkpoint token" do
-    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, opts ->
       count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
       :persistent_term.put({__MODULE__, :llm_call_count}, count)
+
+      assert get_in(opts, [:provider_options, :previous_response_id]) == if(count == 1, do: nil, else: "resp_resume")
 
       if count == 1 do
         {:ok,
          responses_stream_response(
            [ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 2, "b" => 3}, %{id: "tc_calc"})],
-           %{finish_reason: :tool_calls, usage: %{input_tokens: 4, output_tokens: 3}},
+           %{finish_reason: :tool_calls, response_id: "resp_resume", usage: %{input_tokens: 4, output_tokens: 3}},
            model
          )}
       else
@@ -2622,7 +2719,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
 
     config =
       Config.new(%{
-        model: :capable,
+        model: "openai:gpt-4o-mini",
         tools: %{CalculatorTool.name() => CalculatorTool},
         token_secret: "resume-secret"
       })

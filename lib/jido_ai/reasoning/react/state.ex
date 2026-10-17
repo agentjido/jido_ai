@@ -19,6 +19,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
               iteration: Zoi.integer() |> Zoi.default(1),
               llm_call_id: Zoi.string() |> Zoi.nullish(),
               llm_response_id: Zoi.string() |> Zoi.nullish(),
+              llm_response_model: Zoi.string() |> Zoi.nullish(),
               context: Zoi.any(),
               active_tools: Zoi.map() |> Zoi.default(%{}),
               pending_tool_calls: Zoi.list(PendingToolCall.schema()) |> Zoi.default([]),
@@ -67,6 +68,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
       status: :running,
       iteration: 1,
       llm_response_id: nil,
+      llm_response_model: nil,
       context: context,
       active_tools: %{},
       pending_tool_calls: [],
@@ -104,6 +106,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
         iteration: Map.get(map, :iteration, Map.get(map, "iteration", 1)),
         llm_call_id: Map.get(map, :llm_call_id, Map.get(map, "llm_call_id")),
         llm_response_id: Map.get(map, :llm_response_id, Map.get(map, "llm_response_id")),
+        llm_response_model: Map.get(map, :llm_response_model, Map.get(map, "llm_response_model")),
         context: context,
         active_tools: Map.get(map, :active_tools, Map.get(map, "active_tools", %{})) || %{},
         pending_tool_calls: restore_pending(Map.get(map, :pending_tool_calls, Map.get(map, "pending_tool_calls", []))),
@@ -141,6 +144,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
       iteration: state.iteration,
       llm_call_id: state.llm_call_id,
       llm_response_id: state.llm_response_id,
+      llm_response_model: state.llm_response_model,
       context: state.context,
       active_tools: state.active_tools,
       pending_tool_calls: state.pending_tool_calls,
@@ -208,11 +212,11 @@ defmodule Jido.AI.Reasoning.ReAct.State do
   end
 
   @doc """
-  Stores the latest provider response id for multi-turn continuation.
+  Stores the latest provider response ID and model fingerprint for continuation.
   """
-  @spec put_llm_response_id(t(), String.t() | nil) :: t()
-  def put_llm_response_id(%__MODULE__{} = state, response_id) do
-    %{state | llm_response_id: response_id, updated_at_ms: now_ms()}
+  @spec put_llm_response_id(t(), String.t() | nil, String.t() | nil) :: t()
+  def put_llm_response_id(%__MODULE__{} = state, response_id, model \\ nil) do
+    %{state | llm_response_id: response_id, llm_response_model: model, updated_at_ms: now_ms()}
   end
 
   @doc """
