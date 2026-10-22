@@ -1,0 +1,17 @@
+- id: first-agent-definition-component
+  date: "2026-10-22"
+  decision: Keep the first Jido AI Covenant component on the settled Agent-definition layer only.
+  driver: The Agent macro, Plugin configuration, preparation, and JSON authoring boundary are stable enough to protect. The model runtime is still under active design.
+  approved_by: Jido AI restart architecture review
+
+- id: defer-ai-runtime-contract
+  date: "2026-10-22"
+  decision: Keep the respond function name and arguments, the two-Action route pattern, request-option propagation, runtime error tuples, tool-loop and control execution, trace format, and structured streaming outside the active Covenant.
+  driver: More routed examples are required before these runtime choices become public promises.
+  approved_by: Jido AI restart architecture review
+
+- id: signal-action-owns-reply-shape
+  date: "2026-10-22"
+  decision: Keep structured reply shape on the routed SignalAction and keep it out of the Agent AI configuration.
+  driver: The Agent response can include state and Directives. It is not the same value as one model response.
+  approved_by: Jido AI restart architecture review

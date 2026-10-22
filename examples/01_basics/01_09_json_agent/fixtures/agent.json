@@ -1,0 +1,102 @@
+{
+  "definition": {
+    "description": null,
+    "extensions": [
+      {
+        "data": {
+          "controls": {
+            "input": [
+              {
+                "id": "examples/actions/json-permit",
+                "vsn": 1
+              }
+            ],
+            "max_iterations": 3,
+            "max_model_calls": 4,
+            "max_tool_calls": 5,
+            "output": [],
+            "timeout": 30000
+          },
+          "instructions": "Use a tool when arithmetic is required.",
+          "model": {
+            "kind": "alias",
+            "value": "fast"
+          },
+          "tools": [
+            {
+              "description": "Add two integers",
+              "kind": "action",
+              "name": "add_numbers",
+              "target": {
+                "id": "examples/actions/json-add",
+                "vsn": 1
+              },
+              "timeout": 5000
+            },
+            {
+              "description": "Add two integers through a Flow",
+              "kind": "flow",
+              "name": "json_example_add_flow",
+              "target": {
+                "id": "examples/flows/json-add",
+                "vsn": 1
+              },
+              "timeout": 5000
+            }
+          ]
+        },
+        "id": "jido.ai",
+        "provider": {
+          "id": "jido.ai",
+          "vsn": 1
+        },
+        "vsn": 1
+      }
+    ],
+    "metadata": {
+      "$type": "map",
+      "entries": []
+    },
+    "module": {
+      "id": "examples/agents/json-ai",
+      "vsn": 1
+    },
+    "name": "json_ai_example",
+    "routes": [
+      {
+        "as": {
+          "$type": "atom",
+          "id": "examples/atoms/ask",
+          "vsn": 1
+        },
+        "defaults": {
+          "$type": "map",
+          "entries": []
+        },
+        "emits": [
+          "examples.json_ai.answered"
+        ],
+        "handler": {
+          "kind": "action",
+          "target": {
+            "id": "examples/actions/json-handle-ask",
+            "vsn": 1
+          }
+        },
+        "path": "examples.json_ai.ask"
+      }
+    ],
+    "schema": {
+      "id": "examples/schemas/json-ai-state",
+      "vsn": 1
+    },
+    "signal_source": "/examples/json-ai",
+    "topology": {
+      "agents": [],
+      "connections": []
+    },
+    "vsn": 1
+  },
+  "type": "jido.agent.definition",
+  "vsn": 1
+}

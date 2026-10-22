@@ -24,6 +24,14 @@ config :logger, :default_formatter,
     :reason
   ]
 
+if config_env() in [:dev, :test] do
+  config :covenant,
+    root: ".",
+    contracts_dir: "test/contract",
+    test_paths: ["test/contract"],
+    sibling_dir: false
+end
+
 if config_env() == :dev do
   config :git_hooks,
     auto_install: true,

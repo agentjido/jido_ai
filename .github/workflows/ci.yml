@@ -27,5 +27,5 @@ jobs:
       test_matrix: '[{"otp":"27","elixir":"1.18"},{"otp":"28","elixir":"1.18"},{"otp":"28","elixir":"1.19"},{"otp":"29","elixir":"1.20"}]'
       credo_command: mix credo --min-priority high --all
       docs_command: mix docs -f html
-      test_command: mix test
+      test_command: mix test.ci
       validate_hex_package: ${{ github.base_ref == 'main' || github.ref == 'refs/heads/main' || github.event.merge_group.base_ref == 'refs/heads/main' }}

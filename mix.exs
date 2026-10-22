@@ -42,6 +42,8 @@ defmodule JidoAi.MixProject do
       preferred_envs: [
         "test.live": :test,
         "test.authoring": :test,
+        "test.contract": :test,
+        "test.ci": :test,
         examples: :test,
         coveralls: :test,
         "coveralls.detail": :test,
@@ -68,17 +70,15 @@ defmodule JidoAi.MixProject do
       {:jido, path: "../jido", override: true},
       {:jido_action, path: "../jido_action", override: true},
       {:jido_signal, path: "../jido_signal", override: true},
-      {:runic, "~> 0.1.0-alpha.12", override: true},
       {:req_llm, "~> 1.25"},
 
       # Runtime
-      {:fsmx, "~> 0.5"},
       {:jason, "~> 1.4"},
-      {:splode, "~> 0.3.0"},
-      {:yaml_elixir, "~> 2.12"},
       {:zoi, "~> 0.18.11", override: true},
 
       # Dev/Test
+      {:covenant,
+       github: "mikehostetler/covenant", branch: "feat/component-directories", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:doctor, "~> 0.22", only: [:dev], runtime: false},
@@ -97,6 +97,8 @@ defmodule JidoAi.MixProject do
       "test.live": "test --only live",
       examples: "test test/examples --only example",
       "test.authoring": "test test/authoring --only authoring --seed 0",
+      "test.contract": "covenant.check",
+      "test.ci": ["test --seed 0", "covenant.check"],
       "test.fast": "cmd env MIX_ENV=test mix test --exclude flaky --only stable_smoke",
       precommit: [
         "format --check-formatted",

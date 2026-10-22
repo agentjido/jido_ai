@@ -52,6 +52,34 @@ defmodule Jido.AI.Test.LiveTrace do
     |> Map.put("events", [started_event(request), completed_event(output, duration_ms)])
   end
 
+  defp build_trace(request, {:ok, text}, started_at, duration_ms) when is_binary(text) do
+    output = %{
+      "model" => request.model,
+      "text" => text,
+      "finish_reason" => nil,
+      "tool_call_count" => 0,
+      "usage" => %{}
+    }
+
+    base_trace(request, started_at, duration_ms)
+    |> Map.put("status", "ok")
+    |> Map.put("events", [started_event(request), completed_event(output, duration_ms)])
+  end
+
+  defp build_trace(request, {:ok, object}, started_at, duration_ms) when is_map(object) do
+    output = %{
+      "model" => request.model,
+      "object" => object,
+      "finish_reason" => nil,
+      "tool_call_count" => 0,
+      "usage" => %{}
+    }
+
+    base_trace(request, started_at, duration_ms)
+    |> Map.put("status", "ok")
+    |> Map.put("events", [started_event(request), completed_event(output, duration_ms)])
+  end
+
   defp build_trace(request, {:error, reason}, started_at, duration_ms) do
     base_trace(request, started_at, duration_ms)
     |> Map.put("status", "error")
