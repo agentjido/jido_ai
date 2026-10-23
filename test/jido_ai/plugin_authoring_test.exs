@@ -32,6 +32,30 @@ defmodule Jido.AI.Plugin.AuthoringTest do
     def run(_params, _context), do: {:ok, %{allowed: true}}
   end
 
+  defmodule CustomReasoning.Answer do
+    use Jido.Action, name: "json_agent_custom_reasoning_answer"
+
+    def run(%{request: request}, _context) do
+      {:ok,
+       %{
+         output: request.input,
+         usage: Jido.AI.Reasoning.State.usage(request),
+         trace: [%{type: :custom_reasoning}]
+       }}
+    end
+  end
+
+  defmodule CustomReasoning do
+    use Jido.Flow,
+      id: "tests/flows/json-agent-custom-reasoning",
+      name: "json_agent_custom_reasoning"
+
+    flow do
+      step "answer", action: CustomReasoning.Answer, params: input()
+      output result("answer")
+    end
+  end
+
   defmodule Assistant do
     use Jido.AI.Agent,
       id: "tests/agents/json-ai-assistant",
@@ -40,6 +64,7 @@ defmodule Jido.AI.Plugin.AuthoringTest do
     ai do
       model :fast
       instructions "Use tools when needed."
+      reasoning CustomReasoning
 
       tools do
         action Add, as: :add_numbers
@@ -82,6 +107,7 @@ defmodule Jido.AI.Plugin.AuthoringTest do
 
     assert imported == definition
     assert Jido.AI.Plugin.config(imported) == Jido.AI.Plugin.config(Assistant)
+    assert Jido.AI.Plugin.config(imported).reasoning == CustomReasoning
 
     document = Jason.decode!(json)
     [action, flow] = get_in(document, ["definition", "extensions", Access.at(0), "data", "tools"])
@@ -90,6 +116,12 @@ defmodule Jido.AI.Plugin.AuthoringTest do
     assert flow["target"] == %{"id" => "tests/flows/json-agent-add", "vsn" => 1}
 
     config = get_in(document, ["definition", "extensions", Access.at(0), "data"])
+
+    assert config["reasoning"] == %{
+             "kind" => "flow",
+             "target" => %{"id" => "tests/flows/json-agent-custom-reasoning", "vsn" => 1}
+           }
+
     refute Map.has_key?(config, "output")
   end
 
@@ -125,6 +157,7 @@ defmodule Jido.AI.Plugin.AuthoringTest do
       {"jido.ai", 1} => {:plugin, Jido.AI.Plugin},
       {"tests/actions/json-agent-add", 1} => {:action, Add},
       {"tests/flows/json-agent-add", 1} => {:flow, AddFlow},
+      {"tests/flows/json-agent-custom-reasoning", 1} => {:flow, CustomReasoning},
       {"tests/actions/json-agent-permit", 1} => {:action, Permit}
     })
   end

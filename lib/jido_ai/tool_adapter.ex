@@ -1,10 +1,13 @@
 defmodule Jido.AI.ToolAdapter do
   @moduledoc """
-  Adapts declared Jido Actions and Flows to ReqLLM tools.
+  Adapts declared Jido Actions and Flows to ReqLLM tool definitions.
 
-  ReqLLM describes the tool and decodes the model call. `Jido.Exec` validates
-  and runs the selected Jido executable.
+  The default ReAct Flow uses descriptor-only tools, resolves each model call,
+  and runs the selected target as a child Flow component. The executable tool
+  functions remain available for streaming and direct ReqLLM integration.
   """
+
+  alias Jido.AI.Deadline
 
   @type tool_spec :: %{
           required(:kind) => :action | :flow,
@@ -39,6 +42,20 @@ defmodule Jido.AI.ToolAdapter do
     do: {:error, {:invalid_tool_context, context}}
 
   def from_specs(specs, _context, _opts), do: {:error, {:invalid_tool_spec, specs}}
+
+  @doc false
+  @spec definitions_from_specs([tool_spec()]) ::
+          {:ok, [ReqLLM.Tool.t()]} | {:error, error_reason() | term()}
+  def definitions_from_specs(specs) when is_list(specs) do
+    with {:ok, tools} <- map_definitions(specs),
+         :ok <- unique_names(tools),
+         do: {:ok, tools}
+  end
+
+  def definitions_from_specs(specs), do: {:error, {:invalid_tool_spec, specs}}
+
+  @doc false
+  def execution_boundary(_params), do: {:error, :tool_must_run_in_reasoning_flow}
 
   @doc "Converts Jido Action and Flow modules to ReqLLM tools."
   @spec from_executables([module()], map()) ::
@@ -133,6 +150,46 @@ defmodule Jido.AI.ToolAdapter do
     end
   end
 
+  defp map_definitions(specs) do
+    Enum.reduce_while(specs, {:ok, []}, fn spec, {:ok, tools} ->
+      case definition_from_spec(spec) do
+        {:ok, tool} -> {:cont, {:ok, [tool | tools]}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+    |> case do
+      {:ok, tools} -> {:ok, Enum.reverse(tools)}
+      error -> error
+    end
+  end
+
+  defp definition_from_spec(
+         %{
+           kind: kind,
+           target: target,
+           name: name,
+           description: description,
+           timeout: timeout
+         } = spec
+       )
+       when kind in [:action, :flow] and is_atom(target) and is_binary(name) and
+              is_binary(description) and is_integer(timeout) and timeout > 0 do
+    with {:ok, executable} <- Jido.Instruction.resolve(target),
+         :ok <- Jido.Instruction.validate(executable),
+         true <- executable.kind == kind do
+      ReqLLM.Tool.new(
+        name: name,
+        description: description,
+        parameter_schema: target.schema(),
+        callback: {__MODULE__, :execution_boundary}
+      )
+    else
+      _other -> {:error, {:invalid_tool_spec, spec}}
+    end
+  end
+
+  defp definition_from_spec(spec), do: {:error, {:invalid_tool_spec, spec}}
+
   defp from_spec(
          %{
            kind: kind,
@@ -168,26 +225,17 @@ defmodule Jido.AI.ToolAdapter do
         nil ->
           {:ok, nil}
 
-        %{at: at, timeout: timeout} = deadline when is_integer(at) and is_integer(timeout) and timeout > 0 ->
-          {:ok, deadline}
-
         deadline ->
-          {:error, {:invalid_tool_spec, {:deadline, deadline}}}
+          if Deadline.valid?(deadline),
+            do: {:ok, deadline},
+            else: {:error, {:invalid_tool_spec, {:deadline, deadline}}}
       end
     else
       {:error, {:invalid_tool_spec, opts}}
     end
   end
 
-  defp tool_timeout(timeout, nil), do: {:ok, timeout}
-
-  defp tool_timeout(timeout, %{at: at, timeout: request_timeout}) do
-    remaining = at - System.monotonic_time(:millisecond)
-
-    if remaining > 0,
-      do: {:ok, min(timeout, remaining)},
-      else: {:error, {:request_timeout, request_timeout}}
-  end
+  defp tool_timeout(timeout, deadline), do: Deadline.cap(deadline, timeout)
 
   defp infer_specs(targets) do
     Enum.reduce_while(targets, {:ok, []}, fn target, {:ok, specs} ->
@@ -234,14 +282,15 @@ defmodule Jido.AI.ToolAdapter do
     end
   end
 
-  defp decode_params([], params) when is_map(params), do: {:ok, params}
+  @doc false
+  def decode_params([], params) when is_map(params), do: {:ok, params}
 
-  defp decode_params(%_{} = schema, params) do
+  def decode_params(%_{} = schema, params) do
     Zoi.parse(schema, params, coerce: true)
   end
 
-  defp decode_params(_schema, params) when is_map(params), do: {:ok, params}
-  defp decode_params(_schema, params), do: {:error, {:invalid_tool_input, params}}
+  def decode_params(_schema, params) when is_map(params), do: {:ok, params}
+  def decode_params(_schema, params), do: {:error, {:invalid_tool_input, params}}
 
   defp error_message(error) when is_exception(error), do: Exception.message(error)
   defp error_message(nil), do: "Invalid tool call"

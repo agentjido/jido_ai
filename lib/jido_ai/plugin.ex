@@ -8,6 +8,7 @@ defmodule Jido.AI.Plugin do
         ai do
           model :fast
           instructions "Reply in one short sentence."
+          reasoning MyApp.ReasoningFlow
 
           tools do
             action MyApp.Search, as: :search
@@ -36,6 +37,8 @@ defmodule Jido.AI.Plugin do
   alias Jido.Agent.{Data, Error}
   alias Jido.Instruction
   alias Spark.Dsl.Extension, as: Extension
+
+  @default_reasoning Jido.AI.Flow.ReAct
 
   @default_controls %{
     timeout: 60_000,
@@ -101,7 +104,8 @@ defmodule Jido.AI.Plugin do
     name: :ai,
     schema: [
       model: [type: {:or, [:string, :atom]}, required: true],
-      instructions: [type: :string, default: ""]
+      instructions: [type: :string, default: ""],
+      reasoning: [type: :atom, default: @default_reasoning]
     ],
     entities: [@tools, @controls],
     singleton_entity_keys: [:tools, :controls]
@@ -137,6 +141,7 @@ defmodule Jido.AI.Plugin do
   def lower(dsl, config) do
     model = Extension.get_opt(dsl, [:ai], :model)
     instructions = Extension.get_opt(dsl, [:ai], :instructions, "")
+    reasoning = Extension.get_opt(dsl, [:ai], :reasoning, @default_reasoning)
     entities = Extension.get_entities(dsl, [:ai])
     tools = Enum.find(entities, &is_struct(&1, DSL.Tools))
     controls = Enum.find(entities, &is_struct(&1, DSL.Controls))
@@ -153,6 +158,7 @@ defmodule Jido.AI.Plugin do
         ai_config = %{
           model: model,
           instructions: instructions,
+          reasoning: reasoning,
           tools: lower_tools(tools),
           controls: lower_controls(controls)
         }
@@ -169,16 +175,23 @@ defmodule Jido.AI.Plugin do
     with {:ok, ai_config} <-
            Data.fields(
              data,
-             [:model, :instructions, :tools, :controls],
-             %{instructions: "", tools: [], controls: @default_controls}
+             [:model, :instructions, :reasoning, :tools, :controls],
+             %{
+               instructions: "",
+               reasoning: @default_reasoning,
+               tools: [],
+               controls: @default_controls
+             }
            ),
          :ok <- validate_model(ai_config.model),
          :ok <- validate_instructions(ai_config.instructions),
+         :ok <- Error.at(validate_executable(ai_config.reasoning, :flow), :reasoning),
          {:ok, tools} <- Error.at(validate_tools(ai_config.tools), :tools),
          {:ok, controls} <- Error.at(validate_controls(ai_config.controls), :controls) do
       normalized = %{
         model: ai_config.model,
         instructions: ai_config.instructions,
+        reasoning: ai_config.reasoning,
         tools: tools,
         controls: controls
       }
@@ -200,6 +213,9 @@ defmodule Jido.AI.Plugin do
 
   @doc false
   def default_controls, do: @default_controls
+
+  @doc false
+  def default_reasoning, do: @default_reasoning
 
   defp lower_tools(nil), do: []
 

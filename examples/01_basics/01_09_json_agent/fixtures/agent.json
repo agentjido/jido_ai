@@ -22,6 +22,10 @@
             "kind": "alias",
             "value": "fast"
           },
+          "reasoning": {
+            "kind": "builtin",
+            "name": "react"
+          },
           "tools": [
             {
               "description": "Add two integers",
@@ -76,10 +80,10 @@
         "emits": [
           "examples.json_ai.answered"
         ],
-        "handler": {
-          "kind": "action",
+                    "handler": {
+                      "kind": "flow",
           "target": {
-            "id": "examples/actions/json-handle-ask",
+                        "id": "examples/flows/json-handle-ask",
             "vsn": 1
           }
         },

@@ -20,6 +20,7 @@ defmodule JidoAI.Examples.BasicAgentTest do
     expected = %{
       model: :fast,
       instructions: "Reply in one short sentence.",
+      reasoning: Jido.AI.Flow.ReAct,
       tools: [],
       controls: Plugin.default_controls()
     }

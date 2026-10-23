@@ -26,21 +26,33 @@ defmodule JidoAI.Examples.StructuredOutput.Ask do
 end
 
 defmodule JidoAI.Examples.StructuredOutput.HandleAsk do
-  @moduledoc "Runs the AI Action and emits its typed reply."
+  @moduledoc "Reasons and emits one typed reply as a Flow."
 
   alias JidoAI.Examples.StructuredOutput.Ask
 
-  use Jido.Action,
+  use Jido.Flow,
     name: "structured_output_handle_ask",
     description: "Run one structured AI request",
-    schema: Ask.schema()
+    schema: Ask.schema(),
+    extensions: [Jido.AI.Flow.Extension]
 
-  @impl Jido.Action
-  def run(params, context) do
-    with {:ok, answer} <- Jido.Exec.run(Ask, params, context),
-         {:ok, reply} <- Ask.reply(context.signal, answer) do
-      {:ok, context.agent_state, [Jido.Agent.Directive.emit(reply)]}
+  flow do
+    reason("answer",
+      prompt: input(:question),
+      reply: Ask
+    )
+
+    step "reply",
+         answer <- result("answer", :output),
+         inline: [
+           description: "Emit one typed structured reply",
+           schema: Zoi.object(%{answer: Ask.output_schema()}),
+           context: context
+         ] do
+      Jido.AI.Turn.complete_reply(context, Ask, answer)
     end
+
+    output result("reply")
   end
 end
 

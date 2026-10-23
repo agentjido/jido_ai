@@ -62,21 +62,34 @@ defmodule JidoAI.Examples.JSONAgent.Ask do
 end
 
 defmodule JidoAI.Examples.JSONAgent.HandleAsk do
-  @moduledoc "Runs the AI request and emits its reply."
+  @moduledoc "Reasons and emits one typed reply as a Flow."
 
   alias JidoAI.Examples.JSONAgent.Ask
 
-  use Jido.Action,
+  use Jido.Flow,
+    id: "examples/flows/json-handle-ask",
     name: "json_example_handle_ask",
     description: "Handle one JSON AI Agent request",
-    schema: Ask.schema()
+    schema: Ask.schema(),
+    extensions: [Jido.AI.Flow.Extension]
 
-  @impl Jido.Action
-  def run(params, context) do
-    with {:ok, answer} <- Jido.Exec.run(Ask, params, context),
-         {:ok, reply} <- Ask.reply(context.signal, answer) do
-      {:ok, context.agent_state, [Jido.Agent.Directive.emit(reply)]}
+  flow do
+    reason("answer",
+      prompt: input(:question),
+      reply: Ask
+    )
+
+    step "reply",
+         answer <- result("answer", :output),
+         inline: [
+           description: "Emit one typed imported Agent reply",
+           schema: Zoi.object(%{answer: Ask.output_schema()}),
+           context: context
+         ] do
+      Jido.AI.Turn.complete_reply(context, Ask, answer)
     end
+
+    output result("reply")
   end
 end
 
@@ -135,7 +148,7 @@ defmodule JidoAI.Examples.JSONAgent do
       {"examples/actions/json-add", 1} => {:action, Add},
       {"examples/flows/json-add", 1} => {:flow, AddFlow},
       {"examples/actions/json-permit", 1} => {:action, Permit},
-      {"examples/actions/json-handle-ask", 1} => {:action, HandleAsk},
+      {"examples/flows/json-handle-ask", 1} => {:flow, HandleAsk},
       {"examples/atoms/ask", 1} => {:atom, :ask}
     })
   end

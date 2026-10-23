@@ -4,22 +4,30 @@ defmodule Jido.AI.Plugin.Authoring do
   alias Jido.Agent.Error
   alias Jido.Authoring.Registry
 
-  @config_fields ~w(model instructions tools controls)
+  @config_fields ~w(model instructions reasoning tools controls)
   @control_fields ~w(timeout max_iterations max_model_calls max_tool_calls input output)
   @tool_fields ~w(kind target name description timeout)
 
   @doc false
   def encode(
-        %{model: model, instructions: instructions, tools: tools, controls: controls} = config,
+        %{
+          model: model,
+          instructions: instructions,
+          reasoning: reasoning,
+          tools: tools,
+          controls: controls
+        } = config,
         %Registry{} = registry
       )
-      when map_size(config) == 4 do
+      when map_size(config) == 5 do
     with {:ok, model} <- encode_model(model),
+         {:ok, reasoning} <- encode_reasoning(reasoning, registry),
          {:ok, tools} <- traverse(tools, &encode_tool(&1, registry)),
          {:ok, controls} <- encode_controls(controls, registry) do
       encoded = %{
         "model" => model,
         "instructions" => instructions,
+        "reasoning" => reasoning,
         "tools" => tools,
         "controls" => controls
       }
@@ -36,12 +44,14 @@ defmodule Jido.AI.Plugin.Authoring do
     with :ok <- object(config, @config_fields, [], []),
          {:ok, model} <- decode_model(config["model"]),
          :ok <- string(config["instructions"], ["instructions"]),
+         {:ok, reasoning} <- decode_reasoning(config["reasoning"], registry),
          {:ok, tools} <-
            traverse(config["tools"], &decode_tool(&1, registry), ["tools"]),
          {:ok, controls} <- decode_controls(config["controls"], registry) do
       decoded = %{
         model: model,
         instructions: config["instructions"],
+        reasoning: reasoning,
         tools: tools,
         controls: controls
       }
@@ -76,6 +86,26 @@ defmodule Jido.AI.Plugin.Authoring do
 
   defp decode_model(model),
     do: invalid(["model"], "Invalid AI model document", %{value: model})
+
+  defp encode_reasoning(Jido.AI.Flow.ReAct, _registry),
+    do: {:ok, %{"kind" => "builtin", "name" => "react"}}
+
+  defp encode_reasoning(reasoning, registry) do
+    with {:ok, target} <- Registry.encode_reference(registry, :flow, reasoning) do
+      {:ok, %{"kind" => "flow", "target" => target}}
+    end
+  end
+
+  defp decode_reasoning(%{"kind" => "builtin", "name" => "react"} = reasoning, _registry)
+       when map_size(reasoning) == 2,
+       do: {:ok, Jido.AI.Flow.ReAct}
+
+  defp decode_reasoning(%{"kind" => "flow", "target" => target} = reasoning, registry)
+       when map_size(reasoning) == 2,
+       do: Registry.decode_reference(registry, target, :flow)
+
+  defp decode_reasoning(reasoning, _registry),
+    do: invalid(["reasoning"], "Invalid AI reasoning Flow", %{value: reasoning})
 
   defp encode_tool(
          %{

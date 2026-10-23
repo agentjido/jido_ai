@@ -23,6 +23,7 @@ defmodule Jido.AI.AgentTest do
     assert Jido.AI.Plugin.config(Assistant) == %{
              model: "openai:gpt-4o-mini",
              instructions: "",
+             reasoning: Jido.AI.Flow.ReAct,
              tools: [],
              controls: Jido.AI.Plugin.default_controls()
            }

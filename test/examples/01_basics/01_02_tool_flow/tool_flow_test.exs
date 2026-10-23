@@ -46,6 +46,53 @@ defmodule JidoAI.Examples.ToolFlowTest do
     assert Agent.generate("What is 6 times 7?") == {:ok, "The product is 42."}
   end
 
+  test "the Agent runs a Flow tool as a child of the ReAct Flow" do
+    expect(ReqLLM, :generate_text, 2, fn model, context, _options ->
+      case ReqLLM.Context.to_list(context) do
+        [_system, _user] ->
+          call = ReqLLM.ToolCall.new("flow-call-1", "multiply_flow", ~s({"left":3,"right":5}))
+          message = ReqLLM.Context.assistant("", tool_calls: [call])
+
+          {:ok,
+           %ReqLLM.Response{
+             id: "flow-tool-request",
+             model: model,
+             context: ReqLLM.Context.append(context, message),
+             message: message
+           }}
+
+        [_system, _user, %{role: :assistant}, tool_result] ->
+          assert tool_result.name == "multiply_flow"
+          assert tool_result.metadata.tool_output == %{product: 15}
+          {:ok, response(model, context, "The product is 15.")}
+      end
+    end)
+
+    assert {:ok, result} = Agent.reason("What is 3 times 5?")
+    assert result.output == "The product is 15."
+    assert result.usage == %{model_calls: 2, tool_calls: 1, iterations: 1}
+
+    assert Enum.map(result.trace, & &1.type) == [
+             :request_started,
+             :model_completed,
+             :tool_round_completed,
+             :model_completed,
+             :request_completed
+           ]
+
+    assert tool_round = Enum.find(result.trace, &(&1.type == :tool_round_completed))
+
+    assert tool_round.calls == [
+             %{
+               id: "flow-call-1",
+               name: "multiply_flow",
+               kind: :flow,
+               status: :ok,
+               output: %{type: :map, keys: ["product"]}
+             }
+           ]
+  end
+
   test "an invalid call prevents the complete tool batch from running" do
     {:ok, counter} = Elixir.Agent.start_link(fn -> 0 end)
 

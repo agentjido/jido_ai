@@ -38,6 +38,13 @@ defmodule Jido.AI.Agent do
       @spec generate(String.t(), keyword()) :: {:ok, term()} | {:error, term()}
       def generate(input, opts \\ []), do: Jido.AI.generate(__MODULE__, input, opts)
 
+      @doc "Runs one reasoning Flow and returns output, usage, and a sanitized trace."
+      @spec reason(String.t(), keyword()) ::
+              {:ok, Jido.AI.reasoning_result()}
+              | {:ok, Jido.AI.reasoning_result(), Jido.Action.effects()}
+              | {:error, term()}
+      def reason(input, opts \\ []), do: Jido.AI.reason(__MODULE__, input, opts)
+
       @doc "Starts one streaming response with this Agent's AI configuration."
       @spec stream(String.t(), keyword()) ::
               {:ok, ReqLLM.StreamResponse.t()} | {:error, term()}

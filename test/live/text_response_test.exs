@@ -8,11 +8,12 @@ defmodule Jido.AI.Live.TextResponseTest do
 
     {result, _trace} =
       capture_live(Agent, input, "text_response", fn ->
-        Jido.AI.generate(Agent, input, live_options())
+        Jido.AI.reason(Agent, input, live_options())
       end)
 
-    assert {:ok, text} = result
-    assert is_binary(text)
-    assert String.trim(text) != ""
+    assert {:ok, reasoning} = result
+    assert is_binary(reasoning.output)
+    assert String.trim(reasoning.output) != ""
+    assert %{model_calls: 1, tool_calls: 0, iterations: 0} = reasoning.usage
   end
 end

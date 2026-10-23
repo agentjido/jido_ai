@@ -62,6 +62,51 @@ defmodule Jido.AI.Live.ToolRoundTest do
     end
   end
 
+  defmodule MultiplyInFlow do
+    use Jido.Action,
+      name: "multiply_in_flow",
+      description: "Multiply two integers inside a Flow",
+      schema: Zoi.object(%{left: Zoi.integer(), right: Zoi.integer()})
+
+    @impl Jido.Action
+    def run(%{left: left, right: right}, context) do
+      Elixir.Agent.update(context.audit, &[{:multiply, left, right} | &1])
+      {:ok, %{product: left * right}}
+    end
+  end
+
+  defmodule MultiplyFlow do
+    use Jido.Flow,
+      name: "multiply_flow",
+      description: "Multiply two integers by running a composed Flow",
+      schema: Zoi.object(%{left: Zoi.integer(), right: Zoi.integer()})
+
+    flow do
+      step "multiply", action: MultiplyInFlow, params: input()
+      output result("multiply")
+    end
+  end
+
+  defmodule FlowToolAgent do
+    use Jido.AI.Agent, name: "live_flow_tool_agent"
+
+    ai do
+      model :fast
+      instructions "Use the multiply_flow tool for multiplication requests."
+
+      tools do
+        flow MultiplyFlow
+      end
+
+      controls do
+        timeout 30_000
+        max_iterations 2
+        max_model_calls 3
+        max_tool_calls 2
+      end
+    end
+  end
+
   test "a real model completes one Action tool round" do
     {:ok, counter} = Elixir.Agent.start_link(fn -> 0 end)
     input = "Call the multiply tool with left 6 and right 7. Use its result in your answer."
@@ -69,11 +114,12 @@ defmodule Jido.AI.Live.ToolRoundTest do
 
     {result, _trace} =
       capture_live(ToolAgent, input, "action_tool_round", options, fn ->
-        Jido.AI.generate(ToolAgent, input, options)
+        Jido.AI.reason(ToolAgent, input, options)
       end)
 
-    assert {:ok, text} = result
-    assert String.contains?(text, "42")
+    assert {:ok, reasoning} = result
+    assert String.contains?(reasoning.output, "42")
+    assert %{model_calls: 2, tool_calls: 1, iterations: 1} = reasoning.usage
     assert Elixir.Agent.get(counter, & &1) >= 1
   end
 
@@ -84,11 +130,12 @@ defmodule Jido.AI.Live.ToolRoundTest do
 
     {result, _trace} =
       capture_live(MultiStepAgent, input, "dependent_tool_rounds", options, fn ->
-        Jido.AI.generate(MultiStepAgent, input, options)
+        Jido.AI.reason(MultiStepAgent, input, options)
       end)
 
-    assert {:ok, text} = result
-    assert String.contains?(text, "receipt-omega")
+    assert {:ok, reasoning} = result
+    assert String.contains?(reasoning.output, "receipt-omega")
+    assert %{model_calls: 3, tool_calls: 2, iterations: 2} = reasoning.usage
 
     events = audit |> Elixir.Agent.get(& &1) |> Enum.reverse()
     fetch_index = Enum.find_index(events, &(&1 == {:fetch, "alpha"}))
@@ -97,5 +144,21 @@ defmodule Jido.AI.Live.ToolRoundTest do
     assert is_integer(fetch_index)
     assert is_integer(redeem_index)
     assert fetch_index < redeem_index
+  end
+
+  test "a real model runs a Flow as a tool" do
+    {:ok, audit} = Elixir.Agent.start_link(fn -> [] end)
+    input = "Use multiply_flow to multiply 3 by 5. Return the product."
+    options = live_options(max_tokens: 64, jido_context: %{audit: audit})
+
+    {result, _trace} =
+      capture_live(FlowToolAgent, input, "flow_tool_round", options, fn ->
+        Jido.AI.reason(FlowToolAgent, input, options)
+      end)
+
+    assert {:ok, reasoning} = result
+    assert String.contains?(reasoning.output, "15")
+    assert %{model_calls: 2, tool_calls: 1, iterations: 1} = reasoning.usage
+    assert Elixir.Agent.get(audit, & &1) == [{:multiply, 3, 5}]
   end
 end

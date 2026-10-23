@@ -147,7 +147,16 @@ defmodule JidoAI.Contract.AgentContractTest do
 
     assert config.model == :fast
     assert config.instructions == "Return a concise answer."
-    assert Map.keys(config) |> Enum.sort() == [:controls, :instructions, :model, :tools]
+
+    assert Map.keys(config) |> Enum.sort() == [
+             :controls,
+             :instructions,
+             :model,
+             :reasoning,
+             :tools
+           ]
+
+    assert config.reasoning == Jido.AI.Flow.ReAct
 
     assert Jido.AI.Plugin.default_controls() == %{
              timeout: 60_000,

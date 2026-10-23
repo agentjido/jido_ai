@@ -62,10 +62,47 @@ defmodule Jido.AI.PluginTest do
     end
   end
 
+  defmodule FixedReasoning.Answer do
+    use Jido.Action,
+      name: "fixed_reasoning_answer",
+      description: "Return one fixed reasoning result"
+
+    @impl Jido.Action
+    def run(%{request: request}, _context) do
+      {:ok,
+       %{
+         output: "Custom: #{request.input}",
+         usage: Jido.AI.Reasoning.State.usage(request),
+         trace: [%{type: :custom_reasoning}]
+       }}
+    end
+  end
+
+  defmodule FixedReasoning do
+    use Jido.Flow,
+      name: "fixed_reasoning",
+      description: "Return a fixed answer without a model call"
+
+    flow do
+      step "answer", action: FixedReasoning.Answer, params: input()
+      output result("answer")
+    end
+  end
+
+  defmodule CustomReasoningAssistant do
+    use Jido.AI.Agent, name: "custom_reasoning_assistant"
+
+    ai do
+      model "openai:gpt-4o-mini"
+      reasoning FixedReasoning
+    end
+  end
+
   test "an Agent declares its basic AI configuration" do
     assert Jido.AI.Plugin.config(Assistant) == %{
              model: :fast,
              instructions: "Reply in one short sentence.",
+             reasoning: Jido.AI.Flow.ReAct,
              tools: [],
              controls: Jido.AI.Plugin.default_controls()
            }
@@ -75,6 +112,11 @@ defmodule Jido.AI.PluginTest do
     config = Jido.AI.Plugin.config(Assistant)
     assert Jido.AI.Plugin.prepare(nil, Map.to_list(config)) == {:ok, config}
     assert Jido.AI.Plugin.prepare(nil, []) == {:error, :missing_ai_config}
+  end
+
+  test "an Agent can replace the default ReAct reasoning Flow" do
+    assert Jido.AI.Plugin.config(CustomReasoningAssistant).reasoning == FixedReasoning
+    assert CustomReasoningAssistant.generate("hello") == {:ok, "Custom: hello"}
   end
 
   test "the AI Plugin publishes the shared Jido authoring manifest" do

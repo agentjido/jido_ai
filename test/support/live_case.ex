@@ -60,12 +60,26 @@ defmodule Jido.AI.Test.LiveCase do
     assert trace["scenario"] == scenario
     assert trace["status"] == "ok"
 
-    assert Enum.map(trace["events"], & &1["type"]) == [
+    assert_trace_shape(trace)
+
+    {result, trace_path}
+  end
+
+  defp assert_trace_shape(%{"schema_version" => 2, "events" => events} = trace) do
+    assert is_list(events)
+    assert List.first(events)["type"] == "request_started"
+    assert List.last(events)["type"] == "request_completed"
+    assert is_map(trace["result"]["usage"])
+    assert is_list(trace["runtime_events"])
+  end
+
+  defp assert_trace_shape(%{"events" => events, "runtime_events" => runtime_events}) do
+    assert Enum.map(events, & &1["type"]) == [
              "ai.request.started",
              "ai.response.completed"
            ]
 
-    {result, trace_path}
+    assert is_list(runtime_events)
   end
 
   defp restore_aliases(nil), do: Application.delete_env(:jido_ai, :model_aliases)
