@@ -1,19 +1,9 @@
 defmodule JidoAI.Examples.StreamingTest do
-  use ExUnit.Case, async: false
-
-  import Mimic
+  use Jido.AI.Test.ReqLLMCase, async: false
 
   alias JidoAI.Examples.Streaming.Agent
 
   @moduletag :example
-
-  setup :verify_on_exit!
-
-  setup do
-    original = Application.get_env(:jido_ai, :model_aliases)
-    Application.put_env(:jido_ai, :model_aliases, %{fast: "openai:gpt-4o-mini"})
-    on_exit(fn -> restore_aliases(original) end)
-  end
 
   test "the Agent returns a stream that can be read and closed" do
     test_process = self()
@@ -44,7 +34,4 @@ defmodule JidoAI.Examples.StreamingTest do
     assert :ok = ReqLLM.StreamResponse.close(stream_response)
     assert_receive :stream_cancelled
   end
-
-  defp restore_aliases(nil), do: Application.delete_env(:jido_ai, :model_aliases)
-  defp restore_aliases(aliases), do: Application.put_env(:jido_ai, :model_aliases, aliases)
 end

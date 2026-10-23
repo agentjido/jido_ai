@@ -1,4 +1,4 @@
-Mimic.copy(ReqLLM)
+Jido.AI.Test.ReqLLMMock.install!()
 
 ExUnit.start(exclude: [:example, :live])
 

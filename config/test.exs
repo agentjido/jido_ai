@@ -1,5 +1,10 @@
 import Config
 
+config :jido_ai,
+  model_aliases: %{
+    fast: "openai:gpt-4o-mini"
+  }
+
 config :git_hooks,
   auto_install: false
 

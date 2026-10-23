@@ -1,40 +1,28 @@
 # Anatomy of an AI turn
 
-An AI request can last much longer than the Jido Turn that admits it. This is
-the key runtime distinction. `ask/3` sends a routed Signal. AgentServer admits
-the request and commits a request record. The AI Coordinator owns the live
-request after admission; Jido Flow runs the model and tool steps. A final
-Signal settles the request and commits the accepted result through
-AgentServer. The caller can await the same request handle throughout.
+One routed AI turn has these steps:
+
+1. Core Jido selects the route and prepares Plugin input.
+2. `Jido.AI.Turn.prepare/2` validates the current Session or Thread.
+3. Jido AI prepares the model, messages, visible tools, output contract, and
+   limits.
+4. The input control runs.
+5. The configured reasoning Flow runs model and tool work.
+6. The output control checks the final output.
+7. The reasoning Flow returns a completed `Jido.AI.Result`.
+8. `Jido.AI.Turn.complete/4` validates the reply and builds candidate state.
+9. Core Jido commits the candidate state.
+10. Core Jido delivers the Reply Directive after commit.
 
 ```text
-Caller             AgentServer          AI Coordinator / Flow       Model / Tool
-  | ask(query)          |                         |                        |
-  |-------------------> | admit + record pending  |                        |
-  | <--- request handle | ---- start request ----> |                        |
-  |                     |                         | context -> model ----> |
-  |                     |                         | <--- tool choice ------ |
-  |                     |                         | validate/run tool ---> |
-  |                     |                         | <--- tool result ------ |
-  |                     |                         | next model call -----> |
-  |                     | <--- settle result ----- | <--- final answer ----- |
-  |                     | validate + commit       |                        |
-  | <--- await result -- |                         |                        |
+Signal -> prepare -> input control -> reasoning Flow -> output control
+       -> completed result -> candidate state and reply -> core commit
 ```
 
-The diagram is one request, not one uninterrupted AgentServer callback.
-AgentServer can commit other accepted domain work while the model is running.
-The final commit must reconcile with the current Agent state. The request
-handle identifies the AI work; the AgentServer PID identifies the live Agent;
-the Session and Thread values carry portable conversation data.
+An error before step 8 does not change Agent state. An error during Directive
+delivery does not repeat model or tool work.
 
-Context assembly selects prior completed conversation entries. Tool calls and
-their outputs join the active request Context. The runtime does not promote
-pending or failed user input into the default completed Context. Streaming
-events are observations of progress, not a second state store. An observer
-can miss events and still read committed request state later.
+Direct `generate/2`, `reason/2`, and `run/2` calls stop after the AI result.
+They do not build or commit Agent state.
 
-Read [request lifecycle](../../examples/02_requests/02_01_session/README.md)
-and [inspection](../../examples/02_requests/02_22_request_inspection/README.md)
-with this diagram. Then read [long-running turns](10_long_running_turns.md) for
-ownership and time limits.
+Use `preflight/2` to inspect step 3 without running later steps.

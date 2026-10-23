@@ -6,8 +6,7 @@ and the Jido AI DSL compose in one definition.
 The example includes:
 
 - a typed Agent state schema and metadata;
-- a fresh `Jido.Session` added through the definition `initial_state` before
-  each instance is built;
+- a fresh `Jido.Session` returned by `initialize/2` for each instance;
 - a typed request and structured reply with `Jido.SignalAction`;
 - one route Action that commits the Session and returns a Reply Directive;
 - an inline ReAct reasoning Flow;
@@ -34,9 +33,10 @@ request = Ask.new!(%{query: "How does the Jido Agent DSL compose?"})
   Agent.cmd(agent, request, context: %{role: :researcher})
 ```
 
-`ResearchAgent.new/1` computes the Session when the instance is requested. It
-puts that Session in the map definition's `initial_state`, then calls
-`Jido.Agent.instantiate/2`. Each instance gets a different Session.
+`ResearchAgent.new/1` calls the Agent module's normal instantiate function.
+Core Jido gives `initialize/2` the declared and explicit candidate state. The
+callback keeps a supplied Session. When the candidate has no Session, it adds a
+new one, so separate new instances do not share an identity.
 
 ## Run the tests
 

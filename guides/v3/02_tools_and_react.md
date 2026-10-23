@@ -1,44 +1,51 @@
-# Add a tool and ReAct
+# Add tools and ReAct
 
-Use ReAct when a model must choose an operation, read its result, and then
-continue. The tool is a Jido Action or Flow. The AI runtime validates tool
-input and runs the declared target; the model does not call an Elixir function
-directly.
-
-Add these blocks to an `ai :assistant do` definition:
+Declare Jido Actions and Flows as model tools:
 
 ```elixir
-reasoning :react
+defmodule MyApp.ToolAgent do
+  use Jido.AI.Agent, name: "tool_agent"
 
-tools do
-  action MyApp.Multiply, as: :multiply
-end
+  ai do
+    model "openai:gpt-4o-mini"
+    instructions "Use a tool when it is useful."
 
-controls do
-  timeout 30_000
-  max_iterations 4
-  max_model_calls 4
-  max_tool_calls 3
+    tools do
+      action MyApp.Search, as: :search, timeout: 5_000
+      flow MyApp.Research, as: :research, timeout: 10_000
+    end
+
+    controls do
+      timeout 30_000
+      max_iterations 3
+      max_model_calls 4
+      max_tool_calls 4
+    end
+  end
 end
 ```
 
-The Action must have a stable input schema and a result that the model can
-use. If the operation has several dependent steps, declare a Flow tool and
-make its output explicit. Put business rules in the Action or Flow, not in a
-prompt that asks the model to do arithmetic or enforce policy.
+The default `Jido.AI.Flow.ReAct` Flow performs these steps:
 
-One ReAct round can be: model requests `multiply`, Jido validates and runs the
-Action, the tool result enters the request Context, and the model receives
-that result on its next call. A final answer comes only after the model stops
-requesting tools. The three limits above protect different resources: overall
-reasoning rounds, provider calls, and tool calls. A timeout bounds elapsed
-time. Set all of them for an agent that can use tools.
+1. Call the model with visible tool definitions.
+2. Validate the complete tool-call batch.
+3. Run valid Actions and Flows as child Flow components.
+4. Append correlated tool results to the active model Context.
+5. Continue until the model returns final output or a limit stops the request.
 
-Read the [three-round Agent](../../examples/01_authoring/01_02_tool_flow/multi_round_agent.ex)
-and its [behavior test](../../test/examples/01_authoring/01_02_tool_flow/multi_round_test.exs).
-The test checks that each later model call contains the prior tool result. Then
-run [Three tool rounds](../livebooks/three_tool_rounds.livemd) and inspect the
-captured model requests. A live model may choose a different sequence; the
-mock script proves the exact contract.
+One request can reduce the visible set:
 
-Next, decide [where the answer goes](03_results_and_state.md).
+```elixir
+{:ok, result} =
+  MyApp.ToolAgent.reason("Search for the account",
+    visible_tools: [:search]
+  )
+```
+
+The request cannot add tools. A hidden or unknown call is rejected before any
+tool executes.
+
+Tool results are request evidence. They do not automatically update Agent
+state. Use an explicit routed Action for a domain state change.
+
+Continue with [results and state](03_results_and_state.md).

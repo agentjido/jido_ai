@@ -22,7 +22,7 @@ defmodule Jido.AI.Live.AgentServerTraceTest do
     {result, trace_path} =
       capture_live(RequestModes.Agent, input, "agent_server_turn", [], fn ->
         with {:ok, _agent, [%Reply{signal: reply}]} <- AgentServer.call(server, request) do
-          assert_receive delivered, 1_000
+          assert_receive %Jido.Signal{} = delivered, 1_000
           assert delivered.id == reply.id
           assert delivered.type == reply.type
           assert delivered.data == reply.data

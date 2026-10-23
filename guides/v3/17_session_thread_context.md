@@ -1,38 +1,37 @@
-# Session, Thread, and Context
+# Session, Thread, and model Context
 
-Use these names for different things. `Jido.Session` is a portable value that
-holds a `Jido.Thread`. The Thread is an append-only record of entries. A
-Context is the selected, valid conversation that the next model request sees.
-The active AI request is live runtime work, not a Session value.
+Use these values for different purposes:
+
+- `Jido.Session` owns conversation identity, status, metadata, and one Thread.
+- `Jido.Thread` owns ordered committed Signals.
+- `ReqLLM.Context` is the selected message view for one model request.
+- An active request is runtime work. It is not a Session or Thread.
+
+Create fresh Session or Thread data in the core Agent initializer:
 
 ```elixir
-agent do
-  schema Zoi.object(%{
-    reply: Zoi.string() |> Zoi.default(""),
-    messages: Jido.AI.Thread.Projection.schema()
-  })
+defmodule MyApp.ChatAgent do
+  use Jido.AI.Agent, name: "chat_agent"
 
-  ai :assistant do
-    model "openai:gpt-4o-mini"
-    memory history: :messages
-    result into: :reply
+  state do
+    schema Zoi.object(%{session: Jido.Session.schema()})
+  end
+
+  @impl Jido.Agent
+  def initialize(state, _context) do
+    {:ok, Map.put_new_lazy(state, :session, &Jido.Session.new!/0)}
+  end
+
+  ai do
+    model :fast
   end
 end
 ```
 
-The `memory` declaration names the Agent field that holds the Session. The
-first completed request creates conversation data there. A later request can
-select prior completed entries for model input. The raw Thread can also hold
-request settlement, context operations, and application entries. Not every
-entry becomes a provider message. This is why a Thread is not just a list of
-chat messages.
+Core Jido merges static `initial_state` with explicit caller `state:` before it
+calls the initializer. The initializer returns the complete candidate state.
+Use `Map.put_new_lazy/3` when an explicit Session or Thread must be preserved.
 
-Session and Thread values can be encoded and moved between processes. They do
-not carry worker PIDs, provider clients, or a pending request's live queue.
-Closing a Session value does not cancel active AI work. Use
-`Jido.AI.Orchestration` for live control and AgentServer for committed state.
-
-Run [Two requests in one Session](../livebooks/two_requests.livemd). Its mock
-script checks that the second model request sees the first completed exchange.
-Read [Thread and Session values](../../examples/02_requests/02_27_thread_session_values/README.md)
-for codecs and validation. Next, see [how Context is built](18_context_projection.md).
+Session and Thread contain portable data. They do not contain provider clients,
+processes, streams, or a live request queue. Closing a Session prevents another
+turn from using it. It does not cancel unrelated runtime work.

@@ -30,12 +30,16 @@ not part of this catalog.
    request before and after the model call.
 5. [Streaming and cancellation](01_basics/01_05_streaming/README.md) — read
    response chunks and close the stream.
-6. [Core composition](01_basics/01_07_core_composition/README.md) — combine AI
+6. [Request contract](01_basics/01_06_request_contract/README.md) — inspect a
+   prepared request, select visible tools, and read explicit ordered results.
+7. [Core composition](01_basics/01_07_core_composition/README.md) — combine AI
    configuration with core Agent data and another extension.
-7. [Model helpers](01_basics/01_08_model_helpers/README.md) — use model aliases
+8. [Model helpers](01_basics/01_08_model_helpers/README.md) — use model aliases
    and direct model names.
-8. [JSON AI Agent](01_basics/01_09_json_agent/README.md) — export and import a
+9. [JSON AI Agent](01_basics/01_09_json_agent/README.md) — export and import a
    complete AI definition through the shared Jido authoring Registry.
+10. [Conversations](02_conversations/README.md) — initialize Session and Thread
+    state, project committed turns, and commit only completed results.
 
 ## Proposed
 

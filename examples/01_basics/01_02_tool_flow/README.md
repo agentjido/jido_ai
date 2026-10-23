@@ -9,6 +9,7 @@ Let the model select a Jido Action or Flow. Return each result to the model.
 - Run Action and Flow tools through `Jido.Exec`.
 - Reject a mixed valid and invalid tool-call batch before any tool runs.
 - Bound the loop with the `controls` block.
+- Select a declared tool subset for one request with `visible_tools:`.
 
 ## Run it
 
@@ -28,6 +29,10 @@ the configured limits.
 
 Action and Flow effects are not dispatched by this stateless response layer.
 The adapter returns an explicit error if an executable produces effects.
+
+`visible_tools:` accepts only names from this Agent's declared set. Hidden
+tools are not sent to the model. A forged call to a hidden tool is rejected
+before any tool Action or Flow runs.
 
 ## Files
 

@@ -1,41 +1,49 @@
-# Where the answer goes
+# Results and Agent state
 
-An AI request has at least three different results. The model produces
-content. The request returns its final answer or an error. AgentServer stores
-the committed Agent state. Do not treat these as the same value.
+Model output, an AI request result, and committed Agent state are different
+values.
+
+`generate/2` returns only accepted output:
 
 ```elixir
-agent do
-  schema Zoi.object(%{
-    answer: Zoi.string() |> Zoi.default(""),
-    case_id: Zoi.string() |> Zoi.default("new")
-  })
+{:ok, text} = MyAgent.generate("Reply with Ready")
+```
 
-  ai :assistant do
-    model "openai:gpt-4o-mini"
-    result into: :answer
-  end
+`reason/2` returns a completed result:
+
+```elixir
+{:ok, result} = MyAgent.reason("Reply with Ready")
+
+result.status
+#=> :completed
+
+result.output
+result.usage
+result.events
+```
+
+`run/2` also returns an explicit result after execution failure:
+
+```elixir
+case MyAgent.run("Reply with Ready") do
+  {:ok, %Jido.AI.Result{status: :completed} = result} -> result.output
+  {:error, %Jido.AI.Result{} = result} -> {result.status, result.error}
+  {:error, preparation_error} -> preparation_error
 end
 ```
 
-`result into: :answer` maps the accepted result to one domain field. It does
-not replace unrelated state such as `case_id`. The request can also return the
-answer to its caller. After `ask_sync/3`, read `Jido.AgentServer.agent(server)`
-to inspect the committed state, not a stale Agent value kept before the call.
+A direct request does not change Agent state. Its `commit` field is
+`:not_requested`.
 
-Tool results have a different role. They are intermediate evidence inside the
-request Context. A tool result is not automatically a domain-state update. A
-model may make three tool calls and still commit one final answer. If the
-application must update other domain fields, give that work an explicit Jido
-Action or route with its own validated state transition.
+For a routed turn, call `Jido.AI.respond_result/3` and give the completed
+result to `Jido.AI.Turn.complete/4`. This builds candidate state and one Reply
+Directive. Core Jido performs the final commit after the complete route Action
+succeeds.
 
-Validation and commit are separate. A structured result must pass its schema
-before `result into:` can write it. If the provider fails, a tool fails, or
-result validation exhausts repair, the prior domain answer remains in place.
-Request records and Thread entries can still retain evidence about that
-failed attempt. This distinction matters when you show a user the last valid
-answer while also reporting a failed current request.
+If model work, output validation, or an output control fails, the turn Action
+returns an error before candidate state exists. The prior Agent state remains
+unchanged.
 
-The [first-answer test](../../test/examples/01_authoring/01_01_authoring_formats/01_01_authoring_formats_test.exs)
-proves that a provider failure leaves the prior answer unchanged and that a
-later request can succeed. Continue with the [DSL map](04_dsl_map.md).
+Tool work is different. An external tool effect can finish before final output
+fails. Jido AI cannot undo that effect. Effectful tools need application
+authorization and idempotency.

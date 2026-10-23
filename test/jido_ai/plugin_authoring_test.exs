@@ -81,12 +81,6 @@ defmodule Jido.AI.Plugin.AuthoringTest do
     end
   end
 
-  setup do
-    original = Application.get_env(:jido_ai, :model_aliases)
-    Application.put_env(:jido_ai, :model_aliases, %{fast: "openai:gpt-4o-mini"})
-    on_exit(fn -> restore_aliases(original) end)
-  end
-
   test "an AI Agent definition round trips through Jido Authoring JSON" do
     definition = Assistant.definition()
     registry = registry()
@@ -161,7 +155,4 @@ defmodule Jido.AI.Plugin.AuthoringTest do
       {"tests/actions/json-agent-permit", 1} => {:action, Permit}
     })
   end
-
-  defp restore_aliases(nil), do: Application.delete_env(:jido_ai, :model_aliases)
-  defp restore_aliases(aliases), do: Application.put_env(:jido_ai, :model_aliases, aliases)
 end

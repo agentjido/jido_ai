@@ -162,7 +162,7 @@ defmodule JidoAI.Examples.Proposed.ResearchAgent.Worker do
     name: "proposed_research_worker",
     description: "Process delegated research work"
 
-  agent do
+  state do
     schema Zoi.object(%{
              jobs: Zoi.integer() |> Zoi.min(0) |> Zoi.default(0),
              last_query: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil)
@@ -206,9 +206,13 @@ defmodule JidoAI.Examples.Proposed.ResearchAgent.Agent do
     id: "examples/proposed/research_agent",
     name: "proposed_research_agent",
     description: "Show the current core Jido and Jido AI Agent DSL",
-    vsn: 1
+    vsn: 1,
+    metadata: %{
+      category: "proposed",
+      purpose: "kitchen_sink_research_example"
+    }
 
-  agent do
+  state do
     schema Zoi.object(%{
              session: Jido.Session.schema(),
              status: Zoi.enum(["idle", "ready"]) |> Zoi.default("idle"),
@@ -216,11 +220,14 @@ defmodule JidoAI.Examples.Proposed.ResearchAgent.Agent do
              last_delegated_query: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),
              request_count: Zoi.integer() |> Zoi.min(0) |> Zoi.default(0)
            })
+  end
 
-    metadata %{
-      category: "proposed",
-      purpose: "kitchen_sink_research_example"
-    }
+  @impl Jido.Agent
+  def initialize(state, _context) do
+    {:ok,
+     Map.put_new_lazy(state, :session, fn ->
+       Jido.Session.new!(metadata: %{example: "proposed_research_agent"})
+     end)}
   end
 
   ai do
@@ -308,20 +315,9 @@ defmodule JidoAI.Examples.Proposed.ResearchAgent do
 
   alias JidoAI.Examples.Proposed.ResearchAgent.Agent
 
-  @doc "Returns a definition with a new Session in its initial-state boundary."
-  def definition do
-    definition = Agent.definition()
-
-    initial_state =
-      Map.put(
-        definition.initial_state,
-        :session,
-        Jido.Session.new!(metadata: %{example: "proposed_research_agent"})
-      )
-
-    %{definition | initial_state: initial_state}
-  end
+  @doc "Returns the static Agent definition."
+  def definition, do: Agent.definition()
 
   @doc "Builds one Agent instance with a fresh Session."
-  def new(opts \\ []), do: Jido.Agent.instantiate(definition(), opts)
+  def new(opts \\ []), do: Agent.instantiate(opts)
 end

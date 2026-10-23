@@ -1,7 +1,5 @@
 defmodule JidoAI.Examples.Proposed.ResearchAgentTest do
-  use ExUnit.Case, async: false
-
-  import Mimic
+  use Jido.AI.Test.ReqLLMCase, async: false
 
   alias Jido.Agent.Directive.Reply
   alias JidoAI.Examples.Proposed.ResearchAgent
@@ -17,14 +15,6 @@ defmodule JidoAI.Examples.Proposed.ResearchAgentTest do
   }
 
   @moduletag :example
-
-  setup :verify_on_exit!
-
-  setup do
-    original = Application.get_env(:jido_ai, :model_aliases)
-    Application.put_env(:jido_ai, :model_aliases, %{fast: "openai:gpt-4o-mini"})
-    on_exit(fn -> restore_aliases(original) end)
-  end
 
   test "the definition combines the current core and AI DSL" do
     definition = Agent.definition()
@@ -94,8 +84,8 @@ defmodule JidoAI.Examples.Proposed.ResearchAgentTest do
     assert {:ok, first} = ResearchAgent.new(id: "proposed-research-first")
     assert {:ok, second} = ResearchAgent.new(id: "proposed-research-second")
 
-    assert first.initial_state.session == first.state.session
-    assert second.initial_state.session == second.state.session
+    assert first.initial_state == %{}
+    assert second.initial_state == %{}
     refute first.state.session.id == second.state.session.id
     refute first.state.session.thread.id == second.state.session.thread.id
     assert first.state.status == "idle"
@@ -117,17 +107,16 @@ defmodule JidoAI.Examples.Proposed.ResearchAgentTest do
       assert options[:receive_timeout] in 1..30_000
 
       {:ok,
-       %ReqLLM.Response{
-         id: "proposed-research-response",
-         model: model,
-         context: context,
-         message: ReqLLM.Context.assistant(""),
-         object: %{
+       object_response(
+         model,
+         context,
+         %{
            "answer" => expected.answer,
            "sources" => expected.sources,
            "confidence" => expected.confidence
-         }
-       }}
+         },
+         id: "proposed-research-response"
+       )}
     end)
 
     assert {:ok, agent} = ResearchAgent.new(id: "proposed-research-success")
@@ -154,7 +143,4 @@ defmodule JidoAI.Examples.Proposed.ResearchAgentTest do
     assert {:error, _reason} = Agent.cmd(agent, request)
     assert agent.state.session.thread.signals == []
   end
-
-  defp restore_aliases(nil), do: Application.delete_env(:jido_ai, :model_aliases)
-  defp restore_aliases(aliases), do: Application.put_env(:jido_ai, :model_aliases, aliases)
 end

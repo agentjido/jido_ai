@@ -1,21 +1,11 @@
 defmodule JidoAI.Examples.JSONAgentTest do
-  use ExUnit.Case, async: false
-
-  import Mimic
+  use Jido.AI.Test.ReqLLMCase, async: false
 
   alias Jido.Agent.Directive.Reply
   alias JidoAI.Examples.JSONAgent, as: Example
   alias JidoAI.Examples.JSONAgent.Ask
 
   @moduletag :example
-
-  setup :verify_on_exit!
-
-  setup do
-    original = Application.get_env(:jido_ai, :model_aliases)
-    Application.put_env(:jido_ai, :model_aliases, %{fast: "openai:gpt-4o-mini"})
-    on_exit(fn -> restore_aliases(original) end)
-  end
 
   test "the saved JSON imports the complete AI definition" do
     assert {:ok, current_json} = Example.encode_json()
@@ -40,14 +30,7 @@ defmodule JidoAI.Examples.JSONAgentTest do
       assert %ReqLLM.Output{type: :object, schema: schema} = options[:output]
       assert schema == Ask.__signal_action__().output.schema
 
-      {:ok,
-       %ReqLLM.Response{
-         id: "json-agent-example",
-         model: model,
-         context: context,
-         message: ReqLLM.Context.assistant(""),
-         object: %{"answer" => "Ready", "confidence" => 0.95}
-       }}
+      {:ok, object_response(model, context, %{"answer" => "Ready", "confidence" => 0.95}, id: "json-agent-example")}
     end)
 
     agent = Jido.Agent.instantiate!(imported, id: "imported-json-ai")
@@ -58,7 +41,4 @@ defmodule JidoAI.Examples.JSONAgentTest do
     assert reply.data == %{answer: "Ready", confidence: 0.95}
     assert Jido.Signal.get_context(reply, "jidocausationid") == request.id
   end
-
-  defp restore_aliases(nil), do: Application.delete_env(:jido_ai, :model_aliases)
-  defp restore_aliases(aliases), do: Application.put_env(:jido_ai, :model_aliases, aliases)
 end

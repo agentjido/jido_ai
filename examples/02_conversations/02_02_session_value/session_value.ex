@@ -91,8 +91,16 @@ defmodule JidoAI.Examples.SessionValue.Agent do
 
   use Jido.Agent, name: "session_value_example"
 
-  agent do
+  state do
     schema Zoi.object(%{session: Jido.Session.schema()})
+  end
+
+  @impl Jido.Agent
+  def initialize(state, _context) do
+    {:ok,
+     Map.put_new_lazy(state, :session, fn ->
+       Jido.Session.new!(metadata: %{example: "session_value"})
+     end)}
   end
 
   routes do
@@ -109,16 +117,5 @@ defmodule JidoAI.Examples.SessionValue do
   alias JidoAI.Examples.SessionValue.Agent
 
   @doc "Builds an Agent with a new open Session."
-  def new(opts \\ []) do
-    definition = Agent.definition()
-
-    initial_state =
-      Map.put(
-        definition.initial_state,
-        :session,
-        Jido.Session.new!(metadata: %{example: "session_value"})
-      )
-
-    Jido.Agent.instantiate(%{definition | initial_state: initial_state}, opts)
-  end
+  def new(opts \\ []), do: Agent.instantiate(opts)
 end

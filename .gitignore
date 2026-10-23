@@ -25,6 +25,9 @@ jido_ai-*.tar
 # Temporary files, for example, from tests.
 /tmp/
 
+# Local source repositories used for research and comparison.
+/reference/
+
 # Language Servers
 .elixir_ls/
 .expert/

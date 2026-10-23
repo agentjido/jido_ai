@@ -37,8 +37,7 @@ defmodule Jido.AI.Flow.ReAct.ContinueTools do
           |> State.put_private(%{private | conversation: conversation, response: nil})
           |> Map.put(:tool_calls, state.tool_calls + call_count)
           |> Map.put(:iterations, iteration)
-          |> State.trace(%{
-            type: :tool_round_completed,
+          |> State.trace(:tool_round_completed, %{
             iteration: iteration,
             duration_ms: State.since_last_event_ms(state),
             calls:

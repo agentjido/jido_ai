@@ -83,7 +83,7 @@
           "status": "active",
           "testable": true,
           "tests": [
-            "test a fresh derived definition seeds dynamic instance state"
+            "test the initializer completes candidate state and preserves caller state"
           ]
         }
       }

@@ -26,7 +26,7 @@ defmodule Jido.AI.Actions.CallModel do
       tool_calls = ReqLLM.Response.tool_calls(response)
       call_metadata = ReqLLM.Response.call_metadata(response)
 
-      event =
+      data =
         call_metadata
         |> Map.take([
           :response_id,
@@ -38,7 +38,6 @@ defmodule Jido.AI.Actions.CallModel do
           :warnings
         ])
         |> Map.merge(%{
-          type: :model_completed,
           call: call,
           duration_ms: duration_ms,
           tool_calls: Enum.map(tool_calls, &tool_trace/1),
@@ -50,7 +49,7 @@ defmodule Jido.AI.Actions.CallModel do
         |> State.put_private(%{private | response: response})
         |> State.add_usage(response.usage)
         |> Map.put(:model_calls, call)
-        |> State.trace(event)
+        |> State.trace(:model_completed, data)
 
       {:ok, state}
     end

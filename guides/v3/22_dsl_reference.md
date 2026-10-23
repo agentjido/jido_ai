@@ -1,36 +1,82 @@
 # AI Agent DSL reference
 
-The normal static form is `use Jido.AI.Agent` with an `agent` block and one or
-more named `ai` profiles. Routes bind Signals to profiles. The authoring
-compiler validates options before the Agent starts.
+Use core Jido sections with one top-level `ai` section:
 
-| Block or form | Purpose | Start with |
-| --- | --- | --- |
-| `schema` | Durable Agent state shape | A small Zoi object |
-| `ai :name` | Named AI behavior | One `:assistant` profile |
-| `model` / `models` | Provider model or named model choices | One model |
-| `instructions` | Task direction | Short, specific text |
-| `reasoning` | Model/tool sequence | Default or `:react` for tools |
-| `tools` | Declared Action and Flow tools | Only required tools |
-| `controls` | Time, call, stage, and steering rules | Timeout and call limits |
-| `result` | Output schema, repair, and state destination | `into:` field |
-| `memory` | Retained Session field | Add for multi-request Context |
-| `observability` | Content and diagnostics policy | Default until needed |
-| `plugin` | Agent capability or policy extension | Add for a clear use case |
-| `routes` | Signal path to a profile | One AI route |
+```elixir
+defmodule MyApp.Agent do
+  use Jido.AI.Agent, name: "my_agent"
 
-The [DSL map](04_dsl_map.md) shows these forms in one Agent. Use parentheses
-only when Elixir needs them for a multi-line call, such as a structured
-`result(...)`. Simple DSL lines read as `model "..."`, `timeout 10_000`, and
-`result into: :reply`.
+  state do
+    schema Zoi.object(%{session: Jido.Session.schema()})
+  end
 
-Generated `ask/3`, `ask_sync/3`, and `ask_stream/3` are the normal request
-entry points. `ask` returns a handle, `ask_sync` waits, and `ask_stream`
-returns a handle plus events. Request options can narrow tools, select a
-model, provide trusted tool context, or change a supported ReAct limit for
-that request. A request option does not rewrite the Agent definition.
+  ai do
+    model :fast
+    instructions "Answer briefly."
+    reasoning MyApp.ReasoningFlow
 
-Use the [DSL module documentation](../../lib/jido_ai/dsl.ex) and
-[authoring tests](../../test/authoring/README.md) for exact accepted values.
-Unsupported dynamic native tool sources must not appear as a working DSL
-option. Keep provider clients, PIDs, and request handles out of Agent state.
+    tools do
+      action MyApp.Search, as: :search, timeout: 5_000
+      flow MyApp.Research, as: :research, timeout: 10_000
+    end
+
+    controls do
+      timeout 30_000
+      max_iterations 4
+      max_model_calls 4
+      max_tool_calls 6
+      input MyApp.Authorize
+      output MyApp.ValidateOutput
+    end
+  end
+
+  routes do
+    route MyApp.Ask, MyApp.Turn, as: :ask
+  end
+end
+```
+
+## AI fields
+
+| Form | Purpose |
+| --- | --- |
+| `model` | Model alias or provider model name |
+| `instructions` | Static system instructions |
+| `reasoning` | One Jido Flow module or inline `reasoning do` Flow |
+| `tools` | Declared Jido Actions and Flows |
+| `controls` | Total time and call limits, one input control, one output control |
+
+The default reasoning Flow is `Jido.AI.Flow.ReAct`.
+
+Input and output control slots accept one Action each. A control can be a
+module Action or an inline Action. Controls cannot return effects.
+
+## Generated helpers
+
+`use Jido.AI.Agent` adds:
+
+- `generate/2`
+- `preflight/2`
+- `reason/2`
+- `run/2`
+- `stream/2`
+
+## Request options
+
+Jido AI owns these options:
+
+- `:context`
+- `:conversation` for the older clean ReqLLM Context form
+- `:projection`
+- `:visible_tools`
+- `:request_id`
+- `:run_id`
+- `:jido_context`
+
+Other allowed options go to ReqLLM. Raw `:tools` is reserved and rejected.
+Structured direct requests can use ReqLLM `:output`. Routed structured replies
+derive output from the SignalAction reply schema.
+
+Use Map Agent definitions for portable authoring. Module Actions, Flows,
+controls, and reasoning targets must resolve through the trusted Jido authoring
+Registry when a definition is encoded or decoded.

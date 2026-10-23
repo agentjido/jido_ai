@@ -133,13 +133,21 @@ defmodule JidoAI.Contract.AgentContractTest do
   defmodule StatefulAssistant do
     use Jido.AI.Agent, name: "jido_ai_stateful_contract_agent"
 
-    agent do
+    state do
       schema(
         Zoi.object(%{
           session: Jido.Session.schema(),
           tone: Zoi.string() |> Zoi.default("schema")
         })
       )
+    end
+
+    @impl Jido.Agent
+    def initialize(state, _context) do
+      {:ok,
+       state
+       |> Map.put_new_lazy(:session, &Jido.Session.new!/0)
+       |> Map.put_new(:tone, "initialized")}
     end
 
     ai do
@@ -297,39 +305,30 @@ defmodule JidoAI.Contract.AgentContractTest do
   end
 
   @tag obligation: "jido_ai.agent.I7"
-  test "a fresh derived definition seeds dynamic instance state" do
-    base = StatefulAssistant.definition() |> Map.from_struct()
-    first_session = Jido.Session.new!(id: "contract-session-first")
-    second_session = Jido.Session.new!(id: "contract-session-second")
+  test "the initializer completes candidate state and preserves caller state" do
     restored_session = Jido.Session.new!(id: "contract-session-restored")
 
-    first_definition =
-      base
-      |> Map.put(:initial_state, %{session: first_session, tone: "definition"})
-      |> Jido.Agent.define!()
-
-    second_definition =
-      base
-      |> Map.put(:initial_state, %{session: second_session, tone: "definition"})
-      |> Jido.Agent.define!()
-
     assert {:ok, first} =
-             Jido.Agent.instantiate(first_definition,
+             StatefulAssistant.instantiate(
                id: "contract-stateful-first",
                state: %{tone: "caller"}
              )
 
     assert {:ok, second} =
-             Jido.Agent.instantiate(second_definition,
-               id: "contract-stateful-second",
+             StatefulAssistant.instantiate(id: "contract-stateful-second")
+
+    assert {:ok, restored} =
+             StatefulAssistant.instantiate(
+               id: "contract-stateful-restored",
                state: %{session: restored_session}
              )
 
-    assert first.state == %{session: first_session, tone: "caller"}
-    assert second.state == %{session: restored_session, tone: "definition"}
-    refute first_definition.initial_state.session.id == second_definition.initial_state.session.id
-    assert first_definition.state == nil
-    assert second_definition.state == nil
+    assert first.state.tone == "caller"
+    assert second.state.tone == "initialized"
+    refute first.state.session.id == second.state.session.id
+    assert restored.state == %{session: restored_session, tone: "initialized"}
+    assert StatefulAssistant.definition().initial_state == %{}
+    assert StatefulAssistant.definition().state == nil
   end
 
   defp registry do

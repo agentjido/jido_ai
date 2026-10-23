@@ -22,7 +22,7 @@ defmodule Jido.AI.Flow.Reason.Pipeline do
       kind: :step,
       name: "finish",
       action: Jido.AI.Flow.Reason.Return,
-      params: %{result: Ref.result("reason")},
+      params: %{request: Ref.input(:request), result: Ref.result("reason")},
       needs: [previous]
     }
 

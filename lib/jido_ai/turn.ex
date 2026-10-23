@@ -2,22 +2,25 @@ defmodule Jido.AI.Turn do
   @moduledoc """
   Completes one AI request and reply turn inside an Agent Action.
 
-  `complete/4` creates a typed reply Signal, appends the request and reply to a
-  Thread or Session in Agent state, and returns the candidate state with one
-  Reply Directive. The Agent remains responsible for the final state commit
-  and Directive delivery.
+  `complete/4` accepts reply data or a completed `Jido.AI.Result`. It creates a
+  typed reply Signal, appends the request and reply to a Thread or Session in
+  Agent state, and returns the candidate state with one Reply Directive. The
+  Agent remains responsible for the final state commit and Directive delivery.
 
   `prepare/2` validates the current request and turn state without doing model
   work or changing state. Use it as an Action step before a reasoning step.
   """
 
   alias Jido.Agent.Directive
+  alias Jido.AI.Result
   alias Jido.{Session, Signal, Thread}
 
   @type error_reason ::
           :invalid_reply_action
+          | {:invalid_ai_result, term()}
           | :invalid_turn_context
           | :session_closed
+          | {:turn_not_completed, Result.status()}
           | {:invalid_turn_state, term()}
           | {:invalid_turn_options, term()}
           | {:missing_turn_state, atom()}
@@ -40,6 +43,16 @@ defmodule Jido.AI.Turn do
   @doc "Completes a typed turn for the Thread or Session at `:state_key`."
   @spec complete(map(), module(), term(), keyword()) ::
           {:ok, map(), [Directive.t()]} | {:error, error_reason()}
+  def complete(context, reply_action, %Result{status: :completed, output: output} = result, opts) do
+    case Result.validate(result) do
+      :ok -> complete(context, reply_action, output, opts)
+      {:error, reason} -> {:error, {:invalid_ai_result, reason}}
+    end
+  end
+
+  def complete(_context, _reply_action, %Result{status: status}, _opts),
+    do: {:error, {:turn_not_completed, status}}
+
   def complete(context, reply_action, answer, opts)
       when is_map(context) and is_atom(reply_action) and is_list(opts) do
     with :ok <- validate_reply_action(reply_action),

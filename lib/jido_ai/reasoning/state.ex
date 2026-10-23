@@ -10,6 +10,8 @@ defmodule Jido.AI.Reasoning.State do
 
   @type t :: %{
           required(:__jido_ai_reasoning__) => true,
+          required(:request_id) => String.t(),
+          required(:run_id) => String.t(),
           required(:input) => String.t(),
           required(:reasoning) => module(),
           required(:controls) => map(),
@@ -39,6 +41,8 @@ defmodule Jido.AI.Reasoning.State do
   def new(attrs) when is_map(attrs) do
     %{
       __jido_ai_reasoning__: true,
+      request_id: Map.fetch!(attrs, :request_id),
+      run_id: Map.fetch!(attrs, :run_id),
       input: Map.fetch!(attrs, :input),
       reasoning: Map.fetch!(attrs, :reasoning),
       controls: Map.fetch!(attrs, :controls),
@@ -100,14 +104,23 @@ defmodule Jido.AI.Reasoning.State do
   def normalize_usage(_usage), do: %{}
 
   @doc false
-  @spec trace(t(), map()) :: t()
-  def trace(%{__jido_ai_reasoning__: true} = state, event) when is_map(event) do
+  @spec trace(t(), atom(), map()) :: t()
+  def trace(%{__jido_ai_reasoning__: true} = state, type, data)
+      when is_atom(type) and is_map(data) do
     event =
-      event
-      |> Map.put(:sequence, length(state.trace) + 1)
-      |> Map.put(:elapsed_ms, elapsed_ms(state))
+      Jido.AI.Event.new(state, type, data,
+        sequence: length(state.trace) + 1,
+        elapsed_ms: elapsed_ms(state),
+        iteration: state.iterations
+      )
 
     %{state | trace: [event | state.trace]}
+  end
+
+  @doc false
+  @spec trace(t(), map()) :: t()
+  def trace(%{__jido_ai_reasoning__: true} = state, %{type: type} = event) do
+    trace(state, type, Map.delete(event, :type))
   end
 
   @doc false

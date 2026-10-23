@@ -2,7 +2,7 @@ defmodule Jido.AI.TurnTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent.Directive.Reply
-  alias Jido.AI.Turn
+  alias Jido.AI.{Event, Result, Turn}
 
   defmodule Ask do
     @moduledoc false
@@ -77,6 +77,44 @@ defmodule Jido.AI.TurnTest do
     assert state.session.thread.signals == [request, reply]
     assert state.session.thread.rev == 2
     assert session.thread.signals == []
+    assert session.thread.rev == 0
+  end
+
+  test "commits only a completed AI result" do
+    request = Ask.new!(%{question: "Ready?"})
+    session = Jido.Session.new!()
+    context = %{signal: request, agent_state: %{session: session}}
+    identity = %{request_id: "request-1", run_id: "run-1"}
+
+    completed =
+      Result.completed(identity, %{answer: "Ready"}, %{model_calls: 1}, [
+        Event.new(identity, :request_started, %{}, sequence: 1),
+        Event.new(identity, :request_completed, %{}, sequence: 2)
+      ])
+
+    assert {:ok, state, [%Reply{signal: reply}]} =
+             Turn.complete(context, Ask, completed, state_key: :session)
+
+    assert reply.data == %{answer: "Ready"}
+    assert state.session.thread.rev == 2
+    assert session.thread.rev == 0
+
+    failed =
+      Result.failed(identity, :provider_unavailable, [
+        Event.new(identity, :request_started, %{}, sequence: 1),
+        Event.new(identity, :request_failed, %{}, sequence: 2)
+      ])
+
+    assert Turn.complete(context, Ask, failed, state_key: :session) ==
+             {:error, {:turn_not_completed, :failed}}
+
+    assert session.thread.rev == 0
+
+    invalid = %{completed | events: [], trace: []}
+
+    assert Turn.complete(context, Ask, invalid, state_key: :session) ==
+             {:error, {:invalid_ai_result, :invalid_result_events}}
+
     assert session.thread.rev == 0
   end
 

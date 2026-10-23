@@ -3,111 +3,183 @@
 [![CI](https://github.com/agentjido/jido_ai/actions/workflows/ci.yml/badge.svg)](https://github.com/agentjido/jido_ai/actions/workflows/ci.yml)
 [![License](https://img.shields.io/hexpm/l/jido_ai.svg)](LICENSE)
 
-Jido AI adds model calls, tool use, reasoning methods, and request control to
-Jido Agents. You author one Agent with `use Jido.AI.Agent`. The AI DSL states
-what it can do; Jido AgentServer and Jido Flow run the work.
+Jido AI adds model calls, tool use, reasoning Flows, and AI request controls to
+Jido Agents. Core Jido owns Agent state, processes, commits, and directives.
+Jido AI owns model preparation, model tools, AI limits, AI results, and AI
+events.
 
-This `release/v3` branch is active V3 work, not a stable V3 release. The Hex
-package can be on a different version. Use this checkout and the compatible
-sibling V3 packages to run these guides and Livebooks.
+This branch is active V3 work. Use it with the compatible sibling V3 packages
+in this folder.
 
-## One Agent, one answer
+## One Agent and one answer
 
 ```elixir
 defmodule MyApp.AnswerAgent do
   use Jido.AI.Agent, name: "answer_agent"
 
-  agent do
-    schema Zoi.object(%{answer: Zoi.string() |> Zoi.default("")})
+  ai do
+    model "openai:gpt-4o-mini"
+    instructions "Answer in one short sentence."
 
-    ai :assistant do
-      model "openai:gpt-4o-mini"
-      instructions "Answer in one short sentence."
-
-      controls do
-        timeout 10_000
-        max_model_calls 1
-      end
-
-      result into: :answer
+    controls do
+      timeout 10_000
+      max_model_calls 1
     end
-  end
-
-  routes do
-    route "my_app.answer", ai: :assistant
   end
 end
 
-{:ok, _jido} = Jido.start()
-{:ok, server} = Jido.start_agent(MyApp.AnswerAgent)
-{:ok, answer} = MyApp.AnswerAgent.ask_sync(server, "What is Jido AI?")
+{:ok, answer} = MyApp.AnswerAgent.generate("What is Jido AI?")
 ```
 
-`ask_sync/3` waits for the result. `ask/3` returns a request handle for work
-that can take longer. `ask_stream/3` returns a handle and events. The accepted
-answer can also update the Agent's domain state through `result into:`.
+`generate/2` returns only the accepted output. `reason/2` returns a completed
+`Jido.AI.Result` with usage and events.
 
-The [First answer Livebook](guides/livebooks/first_answer.livemd) runs this
-path with a local MockLLM server and no credential. One `backend` value
-switches it to a real model. Add a tool only after this first request works.
+## Prepare before execution
 
-## Learn the system
+`preflight/2` resolves a request without running a control, tool, or model:
 
-The [V3 learning path](guides/v3/learning_path.md) starts with one answer and
-then adds a tool and three ReAct rounds. Written guides explain the authoring
-surface, runtime sequence, controls, policy, observability, and Context. Ten
-Livebooks let you inspect those behaviors. Each starts in mock mode and can
-switch to live mode without changing the Agent definition.
+```elixir
+{:ok, request} =
+  MyApp.AnswerAgent.preflight("What is Jido AI?",
+    request_id: "request-1",
+    run_id: "run-1"
+  )
 
-For exact authoring forms, use the [DSL reference](guides/v3/22_dsl_reference.md).
-For executable integration claims, use the [example catalog](examples/README.md).
-The [design documents](docs/design/README.md) track design targets and gaps;
-the code and tests are the current contract.
+request.model
+Jido.AI.Request.messages(request)
+Jido.AI.Request.visible_tool_names(request)
+request.controls
+```
 
-## Runtime boundary
+Execution uses the same prepared request value. There is not a separate prompt
+path for inspection.
 
-`Jido.AgentServer` owns the committed Agent value. An AI request is admitted
-by a short Jido Turn, then its Coordinator and Jido Flow do model and tool
-work. A later Turn settles the result. `Jido.Session` and `Jido.Thread` are
-portable data; Context is the selected conversation sent to the model. A
-Session is not the live request worker.
+## Select tools for one request
 
-For a new Session or Thread, derive a fresh Agent definition in application
-code and put the value in its core `initial_state`. Then instantiate that
-definition. Explicit caller `state:` values override matching seed fields.
-Do not reuse the derived definition, because that would reuse its generated
-identity.
+An Agent declares its complete tool set. A caller can reduce that set for one
+request:
 
-Tools are declared Jido Actions or Flows. They can have external effects, so
-a failed final answer cannot undo every tool action. Use schema validation,
-tool access policy, time and call limits, and application idempotency where
-the operation needs them. See [Anatomy of an AI turn](guides/v3/09_turn_sequence.md)
-and [Tool access and effects](guides/v3/14_tool_policy.md).
+```elixir
+defmodule MyApp.ToolAgent do
+  use Jido.AI.Agent, name: "tool_agent"
 
-## Work on this checkout
+  ai do
+    model "openai:gpt-4o-mini"
 
-This checkout uses pinned compatible V3 Jido dependencies. ReqLLM uses the Hex
-`~> 1.25` requirement, and Zoi uses a pinned public fork with stored-value
-validation support.
+    tools do
+      action MyApp.Search, as: :search
+      action MyApp.Update, as: :update
+    end
+  end
+end
 
-Current core Plugins define callbacks through `Jido.Plugin`.
-Custom Directives implement `Jido.Agent.Directive.validate/1`; validation no
-longer belongs to the Plugin. Examples and test fixtures use these contracts.
+{:ok, result} =
+  MyApp.ToolAgent.reason("Find the account", visible_tools: [:search])
+```
 
-Run commands inside `jido_ai/`, not the parent folder of separate Git
-repositories:
+Hidden tools are not sent to the model. A forged call to a hidden or
+undeclared tool is rejected before execution. A request cannot add a tool that
+the Agent did not declare.
+
+## Explicit results and events
+
+`run/2` makes success and failure explicit:
+
+```elixir
+case MyApp.AnswerAgent.run("What is Jido AI?") do
+  {:ok, %Jido.AI.Result{status: :completed} = result} ->
+    result.output
+
+  {:error, %Jido.AI.Result{status: status} = result} ->
+    {status, result.error}
+
+  {:error, preparation_error} ->
+    preparation_error
+end
+```
+
+Every request event has:
+
+- `request_id`
+- `run_id`
+- `sequence`
+- `type`
+- `elapsed_ms`
+- `iteration`
+- a safe `data` Map
+
+The final event is one of `:request_completed`, `:request_failed`, or
+`:request_cancelled`. `trace` is a compatibility alias for `events`.
+
+## Session, Thread, and model context
+
+`Jido.Session` and `Jido.Thread` are immutable source values. They are not
+model Context values and they do not own a process.
+
+Use the core Agent initializer for fresh instance data:
+
+```elixir
+defmodule MyApp.ChatAgent do
+  use Jido.AI.Agent, name: "chat_agent"
+
+  state do
+    schema Zoi.object(%{session: Jido.Session.schema()})
+  end
+
+  @impl Jido.Agent
+  def initialize(state, _context) do
+    {:ok, Map.put_new_lazy(state, :session, &Jido.Session.new!/0)}
+  end
+
+  ai do
+    model "openai:gpt-4o-mini"
+  end
+end
+```
+
+Core Jido merges declared `initial_state` with explicit caller `state:` before
+it calls `initialize/2`. The callback above keeps a supplied Session and creates
+one only when the candidate state does not contain one.
+
+`Jido.AI.Context.project/3` selects complete correlated SignalAction turns and
+builds a ReqLLM Context. Unrelated and incomplete Signals do not enter the
+model request. Projection does not change Session or Thread data.
+
+## State commit rule
+
+A direct AI request does not change Agent state. Its result has
+`commit: :not_requested`.
+
+A routed turn can pass a completed result to `Jido.AI.Turn.complete/4`. This
+function validates the typed reply and returns candidate Agent state with one
+Reply Directive. It does not commit by itself. Core Jido commits state only
+after the complete route Action succeeds. A provider failure, output control
+failure, invalid output, or incomplete result does not produce candidate turn
+state.
+
+Jido AI cannot undo an external effect that a tool already completed. Use
+application authorization and idempotency for effectful tools.
+
+## Learn and verify
+
+Use the [example catalog](examples/README.md). Start with:
+
+- [Basic Agent](examples/01_basics/01_01_basic_agent/README.md)
+- [Action and Flow tools](examples/01_basics/01_02_tool_flow/README.md)
+- [Request contract](examples/01_basics/01_06_request_contract/README.md)
+- [Conversations](examples/02_conversations/README.md)
+
+Run commands inside `jido_ai/`:
 
 ```sh
 mix deps.get
-mix compile
-mix test
+mix format --check-formatted
+mix compile --warnings-as-errors
 mix test --include authoring --include example --warnings-as-errors --seed 0
-mix docs
+mix test.live
 ```
 
-The standard unit test alias excludes example and authoring suites; run those
-separately when you change their contracts. Livebooks use sibling path
-dependencies so they run against this V3 code. Real mode needs the API key
-named in each notebook; mock mode needs none.
+Live tests need the provider credentials used by ReqLLM. They write sanitized
+local traces under `tmp/jido_ai_traces/`.
 
-For the wider Jido package map, see [jido.run](https://jido.run).
+For the wider package map, see [jido.run](https://jido.run).

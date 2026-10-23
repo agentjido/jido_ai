@@ -8,6 +8,21 @@ Each example should add one main public feature. It should use the public API,
 include one important failure case, and have a matching test. Detailed error
 matrices belong in unit and contract tests.
 
+## Implemented request-contract checkpoint
+
+The current catalog now includes these foundations:
+
+- explicit completed and failed `Jido.AI.Result` values
+- atomic routed-turn state rules through `Jido.AI.Turn`
+- pure `preflight/2` request preparation
+- Session and Thread projection through `Jido.AI.Context`
+- request-specific `visible_tools:` selection
+- correlated ordered `Jido.AI.Event` Maps
+- fresh Session and Thread data through core `initialize/2`
+
+See `01_basics/01_06_request_contract` and
+`02_conversations/02_04_conversation_history`.
+
 ## Capability ladder
 
 | Rung | Capability | Main lesson | Current source |
@@ -16,7 +31,7 @@ matrices belong in unit and contract tests.
 | 2. Structure | Produce a typed reply | Signal Action reply and structured output | `01_03_structured_output` |
 | 3. Act | Use tools | Action tools, Flow tools, and the ReAct loop | `01_02_tool_flow` |
 | 4. Govern | Bound one turn | One input control, one output control, time limits, and call limits | `01_04_controls` |
-| 5. Remember | Keep conversation state | Thread, Session, `initialize_state/2`, and history | Current `02_*` examples |
+| 5. Remember | Keep conversation state | Thread, Session, `initialize/2`, and history | Current `02_*` examples |
 | 6. Run | Execute long work | Synchronous, asynchronous, streaming, await, and cancel | `01_05_streaming` and `02_05_request_modes` |
 | 7. Correct | Change active work | Steering and injected input | Old `02_02_steering` |
 | 8. Observe | Inspect work | Usage, semantic trace, request status, and failure position | Old call-count and inspection examples |
@@ -81,7 +96,7 @@ them in the basic Agent guide or in a reference page.
 
 ### 02_02_initialized_session_agent
 
-- Use `initialize_state/2`.
+- Use `initialize/2`.
 - Create a fresh Session for each Agent instance.
 - Show explicit caller-state precedence.
 
@@ -253,9 +268,9 @@ important failure in each teaching example.
 
 ## Proposed next sequence
 
-1. Finish `initialize_state/2` in core Jido.
-2. Consolidate the conversation examples.
-3. Add `04_01_failed_output`.
-4. Add `04_02_tool_limits`.
-5. Add `04_03_commit_and_reply`.
+1. Add `04_01_failed_output`.
+2. Add `04_02_tool_limits`.
+3. Add `04_03_commit_and_reply`.
+4. Add deterministic ReAct script support.
+5. Add request event streaming after the core stream boundary is stable.
 6. Add active request steering and inspection.

@@ -33,10 +33,10 @@ defmodule JidoAI.Examples.SessionAgent.Turn do
     output_schema: Zoi.object(%{session: Jido.Session.schema()})
 
   @impl Jido.Action
-  def run(params, context) do
+  def run(%{question: question}, context) do
     with {:ok, _prepared} <- Jido.AI.Turn.prepare(context, state_key: :session),
-         {:ok, answer} <- Ask.run(params, context),
-         do: Jido.AI.Turn.complete(context, Ask, answer, state_key: :session)
+         {:ok, result} <- Jido.AI.respond_result(context, question, reply: Ask),
+         do: Jido.AI.Turn.complete(context, Ask, result, state_key: :session)
   end
 end
 
@@ -47,8 +47,16 @@ defmodule JidoAI.Examples.SessionAgent.Agent do
 
   use Jido.AI.Agent, name: "session_agent_example"
 
-  agent do
+  state do
     schema Zoi.object(%{session: Jido.Session.schema()})
+  end
+
+  @impl Jido.Agent
+  def initialize(state, _context) do
+    {:ok,
+     Map.put_new_lazy(state, :session, fn ->
+       Jido.Session.new!(metadata: %{example: "session_agent"})
+     end)}
   end
 
   ai do
@@ -69,16 +77,5 @@ defmodule JidoAI.Examples.SessionAgent do
   alias JidoAI.Examples.SessionAgent.Agent
 
   @doc "Builds an Agent value with a new open Session."
-  def new(opts \\ []) do
-    definition = Agent.definition()
-
-    initial_state =
-      Map.put(
-        definition.initial_state,
-        :session,
-        Jido.Session.new!(metadata: %{example: "session_agent"})
-      )
-
-    Jido.Agent.instantiate(%{definition | initial_state: initial_state}, opts)
-  end
+  def new(opts \\ []), do: Agent.instantiate(opts)
 end

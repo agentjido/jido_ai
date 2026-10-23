@@ -1,44 +1,41 @@
 defmodule JidoAI.Examples.ThreadAgentTest do
-  use ExUnit.Case, async: false
-
-  import Mimic
+  use Jido.AI.Test.ReqLLMCase, async: false
 
   alias Jido.Agent.Directive.Reply
-  alias JidoAI.Examples.ThreadAgent
   alias JidoAI.Examples.ThreadAgent.{Agent, Ask, Turn}
 
   @moduletag :example
-
-  setup :set_mimic_global
-  setup :verify_on_exit!
-
-  setup do
-    original = Application.get_env(:jido_ai, :model_aliases)
-    Application.put_env(:jido_ai, :model_aliases, %{fast: "openai:gpt-4o-mini"})
-    on_exit(fn -> restore_aliases(original) end)
-  end
 
   test "the route uses one turn Action without a Flow helper macro" do
     assert [%{handler: %{kind: :action, target: Turn}}] = Agent.definition().routes
   end
 
-  test "each constructor call seeds a fresh Thread before caller state is merged" do
-    assert {:ok, first} = ThreadAgent.new(id: "thread-agent-first", state: %{})
-    assert {:ok, second} = ThreadAgent.new(id: "thread-agent-second")
+  test "each constructor call initializes a fresh Thread when state does not supply one" do
+    assert {:ok, first} = Agent.instantiate(id: "thread-agent-first", state: %{})
+    assert {:ok, second} = Agent.instantiate(id: "thread-agent-second")
 
-    assert first.initial_state.thread == first.state.thread
-    assert second.initial_state.thread == second.state.thread
+    assert first.initial_state == %{}
+    assert second.initial_state == %{}
     refute first.state.thread.id == second.state.thread.id
+  end
+
+  test "the initializer preserves a supplied Thread" do
+    thread = Jido.Thread.new!(id: "thread-agent-restored")
+
+    assert {:ok, agent} =
+             Agent.instantiate(id: "thread-agent-with-state", state: %{thread: thread})
+
+    assert agent.state.thread == thread
   end
 
   test "a successful route commits and returns one complete Thread turn" do
     expect(ReqLLM, :generate_text, fn model, context, options ->
       assert %ReqLLM.Output{type: :object} = options[:output]
-      {:ok, response(model, context, %{"answer" => "Ready"})}
+      {:ok, object_response(model, context, %{"answer" => "Ready"}, id: "thread-agent-response")}
     end)
 
     assert {:ok, %Jido.Agent{module: Agent} = agent} =
-             ThreadAgent.new(id: "thread-agent-success")
+             Agent.instantiate(id: "thread-agent-success")
 
     request = Ask.new!(%{question: "Are you ready?"})
 
@@ -57,24 +54,11 @@ defmodule JidoAI.Examples.ThreadAgentTest do
       {:error, :provider_unavailable}
     end)
 
-    assert {:ok, agent} = ThreadAgent.new(id: "thread-agent-failure")
+    assert {:ok, agent} = Agent.instantiate(id: "thread-agent-failure")
     request = Ask.new!(%{question: "Are you ready?"})
 
     assert {:error, _reason} = Jido.Agent.cmd(agent, request)
     assert agent.state.thread.rev == 0
     assert agent.state.thread.signals == []
   end
-
-  defp response(model, context, object) do
-    %ReqLLM.Response{
-      id: "thread-agent-response",
-      model: model,
-      context: context,
-      message: ReqLLM.Context.assistant(""),
-      object: object
-    }
-  end
-
-  defp restore_aliases(nil), do: Application.delete_env(:jido_ai, :model_aliases)
-  defp restore_aliases(aliases), do: Application.put_env(:jido_ai, :model_aliases, aliases)
 end

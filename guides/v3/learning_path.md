@@ -1,54 +1,61 @@
 # Jido AI V3 learning path
 
-Start with one Agent. Add tools only after the first answer works. The written
-guides explain the contracts; the Livebooks let you inspect the same contracts
-in a running Agent. All teaching Agents use `Jido.AI.Agent` and its DSL.
+Start with one direct answer. Then add tools, request evidence, and committed
+conversation state.
 
-Each Livebook starts in MockLLM mode and needs no API key. Change one `backend`
-value to `:live` to use the model declared by that notebook's Agent. Mock mode
-has a scripted answer and exact checks. Live output can differ.
+## 1. Generate
 
-## Start here
+- [Basic AI Agent](../../examples/01_basics/01_01_basic_agent/README.md)
+- [First Agent guide](01_first_agent.md)
 
-1. [Your first AI Agent](01_first_agent.md) · [Run it](../livebooks/first_answer.livemd)
-2. [Add a tool and ReAct](02_tools_and_react.md) · [Run three rounds](../livebooks/three_tool_rounds.livemd)
-3. [Where the answer goes](03_results_and_state.md)
+Learn the Agent wrapper, model selection, instructions, and `generate/2`.
 
-## Author the Agent
+## 2. Act
 
-4. [How the AI DSL fits together](04_dsl_map.md)
-5. [Models, profiles, and instructions](05_models_profiles_instructions.md)
-6. [Design a tool contract](06_tool_contracts.md)
-7. [Structured results and repair](07_structured_results.md) · [Break and repair](../livebooks/repair_result.livemd)
-8. [Choose a reasoning method](08_reasoning_methods.md) · [Compare](../livebooks/reasoning_methods.livemd)
+- [Action and Flow tools](../../examples/01_basics/01_02_tool_flow/README.md)
+- [Tools and ReAct guide](02_tools_and_react.md)
 
-## Understand a turn
+Declare core Jido executables as model tools and run the bounded ReAct Flow.
 
-9. [Anatomy of an AI turn](09_turn_sequence.md)
-10. [Long-running turns](10_long_running_turns.md) · [Bound a turn](../livebooks/long_turn.livemd)
-11. [Controls and limits](11_controls_and_limits.md)
-12. [Stream, steer, and cancel](12_stream_steer_cancel.md) · [Steer a turn](../livebooks/steer_turn.livemd)
-13. [Failures and recovery](13_failures_and_recovery.md)
+## 3. Structure and govern
 
-## Govern and inspect
+- [Structured output](../../examples/01_basics/01_03_structured_output/README.md)
+- [Input and output controls](../../examples/01_basics/01_04_controls/README.md)
+- [Controls and limits](11_controls_and_limits.md)
 
-14. [Tool access and effects](14_tool_policy.md) · [Allow and deny](../livebooks/tool_policy.livemd)
-15. [Budgets and quotas](15_budgets_and_quotas.md)
-16. [Observability and diagnostics](16_observability.md)
+Derive output from a SignalAction contract. Add one input control, one output
+control, and total request limits.
 
-## Work with Context
+## 4. Inspect one request
 
-17. [Session, Thread, and Context](17_session_thread_context.md) · [Two requests](../livebooks/two_requests.livemd)
-18. [How Context is built](18_context_projection.md)
-19. [Multiple Contexts](19_multiple_contexts.md) · [Switch Context](../livebooks/switch_context.livemd)
-20. [Checkpoint and resume](20_checkpoint_resume.md) · [Resume](../livebooks/resume_context.livemd)
+- [Request contract](../../examples/01_basics/01_06_request_contract/README.md)
+- [Results and state](03_results_and_state.md)
+- [Turn sequence](09_turn_sequence.md)
+- [Failures and recovery](13_failures_and_recovery.md)
+- [Observability and events](16_observability.md)
+
+Use preflight, explicit results, request IDs, run IDs, and canonical events.
+
+## 5. Limit tool access
+
+- [Tool policy](14_tool_policy.md)
+
+Select a declared tool subset for one request. Hidden tools cannot execute.
+
+## 6. Remember complete turns
+
+- [Conversation examples](../../examples/02_conversations/README.md)
+- [Session, Thread, and Context](17_session_thread_context.md)
+- [Context projection](18_context_projection.md)
+
+Create fresh Session and Thread values with `initialize/2`. Project only
+complete correlated turns into model messages. Commit state only after the AI
+result is complete and valid.
 
 ## Reference
 
-21. [Test your AI Agent](21_testing_agents.md)
-22. [DSL reference](22_dsl_reference.md)
+- [AI Agent DSL](22_dsl_reference.md)
+- Example backlog: `examples/BACKLOG.md`
 
-The detailed [design documents](../../docs/design/README.md) track design
-targets and alignment gaps. These guides describe the public V3 code that a
-developer can use now. A proposed feature does not belong in a runnable guide
-until it works.
+Guides for steering, quotas, multiple Context lanes, and active Flow resume are
+future design material until their public V3 contracts are implemented.

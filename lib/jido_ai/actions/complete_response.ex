@@ -6,7 +6,7 @@ defmodule Jido.AI.Actions.CompleteResponse do
   trace. It does not include a ReqLLM response or private model reasoning.
   """
 
-  alias Jido.AI.Request
+  alias Jido.AI.{Request, Result}
   alias Jido.AI.Reasoning.State
 
   use Jido.Action,
@@ -23,18 +23,13 @@ defmodule Jido.AI.Actions.CompleteResponse do
 
     with {:ok, output} <- Request.response_output(private.response, private.output_descriptor) do
       state =
-        State.trace(state, %{
-          type: :request_completed,
+        State.trace(state, :request_completed, %{
           output: State.summarize(output),
           usage: State.usage(state)
         })
 
-      {:ok,
-       %{
-         output: output,
-         usage: State.usage(state),
-         trace: Enum.reverse(state.trace)
-       }}
+      events = Enum.reverse(state.trace)
+      {:ok, Result.completed(state, output, State.usage(state), events)}
     end
   end
 end

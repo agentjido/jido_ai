@@ -10,7 +10,7 @@ defmodule JidoAI.Examples.CoreComposition.Agent do
     name: "core_composition_example",
     extensions: [JidoAI.Examples.CoreComposition.Audit]
 
-  agent do
+  state do
     schema Zoi.object(%{
              customer_id: Zoi.string(),
              request_count: Zoi.integer() |> Zoi.default(0)

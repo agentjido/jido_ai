@@ -19,14 +19,6 @@ defmodule Jido.AI.Test.LiveCase do
     end
   end
 
-  setup do
-    original = Application.get_env(:jido_ai, :model_aliases)
-    aliases = Map.put(original || %{}, :fast, "openai:gpt-4o-mini")
-    Application.put_env(:jido_ai, :model_aliases, aliases)
-
-    on_exit(fn -> restore_aliases(original) end)
-  end
-
   @doc false
   def live_options, do: @default_options
 
@@ -81,7 +73,4 @@ defmodule Jido.AI.Test.LiveCase do
 
     assert is_list(runtime_events)
   end
-
-  defp restore_aliases(nil), do: Application.delete_env(:jido_ai, :model_aliases)
-  defp restore_aliases(aliases), do: Application.put_env(:jido_ai, :model_aliases, aliases)
 end

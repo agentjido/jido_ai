@@ -1,21 +1,12 @@
 defmodule JidoAI.Examples.ConversationHistoryTest do
-  use ExUnit.Case, async: false
-
-  import Mimic
+  use Jido.AI.Test.ReqLLMCase, async: false
 
   alias Jido.Agent.Directive.Reply
+  alias Jido.AI.Context
   alias JidoAI.Examples.ConversationHistory
-  alias JidoAI.Examples.ConversationHistory.{Agent, Ask, Projector, Turn}
+  alias JidoAI.Examples.ConversationHistory.{Agent, Ask, Turn}
 
   @moduletag :example
-
-  setup :verify_on_exit!
-
-  setup do
-    original = Application.get_env(:jido_ai, :model_aliases)
-    Application.put_env(:jido_ai, :model_aliases, %{fast: "openai:gpt-4o-mini"})
-    on_exit(fn -> restore_aliases(original) end)
-  end
 
   test "the route uses one turn Action without a Flow helper macro" do
     assert [%{handler: %{kind: :action, target: Turn}}] = Agent.definition().routes
@@ -25,7 +16,7 @@ defmodule JidoAI.Examples.ConversationHistoryTest do
     expect(ReqLLM, :generate_text, 2, fn model, context, _options ->
       case message_texts(context) do
         ["Use the committed conversation and answer briefly.", "My name is Ana."] ->
-          {:ok, response(model, context, %{"answer" => "Hello Ana."})}
+          {:ok, object_response(model, context, %{"answer" => "Hello Ana."}, id: "conversation-response")}
 
         [
           "Use the committed conversation and answer briefly.",
@@ -33,7 +24,7 @@ defmodule JidoAI.Examples.ConversationHistoryTest do
           "Hello Ana.",
           "What is my name?"
         ] ->
-          {:ok, response(model, context, %{"answer" => "Your name is Ana."})}
+          {:ok, object_response(model, context, %{"answer" => "Your name is Ana."}, id: "conversation-response")}
       end
     end)
 
@@ -74,7 +65,7 @@ defmodule JidoAI.Examples.ConversationHistoryTest do
 
     original = thread
 
-    context = Projector.project(thread)
+    context = Context.project!(thread, Ask, input: :question, output: :answer)
 
     assert message_texts(context) == ["Keep this.", "Kept."]
     assert Enum.all?(context.messages, &(&1.metadata == %{}))
@@ -82,7 +73,7 @@ defmodule JidoAI.Examples.ConversationHistoryTest do
     assert thread == original
   end
 
-  test "projection ignores malformed request and reply data" do
+  test "projection rejects malformed matching request data" do
     request = Ask.new!(%{question: "Valid question"})
     {:ok, reply} = Ask.reply(request, %{answer: "Valid answer"})
     malformed_request = %{request | data: %{question: 123}}
@@ -92,7 +83,8 @@ defmodule JidoAI.Examples.ConversationHistoryTest do
     {:ok, thread} =
       Jido.Thread.append_many(thread, [malformed_request, reply, request, malformed_reply])
 
-    assert Projector.project(thread).messages == []
+    assert {:error, {:invalid_projection_signal, 0, _reason}} =
+             Context.project(thread, Ask, input: :question, output: :answer)
   end
 
   defp message_texts(context) do
@@ -100,17 +92,4 @@ defmodule JidoAI.Examples.ConversationHistoryTest do
       message.content |> List.first() |> Map.fetch!(:text)
     end)
   end
-
-  defp response(model, context, object) do
-    %ReqLLM.Response{
-      id: "conversation-response",
-      model: model,
-      context: context,
-      message: ReqLLM.Context.assistant(""),
-      object: object
-    }
-  end
-
-  defp restore_aliases(nil), do: Application.delete_env(:jido_ai, :model_aliases)
-  defp restore_aliases(aliases), do: Application.put_env(:jido_ai, :model_aliases, aliases)
 end

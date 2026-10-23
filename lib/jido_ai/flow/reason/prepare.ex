@@ -8,11 +8,14 @@ defmodule Jido.AI.Flow.Reason.Prepare do
     description: "Prepare one AI reasoning request"
 
   @impl Jido.Action
+  def run(%{prepared: %Request{} = request}, _context), do: {:ok, Request.start(request)}
+
   def run(params, context) when is_map(params) and is_map(context) do
     with {:ok, input} <- fetch_input(params),
          {:ok, config} <- prepared_config(context),
-         {:ok, runtime} <- runtime(params, context) do
-      Request.prepare(config, input, runtime, Map.get(params, :reply))
+         {:ok, runtime} <- runtime(params, context),
+         {:ok, request} <- Request.prepare(config, input, runtime, Map.get(params, :reply)) do
+      {:ok, Request.start(request)}
     end
   end
 

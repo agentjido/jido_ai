@@ -31,6 +31,8 @@ A live test must prove behavior that a mocked ReqLLM response cannot prove:
 - a provider accepts the reply schema from a routed Signal Action;
 - a stream produces content and closes;
 - an imported JSON Agent can make a routed request.
+- prepared request identity matches the real completed result;
+- a real model receives and uses only the selected declared tool subset.
 
 Model aliases, Plugin composition, controls, validation, limits, JSON codecs,
 and Agent state changes stay in the offline suite. These are deterministic

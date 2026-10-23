@@ -200,67 +200,22 @@ defmodule JidoAi.MixProject do
         Core: [
           Jido.AI,
           Jido.AI.Agent,
+          Jido.AI.Plugin,
           Jido.AI.Request,
-          Jido.AI.Request.Handle,
-          Jido.AI.Output,
+          Jido.AI.Result,
+          Jido.AI.Event,
+          Jido.AI.Context,
           Jido.Thread,
-          Jido.Thread.Entry,
           Jido.Session,
           Jido.AI.Turn,
-          Jido.AI.Observe,
-          Jido.AI.Observe.Sanitize,
-          Jido.AI.Validation,
-          Jido.AI.ToolAdapter
+          Jido.AI.ToolAdapter,
+          Jido.AI.Controls,
+          Jido.AI.Deadline,
+          Jido.AI.Models
         ],
-        Errors: [
-          Jido.AI.Error,
-          ~r/Jido\.AI\.Error\..*/
-        ],
-        "Actions — LLM": [
-          Jido.AI.Actions.Helpers,
-          ~r/Jido\.AI\.Actions\.LLM\..*/
-        ],
-        "Actions — Planning": [
-          ~r/Jido\.AI\.Actions\.Planning\..*/
-        ],
-        "Actions — Reasoning": [
-          ~r/Jido\.AI\.Actions\.Reasoning\..*/
-        ],
-        "Actions — Retrieval": [
-          Jido.AI.Retrieval.Store,
-          ~r/Jido\.AI\.Actions\.Retrieval\..*/
-        ],
-        "Actions — Tool Calling": [
-          ~r/Jido\.AI\.Actions\.ToolCalling\..*/
-        ],
-        "Actions — Quota": [
-          ~r/Jido\.AI\.Actions\.Quota\..*/
-        ],
-        "Actions — Skill": [
-          ~r/Jido\.AI\.Actions\.Skill\..*/
-        ],
-        "Reasoning Strategies": [
-          ~r/Jido\.AI\.Reasoning\..*/
-        ],
-        Plugins: [
-          ~r/Jido\.AI\.Plugins\..*/
-        ],
-        Signals: [
-          Jido.AI.Signal.Helpers,
-          ~r/Jido\.AI\.Signal\..*/
-        ],
-        Testing: [
-          Jido.AI.Test,
-          Jido.AI.TestCase,
-          ~r/Jido\.AI\.Test\..*/
-        ],
-        Skills: [
-          Jido.AI.Skill,
-          ~r/Jido\.AI\.Skill\..*/
-        ],
-        Quota: [
-          Jido.AI.Quota.Store
-        ]
+        Actions: [~r/Jido\.AI\.Actions\..*/],
+        Flows: [~r/Jido\.AI\.Flow\..*/],
+        Reasoning: [~r/Jido\.AI\.Reasoning\..*/]
       ]
     ]
   end

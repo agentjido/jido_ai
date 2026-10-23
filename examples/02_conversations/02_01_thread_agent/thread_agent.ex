@@ -33,10 +33,10 @@ defmodule JidoAI.Examples.ThreadAgent.Turn do
     output_schema: Zoi.object(%{thread: Jido.Thread.schema()})
 
   @impl Jido.Action
-  def run(params, context) do
+  def run(%{question: question}, context) do
     with {:ok, _prepared} <- Jido.AI.Turn.prepare(context, state_key: :thread),
-         {:ok, answer} <- Ask.run(params, context),
-         do: Jido.AI.Turn.complete(context, Ask, answer, state_key: :thread)
+         {:ok, result} <- Jido.AI.respond_result(context, question, reply: Ask),
+         do: Jido.AI.Turn.complete(context, Ask, result, state_key: :thread)
   end
 end
 
@@ -47,8 +47,16 @@ defmodule JidoAI.Examples.ThreadAgent.Agent do
 
   use Jido.AI.Agent, name: "thread_agent_example"
 
-  agent do
+  state do
     schema Zoi.object(%{thread: Jido.Thread.schema()})
+  end
+
+  @impl Jido.Agent
+  def initialize(state, _context) do
+    {:ok,
+     Map.put_new_lazy(state, :thread, fn ->
+       Jido.Thread.new!(metadata: %{example: "thread_agent"})
+     end)}
   end
 
   ai do
@@ -60,25 +68,5 @@ defmodule JidoAI.Examples.ThreadAgent.Agent do
     signal_source "/examples/thread-agent"
 
     route Ask, Turn, as: :ask
-  end
-end
-
-defmodule JidoAI.Examples.ThreadAgent do
-  @moduledoc "Builds the complete Thread-backed AI Agent."
-
-  alias JidoAI.Examples.ThreadAgent.Agent
-
-  @doc "Builds an Agent value with a new portable Thread."
-  def new(opts \\ []) do
-    definition = Agent.definition()
-
-    initial_state =
-      Map.put(
-        definition.initial_state,
-        :thread,
-        Jido.Thread.new!(metadata: %{example: "thread_agent"})
-      )
-
-    Jido.Agent.instantiate(%{definition | initial_state: initial_state}, opts)
   end
 end

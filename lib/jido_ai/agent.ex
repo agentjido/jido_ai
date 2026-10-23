@@ -17,13 +17,13 @@ defmodule Jido.AI.Agent do
   Other Agent extensions can still be supplied with the `:extensions` option.
 
   The `ai` block is a top-level Plugin section. Keep core Agent data in the
-  optional `agent` block.
+  optional `state` block.
 
-  Jido AI uses the core Agent instance-state boundary. For a new
-  `Jido.Session` or `Jido.Thread`, application code can derive a fresh Agent
-  definition and put the value in its `initial_state` before instantiation.
-  Explicit caller `state:` values override matching seed fields. Do not reuse
-  a derived definition that contains a generated identity.
+  Jido AI uses the core Agent instance-state boundary. Use the core
+  `c:Jido.Agent.initialize/2` callback to create a new `Jido.Session` or
+  `Jido.Thread` for each Agent instance. Core Jido merges static
+  `initial_state` with explicit caller `state:` before it calls the initializer.
+  The initializer returns the complete candidate state for schema validation.
   """
 
   @doc false
@@ -43,6 +43,18 @@ defmodule Jido.AI.Agent do
       @doc "Generates one response with this Agent's AI configuration."
       @spec generate(String.t(), keyword()) :: {:ok, term()} | {:error, term()}
       def generate(input, opts \\ []), do: Jido.AI.generate(__MODULE__, input, opts)
+
+      @doc "Prepares one request without running controls, tools, or a model."
+      @spec preflight(String.t(), keyword()) ::
+              {:ok, Jido.AI.Request.t()} | {:error, term()}
+      def preflight(input, opts \\ []), do: Jido.AI.preflight(__MODULE__, input, opts)
+
+      @doc "Runs one request and returns an explicit completed or failed result."
+      @spec run(String.t(), keyword()) ::
+              {:ok, Jido.AI.Result.t()}
+              | {:ok, Jido.AI.Result.t(), Jido.Action.effects()}
+              | {:error, Jido.AI.Result.t() | term()}
+      def run(input, opts \\ []), do: Jido.AI.run(__MODULE__, input, opts)
 
       @doc "Runs one reasoning Flow and returns output, usage, and a sanitized trace."
       @spec reason(String.t(), keyword()) ::

@@ -1,54 +1,51 @@
 # Your first AI Agent
 
-An AI Agent is a Jido Agent with an AI profile. The Agent owns durable domain
-state. The profile states which model to call, how to reason, which tools are
-available, and where the answer goes. A module definition does not start a
-process or call a model.
+Define one Agent with one AI section:
 
 ```elixir
 defmodule MyApp.AnswerAgent do
   use Jido.AI.Agent, name: "answer_agent"
 
-  agent do
-    schema Zoi.object(%{answer: Zoi.string() |> Zoi.default("")})
+  ai do
+    model "openai:gpt-4o-mini"
+    instructions "Answer in one short sentence."
 
-    ai :assistant do
-      model "openai:gpt-4o-mini"
-      instructions "Answer in one short sentence."
-
-      controls do
-        timeout 10_000
-        max_model_calls 1
-      end
-
-      result into: :answer
+    controls do
+      timeout 10_000
+      max_model_calls 1
     end
-  end
-
-  routes do
-    route "my_app.answer", ai: :assistant, as: :answer
   end
 end
 ```
 
-Start Jido, start one AgentServer, and use the generated AI helper:
+Generate one output:
 
 ```elixir
-{:ok, _jido} = Jido.start()
-{:ok, server} = Jido.start_agent(MyApp.AnswerAgent)
-{:ok, answer} = MyApp.AnswerAgent.ask_sync(server, "What is Jido AI?")
+{:ok, answer} = MyApp.AnswerAgent.generate("What is Jido AI?")
 ```
 
-`ask_sync/3` waits for the AI request to finish. `ask/3` returns a request
-handle when the caller must do other work while the model runs. A core
-`as: :answer` route generates `answer_signal/2`, which builds a Signal.
-`Jido.AgentServer.call/3` admits that Signal and returns the admission Agent
-revision. Use the generated `ask` helpers to wait for AI work.
+Inspect one prepared request without a model call:
 
-The first change to make is an instruction, not a custom runtime. Keep one
-profile and one route until you have a reason for more. Set a timeout and a
-model-call limit so an external provider cannot make the turn unbounded.
+```elixir
+{:ok, request} = MyApp.AnswerAgent.preflight("What is Jido AI?")
 
-Run [First answer](../livebooks/first_answer.livemd) without credentials. It
-uses a local model server but still runs the normal AgentServer and request
-path. Next, [add a tool](02_tools_and_react.md).
+request.model
+Jido.AI.Request.messages(request)
+request.controls
+```
+
+Read a completed result with usage and events:
+
+```elixir
+{:ok, result} = MyApp.AnswerAgent.reason("What is Jido AI?")
+
+result.output
+result.usage
+result.events
+```
+
+These direct calls do not start an AgentServer and do not change Agent state.
+Use a routed SignalAction turn when the application must commit Session,
+Thread, or domain state.
+
+Continue with [tools and ReAct](02_tools_and_react.md).

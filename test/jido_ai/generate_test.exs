@@ -1,13 +1,11 @@
 defmodule Jido.AI.GenerateTest do
-  use ExUnit.Case, async: false
-
-  import Mimic
+  use Jido.AI.Test.ReqLLMCase, async: false
 
   defmodule Assistant do
     use Jido.AI.Agent, name: "generate_test_assistant"
 
     ai do
-      model :test_model
+      model :fast
       instructions "Reply in one short sentence."
     end
   end
@@ -48,7 +46,7 @@ defmodule Jido.AI.GenerateTest do
     alias Jido.AI.GenerateTest.Echo
 
     ai do
-      model :test_model
+      model :fast
 
       tools do
         action Echo
@@ -72,17 +70,9 @@ defmodule Jido.AI.GenerateTest do
     use Jido.AI.Agent, name: "generate_test_single_pass_assistant"
 
     ai do
-      model :test_model
+      model :fast
       reasoning SinglePass
     end
-  end
-
-  setup :verify_on_exit!
-
-  setup do
-    original = Application.get_env(:jido_ai, :model_aliases)
-    Application.put_env(:jido_ai, :model_aliases, %{test_model: "openai:gpt-4o-mini"})
-    on_exit(fn -> restore_aliases(original) end)
   end
 
   test "generates text with the resolved model and configured instructions" do
@@ -95,7 +85,7 @@ defmodule Jido.AI.GenerateTest do
       assert %{role: :system, content: [%{type: :text, text: "Reply in one short sentence."}]} = system
       assert %{role: :user, content: [%{type: :text, text: "Are you ready?"}]} = user
 
-      {:ok, response(model, context, "Ready")}
+      {:ok, text_response(model, context, "Ready", id: "test-response")}
     end)
 
     assert Assistant.generate("Are you ready?", temperature: 0.0) == {:ok, "Ready"}
@@ -103,7 +93,7 @@ defmodule Jido.AI.GenerateTest do
 
   test "reason returns the first-class semantic trace and accumulated usage" do
     expect(ReqLLM, :generate_text, fn model, context, _options ->
-      response = response(model, context, "Ready")
+      response = text_response(model, context, "Ready", id: "test-response")
 
       {:ok,
        %{
@@ -115,6 +105,9 @@ defmodule Jido.AI.GenerateTest do
     end)
 
     assert {:ok, result} = Assistant.reason("Are you ready?")
+    assert result.status == :completed
+    assert result.commit == :not_requested
+    assert Jido.AI.Result.validate(result) == :ok
     assert result.output == "Ready"
 
     assert %{
@@ -133,23 +126,27 @@ defmodule Jido.AI.GenerateTest do
            ]
 
     assert [started, model, completed] = result.trace
-    assert started.model == "openai:gpt-4o-mini"
-    assert started.reasoning == "Jido.AI.Flow.ReAct"
-    assert model.response_id == "trace-response"
-    assert model.finish_reason == :stop
-    assert model.tool_calls == []
-    assert model.usage.input_tokens == 11
-    assert completed.output == %{type: :text, bytes: 5}
+    assert started.data.model == "openai:gpt-4o-mini"
+    assert started.data.reasoning == "Jido.AI.Flow.ReAct"
+    assert started.data.visible_tools == []
+    assert model.data.response_id == "trace-response"
+    assert model.data.finish_reason == :stop
+    assert model.data.tool_calls == []
+    assert model.data.usage.input_tokens == 11
+    assert completed.data.output == %{type: :text, bytes: 5}
     assert Enum.map(result.trace, & &1.sequence) == [1, 2, 3]
     assert Enum.all?(result.trace, &(is_integer(&1.elapsed_ms) and &1.elapsed_ms >= 0))
+    assert Enum.all?(result.events, &(&1.request_id == result.request_id))
+    assert Enum.all?(result.events, &(&1.run_id == result.run_id))
+    assert Jido.AI.Event.terminal?(completed)
 
-    refute Map.has_key?(model, :text)
-    refute Map.has_key?(model, :reasoning)
+    refute Map.has_key?(model.data, :text)
+    refute Map.has_key?(model.data, :reasoning)
   end
 
   test "a custom reasoning Flow composes the public model Actions" do
     expect(ReqLLM, :generate_text, fn model, context, _options ->
-      {:ok, response(model, context, "Custom Flow")}
+      {:ok, text_response(model, context, "Custom Flow", id: "test-response")}
     end)
 
     assert SinglePassAssistant.generate("Use the custom Flow") == {:ok, "Custom Flow"}
@@ -178,7 +175,7 @@ defmodule Jido.AI.GenerateTest do
                :user
              ]
 
-      {:ok, response(model, context, "Ana")}
+      {:ok, text_response(model, context, "Ana", id: "test-response")}
     end)
 
     assert Assistant.generate("Who am I?", conversation: conversation) == {:ok, "Ana"}
@@ -229,14 +226,11 @@ defmodule Jido.AI.GenerateTest do
         )
 
       {:ok,
-       %ReqLLM.Response{
+       tool_response(model, context, [output_call],
          id: "structured-response",
-         model: model,
-         context: context,
-         message: ReqLLM.Context.assistant("", tool_calls: [output_call]),
          finish_reason: :tool_calls,
          object: %{"answer" => "Ready"}
-       }}
+       )}
     end)
 
     context = %{
@@ -248,16 +242,4 @@ defmodule Jido.AI.GenerateTest do
     assert Jido.AI.respond(context, "Are you ready?", reply: Reply) ==
              {:ok, %{answer: "Ready"}}
   end
-
-  defp response(model, context, text) do
-    %ReqLLM.Response{
-      id: "test-response",
-      model: model,
-      context: context,
-      message: ReqLLM.Context.assistant(text)
-    }
-  end
-
-  defp restore_aliases(nil), do: Application.delete_env(:jido_ai, :model_aliases)
-  defp restore_aliases(aliases), do: Application.put_env(:jido_ai, :model_aliases, aliases)
 end

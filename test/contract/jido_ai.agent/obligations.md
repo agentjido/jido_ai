@@ -58,9 +58,9 @@ request-option propagation, traces, or streaming.
 - **kind:** functional
 - **status:** active
 
-### jido_ai.agent.I7 — Seed dynamic instance state through a fresh definition
+### jido_ai.agent.I7 — Initialize dynamic instance state
 
-- **scope:** `Jido.AI.Agent`, `Jido.Agent.define/1`, `Jido.Agent.instantiate/2`
-- **must:** An application can derive a fresh Agent definition for each instantiation and put a new Session or Thread in its `initial_state`. Explicit caller state overrides matching seed fields, and separate derived definitions do not share generated identities.
+- **scope:** `Jido.AI.Agent`, `Jido.Agent.initialize/2`, `Jido.Agent.instantiate/2`
+- **must:** An Agent can create a new Session or Thread for each instance through `initialize/2`. The callback receives static initial state merged with explicit caller state and returns the complete candidate state. It preserves a supplied Session or Thread and creates one only when absent. Separate instances do not share generated identities.
 - **kind:** functional
 - **status:** active

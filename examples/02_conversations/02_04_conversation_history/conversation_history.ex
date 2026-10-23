@@ -1,51 +1,3 @@
-defmodule JidoAI.Examples.ConversationHistory.Projector do
-  @moduledoc "Projects committed example Signals into a ReqLLM context."
-
-  alias Jido.Signal
-  alias JidoAI.Examples.ConversationHistory.Ask
-
-  def project(%Jido.Thread{signals: signals}) do
-    {_pending, pairs} = Enum.reduce(signals, {%{}, []}, &project_signal/2)
-
-    messages = pairs |> Enum.reverse() |> Enum.flat_map(&pair_messages/1)
-
-    ReqLLM.Context.new(messages)
-  end
-
-  defp project_signal(%Signal{type: type} = signal, {pending, pairs}) do
-    cond do
-      type == Ask.type() ->
-        case Ask.validate_data(signal.data) do
-          {:ok, data} -> {Map.put(pending, signal.id, data.question), pairs}
-          {:error, _issues} -> {pending, pairs}
-        end
-
-      type == Ask.answer_type() ->
-        project_reply(signal, pending, pairs)
-
-      true ->
-        {pending, pairs}
-    end
-  end
-
-  defp project_signal(_signal, state), do: state
-
-  defp project_reply(reply, pending, pairs) do
-    request_id = Signal.get_context(reply, "jidocausationid")
-
-    with {:ok, question} <- Map.fetch(pending, request_id),
-         {:ok, data} <- Ask.validate_answer(reply.data) do
-      {Map.delete(pending, request_id), [{question, data.answer} | pairs]}
-    else
-      _not_a_complete_pair -> {pending, pairs}
-    end
-  end
-
-  defp pair_messages({question, answer}) do
-    [ReqLLM.Context.user(question), ReqLLM.Context.assistant(answer)]
-  end
-end
-
 defmodule JidoAI.Examples.ConversationHistory.Ask do
   @moduledoc "Defines a stateful conversation request and reply."
 
@@ -67,20 +19,12 @@ defmodule JidoAI.Examples.ConversationHistory.Ask do
       schema: @answer_schema
     ]
 
-  @doc "Returns the reply Signal type used by the local projector."
-  def answer_type, do: @answer_type
-
-  @doc "Validates reply data before the local projector reads it."
-  def validate_answer(data), do: Zoi.parse(@answer_schema, data)
-
   @impl Jido.Action
   def run(%{question: question}, context) do
-    conversation =
-      JidoAI.Examples.ConversationHistory.Projector.project(context.agent_state.session.thread)
-
     Jido.AI.respond(context, question,
       reply: __MODULE__,
-      conversation: conversation
+      context: context.agent_state.session,
+      projection: [signal_action: __MODULE__, input: :question, output: :answer]
     )
   end
 end
@@ -97,10 +41,15 @@ defmodule JidoAI.Examples.ConversationHistory.Turn do
     output_schema: Zoi.object(%{session: Jido.Session.schema()})
 
   @impl Jido.Action
-  def run(params, context) do
+  def run(%{question: question}, context) do
     with {:ok, _prepared} <- Jido.AI.Turn.prepare(context, state_key: :session),
-         {:ok, answer} <- Ask.run(params, context),
-         do: Jido.AI.Turn.complete(context, Ask, answer, state_key: :session)
+         {:ok, result} <-
+           Jido.AI.respond_result(context, question,
+             reply: Ask,
+             context: context.agent_state.session,
+             projection: [signal_action: Ask, input: :question, output: :answer]
+           ),
+         do: Jido.AI.Turn.complete(context, Ask, result, state_key: :session)
   end
 end
 
@@ -111,8 +60,16 @@ defmodule JidoAI.Examples.ConversationHistory.Agent do
 
   use Jido.AI.Agent, name: "conversation_history_example"
 
-  agent do
+  state do
     schema Zoi.object(%{session: Jido.Session.schema()})
+  end
+
+  @impl Jido.Agent
+  def initialize(state, _context) do
+    {:ok,
+     Map.put_new_lazy(state, :session, fn ->
+       Jido.Session.new!(metadata: %{example: "conversation_history"})
+     end)}
   end
 
   ai do
@@ -133,16 +90,5 @@ defmodule JidoAI.Examples.ConversationHistory do
   alias JidoAI.Examples.ConversationHistory.Agent
 
   @doc "Builds an Agent with a new Session for committed conversation history."
-  def new(opts \\ []) do
-    definition = Agent.definition()
-
-    initial_state =
-      Map.put(
-        definition.initial_state,
-        :session,
-        Jido.Session.new!(metadata: %{example: "conversation_history"})
-      )
-
-    Jido.Agent.instantiate(%{definition | initial_state: initial_state}, opts)
-  end
+  def new(opts \\ []), do: Agent.instantiate(opts)
 end

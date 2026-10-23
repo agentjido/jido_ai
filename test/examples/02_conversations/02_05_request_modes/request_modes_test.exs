@@ -1,7 +1,5 @@
 defmodule JidoAI.Examples.RequestModesTest do
-  use ExUnit.Case, async: false
-
-  import Mimic
+  use Jido.AI.Test.ReqLLMCase, async: false
 
   alias Jido.Agent.Directive.Reply
   alias Jido.AgentServer
@@ -10,17 +8,10 @@ defmodule JidoAI.Examples.RequestModesTest do
 
   @moduletag :example
 
-  setup :set_mimic_global
-  setup :verify_on_exit!
-
   setup do
-    original = Application.get_env(:jido_ai, :model_aliases)
-    Application.put_env(:jido_ai, :model_aliases, %{fast: "openai:gpt-4o-mini"})
-
     jido = :"jido_ai_request_modes_#{System.unique_integer([:positive])}"
     start_supervised!({Jido, name: jido})
 
-    on_exit(fn -> restore_aliases(original) end)
     {:ok, jido: jido}
   end
 
@@ -33,7 +24,7 @@ defmodule JidoAI.Examples.RequestModesTest do
   test "AgentServer call and submit await commit complete Session turns", %{jido: jido} do
     stub(ReqLLM, :generate_text, fn model, context, _options ->
       question = context |> ReqLLM.Context.to_list() |> List.last() |> message_text()
-      {:ok, response(model, context, %{"answer" => "Answer: #{question}"})}
+      {:ok, object_response(model, context, %{"answer" => "Answer: #{question}"}, id: "request-mode-response")}
     end)
 
     {:ok, server} = RequestModes.start(jido, id: "request-modes-success")
@@ -69,7 +60,8 @@ defmodule JidoAI.Examples.RequestModesTest do
       send(parent, {:model_request_started, self()})
 
       receive do
-        :finish_request -> {:ok, response(model, context, %{"answer" => "Too late"})}
+        :finish_request ->
+          {:ok, object_response(model, context, %{"answer" => "Too late"}, id: "request-mode-response")}
       end
     end)
 
@@ -104,17 +96,4 @@ defmodule JidoAI.Examples.RequestModesTest do
   end
 
   defp message_text(message), do: message.content |> List.first() |> Map.fetch!(:text)
-
-  defp response(model, context, object) do
-    %ReqLLM.Response{
-      id: "request-mode-response",
-      model: model,
-      context: context,
-      message: ReqLLM.Context.assistant(""),
-      object: object
-    }
-  end
-
-  defp restore_aliases(nil), do: Application.delete_env(:jido_ai, :model_aliases)
-  defp restore_aliases(aliases), do: Application.put_env(:jido_ai, :model_aliases, aliases)
 end
