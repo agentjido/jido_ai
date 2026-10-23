@@ -3,7 +3,7 @@ defmodule JidoAI.Examples.SessionAgentTest do
 
   import Mimic
 
-  alias Jido.Agent.Directive.Emit
+  alias Jido.Agent.Directive.Reply
   alias JidoAI.Examples.SessionAgent
   alias JidoAI.Examples.SessionAgent.{Agent, Ask, Turn}
 
@@ -17,19 +17,21 @@ defmodule JidoAI.Examples.SessionAgentTest do
     on_exit(fn -> restore_aliases(original) end)
   end
 
-  test "the routed turn prepares, reasons, and commits in one Flow" do
-    assert [%{handler: %{kind: :flow, target: Turn}}] = Agent.definition().routes
-    assert %Jido.Flow{components: components} = Turn.flow()
-    assert components |> Map.keys() |> Enum.sort() == ["answer", "commit", "prepare"]
-    assert components["prepare"].call.target == Jido.AI.Actions.PrepareTurn
-    assert components["answer"].needs == ["prepare"]
-    assert components["commit"].call.target == Turn.step_action("commit")
-    commit = Turn.step_action("commit")
-    assert {Turn, _path} = apply(commit, :__jido_inline_action__, [])
-    assert {:ok, _flow} = Jido.Flow.validate(Turn.flow())
+  test "the route uses one turn Action without a Flow helper macro" do
+    assert [%{handler: %{kind: :action, target: Turn}}] = Agent.definition().routes
   end
 
-  test "a successful route emits and commits one typed reply Signal" do
+  test "each constructor call seeds a fresh Session before caller state is merged" do
+    assert {:ok, first} = SessionAgent.new(id: "session-agent-first", state: %{})
+    assert {:ok, second} = SessionAgent.new(id: "session-agent-second")
+
+    assert first.initial_state.session == first.state.session
+    assert second.initial_state.session == second.state.session
+    refute first.state.session.id == second.state.session.id
+    refute first.state.session.thread.id == second.state.session.thread.id
+  end
+
+  test "a successful route returns and commits one typed Reply Signal" do
     expect(ReqLLM, :generate_text, fn model, context, options ->
       assert %ReqLLM.Output{type: :object} = options[:output]
       {:ok, response(model, context, %{"answer" => "Ready"})}
@@ -41,7 +43,7 @@ defmodule JidoAI.Examples.SessionAgentTest do
     session_id = agent.state.session.id
     request = Ask.new!(%{question: "Are you ready?"})
 
-    assert {:ok, updated, [%Emit{signal: reply}]} = Agent.cmd(agent, request)
+    assert {:ok, updated, [%Reply{signal: reply}]} = Agent.cmd(agent, request)
     assert reply.type == "examples.session_agent.answered"
     assert reply.data == %{answer: "Ready"}
     assert Jido.Signal.get_context(reply, "jidocausationid") == request.id
@@ -67,7 +69,7 @@ defmodule JidoAI.Examples.SessionAgentTest do
   end
 
   @tag capture_log: true
-  test "a closed Session stops the Flow before a model request" do
+  test "a closed Session stops the action before a model request" do
     reject(ReqLLM, :generate_text, 3)
 
     {:ok, session} = Jido.Session.new!() |> Jido.Session.close()

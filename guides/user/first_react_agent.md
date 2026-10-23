@@ -202,7 +202,7 @@ thread = Jido.Thread.new(metadata: %{system_prompt: saved_system_prompt})
 {:ok, session} =
   Jido.AI.Thread.Projection.append(Jido.Session.new(thread: thread), context_messages)
 
-{:ok, agent} = Jido.AI.Agent.from_initial_state(MyAgent, %{messages: session})
+{:ok, agent} = MyAgent.instantiate(state: %{messages: session})
 {:ok, server} = Jido.start_agent(MyJido, agent)
 ```
 
@@ -210,7 +210,7 @@ A nil `system_prompt` in Thread metadata uses the Agent's configured prompt. A s
 overrides it. Use `profile: :review` to select another AI profile. This imports
 context data; it does not resume execution. Use native checkpoint restore
 for current V3 state.
-See the [initial-state examples](../../examples/14_resume/14_11_initial_state/README.md).
+See the [Session Agent example](../../examples/02_conversations/02_03_session_agent/README.md).
 
 ## Note: Retrieval And ReAct
 

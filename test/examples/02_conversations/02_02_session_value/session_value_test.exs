@@ -1,7 +1,7 @@
 defmodule JidoAI.Examples.SessionValueTest do
   use ExUnit.Case, async: true
 
-  alias Jido.Agent.Directive.Emit
+  alias Jido.Agent.Directive.Reply
   alias JidoAI.Examples.SessionValue
   alias JidoAI.Examples.SessionValue.{Agent, Close, Record}
 
@@ -14,7 +14,7 @@ defmodule JidoAI.Examples.SessionValueTest do
 
     record = Record.new!(%{note: "Keep this conversation portable."})
 
-    assert {:ok, agent, [%Emit{signal: recorded}]} = Jido.Agent.cmd(agent, record)
+    assert {:ok, agent, [%Reply{signal: recorded}]} = Jido.Agent.cmd(agent, record)
     assert recorded.data == %{note: "Keep this conversation portable."}
     assert agent.state.session.status == :open
     assert agent.state.session.thread.signals == [record, recorded]
@@ -22,7 +22,7 @@ defmodule JidoAI.Examples.SessionValueTest do
 
     close = Close.new!()
 
-    assert {:ok, closed, [%Emit{signal: closed_reply}]} = Jido.Agent.cmd(agent, close)
+    assert {:ok, closed, [%Reply{signal: closed_reply}]} = Jido.Agent.cmd(agent, close)
     assert closed_reply.data == %{session_id: closed.state.session.id, status: "closed"}
     assert closed.state.session.status == :closed
     assert closed.state.session.thread.signals == [record, recorded, close, closed_reply]

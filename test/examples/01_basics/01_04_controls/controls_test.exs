@@ -33,7 +33,7 @@ defmodule JidoAI.Examples.ControlsTest do
   end
 
   test "the inline output control is an ordinary Jido Action" do
-    [action] = Jido.AI.Plugin.config(Agent).controls.output
+    action = Jido.AI.Plugin.config(Agent).controls.output
 
     assert action.__jido_authoring_kind__() == :action
     assert action.name() == "require_source"

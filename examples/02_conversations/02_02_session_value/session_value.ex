@@ -35,7 +35,7 @@ defmodule JidoAI.Examples.SessionValue.RecordSession do
   def run(%{note: note}, %{agent_state: %{session: session} = state, signal: request}) do
     with {:ok, reply} <- Record.reply(request, %{note: note}),
          {:ok, session} <- Jido.Session.append_many(session, [request, reply]) do
-      {:ok, %{state | session: session}, [Directive.emit(reply)]}
+      {:ok, %{state | session: session}, [Directive.reply(reply)]}
     end
   end
 end
@@ -79,7 +79,7 @@ defmodule JidoAI.Examples.SessionValue.CloseSession do
     with {:ok, reply} <- Close.reply(request, %{session_id: session.id, status: "closed"}),
          {:ok, session} <- Jido.Session.append_many(session, [request, reply]),
          {:ok, session} <- Jido.Session.close(session) do
-      {:ok, %{state | session: session}, [Directive.emit(reply)]}
+      {:ok, %{state | session: session}, [Directive.reply(reply)]}
     end
   end
 end
@@ -98,15 +98,8 @@ defmodule JidoAI.Examples.SessionValue.Agent do
   routes do
     signal_source "/examples/session-value"
 
-    route Record,
-      via: RecordSession,
-      as: :record,
-      emits: ["examples.session_value.recorded"]
-
-    route Close,
-      via: CloseSession,
-      as: :close,
-      emits: ["examples.session_value.closed"]
+    route Record, RecordSession, as: :record
+    route Close, CloseSession, as: :close
   end
 end
 
@@ -117,11 +110,15 @@ defmodule JidoAI.Examples.SessionValue do
 
   @doc "Builds an Agent with a new open Session."
   def new(opts \\ []) do
-    opts =
-      Keyword.put_new_lazy(opts, :state, fn ->
-        %{session: Jido.Session.new!(metadata: %{example: "session_value"})}
-      end)
+    definition = Agent.definition()
 
-    Agent.instantiate(opts)
+    initial_state =
+      Map.put(
+        definition.initial_state,
+        :session,
+        Jido.Session.new!(metadata: %{example: "session_value"})
+      )
+
+    Jido.Agent.instantiate(%{definition | initial_state: initial_state}, opts)
   end
 end

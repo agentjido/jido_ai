@@ -18,6 +18,12 @@ defmodule Jido.AI.Agent do
 
   The `ai` block is a top-level Plugin section. Keep core Agent data in the
   optional `agent` block.
+
+  Jido AI uses the core Agent instance-state boundary. For a new
+  `Jido.Session` or `Jido.Thread`, application code can derive a fresh Agent
+  definition and put the value in its `initial_state` before instantiation.
+  Explicit caller `state:` values override matching seed fields. Do not reuse
+  a derived definition that contains a generated identity.
   """
 
   @doc false

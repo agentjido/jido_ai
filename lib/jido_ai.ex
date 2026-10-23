@@ -66,8 +66,8 @@ defmodule Jido.AI do
   reasoning Flow and returns the reply data.
 
   Do not call this function from an Action inside another Flow. Add
-  `Jido.AI.Flow.Extension` to the parent Flow and use `reason/2` so all work
-  remains in one execution graph.
+  `Jido.AI.Flow.Reason` as a normal step in the parent Flow so all work remains
+  in one execution graph.
   """
   @spec respond(map(), String.t(), keyword()) ::
           {:ok, map()} | {:error, request_error()}

@@ -153,14 +153,14 @@ defmodule Jido.AI.Request do
 
   defp normalize_output(output, _descriptor), do: {:ok, output}
 
-  defp validate_stream_controls(%{output: []}), do: :ok
+  defp validate_stream_controls(%{output: nil}), do: :ok
 
   defp validate_stream_controls(_controls),
     do: {:error, :output_control_requires_buffered_response}
 
-  defp run_controls(actions, stage, value, context, deadline) do
+  defp run_controls(action, stage, value, context, deadline) do
     with {:ok, timeout} <- Deadline.remaining(deadline) do
-      Controls.run(actions, stage, value, context, timeout: timeout)
+      Controls.run(action, stage, value, context, timeout: timeout)
     end
   end
 

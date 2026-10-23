@@ -126,10 +126,24 @@ defmodule JidoAI.Contract.AgentContractTest do
     routes do
       signal_source "/tests/jido-ai"
 
-      route Ask,
-        via: ObservePrepared,
-        as: :ask,
-        emits: ["tests.jido_ai.answered"]
+      route Ask, ObservePrepared, as: :ask
+    end
+  end
+
+  defmodule StatefulAssistant do
+    use Jido.AI.Agent, name: "jido_ai_stateful_contract_agent"
+
+    agent do
+      schema(
+        Zoi.object(%{
+          session: Jido.Session.schema(),
+          tone: Zoi.string() |> Zoi.default("schema")
+        })
+      )
+    end
+
+    ai do
+      model :fast
     end
   end
 
@@ -163,8 +177,8 @@ defmodule JidoAI.Contract.AgentContractTest do
              max_iterations: 8,
              max_model_calls: 12,
              max_tool_calls: 16,
-             input: [],
-             output: []
+             input: nil,
+             output: nil
            }
   end
 
@@ -182,7 +196,7 @@ defmodule JidoAI.Contract.AgentContractTest do
       assert instruction.kind == tool.kind
     end
 
-    for control <- config.controls.input ++ config.controls.output do
+    for control <- [config.controls.input, config.controls.output] do
       assert {:ok, %{kind: :action}} = Jido.Instruction.resolve(control)
     end
 
@@ -195,7 +209,7 @@ defmodule JidoAI.Contract.AgentContractTest do
     assert {:error, %Jido.Agent.Error{}} =
              Jido.AI.Plugin.normalize(%{
                model: :fast,
-               controls: %{input: [MultiplyFlow]}
+               controls: %{input: MultiplyFlow}
              })
   end
 
@@ -240,8 +254,8 @@ defmodule JidoAI.Contract.AgentContractTest do
 
     assert action["target"] == %{"id" => "tests/actions/jido-ai-multiply", "vsn" => 1}
     assert flow["target"] == %{"id" => "tests/flows/jido-ai-multiply", "vsn" => 1}
-    assert hd(config["controls"]["input"]) == registered("input-control")
-    assert hd(config["controls"]["output"]) == registered("output-control")
+    assert config["controls"]["input"] == registered("input-control")
+    assert config["controls"]["output"] == registered("output-control")
     refute Map.has_key?(config, "output")
     assert hd(definition["routes"])["handler"]["target"] == registered("handler")
   end
@@ -279,7 +293,43 @@ defmodule JidoAI.Contract.AgentContractTest do
 
     assert [route] = Assistant.definition().routes
     assert route.path == "tests.jido_ai.ask"
-    assert route.emits == ["tests.jido_ai.answered"]
+    assert route.handler == %{kind: :action, target: ObservePrepared}
+  end
+
+  @tag obligation: "jido_ai.agent.I7"
+  test "a fresh derived definition seeds dynamic instance state" do
+    base = StatefulAssistant.definition() |> Map.from_struct()
+    first_session = Jido.Session.new!(id: "contract-session-first")
+    second_session = Jido.Session.new!(id: "contract-session-second")
+    restored_session = Jido.Session.new!(id: "contract-session-restored")
+
+    first_definition =
+      base
+      |> Map.put(:initial_state, %{session: first_session, tone: "definition"})
+      |> Jido.Agent.define!()
+
+    second_definition =
+      base
+      |> Map.put(:initial_state, %{session: second_session, tone: "definition"})
+      |> Jido.Agent.define!()
+
+    assert {:ok, first} =
+             Jido.Agent.instantiate(first_definition,
+               id: "contract-stateful-first",
+               state: %{tone: "caller"}
+             )
+
+    assert {:ok, second} =
+             Jido.Agent.instantiate(second_definition,
+               id: "contract-stateful-second",
+               state: %{session: restored_session}
+             )
+
+    assert first.state == %{session: first_session, tone: "caller"}
+    assert second.state == %{session: restored_session, tone: "definition"}
+    refute first_definition.initial_state.session.id == second_definition.initial_state.session.id
+    assert first_definition.state == nil
+    assert second_definition.state == nil
   end
 
   defp registry do

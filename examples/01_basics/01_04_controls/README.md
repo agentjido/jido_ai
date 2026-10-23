@@ -18,8 +18,11 @@ mix test test/examples/01_basics/01_04_controls --include example --seed 0
 ```
 
 Controls are normal Jido Actions. Jido Exec validates and runs them. The input
-control uses an Action module. The output control uses `output_action` to
+control uses an Action module. The output control uses `output` with a block to
 compile an ordinary inline Action. They do not depend on a provider.
+
+A `controls` block accepts at most one input control and one output control.
+Each control can be a module Action or an inline Action.
 
 ## Files
 

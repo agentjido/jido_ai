@@ -3,7 +3,7 @@ defmodule JidoAI.Examples.StructuredOutputTest do
 
   import Mimic
 
-  alias Jido.Agent.Directive.Emit
+  alias Jido.Agent.Directive.Reply
   alias JidoAI.Examples.StructuredOutput.{Agent, Ask}
 
   @moduletag :example
@@ -16,7 +16,15 @@ defmodule JidoAI.Examples.StructuredOutputTest do
     on_exit(fn -> restore_aliases(original) end)
   end
 
-  test "the route shapes and emits the structured reply" do
+  test "the Agent embeds its reasoning Flow" do
+    reasoning = Jido.AI.Plugin.config(Agent).reasoning
+    path = [host: Jido.AI.Plugin, declaration: :reasoning, role: :flow]
+
+    assert reasoning == Jido.Flow.Inline.target!(Agent, path)
+    assert reasoning.__jido_inline_flow__() == {Agent, path}
+  end
+
+  test "the route shapes and returns the structured Reply" do
     expected = %{answer: "Ready", confidence: 0.9}
 
     expect(ReqLLM, :generate_text, fn model, context, options ->
@@ -38,7 +46,7 @@ defmodule JidoAI.Examples.StructuredOutputTest do
     agent = Agent.instantiate!(id: "structured-output")
     request = Agent.ask_signal!(%{question: "Are we ready?"})
 
-    assert {:ok, ^agent, [%Emit{signal: reply}]} = Agent.cmd(agent, request)
+    assert {:ok, ^agent, [%Reply{signal: reply}]} = Agent.cmd(agent, request)
     assert reply.type == "examples.structured_output.answered"
     assert reply.data == expected
     assert Jido.Signal.get_context(reply, "jidocausationid") == request.id

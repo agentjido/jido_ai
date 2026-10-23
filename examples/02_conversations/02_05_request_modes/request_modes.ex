@@ -26,38 +26,17 @@ defmodule JidoAI.Examples.RequestModes.Turn do
 
   alias JidoAI.Examples.RequestModes.Ask
 
-  use Jido.Flow,
+  use Jido.Action,
     name: "request_modes_turn",
     description: "Generate and commit one runtime-controlled AI turn",
     schema: Ask.schema(),
-    output_schema: Zoi.object(%{session: Jido.Session.schema()}),
-    extensions: [Jido.AI.Flow.Extension]
+    output_schema: Zoi.object(%{session: Jido.Session.schema()})
 
-  flow do
-    step "prepare",
-      action: Jido.AI.Actions.PrepareTurn,
-      params: %{}
-
-    reason("answer",
-      prompt: input(:question),
-      reply: Ask,
-      needs: ["prepare"]
-    )
-
-    step "commit",
-         [
-           answer <- result("answer", :output),
-           state_key <- result("prepare", :state_key)
-         ],
-         inline: [
-           description: "Complete one typed runtime turn",
-           schema: Zoi.object(%{answer: Ask.output_schema(), state_key: Zoi.atom()}),
-           context: context
-         ] do
-      Jido.AI.Turn.complete(context, Ask, answer, state_key: state_key)
-    end
-
-    output result("commit")
+  @impl Jido.Action
+  def run(params, context) do
+    with {:ok, _prepared} <- Jido.AI.Turn.prepare(context, state_key: :session),
+         {:ok, answer} <- Ask.run(params, context),
+         do: Jido.AI.Turn.complete(context, Ask, answer, state_key: :session)
   end
 end
 
@@ -80,10 +59,7 @@ defmodule JidoAI.Examples.RequestModes.Agent do
   routes do
     signal_source "/examples/request-modes"
 
-    route Ask,
-      via: Turn,
-      as: :ask,
-      emits: ["examples.request_modes.answered"]
+    route Ask, Turn, as: :ask
   end
 end
 
@@ -94,11 +70,15 @@ defmodule JidoAI.Examples.RequestModes do
 
   @doc "Starts the request-mode Agent with a new Session."
   def start(jido, opts \\ []) do
-    opts =
-      Keyword.put_new_lazy(opts, :state, fn ->
-        %{session: Jido.Session.new!(metadata: %{example: "request_modes"})}
-      end)
+    definition = Agent.definition()
 
-    Jido.start_agent(jido, Agent, opts)
+    initial_state =
+      Map.put(
+        definition.initial_state,
+        :session,
+        Jido.Session.new!(metadata: %{example: "request_modes"})
+      )
+
+    Jido.start_agent(jido, %{definition | initial_state: initial_state}, opts)
   end
 end

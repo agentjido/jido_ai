@@ -6,7 +6,7 @@ defmodule Jido.AI.Flow.Reason.Pipeline do
 
   @spec new(State.t()) :: {:ok, Jido.Flow.t()} | {:error, Exception.t()}
   def new(%{__jido_ai_reasoning__: true} = state) do
-    {input_controls, previous} = controls(state.controls.input, :input, nil)
+    {input_control, previous} = control(state.controls.input, :input, nil)
 
     reason = %{
       kind: :subflow,
@@ -16,7 +16,7 @@ defmodule Jido.AI.Flow.Reason.Pipeline do
       needs: List.wrap(previous)
     }
 
-    {output_controls, previous} = controls(state.controls.output, :output, "reason")
+    {output_control, previous} = control(state.controls.output, :output, "reason")
 
     finish = %{
       kind: :step,
@@ -29,32 +29,30 @@ defmodule Jido.AI.Flow.Reason.Pipeline do
     Jido.Flow.new(%{
       name: "jido_ai_reason_pipeline",
       description: "Run AI controls around one selected reasoning Flow",
-      components: input_controls ++ [reason] ++ output_controls ++ [finish],
+      components: input_control ++ [reason] ++ output_control ++ [finish],
       output: Ref.result("finish")
     })
   end
 
-  defp controls(actions, stage, previous) do
-    actions
-    |> Enum.with_index()
-    |> Enum.map_reduce(previous, fn {action, index}, previous ->
-      name = "#{stage}_control_#{index + 1}"
+  defp control(nil, _stage, previous), do: {[], previous}
 
-      value =
-        case stage do
-          :input -> Ref.input([:request, :input])
-          :output -> Ref.result("reason", :output)
-        end
+  defp control(action, stage, previous) do
+    name = "#{stage}_control"
 
-      component = %{
-        kind: :step,
-        name: name,
-        action: action,
-        params: %{stage => value},
-        needs: List.wrap(previous)
-      }
+    value =
+      case stage do
+        :input -> Ref.input([:request, :input])
+        :output -> Ref.result("reason", :output)
+      end
 
-      {component, name}
-    end)
+    component = %{
+      kind: :step,
+      name: name,
+      action: action,
+      params: %{stage => value},
+      needs: List.wrap(previous)
+    }
+
+    {[component], name}
   end
 end

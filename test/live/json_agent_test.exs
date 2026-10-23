@@ -1,7 +1,7 @@
 defmodule Jido.AI.Live.JSONAgentTest do
   use Jido.AI.Test.LiveCase, async: false
 
-  alias Jido.Agent.Directive.Emit
+  alias Jido.Agent.Directive.Reply
   alias JidoAI.Examples.JSONAgent, as: Example
   alias JidoAI.Examples.JSONAgent.Ask
 
@@ -14,7 +14,7 @@ defmodule Jido.AI.Live.JSONAgentTest do
 
     {result, _trace} =
       capture_live(agent, input, "imported_json_agent", [], fn ->
-        with {:ok, _agent, [%Emit{signal: reply}]} <- Jido.Agent.cmd(agent, request) do
+        with {:ok, _agent, [%Reply{signal: reply}]} <- Jido.Agent.cmd(agent, request) do
           send(self(), {:json_reply, reply})
           {:ok, reply.data}
         end

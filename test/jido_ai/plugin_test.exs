@@ -98,6 +98,21 @@ defmodule Jido.AI.PluginTest do
     end
   end
 
+  defmodule InlineReasoningAssistant do
+    use Jido.AI.Agent, name: "inline_reasoning_assistant"
+
+    alias Jido.AI.PluginTest.FixedReasoning.Answer
+
+    ai do
+      model "openai:gpt-4o-mini"
+
+      reasoning do
+        step "answer", action: Answer, params: input()
+        output result("answer")
+      end
+    end
+  end
+
   test "an Agent declares its basic AI configuration" do
     assert Jido.AI.Plugin.config(Assistant) == %{
              model: :fast,
@@ -117,6 +132,17 @@ defmodule Jido.AI.PluginTest do
   test "an Agent can replace the default ReAct reasoning Flow" do
     assert Jido.AI.Plugin.config(CustomReasoningAssistant).reasoning == FixedReasoning
     assert CustomReasoningAssistant.generate("hello") == {:ok, "Custom: hello"}
+  end
+
+  test "an Agent can declare its reasoning Flow inline" do
+    reasoning = Jido.AI.Plugin.config(InlineReasoningAssistant).reasoning
+    path = [host: Jido.AI.Plugin, declaration: :reasoning, role: :flow]
+
+    assert reasoning == Jido.Flow.Inline.target!(InlineReasoningAssistant, path)
+    assert reasoning.__jido_inline_flow__() == {InlineReasoningAssistant, path}
+    assert reasoning.__jido_authoring_kind__() == :flow
+    assert reasoning.name() == "inline_reasoning_assistant_reasoning"
+    assert InlineReasoningAssistant.generate("hello") == {:ok, "Custom: hello"}
   end
 
   test "the AI Plugin publishes the shared Jido authoring manifest" do
@@ -187,9 +213,42 @@ defmodule Jido.AI.PluginTest do
              max_iterations: 2,
              max_model_calls: 3,
              max_tool_calls: 4,
-             input: [PermitInput],
-             output: [CheckOutput]
+             input: PermitInput,
+             output: CheckOutput
            }
+  end
+
+  test "a controls block accepts only one input and one output definition" do
+    for {stage, action} <- [input: PermitInput, output: CheckOutput] do
+      module = "Jido.AI.PluginTest.Duplicate#{stage |> Atom.to_string() |> Macro.camelize()}Control"
+
+      source = """
+      defmodule #{module} do
+        use Jido.AI.Agent, name: "duplicate_#{stage}_control"
+
+        ai do
+          model :fast
+
+          controls do
+            #{stage} #{inspect(action)}
+            #{stage} #{inspect(action)}
+          end
+        end
+      end
+      """
+
+      assert_raise Spark.Error.DslError, ~r/Expected a single #{stage}/, fn ->
+        Code.compile_string(source)
+      end
+    end
+  end
+
+  test "map configuration rejects control lists" do
+    assert {:error, %Jido.Agent.Error{path: [:controls, :input]}} =
+             Jido.AI.Plugin.normalize(%{
+               model: :fast,
+               controls: %{input: [PermitInput]}
+             })
   end
 
   defmodule InlineControlsAssistant do
@@ -199,7 +258,7 @@ defmodule Jido.AI.PluginTest do
       model :fast
 
       controls do
-        input_action %{input: input},
+        input %{input: input},
           name: "inline_input_control",
           schema: Zoi.object(%{input: Zoi.string()}),
           context: context do
@@ -208,7 +267,7 @@ defmodule Jido.AI.PluginTest do
             else: {:error, :not_authorized}
         end
 
-        output_action %{output: output},
+        output %{output: output},
           name: "inline_output_control",
           schema: Zoi.object(%{output: Zoi.string()}) do
           {:ok, %{length: String.length(output)}}
@@ -222,13 +281,13 @@ defmodule Jido.AI.PluginTest do
   test "inline controls compile to ordinary Jido Actions" do
     controls = Jido.AI.Plugin.config(InlineControlsAssistant).controls
 
-    assert [input] = controls.input
-    assert [output] = controls.output
+    input = controls.input
+    output = controls.output
     assert input.__jido_authoring_kind__() == :action
     assert output.__jido_authoring_kind__() == :action
     assert function_exported?(input, :__jido_inline_action__, 0)
     assert function_exported?(output, :__jido_inline_action__, 0)
-    assert Jido.AI.Controls.run([input], :input, "request", %{authorized: true}) == :ok
-    assert Jido.AI.Controls.run([output], :output, "answer", %{}) == :ok
+    assert Jido.AI.Controls.run(input, :input, "request", %{authorized: true}) == :ok
+    assert Jido.AI.Controls.run(output, :output, "answer", %{}) == :ok
   end
 end

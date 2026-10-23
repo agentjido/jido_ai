@@ -3,7 +3,7 @@ defmodule JidoAI.Examples.JSONAgentTest do
 
   import Mimic
 
-  alias Jido.Agent.Directive.Emit
+  alias Jido.Agent.Directive.Reply
   alias JidoAI.Examples.JSONAgent, as: Example
   alias JidoAI.Examples.JSONAgent.Ask
 
@@ -27,11 +27,11 @@ defmodule JidoAI.Examples.JSONAgentTest do
     config = Jido.AI.Plugin.config(imported)
     assert config.model == :fast
     assert Enum.map(config.tools, & &1.name) == ["add_numbers", "json_example_add_flow"]
-    assert config.controls.input == [JidoAI.Examples.JSONAgent.Permit]
+    assert config.controls.input == JidoAI.Examples.JSONAgent.Permit
     refute Map.has_key?(config, :output)
   end
 
-  test "the imported Agent routes and emits a structured response" do
+  test "the imported Agent routes and returns a structured Reply" do
     assert {:ok, imported} = Example.import()
 
     expect(ReqLLM, :generate_text, fn model, context, options ->
@@ -53,7 +53,7 @@ defmodule JidoAI.Examples.JSONAgentTest do
     agent = Jido.Agent.instantiate!(imported, id: "imported-json-ai")
     request = Ask.new!(%{question: "Are you ready?"})
 
-    assert {:ok, ^agent, [%Emit{signal: reply}]} = Jido.Agent.cmd(agent, request)
+    assert {:ok, ^agent, [%Reply{signal: reply}]} = Jido.Agent.cmd(agent, request)
     assert reply.type == "examples.json_ai.answered"
     assert reply.data == %{answer: "Ready", confidence: 0.95}
     assert Jido.Signal.get_context(reply, "jidocausationid") == request.id

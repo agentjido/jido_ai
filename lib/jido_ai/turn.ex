@@ -4,8 +4,8 @@ defmodule Jido.AI.Turn do
 
   `complete/4` creates a typed reply Signal, appends the request and reply to a
   Thread or Session in Agent state, and returns the candidate state with one
-  emit Directive. The Agent remains responsible for the final state commit and
-  Directive dispatch.
+  Reply Directive. The Agent remains responsible for the final state commit
+  and Directive delivery.
 
   `prepare/2` validates the current request and turn state without doing model
   work or changing state. Use it as an Action step before a reasoning step.
@@ -52,7 +52,7 @@ defmodule Jido.AI.Turn do
          } <- prepared,
          {:ok, reply} <- reply(reply_action, request, answer),
          {:ok, conversation} <- append(conversation, [request, reply]) do
-      {:ok, Map.put(agent_state, state_key, conversation), [Directive.emit(reply)]}
+      {:ok, Map.put(agent_state, state_key, conversation), [Directive.reply(reply)]}
     end
   end
 
@@ -66,14 +66,14 @@ defmodule Jido.AI.Turn do
   def complete(_context, _reply_action, _answer, opts),
     do: {:error, {:invalid_turn_options, opts}}
 
-  @doc "Creates and emits a typed reply without changing Agent state."
+  @doc "Creates one typed Reply Directive without changing Agent state."
   @spec complete_reply(map(), module(), term()) ::
           {:ok, map(), [Directive.t()]} | {:error, error_reason()}
   def complete_reply(context, reply_action, answer)
       when is_map(context) and is_atom(reply_action) do
     with {:ok, request, agent_state} <- turn_context(context),
          {:ok, reply} <- reply(reply_action, request, answer) do
-      {:ok, agent_state, [Directive.emit(reply)]}
+      {:ok, agent_state, [Directive.reply(reply)]}
     end
   end
 

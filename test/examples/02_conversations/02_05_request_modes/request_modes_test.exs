@@ -3,7 +3,7 @@ defmodule JidoAI.Examples.RequestModesTest do
 
   import Mimic
 
-  alias Jido.Agent.Directive.Emit
+  alias Jido.Agent.Directive.Reply
   alias Jido.AgentServer
   alias JidoAI.Examples.RequestModes
   alias JidoAI.Examples.RequestModes.{Agent, Ask, Turn}
@@ -24,18 +24,10 @@ defmodule JidoAI.Examples.RequestModesTest do
     {:ok, jido: jido}
   end
 
-  test "the request-mode example owns its Agent contract and turn Flow" do
+  test "the request-mode example owns its Agent contract and turn Action" do
     assert Agent.definition().name == "request_modes_example"
     assert Ask.type() == "examples.request_modes.ask"
-    assert [%{handler: %{kind: :flow, target: Turn}}] = Agent.definition().routes
-    assert %Jido.Flow{components: components} = Turn.flow()
-    assert components |> Map.keys() |> Enum.sort() == ["answer", "commit", "prepare"]
-    assert components["prepare"].call.target == Jido.AI.Actions.PrepareTurn
-    assert components["answer"].needs == ["prepare"]
-    assert components["commit"].call.target == Turn.step_action("commit")
-    commit = Turn.step_action("commit")
-    assert {Turn, _path} = apply(commit, :__jido_inline_action__, [])
-    assert {:ok, _flow} = Jido.Flow.validate(Turn.flow())
+    assert [%{handler: %{kind: :action, target: Turn}}] = Agent.definition().routes
   end
 
   test "AgentServer call and submit await commit complete Session turns", %{jido: jido} do
@@ -44,15 +36,11 @@ defmodule JidoAI.Examples.RequestModesTest do
       {:ok, response(model, context, %{"answer" => "Answer: #{question}"})}
     end)
 
-    {:ok, server} =
-      RequestModes.start(jido,
-        id: "request-modes-success",
-        default_dispatch: {:pid, target: self()}
-      )
+    {:ok, server} = RequestModes.start(jido, id: "request-modes-success")
 
     first = Ask.new!(%{question: "First"})
-    assert {:ok, called, [%Emit{signal: first_reply}]} = AgentServer.call(server, first)
-    assert_receive {:signal, delivered_first}, 1_000
+    assert {:ok, called, [%Reply{signal: first_reply}]} = AgentServer.call(server, first)
+    assert_receive delivered_first, 1_000
     assert delivered_first.id == first_reply.id
     assert delivered_first.type == first_reply.type
     assert delivered_first.data == first_reply.data
@@ -63,8 +51,8 @@ defmodule JidoAI.Examples.RequestModesTest do
     second = Ask.new!(%{question: "Second"})
     pending = AgentServer.submit(server, second)
     assert %AgentServer.Pending{} = pending
-    assert {:ok, submitted, [%Emit{signal: second_reply}]} = AgentServer.await(pending)
-    assert_receive {:signal, delivered_second}, 1_000
+    assert {:ok, submitted, [%Reply{signal: second_reply}]} = AgentServer.await(pending)
+    assert_receive delivered_second, 1_000
     assert delivered_second.id == second_reply.id
     assert delivered_second.type == second_reply.type
     assert delivered_second.data == second_reply.data

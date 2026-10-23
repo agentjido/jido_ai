@@ -1,7 +1,7 @@
 defmodule Jido.AI.TurnTest do
   use ExUnit.Case, async: true
 
-  alias Jido.Agent.Directive.Emit
+  alias Jido.Agent.Directive.Reply
   alias Jido.AI.Turn
 
   defmodule Ask do
@@ -30,7 +30,7 @@ defmodule Jido.AI.TurnTest do
     request = Ask.new!(%{question: "Ready?"})
     thread = Jido.Thread.new!()
 
-    assert {:ok, state, [%Emit{signal: reply}]} =
+    assert {:ok, state, [%Reply{signal: reply}]} =
              Turn.complete(
                %{signal: request, agent_state: %{thread: thread, count: 1}},
                Ask,
@@ -66,7 +66,7 @@ defmodule Jido.AI.TurnTest do
     request = Ask.new!(%{question: "Ready?"})
     session = Jido.Session.new!()
 
-    assert {:ok, state, [%Emit{signal: reply}]} =
+    assert {:ok, state, [%Reply{signal: reply}]} =
              Turn.complete(
                %{signal: request, agent_state: %{session: session}},
                Ask,
@@ -84,7 +84,7 @@ defmodule Jido.AI.TurnTest do
     request = Ask.new!(%{question: "Ready?"})
     agent_state = %{count: 1}
 
-    assert {:ok, ^agent_state, [%Emit{signal: reply}]} =
+    assert {:ok, ^agent_state, [%Reply{signal: reply}]} =
              Turn.complete_reply(
                %{signal: request, agent_state: agent_state},
                Ask,

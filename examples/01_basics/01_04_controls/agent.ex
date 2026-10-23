@@ -27,7 +27,7 @@ defmodule JidoAI.Examples.Controls.Agent do
       max_tool_calls 1
       input JidoAI.Examples.Controls.MemberOnly
 
-      output_action %{output: output},
+      output %{output: output},
         name: "require_source",
         description: "Require a source marker in generated text",
         schema: Zoi.object(%{output: Zoi.string()}) do

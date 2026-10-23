@@ -6,7 +6,8 @@ Use a routed `Jido.SignalAction` as the structured reply contract.
 
 - Define request and reply Signal contracts in one Action.
 - Shape the model result from the reply schema.
-- Emit a correlated reply Signal from a normal route Action.
+- Define the Agent reasoning steps in an embedded `reasoning do` Flow.
+- Return a correlated Reply Directive from a normal route Action.
 
 ## Run it
 
@@ -17,7 +18,7 @@ mix test test/examples/01_basics/01_03_structured_output --include example --see
 ```
 
 The test replaces the ReqLLM request. It checks the derived descriptor, parsed
-data, and emitted reply Signal. It does not use an API key or the network.
+data, and Reply Signal. It does not use an API key or the network.
 
 ## Files
 

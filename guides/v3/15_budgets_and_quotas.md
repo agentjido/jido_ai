@@ -10,7 +10,7 @@ The quota Plugin can be declared in `agent do` beside the AI profile:
 
 ```elixir
 agent do
-  plugin Jido.AI.Plugins.Quota, config: [scope: "support", max_requests: 10]
+  plugin Jido.AI.Plugins.Quota, config: %{scope: "support", max_requests: 10}
 
   ai :assistant do
     model "openai:gpt-4o-mini"

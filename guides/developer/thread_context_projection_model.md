@@ -48,10 +48,10 @@ caller-supplied references alone do not grant durability.
 
 ## Import and checkpoints
 
-`Agent.from_initial_state/2,3` accepts canonical Session values or encoded Session
-maps in declared fields. It preserves their entries and rejects incomplete tool
-exchanges. It does not import live request or Plugin state. The legacy special
-`:context` input and reverse-order history replacement API are removed.
+The application restores a canonical Session value and passes it to
+`Jido.Agent.instantiate/2` through the declared state field. Core validates the
+complete Agent state. This does not restore a live request or Plugin runtime
+state. Jido AI does not add a second initial-state import API.
 
 Standalone `ReAct.State.context` is a canonical Thread. Its state checkpoint
 format is version 4 and encodes that Thread. Execution checkpoint data retains

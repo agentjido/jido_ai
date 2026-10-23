@@ -1,7 +1,7 @@
 defmodule Jido.AI.Live.AgentServerTraceTest do
   use Jido.AI.Test.LiveCase, async: false
 
-  alias Jido.Agent.Directive.Emit
+  alias Jido.Agent.Directive.Reply
   alias Jido.AgentServer
   alias JidoAI.Examples.RequestModes
   alias JidoAI.Examples.RequestModes.Ask
@@ -15,18 +15,14 @@ defmodule Jido.AI.Live.AgentServerTraceTest do
   test "a routed live turn includes core Jido runtime telemetry", %{jido: jido} do
     input = "Reply with Ready in one short sentence."
 
-    {:ok, server} =
-      RequestModes.start(jido,
-        id: "live-agent-server-trace",
-        default_dispatch: {:pid, target: self()}
-      )
+    {:ok, server} = RequestModes.start(jido, id: "live-agent-server-trace")
 
     request = Ask.new!(%{question: input})
 
     {result, trace_path} =
       capture_live(RequestModes.Agent, input, "agent_server_turn", [], fn ->
-        with {:ok, _agent, [%Emit{signal: reply}]} <- AgentServer.call(server, request) do
-          assert_receive {:signal, delivered}, 1_000
+        with {:ok, _agent, [%Reply{signal: reply}]} <- AgentServer.call(server, request) do
+          assert_receive delivered, 1_000
           assert delivered.id == reply.id
           assert delivered.type == reply.type
           assert delivered.data == reply.data

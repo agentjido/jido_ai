@@ -7,6 +7,8 @@ Implement tool-using AI behavior with explicit model policy, bounded execution, 
 - Prefer `Jido.AI.Actions.*` and `Jido.AI.Agent` over ad-hoc raw facade calls.
 - Keep model alias, timeout, retry, and request policy explicit.
 - Use **Zoi-first** schemas for structured inputs/outputs and tool contracts.
+- Derive a fresh definition for each new Session or Thread and put the value in core `initial_state` before instantiation.
+- Use explicit `state:` as the caller override, including for restored Session or Thread values.
 - Treat `ask`/`await` request handles as the safe concurrency boundary.
 - Keep provider-specific logic behind ReqLLM integration points.
 - Treat `agent_skills` filesystem discovery as an explicit trust boundary; runtime specs must use `source: nil`, carry inline bodies, and provider-backed resources must pass through `Jido.AI.Skill.ResourceProvider` validation.

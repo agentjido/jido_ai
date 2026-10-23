@@ -51,21 +51,17 @@ replace the full audit log with that view unless this is your explicit intent.
 ## Save and import
 
 ```elixir
-encoded = session |> Jido.Session.encode() |> Jason.encode!()
-{:ok, restored} = encoded |> Jason.decode!() |> Jido.Session.decode()
-{:ok, agent} = Jido.AI.Agent.from_initial_state(MyAgent, %{messages: restored})
+restored = MyApp.SessionStore.load!("session-1")
+{:ok, agent} = MyAgent.instantiate(state: %{messages: restored})
 ```
 
-Use the declared field name in place of `messages` when it differs. Import also
-accepts an encoded Session map in that field. It preserves Session identity,
-Thread entry identities, timestamps, and references. A saved system prompt
-updates the selected Profile; `nil` retains its configured prompt, and `""` is
-an explicit empty prompt. Use `profile: :review` to select another Profile.
+The application storage adapter owns encoding and decoding. It must return a
+canonical `Jido.Session` value. Use the declared field name in place of
+`messages` when it differs. Core Agent instantiation validates the Session and
+the complete Agent state.
 
-Import accepts complete tool exchanges. It rejects pending, orphaned, duplicate,
-or interrupted exchanges. It does not restore active requests, workers, or
-Plugin state. Use an execution checkpoint to resume pending work. The old
-special `:context` import input is removed.
+This state input does not restore active requests, workers, or Plugin state.
+Use an execution checkpoint to resume pending work.
 
 ## Replace, compact, or switch
 
@@ -101,8 +97,8 @@ canonical Thread to inspect entry identity and references. Use
 `snapshot.details[:tool_results]` for completed structured tool outputs rather
 than parsing provider-facing tool messages.
 
-See the [Thread and Session example](../../examples/02_requests/02_27_thread_session_values/README.md)
-and [initial-state import example](../../examples/14_resume/14_11_initial_state/README.md).
+See the [Session Agent example](../../examples/02_conversations/02_03_session_agent/README.md)
+and [conversation history example](../../examples/02_conversations/02_04_conversation_history/README.md).
 
 ## Next
 

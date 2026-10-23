@@ -3,27 +3,27 @@ defmodule Jido.AI.Plugin.DSL.ControlMacros do
 
   alias Jido.Action.Inline
 
-  defmacro input_action(options, body) when is_list(options) and is_list(body) do
+  defmacro input(options, body) when is_list(options) and is_list(body) do
     compile_control(:input, nil, options ++ body, __CALLER__)
   end
 
-  defmacro input_action(pattern, options) when is_list(options) do
+  defmacro input(pattern, options) when is_list(options) do
     compile_control(:input, pattern, options, __CALLER__)
   end
 
-  defmacro input_action(pattern, options, body) when is_list(options) and is_list(body) do
+  defmacro input(pattern, options, body) when is_list(options) and is_list(body) do
     compile_control(:input, pattern, options ++ body, __CALLER__)
   end
 
-  defmacro output_action(options, body) when is_list(options) and is_list(body) do
+  defmacro output(options, body) when is_list(options) and is_list(body) do
     compile_control(:output, nil, options ++ body, __CALLER__)
   end
 
-  defmacro output_action(pattern, options) when is_list(options) do
+  defmacro output(pattern, options) when is_list(options) do
     compile_control(:output, pattern, options, __CALLER__)
   end
 
-  defmacro output_action(pattern, options, body) when is_list(options) and is_list(body) do
+  defmacro output(pattern, options, body) when is_list(options) and is_list(body) do
     compile_control(:output, pattern, options ++ body, __CALLER__)
   end
 
@@ -42,7 +42,7 @@ defmodule Jido.AI.Plugin.DSL.ControlMacros do
       Inline.compile!(Macro.escape(path), parsed, caller,
         default_name: "jido_ai_#{stage}_control_#{index}",
         remove_imports: [
-          {__MODULE__, [input_action: 2, input_action: 3, output_action: 2, output_action: 3]}
+          {__MODULE__, [input: 2, input: 3, output: 2, output: 3]}
         ]
       )
 

@@ -1,30 +1,55 @@
-# Checkpoint and resume
+# Start from application state
 
-There are two forms of continuation. Importing initial Context restores
-portable conversation data before an Agent starts. An execution checkpoint
-continues a paused ReAct request from a supported boundary. They solve
-different problems and do not restore the same live resources.
+The application creates dynamic instance data before it instantiates an Agent.
+This includes a new or restored `Jido.Session` or `Jido.Thread`.
 
-For initial Context, declare a Session field with `memory history:` and pass
-that field through `Jido.AI.Agent.from_initial_state/3`. The import validates
-the Session and complete exchanges. It does not replay tools or model calls.
-It also does not restore pending request workers, input queues, or Plugin
-state. The [initial-state example](../../examples/14_resume/14_11_initial_state/README.md)
-shows both the Session value and its encoded form.
+Declare the value in the Agent state schema:
 
-A ReAct checkpoint can pause after a model response or a complete tool round.
-Resume checks the code, permissions, and remaining budgets. Completed tool
-results are retained, so a resumed request need not run those tools again.
-Partial tool batches and rollback of external effects are not supported.
-Tokens are caller-owned and replayable; put durable single-use rules in your
-application if the business process needs them.
+```elixir
+agent do
+  schema Zoi.object(%{session: Jido.Session.schema()})
+end
+```
 
-Decide which form you need before you save data. If the goal is “start a new
-Agent with the prior conversation,” save a `Jido.Session`. If the goal is
-“continue this paused request,” use an execution checkpoint at an allowed
-boundary. A raw request trace is neither form. Test resume after a complete
-tool exchange and test rejection of malformed or mismatched input.
+For a new Session, derive a fresh definition and seed its `initial_state`:
 
-Read the [checkpoint example](../../examples/14_resume/14_03_checkpoint_resume/README.md)
-and run [Resume Context](../livebooks/resume_context.livemd) for the simpler
-initial-import case. The notebook does not claim to restore a live worker.
+```elixir
+definition = MyApp.Assistant.definition()
+
+initial_state =
+  Map.put(
+    definition.initial_state,
+    :session,
+    Jido.Session.new!()
+  )
+
+{:ok, agent} =
+  Jido.Agent.instantiate(
+    %{definition | initial_state: initial_state},
+    id: "assistant-1",
+    state: %{}
+  )
+```
+
+Create this derived definition for each instance. Reusing it would reuse the
+generated Session identity. Use the derived definition only for construction;
+store the Session or resulting Agent state instead of the derived definition.
+
+For a restored Session, pass the restored value as an explicit caller override:
+
+```elixir
+restored = MyApp.SessionStore.load!("session-1")
+
+{:ok, agent} =
+  MyApp.Assistant.instantiate(
+    id: "assistant-1",
+    state: %{session: restored}
+  )
+```
+
+Core Jido merges `initial_state` first and explicit `state:` second. It then
+applies schema defaults and validates the complete state.
+
+This starts a new Agent value from prior application data. It does not replay
+model calls or tools. It does not restore a pending request, a worker, a queue,
+or Plugin runtime state. A live execution checkpoint is a different contract.

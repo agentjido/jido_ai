@@ -1,7 +1,7 @@
 defmodule Jido.AI.Live.StructuredReplyTest do
   use Jido.AI.Test.LiveCase, async: false
 
-  alias Jido.Agent.Directive.Emit
+  alias Jido.Agent.Directive.Reply
   alias JidoAI.Examples.StructuredOutput.{Agent, Ask}
 
   test "a real model returns a routed reply shaped by a Signal Action" do
@@ -11,7 +11,7 @@ defmodule Jido.AI.Live.StructuredReplyTest do
 
     {result, _trace} =
       capture_live(agent, input, "structured_reply", [], fn ->
-        with {:ok, _agent, [%Emit{signal: reply}]} <- Agent.cmd(agent, request) do
+        with {:ok, _agent, [%Reply{signal: reply}]} <- Agent.cmd(agent, request) do
           send(self(), {:structured_reply, reply})
           {:ok, reply.data}
         end

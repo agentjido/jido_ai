@@ -62,34 +62,19 @@ defmodule JidoAI.Examples.JSONAgent.Ask do
 end
 
 defmodule JidoAI.Examples.JSONAgent.HandleAsk do
-  @moduledoc "Reasons and emits one typed reply as a Flow."
+  @moduledoc "Converts typed answer data to an Agent Reply Directive."
 
   alias JidoAI.Examples.JSONAgent.Ask
 
-  use Jido.Flow,
-    id: "examples/flows/json-handle-ask",
+  use Jido.Action,
     name: "json_example_handle_ask",
     description: "Handle one JSON AI Agent request",
-    schema: Ask.schema(),
-    extensions: [Jido.AI.Flow.Extension]
+    schema: Ask.schema()
 
-  flow do
-    reason("answer",
-      prompt: input(:question),
-      reply: Ask
-    )
-
-    step "reply",
-         answer <- result("answer", :output),
-         inline: [
-           description: "Emit one typed imported Agent reply",
-           schema: Zoi.object(%{answer: Ask.output_schema()}),
-           context: context
-         ] do
-      Jido.AI.Turn.complete_reply(context, Ask, answer)
-    end
-
-    output result("reply")
+  @impl Jido.Action
+  def run(params, context) do
+    with {:ok, answer} <- Ask.run(params, context),
+         do: Jido.AI.Turn.complete_reply(context, Ask, answer)
   end
 end
 
@@ -123,10 +108,7 @@ defmodule JidoAI.Examples.JSONAgent.Agent do
   routes do
     signal_source "/examples/json-ai"
 
-    route Ask,
-      via: HandleAsk,
-      as: :ask,
-      emits: ["examples.json_ai.answered"]
+    route Ask, HandleAsk, as: :ask
   end
 end
 
@@ -146,9 +128,9 @@ defmodule JidoAI.Examples.JSONAgent do
       {"examples/schemas/json-ai-state", 1} => {:schema, definition().schema},
       {"jido.ai", 1} => {:plugin, Jido.AI.Plugin},
       {"examples/actions/json-add", 1} => {:action, Add},
+      {"examples/actions/json-handle-ask", 1} => {:action, HandleAsk},
       {"examples/flows/json-add", 1} => {:flow, AddFlow},
       {"examples/actions/json-permit", 1} => {:action, Permit},
-      {"examples/flows/json-handle-ask", 1} => {:flow, HandleAsk},
       {"examples/atoms/ask", 1} => {:atom, :ask}
     })
   end

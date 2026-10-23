@@ -3,7 +3,7 @@ defmodule JidoAI.Examples.ConversationHistoryTest do
 
   import Mimic
 
-  alias Jido.Agent.Directive.Emit
+  alias Jido.Agent.Directive.Reply
   alias JidoAI.Examples.ConversationHistory
   alias JidoAI.Examples.ConversationHistory.{Agent, Ask, Projector, Turn}
 
@@ -17,16 +17,8 @@ defmodule JidoAI.Examples.ConversationHistoryTest do
     on_exit(fn -> restore_aliases(original) end)
   end
 
-  test "the routed turn projects history, reasons, and commits" do
-    assert [%{handler: %{kind: :flow, target: Turn}}] = Agent.definition().routes
-    assert %Jido.Flow{components: components} = Turn.flow()
-    assert components |> Map.keys() |> Enum.sort() == ["answer", "commit", "conversation", "prepare"]
-    assert components["prepare"].call.target == Jido.AI.Actions.PrepareTurn
-    assert components["conversation"].call.target == JidoAI.Examples.ConversationHistory.LoadConversation
-    assert components["commit"].call.target == Turn.step_action("commit")
-    commit = Turn.step_action("commit")
-    assert {Turn, _path} = apply(commit, :__jido_inline_action__, [])
-    assert {:ok, _flow} = Jido.Flow.validate(Turn.flow())
+  test "the route uses one turn Action without a Flow helper macro" do
+    assert [%{handler: %{kind: :action, target: Turn}}] = Agent.definition().routes
   end
 
   test "the second turn receives only the first committed request and reply" do
@@ -49,11 +41,11 @@ defmodule JidoAI.Examples.ConversationHistoryTest do
              ConversationHistory.new(id: "conversation-history")
 
     first = Ask.new!(%{question: "My name is Ana."})
-    assert {:ok, agent, [%Emit{}]} = Agent.cmd(agent, first)
+    assert {:ok, agent, [%Reply{}]} = Agent.cmd(agent, first)
 
     thread_before_projection = agent.state.session.thread
     second = Ask.new!(%{question: "What is my name?"})
-    assert {:ok, agent, [%Emit{signal: reply}]} = Agent.cmd(agent, second)
+    assert {:ok, agent, [%Reply{signal: reply}]} = Agent.cmd(agent, second)
 
     assert reply.data == %{answer: "Your name is Ana."}
     assert thread_before_projection.signals == Enum.take(agent.state.session.thread.signals, 2)

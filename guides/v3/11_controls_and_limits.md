@@ -22,6 +22,10 @@ before its domain-state commit. Put a rule at the earliest stage with enough
 information to decide it. That reduces wasted model calls and avoids a late
 rejection after an avoidable external effect.
 
+The current DSL accepts at most one input control and one output control. Each
+slot accepts either a module Action or an inline Action. Put related checks in
+that one Action.
+
 Controls are not all authorization. A model instruction does not enforce tool
 access; a timeout does not make a non-idempotent tool safe to retry. Set a
 specific tool policy for effects and a specific quota for use across

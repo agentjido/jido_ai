@@ -22,42 +22,21 @@ defmodule JidoAI.Examples.ThreadAgent.Ask do
 end
 
 defmodule JidoAI.Examples.ThreadAgent.Turn do
-  @moduledoc "Generates an answer and commits one complete Thread turn."
+  @moduledoc "Runs and commits one complete Thread turn."
 
   alias JidoAI.Examples.ThreadAgent.Ask
 
-  use Jido.Flow,
+  use Jido.Action,
     name: "thread_agent_turn",
     description: "Generate an answer and commit one Thread turn",
     schema: Ask.schema(),
-    output_schema: Zoi.object(%{thread: Jido.Thread.schema()}),
-    extensions: [Jido.AI.Flow.Extension]
+    output_schema: Zoi.object(%{thread: Jido.Thread.schema()})
 
-  flow do
-    step "prepare",
-      action: Jido.AI.Actions.PrepareTurn,
-      params: %{state_key: :thread}
-
-    reason("answer",
-      prompt: input(:question),
-      reply: Ask,
-      needs: ["prepare"]
-    )
-
-    step "commit",
-         [
-           answer <- result("answer", :output),
-           state_key <- result("prepare", :state_key)
-         ],
-         inline: [
-           description: "Complete one typed Thread turn",
-           schema: Zoi.object(%{answer: Ask.output_schema(), state_key: Zoi.atom()}),
-           context: context
-         ] do
-      Jido.AI.Turn.complete(context, Ask, answer, state_key: state_key)
-    end
-
-    output result("commit")
+  @impl Jido.Action
+  def run(params, context) do
+    with {:ok, _prepared} <- Jido.AI.Turn.prepare(context, state_key: :thread),
+         {:ok, answer} <- Ask.run(params, context),
+         do: Jido.AI.Turn.complete(context, Ask, answer, state_key: :thread)
   end
 end
 
@@ -80,10 +59,7 @@ defmodule JidoAI.Examples.ThreadAgent.Agent do
   routes do
     signal_source "/examples/thread-agent"
 
-    route Ask,
-      via: Turn,
-      as: :ask,
-      emits: ["examples.thread_agent.answered"]
+    route Ask, Turn, as: :ask
   end
 end
 
@@ -94,11 +70,15 @@ defmodule JidoAI.Examples.ThreadAgent do
 
   @doc "Builds an Agent value with a new portable Thread."
   def new(opts \\ []) do
-    opts =
-      Keyword.put_new_lazy(opts, :state, fn ->
-        %{thread: Jido.Thread.new!(metadata: %{example: "thread_agent"})}
-      end)
+    definition = Agent.definition()
 
-    Agent.instantiate(opts)
+    initial_state =
+      Map.put(
+        definition.initial_state,
+        :thread,
+        Jido.Thread.new!(metadata: %{example: "thread_agent"})
+      )
+
+    Jido.Agent.instantiate(%{definition | initial_state: initial_state}, opts)
   end
 end

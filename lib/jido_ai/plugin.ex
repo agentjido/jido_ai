@@ -21,7 +21,7 @@ defmodule Jido.AI.Plugin do
             max_tool_calls 4
             input MyApp.AuthorizeRequest
 
-            output_action %{output: output},
+            output %{output: output},
               schema: Zoi.object(%{output: Zoi.string()}) do
               if output == "", do: {:error, :empty_answer}, else: {:ok, %{accepted: true}}
             end
@@ -29,8 +29,21 @@ defmodule Jido.AI.Plugin do
         end
       end
 
-  Tool and control declarations use Jido Actions and Flows. The Plugin only
-  stores static configuration. It does not call a model or start a process.
+  Define the reasoning Flow inline when it belongs to only one Agent:
+
+      ai do
+        model :fast
+
+        reasoning do
+          step "model", action: Jido.AI.Actions.CallModel, params: input(:request)
+          step "complete", action: Jido.AI.Actions.CompleteResponse, params: result("model")
+          output result("complete")
+        end
+      end
+
+  Tool declarations use Jido Actions and Flows. Each input or output control
+  slot accepts one Jido Action. The Plugin only stores static configuration.
+  It does not call a model or start a process.
   """
 
   alias Jido.AI.Plugin.DSL
@@ -45,8 +58,15 @@ defmodule Jido.AI.Plugin do
     max_iterations: 8,
     max_model_calls: 12,
     max_tool_calls: 16,
-    input: [],
-    output: []
+    input: nil,
+    output: nil
+  }
+
+  @reasoning %Spark.Dsl.Entity{
+    name: :__reasoning__,
+    target: DSL.Reasoning,
+    args: [:target],
+    schema: [target: [type: :atom, required: true]]
   }
 
   @action_tool %Spark.Dsl.Entity{
@@ -97,18 +117,18 @@ defmodule Jido.AI.Plugin do
       max_model_calls: [type: :pos_integer, default: @default_controls.max_model_calls],
       max_tool_calls: [type: :pos_integer, default: @default_controls.max_tool_calls]
     ],
-    entities: [inputs: [@input_control], outputs: [@output_control]]
+    entities: [input: [@input_control], output: [@output_control]],
+    singleton_entity_keys: [:input, :output]
   }
 
   @section %Spark.Dsl.Section{
     name: :ai,
     schema: [
       model: [type: {:or, [:string, :atom]}, required: true],
-      instructions: [type: :string, default: ""],
-      reasoning: [type: :atom, default: @default_reasoning]
+      instructions: [type: :string, default: ""]
     ],
-    entities: [@tools, @controls],
-    singleton_entity_keys: [:tools, :controls]
+    entities: [@reasoning, @tools, @controls],
+    singleton_entity_keys: [:__reasoning__, :tools, :controls]
   }
 
   use Jido.Plugin, id: "jido.ai", sections: [@section]
@@ -125,7 +145,8 @@ defmodule Jido.AI.Plugin do
   end
 
   @impl Jido.Agent.Extension
-  def authoring_imports, do: [Jido.AI.Plugin.DSL.ControlMacros]
+  def authoring_imports,
+    do: [Jido.AI.Plugin.DSL.ControlMacros, Jido.AI.Plugin.DSL.ReasoningMacros]
 
   @impl Jido.Agent.Extension
   defdelegate encode_authoring_data(data, registry),
@@ -141,8 +162,8 @@ defmodule Jido.AI.Plugin do
   def lower(dsl, config) do
     model = Extension.get_opt(dsl, [:ai], :model)
     instructions = Extension.get_opt(dsl, [:ai], :instructions, "")
-    reasoning = Extension.get_opt(dsl, [:ai], :reasoning, @default_reasoning)
     entities = Extension.get_entities(dsl, [:ai])
+    reasoning = Enum.find(entities, &is_struct(&1, DSL.Reasoning))
     tools = Enum.find(entities, &is_struct(&1, DSL.Tools))
     controls = Enum.find(entities, &is_struct(&1, DSL.Controls))
     dsl_used? = model != nil or entities != []
@@ -158,7 +179,7 @@ defmodule Jido.AI.Plugin do
         ai_config = %{
           model: model,
           instructions: instructions,
-          reasoning: reasoning,
+          reasoning: lower_reasoning(reasoning),
           tools: lower_tools(tools),
           controls: lower_controls(controls)
         }
@@ -217,6 +238,9 @@ defmodule Jido.AI.Plugin do
   @doc false
   def default_reasoning, do: @default_reasoning
 
+  defp lower_reasoning(nil), do: @default_reasoning
+  defp lower_reasoning(%DSL.Reasoning{target: target}), do: target
+
   defp lower_tools(nil), do: []
 
   defp lower_tools(%DSL.Tools{entries: entries}) do
@@ -244,8 +268,8 @@ defmodule Jido.AI.Plugin do
       max_iterations: controls.max_iterations,
       max_model_calls: controls.max_model_calls,
       max_tool_calls: controls.max_tool_calls,
-      input: Enum.map(controls.inputs, & &1.action),
-      output: Enum.map(controls.outputs, & &1.action)
+      input: control_action(controls.input),
+      output: control_action(controls.output)
     }
   end
 
@@ -290,17 +314,20 @@ defmodule Jido.AI.Plugin do
          :ok <- Data.positive(value.max_iterations),
          :ok <- Data.positive(value.max_model_calls),
          :ok <- Data.positive(value.max_tool_calls),
-         {:ok, input} <- Error.at(validate_control_actions(value.input), :input),
-         {:ok, output} <- Error.at(validate_control_actions(value.output), :output) do
+         {:ok, input} <- Error.at(validate_control_action(value.input), :input),
+         {:ok, output} <- Error.at(validate_control_action(value.output), :output) do
       {:ok, %{value | input: input, output: output}}
     end
   end
 
-  defp validate_control_actions(actions) do
-    Data.list(actions, fn action ->
-      with :ok <- validate_executable(action, :action), do: {:ok, action}
-    end)
+  defp validate_control_action(nil), do: {:ok, nil}
+
+  defp validate_control_action(action) do
+    with :ok <- validate_executable(action, :action), do: {:ok, action}
   end
+
+  defp control_action(nil), do: nil
+  defp control_action(control), do: control.action
 
   defp validate_executable(target, kind)
        when is_atom(target) and target not in [nil, true, false] do

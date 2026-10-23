@@ -33,7 +33,7 @@ request-option propagation, traces, or streaming.
 ### jido_ai.agent.I3 — Use Jido executable primitives
 
 - **scope:** AI tools and controls
-- **must:** Accept only Jido Actions or Flows as tools. Accept only Jido Actions as input or output controls. Keep their normalized target kind and registered module reference.
+- **must:** Accept only Jido Actions or Flows as tools. Accept at most one Jido Action as the input control and at most one Jido Action as the output control. Keep each normalized target kind and registered module reference.
 - **kind:** functional
 - **status:** active
 
@@ -55,5 +55,12 @@ request-option propagation, traces, or streaming.
 
 - **scope:** normalized and encoded AI definitions, routed `Jido.SignalAction` reply contracts
 - **must:** Store no Agent-level output contract in the AI definition. Keep a structured reply schema on the routed `Jido.SignalAction` output contract. Output control Actions are not reply schemas.
+- **kind:** functional
+- **status:** active
+
+### jido_ai.agent.I7 — Seed dynamic instance state through a fresh definition
+
+- **scope:** `Jido.AI.Agent`, `Jido.Agent.define/1`, `Jido.Agent.instantiate/2`
+- **must:** An application can derive a fresh Agent definition for each instantiation and put a new Session or Thread in its `initial_state`. Explicit caller state overrides matching seed fields, and separate derived definitions do not share generated identities.
 - **kind:** functional
 - **status:** active

@@ -20,7 +20,7 @@ defmodule MyApp.Assistant do
     schema Zoi.object(%{answer: Zoi.any() |> Zoi.default(nil)})
 
     plugin Jido.AI.Plugins.ModelRouting,
-      config: [routes: %{"ai.ask" => :capable}]
+      config: %{routes: %{"ai.ask" => :capable}}
 
     ai :assistant do
       models do

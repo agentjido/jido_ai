@@ -85,63 +85,22 @@ defmodule JidoAI.Examples.ConversationHistory.Ask do
   end
 end
 
-defmodule JidoAI.Examples.ConversationHistory.LoadConversation do
-  @moduledoc "Projects committed Session history for one reasoning request."
-
-  use Jido.Action,
-    name: "conversation_history_load",
-    description: "Project committed Session history"
-
-  @impl Jido.Action
-  def run(%{session: %Jido.Session{} = session}, _context) do
-    conversation =
-      JidoAI.Examples.ConversationHistory.Projector.project(session.thread)
-
-    {:ok, %{conversation: conversation}}
-  end
-end
-
 defmodule JidoAI.Examples.ConversationHistory.Turn do
-  @moduledoc "Generates an answer from committed history and commits the new turn."
+  @moduledoc "Runs and commits one complete conversation turn."
 
   alias JidoAI.Examples.ConversationHistory.Ask
 
-  use Jido.Flow,
+  use Jido.Action,
     name: "conversation_history_turn",
     description: "Generate an answer from history and commit the new turn",
     schema: Ask.schema(),
-    output_schema: Zoi.object(%{session: Jido.Session.schema()}),
-    extensions: [Jido.AI.Flow.Extension]
+    output_schema: Zoi.object(%{session: Jido.Session.schema()})
 
-  flow do
-    step "prepare",
-      action: Jido.AI.Actions.PrepareTurn,
-      params: %{}
-
-    step "conversation",
-      action: JidoAI.Examples.ConversationHistory.LoadConversation,
-      params: %{session: result("prepare", :turn_state)}
-
-    reason("answer",
-      prompt: input(:question),
-      reply: Ask,
-      conversation: result("conversation", :conversation)
-    )
-
-    step "commit",
-         [
-           answer <- result("answer", :output),
-           state_key <- result("prepare", :state_key)
-         ],
-         inline: [
-           description: "Complete one typed conversation turn",
-           schema: Zoi.object(%{answer: Ask.output_schema(), state_key: Zoi.atom()}),
-           context: context
-         ] do
-      Jido.AI.Turn.complete(context, Ask, answer, state_key: state_key)
-    end
-
-    output result("commit")
+  @impl Jido.Action
+  def run(params, context) do
+    with {:ok, _prepared} <- Jido.AI.Turn.prepare(context, state_key: :session),
+         {:ok, answer} <- Ask.run(params, context),
+         do: Jido.AI.Turn.complete(context, Ask, answer, state_key: :session)
   end
 end
 
@@ -164,10 +123,7 @@ defmodule JidoAI.Examples.ConversationHistory.Agent do
   routes do
     signal_source "/examples/conversation"
 
-    route Ask,
-      via: Turn,
-      as: :ask,
-      emits: ["examples.conversation.answered"]
+    route Ask, Turn, as: :ask
   end
 end
 
@@ -178,11 +134,15 @@ defmodule JidoAI.Examples.ConversationHistory do
 
   @doc "Builds an Agent with a new Session for committed conversation history."
   def new(opts \\ []) do
-    opts =
-      Keyword.put_new_lazy(opts, :state, fn ->
-        %{session: Jido.Session.new!(metadata: %{example: "conversation_history"})}
-      end)
+    definition = Agent.definition()
 
-    Agent.instantiate(opts)
+    initial_state =
+      Map.put(
+        definition.initial_state,
+        :session,
+        Jido.Session.new!(metadata: %{example: "conversation_history"})
+      )
+
+    Jido.Agent.instantiate(%{definition | initial_state: initial_state}, opts)
   end
 end

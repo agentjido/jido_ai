@@ -156,8 +156,8 @@ defmodule Jido.AI.Plugin.Authoring do
   defp executable_kind(value), do: invalid(["kind"], "Invalid AI tool kind", %{value: value})
 
   defp encode_controls(controls, registry) when is_map(controls) do
-    with {:ok, input} <- encode_references(controls.input, :action, registry),
-         {:ok, output} <- encode_references(controls.output, :action, registry) do
+    with {:ok, input} <- encode_control(controls.input, registry),
+         {:ok, output} <- encode_control(controls.output, registry) do
       {:ok,
        %{
          "timeout" => controls.timeout,
@@ -188,20 +188,8 @@ defmodule Jido.AI.Plugin.Authoring do
            ),
          :ok <-
            positive(controls["max_tool_calls"], ["controls", "max_tool_calls"]),
-         {:ok, input} <-
-           decode_references(
-             controls["input"],
-             :action,
-             registry,
-             ["controls", "input"]
-           ),
-         {:ok, output} <-
-           decode_references(
-             controls["output"],
-             :action,
-             registry,
-             ["controls", "output"]
-           ) do
+         {:ok, input} <- decode_control(controls["input"], registry, ["controls", "input"]),
+         {:ok, output} <- decode_control(controls["output"], registry, ["controls", "output"]) do
       {:ok,
        %{
          timeout: controls["timeout"],
@@ -214,11 +202,17 @@ defmodule Jido.AI.Plugin.Authoring do
     end
   end
 
-  defp encode_references(values, kind, registry),
-    do: traverse(values, &Registry.encode_reference(registry, kind, &1))
+  defp encode_control(nil, _registry), do: {:ok, nil}
+  defp encode_control(control, registry), do: Registry.encode_reference(registry, :action, control)
 
-  defp decode_references(values, kind, registry, path),
-    do: traverse(values, &Registry.decode_reference(registry, &1, kind), path)
+  defp decode_control(nil, _registry, _path), do: {:ok, nil}
+
+  defp decode_control(control, registry, path) do
+    case Registry.decode_reference(registry, control, :action) do
+      {:ok, control} -> {:ok, control}
+      {:error, error} -> {:error, prefix(error, path)}
+    end
+  end
 
   defp object(value, required, optional, path)
        when is_map(value) and not is_struct(value) do

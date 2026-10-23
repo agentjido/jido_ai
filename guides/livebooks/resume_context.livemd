@@ -83,10 +83,9 @@ saved = Jido.Session.new(id: "saved-case-session", thread: thread)
   ])
 
 {:ok, agent} =
-  Jido.AI.Agent.from_initial_state(
-    Guide.ResumeContext,
-    %{messages: saved},
-    id: "guide-resumed-agent"
+  Guide.ResumeContext.instantiate(
+    id: "guide-resumed-agent",
+    state: %{messages: saved}
   )
 
 %{saved_session_id: saved.id, imported_session_id: agent.state.messages.id}

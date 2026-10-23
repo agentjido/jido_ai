@@ -1,7 +1,7 @@
 defmodule Jido.AI.Live.ConversationHistoryTest do
   use Jido.AI.Test.LiveCase, async: false
 
-  alias Jido.Agent.Directive.Emit
+  alias Jido.Agent.Directive.Reply
   alias JidoAI.Examples.ConversationHistory
   alias JidoAI.Examples.ConversationHistory.{Agent, Ask}
 
@@ -12,7 +12,7 @@ defmodule Jido.AI.Live.ConversationHistoryTest do
 
     {first_result, _first_trace} =
       capture_live(agent, first_input, "conversation_history_first_turn", [], fn ->
-        with {:ok, updated, [%Emit{signal: reply}]} <- Agent.cmd(agent, first_request) do
+        with {:ok, updated, [%Reply{signal: reply}]} <- Agent.cmd(agent, first_request) do
           send(self(), {:first_turn, updated})
           {:ok, reply.data}
         end
@@ -27,7 +27,7 @@ defmodule Jido.AI.Live.ConversationHistoryTest do
 
     {second_result, _second_trace} =
       capture_live(agent, second_input, "conversation_history_second_turn", [], fn ->
-        with {:ok, updated, [%Emit{signal: reply}]} <- Agent.cmd(agent, second_request) do
+        with {:ok, updated, [%Reply{signal: reply}]} <- Agent.cmd(agent, second_request) do
           send(self(), {:second_turn, updated})
           {:ok, reply.data}
         end

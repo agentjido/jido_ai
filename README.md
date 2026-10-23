@@ -72,6 +72,12 @@ work. A later Turn settles the result. `Jido.Session` and `Jido.Thread` are
 portable data; Context is the selected conversation sent to the model. A
 Session is not the live request worker.
 
+For a new Session or Thread, derive a fresh Agent definition in application
+code and put the value in its core `initial_state`. Then instantiate that
+definition. Explicit caller `state:` values override matching seed fields.
+Do not reuse the derived definition, because that would reuse its generated
+identity.
+
 Tools are declared Jido Actions or Flows. They can have external effects, so
 a failed final answer cannot undo every tool action. Use schema validation,
 tool access policy, time and call limits, and application idempotency where

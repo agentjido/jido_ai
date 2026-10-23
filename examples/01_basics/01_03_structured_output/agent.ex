@@ -26,33 +26,19 @@ defmodule JidoAI.Examples.StructuredOutput.Ask do
 end
 
 defmodule JidoAI.Examples.StructuredOutput.HandleAsk do
-  @moduledoc "Reasons and emits one typed reply as a Flow."
+  @moduledoc "Converts typed answer data to an Agent Reply Directive."
 
   alias JidoAI.Examples.StructuredOutput.Ask
 
-  use Jido.Flow,
+  use Jido.Action,
     name: "structured_output_handle_ask",
-    description: "Run one structured AI request",
-    schema: Ask.schema(),
-    extensions: [Jido.AI.Flow.Extension]
+    description: "Handle one structured AI request",
+    schema: Ask.schema()
 
-  flow do
-    reason("answer",
-      prompt: input(:question),
-      reply: Ask
-    )
-
-    step "reply",
-         answer <- result("answer", :output),
-         inline: [
-           description: "Emit one typed structured reply",
-           schema: Zoi.object(%{answer: Ask.output_schema()}),
-           context: context
-         ] do
-      Jido.AI.Turn.complete_reply(context, Ask, answer)
-    end
-
-    output result("reply")
+  @impl Jido.Action
+  def run(params, context) do
+    with {:ok, answer} <- Ask.run(params, context),
+         do: Jido.AI.Turn.complete_reply(context, Ask, answer)
   end
 end
 
@@ -66,14 +52,23 @@ defmodule JidoAI.Examples.StructuredOutput.Agent do
   ai do
     model :fast
     instructions "Return a concise assessment."
+
+    reasoning do
+      step "model",
+        action: Jido.AI.Actions.CallModel,
+        params: input(:request)
+
+      step "complete",
+        action: Jido.AI.Actions.CompleteResponse,
+        params: result("model")
+
+      output result("complete")
+    end
   end
 
   routes do
     signal_source "/examples/structured-output"
 
-    route Ask,
-      via: HandleAsk,
-      as: :ask,
-      emits: ["examples.structured_output.answered"]
+    route Ask, HandleAsk, as: :ask
   end
 end

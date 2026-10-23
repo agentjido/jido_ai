@@ -37,20 +37,20 @@ defmodule Jido.AI.ControlsTest do
     def run(_params, _context), do: {:ok, %{allowed: true}}
   end
 
-  test "an empty Action list permits the value" do
-    assert Controls.run([], :input, "value", %{}) == :ok
+  test "an empty control slot permits the value" do
+    assert Controls.run(nil, :input, "value", %{}) == :ok
   end
 
   @tag capture_log: true
   test "a control Action runs through Jido Exec" do
-    assert Controls.run([MemberOnly], :input, "value", %{member?: true}) == :ok
+    assert Controls.run(MemberOnly, :input, "value", %{member?: true}) == :ok
 
-    assert {:error, error} = Controls.run([MemberOnly], :input, "value", %{})
+    assert {:error, error} = Controls.run(MemberOnly, :input, "value", %{})
     assert Exception.message(error) == "member_required"
   end
 
   test "control Action effects are not lost" do
-    assert Controls.run([Effectful], :input, "value", %{}) ==
+    assert Controls.run(Effectful, :input, "value", %{}) ==
              {:error, {:control_effects_not_supported, Effectful, [:not_dispatched]}}
   end
 
@@ -61,7 +61,7 @@ defmodule Jido.AI.ControlsTest do
       if Process.whereis(PreparedOnce) == self(), do: Process.unregister(PreparedOnce)
     end)
 
-    assert Controls.run([PreparedOnce], :input, "value", %{}) == :ok
+    assert Controls.run(PreparedOnce, :input, "value", %{}) == :ok
     assert_receive :prepared
     refute_receive :prepared
   end

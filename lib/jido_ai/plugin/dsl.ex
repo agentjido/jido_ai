@@ -1,3 +1,8 @@
+defmodule Jido.AI.Plugin.DSL.Reasoning do
+  @moduledoc false
+  defstruct [:target, :__spark_metadata__]
+end
+
 defmodule Jido.AI.Plugin.DSL.Tools do
   @moduledoc false
   defstruct [:__spark_metadata__, entries: []]
@@ -22,8 +27,8 @@ defmodule Jido.AI.Plugin.DSL.Controls do
     max_iterations: 8,
     max_model_calls: 12,
     max_tool_calls: 16,
-    inputs: [],
-    outputs: []
+    input: nil,
+    output: nil
   ]
 end
 

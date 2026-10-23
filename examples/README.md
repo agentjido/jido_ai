@@ -38,3 +38,8 @@ not part of this catalog.
    and direct model names.
 9. [JSON AI Agent](01_basics/01_09_json_agent/README.md) — export and import a
    complete AI definition through the shared Jido authoring Registry.
+
+## Proposed
+
+- [Research Agent](99_proposed/research_agent/README.md) — inspect one
+  kitchen-sink definition that combines the current core Jido and Jido AI DSL.
