@@ -72,11 +72,33 @@ defmodule Jido.AI.Result do
     }
   end
 
+  @doc false
+  @spec from_map(map()) :: {:ok, t()} | {:error, term()}
+  def from_map(value) when is_map(value) and not is_struct(value) do
+    known = Map.keys(__struct__()) -- [:__struct__]
+
+    if Enum.sort(Map.keys(value)) == Enum.sort(known) do
+      result = struct!(__MODULE__, value)
+
+      case validate(result) do
+        :ok -> {:ok, result}
+        {:error, reason} -> {:error, reason}
+      end
+    else
+      {:error, :invalid_ai_result}
+    end
+  rescue
+    KeyError -> {:error, :invalid_ai_result}
+  end
+
+  def from_map(_value), do: {:error, :invalid_ai_result}
+
   @doc "Validates result identity, event order, and terminal status."
   @spec validate(term()) :: :ok | {:error, term()}
   def validate(%__MODULE__{} = result) do
     with :ok <- validate_status(result),
          :ok <- validate_identity(result),
+         :ok <- validate_usage(result),
          :ok <- validate_events(result) do
       validate_commit(result.commit)
     end
@@ -100,6 +122,9 @@ defmodule Jido.AI.Result do
        do: :ok
 
   defp validate_identity(_result), do: {:error, :invalid_result_identity}
+
+  defp validate_usage(%__MODULE__{usage: usage}) when is_map(usage), do: :ok
+  defp validate_usage(_result), do: {:error, :invalid_result_usage}
 
   defp validate_events(%__MODULE__{events: events, trace: events} = result)
        when is_list(events) and events != [] do

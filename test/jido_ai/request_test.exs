@@ -27,20 +27,11 @@ defmodule Jido.AI.RequestTest do
   end
 
   defmodule Ask do
-    use Jido.SignalAction,
+    use Jido.Action,
       name: "request_test_ask",
       description: "Ask one projected question",
-      vsn: 1,
-      input: [
-        type: "test.request.ask",
-        default_source: "/test/request/client",
-        schema: Zoi.object(%{question: Zoi.string()})
-      ],
-      output: [
-        type: "test.request.answered",
-        default_source: "/test/request",
-        schema: Zoi.object(%{answer: Zoi.string()})
-      ]
+      schema: Zoi.object(%{question: Zoi.string()}),
+      output_schema: Zoi.object(%{answer: Zoi.string()})
 
     @impl Jido.Action
     def run(%{question: question}, _context), do: {:ok, %{answer: question}}
@@ -65,6 +56,15 @@ defmodule Jido.AI.RequestTest do
         max_tool_calls 5
       end
     end
+
+    routes do
+      signal_source "/test/request"
+
+      route "test.request.ask", Ask, as: :ask do
+        state(:unchanged)
+        reply("test.request.answered", from: output())
+      end
+    end
   end
 
   test "preflight resolves one request without model work" do
@@ -86,14 +86,17 @@ defmodule Jido.AI.RequestTest do
     assert request.request_options[:temperature] == 0.0
     assert Enum.map(Request.messages(request), & &1.role) == [:system, :user]
 
-    assert {:ok, structured} = Agent.preflight("Hello", reply: Ask)
+    assert {:ok, structured} =
+             Agent.preflight("Hello", reply: {Agent, "test.request.ask"})
+
     assert %ReqLLM.Output{type: :object} = structured.output_descriptor
   end
 
   test "preflight projects complete Session turns without changing the Session" do
-    first = Ask.new!(%{question: "My name is Ana."})
-    {:ok, reply} = Ask.reply(first, %{answer: "Hello Ana."})
-    incomplete = Ask.new!(%{question: "Do not include this."})
+    first = Agent.ask_signal!(%{question: "My name is Ana."})
+    assert {:ok, contract} = Jido.AI.Route.resolve({Agent, "test.request.ask"})
+    assert {:ok, reply} = Jido.AI.Route.reply(contract, first, %{answer: "Hello Ana."})
+    incomplete = Agent.ask_signal!(%{question: "Do not include this."})
     session = Jido.Session.new!()
     {:ok, session} = Jido.Session.append_many(session, [first, reply, incomplete])
     original = session
@@ -101,7 +104,11 @@ defmodule Jido.AI.RequestTest do
     assert {:ok, request} =
              Agent.preflight("What is my name?",
                context: session,
-               projection: [signal_action: Ask, input: :question, output: :answer]
+               projection: [
+                 route: {Agent, "test.request.ask"},
+                 input: :question,
+                 output: :answer
+               ]
              )
 
     assert Enum.map(Request.messages(request), &message_text/1) == [

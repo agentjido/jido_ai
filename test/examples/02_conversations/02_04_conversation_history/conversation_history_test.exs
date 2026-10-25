@@ -4,7 +4,9 @@ defmodule JidoAI.Examples.ConversationHistoryTest do
   alias Jido.Agent.Directive.Reply
   alias Jido.AI.Context
   alias JidoAI.Examples.ConversationHistory
-  alias JidoAI.Examples.ConversationHistory.{Agent, Ask, Turn}
+  alias JidoAI.Examples.ConversationHistory.{Agent, Turn}
+
+  @route {Agent, "examples.conversation.ask"}
 
   @moduletag :example
 
@@ -31,11 +33,11 @@ defmodule JidoAI.Examples.ConversationHistoryTest do
     assert {:ok, %Jido.Agent{module: Agent} = agent} =
              ConversationHistory.new(id: "conversation-history")
 
-    first = Ask.new!(%{question: "My name is Ana."})
+    first = Agent.ask_signal!(%{question: "My name is Ana."})
     assert {:ok, agent, [%Reply{}]} = Agent.cmd(agent, first)
 
     thread_before_projection = agent.state.session.thread
-    second = Ask.new!(%{question: "What is my name?"})
+    second = Agent.ask_signal!(%{question: "What is my name?"})
     assert {:ok, agent, [%Reply{signal: reply}]} = Agent.cmd(agent, second)
 
     assert reply.data == %{answer: "Your name is Ana."}
@@ -45,8 +47,9 @@ defmodule JidoAI.Examples.ConversationHistoryTest do
   end
 
   test "projection uses correlation and excludes unrelated and incomplete Signals" do
-    request = Ask.new!(%{question: "Keep this."})
-    {:ok, reply} = Ask.reply(request, %{answer: "Kept."})
+    request = Agent.ask_signal!(%{question: "Keep this."})
+    {:ok, contract} = Jido.AI.Route.resolve(@route)
+    {:ok, reply} = Jido.AI.Route.reply(contract, request, %{answer: "Kept."})
 
     {:ok, reply} = Jido.Signal.put_context(reply, "diagnostic", "trace-1")
 
@@ -57,7 +60,7 @@ defmodule JidoAI.Examples.ConversationHistoryTest do
         source: "/examples/conversation"
       )
 
-    incomplete = Ask.new!(%{question: "Do not include this."})
+    incomplete = Agent.ask_signal!(%{question: "Do not include this."})
     thread = Jido.Thread.new!()
 
     {:ok, thread} =
@@ -65,7 +68,7 @@ defmodule JidoAI.Examples.ConversationHistoryTest do
 
     original = thread
 
-    context = Context.project!(thread, Ask, input: :question, output: :answer)
+    context = Context.project!(thread, @route, input: :question, output: :answer)
 
     assert message_texts(context) == ["Keep this.", "Kept."]
     assert Enum.all?(context.messages, &(&1.metadata == %{}))
@@ -74,8 +77,9 @@ defmodule JidoAI.Examples.ConversationHistoryTest do
   end
 
   test "projection rejects malformed matching request data" do
-    request = Ask.new!(%{question: "Valid question"})
-    {:ok, reply} = Ask.reply(request, %{answer: "Valid answer"})
+    request = Agent.ask_signal!(%{question: "Valid question"})
+    {:ok, contract} = Jido.AI.Route.resolve(@route)
+    {:ok, reply} = Jido.AI.Route.reply(contract, request, %{answer: "Valid answer"})
     malformed_request = %{request | data: %{question: 123}}
     malformed_reply = %{reply | data: %{answer: 123}}
     thread = Jido.Thread.new!()
@@ -84,7 +88,7 @@ defmodule JidoAI.Examples.ConversationHistoryTest do
       Jido.Thread.append_many(thread, [malformed_request, reply, request, malformed_reply])
 
     assert {:error, {:invalid_projection_signal, 0, _reason}} =
-             Context.project(thread, Ask, input: :question, output: :answer)
+             Context.project(thread, @route, input: :question, output: :answer)
   end
 
   defp message_texts(context) do

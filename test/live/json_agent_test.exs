@@ -3,14 +3,13 @@ defmodule Jido.AI.Live.JSONAgentTest do
 
   alias Jido.Agent.Directive.Reply
   alias JidoAI.Examples.JSONAgent, as: Example
-  alias JidoAI.Examples.JSONAgent.Ask
 
   test "an imported JSON Agent makes a real routed request" do
     input = "This request has no arithmetic. Do not call a tool. Return answer Imported and confidence 0.8."
     assert {:ok, definition} = Example.import()
 
     agent = Jido.Agent.instantiate!(definition, id: "live-imported-json-ai")
-    request = Ask.new!(%{question: input})
+    request = Jido.Agent.input_signal!(definition, "examples.json_ai.ask", %{question: input})
 
     {result, _trace} =
       capture_live(agent, input, "imported_json_agent", [], fn ->

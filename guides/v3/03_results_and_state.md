@@ -36,9 +36,9 @@ A direct request does not change Agent state. Its `commit` field is
 `:not_requested`.
 
 For a routed turn, call `Jido.AI.respond_result/3` and give the completed
-result to `Jido.AI.Turn.complete/4`. This builds candidate state and one Reply
-Directive. Core Jido performs the final commit after the complete route Action
-succeeds.
+result to `Jido.AI.Turn.complete/4`. This builds output for the route state and
+reply projections. Core Jido validates the output, performs the final commit,
+and builds the correlated Reply Directive.
 
 If model work, output validation, or an output control fails, the turn Action
 returns an error before candidate state exists. The prior Agent state remains

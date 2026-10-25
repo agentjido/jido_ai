@@ -73,7 +73,7 @@
           "testable": true,
           "tests": [
             "test registered JSON references round-trip the same Agent definition",
-            "test the Signal Action owns structured reply shape"
+            "test the route owns structured reply shape"
           ]
         },
         "jido_ai.agent.I7": {

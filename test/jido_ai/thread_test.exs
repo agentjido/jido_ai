@@ -2,28 +2,36 @@ defmodule Jido.ThreadTest do
   use ExUnit.Case, async: true
 
   defmodule Ask do
-    use Jido.SignalAction,
+    use Jido.Action,
       name: "thread_test_ask",
       description: "Ask one question",
-      vsn: 1,
-      input: [
-        type: "test.thread.ask",
-        default_source: "/test/thread/client",
-        schema: Zoi.object(%{question: Zoi.string()})
-      ],
-      output: [
-        type: "test.thread.answered",
-        default_source: "/test/thread",
-        schema: Zoi.object(%{answer: Zoi.string()})
-      ]
+      schema: Zoi.object(%{question: Zoi.string()}),
+      output_schema: Zoi.object(%{answer: Zoi.string()})
 
     @impl Jido.Action
     def run(_params, _context), do: {:ok, %{answer: "Ready"}}
   end
 
+  defmodule RoutedAgent do
+    use Jido.Agent, name: "thread_test_agent"
+
+    routes do
+      signal_source "/test/thread"
+
+      route "test.thread.ask", Ask, as: :ask do
+        state(:unchanged)
+        reply("test.thread.answered", from: output())
+      end
+    end
+  end
+
   test "a Thread keeps correlated Signals in order without changing the old value" do
-    request = Ask.new!(%{question: "Ready?"})
-    {:ok, reply} = Ask.reply(request, %{answer: "Ready"})
+    request = RoutedAgent.ask_signal!(%{question: "Ready?"})
+    agent = RoutedAgent.instantiate!(id: "thread-test")
+
+    assert {:ok, ^agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+             RoutedAgent.cmd(agent, request)
+
     original = Jido.Thread.new!(id: "thread-1", metadata: %{topic: "status"})
 
     assert {:ok, thread} = Jido.Thread.append_many(original, [request, reply])

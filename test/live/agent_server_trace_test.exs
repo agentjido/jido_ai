@@ -4,7 +4,7 @@ defmodule Jido.AI.Live.AgentServerTraceTest do
   alias Jido.Agent.Directive.Reply
   alias Jido.AgentServer
   alias JidoAI.Examples.RequestModes
-  alias JidoAI.Examples.RequestModes.Ask
+  alias JidoAI.Examples.RequestModes.Agent
 
   setup do
     jido = :"jido_ai_live_trace_#{System.unique_integer([:positive])}"
@@ -17,7 +17,7 @@ defmodule Jido.AI.Live.AgentServerTraceTest do
 
     {:ok, server} = RequestModes.start(jido, id: "live-agent-server-trace")
 
-    request = Ask.new!(%{question: input})
+    request = Agent.ask_signal!(%{question: input})
 
     {result, trace_path} =
       capture_live(RequestModes.Agent, input, "agent_server_turn", [], fn ->

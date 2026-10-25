@@ -10,9 +10,10 @@ One routed AI turn has these steps:
 5. The configured reasoning Flow runs model and tool work.
 6. The output control checks the final output.
 7. The reasoning Flow returns a completed `Jido.AI.Result`.
-8. `Jido.AI.Turn.complete/4` validates the reply and builds candidate state.
-9. Core Jido commits the candidate state.
-10. Core Jido delivers the Reply Directive after commit.
+8. `Jido.AI.Turn.complete/4` validates the route reply data and builds route
+   output.
+9. Core Jido projects and commits the candidate state.
+10. Core Jido builds and delivers the correlated Reply Directive after commit.
 
 ```text
 Signal -> prepare -> input control -> reasoning Flow -> output control

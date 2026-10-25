@@ -141,9 +141,10 @@ Core Jido merges declared `initial_state` with explicit caller `state:` before
 it calls `initialize/2`. The callback above keeps a supplied Session and creates
 one only when the candidate state does not contain one.
 
-`Jido.AI.Context.project/3` selects complete correlated SignalAction turns and
-builds a ReqLLM Context. Unrelated and incomplete Signals do not enter the
-model request. Projection does not change Session or Thread data.
+`Jido.AI.Context.project/3` uses an Agent route reference such as
+`{MyApp.ChatAgent, "chat.ask"}`. It selects complete correlated request and
+reply pairs and builds a ReqLLM Context. Unrelated and incomplete Signals do
+not enter the model request. Projection does not change Session or Thread data.
 
 ## State commit rule
 
@@ -151,11 +152,12 @@ A direct AI request does not change Agent state. Its result has
 `commit: :not_requested`.
 
 A routed turn can pass a completed result to `Jido.AI.Turn.complete/4`. This
-function validates the typed reply and returns candidate Agent state with one
-Reply Directive. It does not commit by itself. Core Jido commits state only
-after the complete route Action succeeds. A provider failure, output control
-failure, invalid output, or incomplete result does not produce candidate turn
-state.
+function validates the route reply data and returns `%{state: state, reply:
+reply}` for the route projections. It does not commit or build the delivered
+reply by itself. Core Jido validates the complete Action output, commits the
+selected state, and then delivers the correlated route reply. A provider
+failure, output control failure, invalid output, or incomplete result does not
+produce candidate turn state.
 
 Jido AI cannot undo an external effect that a tool already completed. Use
 application authorization and idempotency for effectful tools.

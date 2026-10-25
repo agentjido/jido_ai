@@ -102,29 +102,23 @@ end
 defmodule JidoAI.Examples.Proposed.ResearchAgent.Ask do
   @moduledoc "Defines the typed research request and reply Signals."
 
-  use Jido.SignalAction,
+  use Jido.Action,
     name: "proposed_research_ask",
     description: "Ask the proposed research Agent one question",
-    vsn: 1,
-    input: [
-      type: "examples.proposed.research.ask",
-      default_source: "/examples/proposed/research/client",
-      schema: Zoi.object(%{query: Zoi.string() |> Zoi.min(1)})
-    ],
-    output: [
-      type: "examples.proposed.research.answered",
-      default_source: "/examples/proposed/research",
-      schema:
-        Zoi.object(%{
-          answer: Zoi.string() |> Zoi.min(1),
-          sources: Zoi.list(Zoi.string()),
-          confidence: Zoi.number() |> Zoi.min(0) |> Zoi.max(1)
-        })
-    ]
+    schema: Zoi.object(%{query: Zoi.string() |> Zoi.min(1)}),
+    output_schema:
+      Zoi.object(%{
+        answer: Zoi.string() |> Zoi.min(1),
+        sources: Zoi.list(Zoi.string()),
+        confidence: Zoi.number() |> Zoi.min(0) |> Zoi.max(1)
+      })
 
   @impl Jido.Action
   def run(%{query: query}, context),
-    do: Jido.AI.respond(context, query, reply: __MODULE__)
+    do:
+      Jido.AI.respond(context, query,
+        reply: {JidoAI.Examples.Proposed.ResearchAgent.Agent, "examples.proposed.research.ask"}
+      )
 end
 
 defmodule JidoAI.Examples.Proposed.ResearchAgent.Turn do
@@ -135,14 +129,31 @@ defmodule JidoAI.Examples.Proposed.ResearchAgent.Turn do
   use Jido.Action,
     name: "proposed_research_turn",
     description: "Generate and commit one structured research reply",
-    schema: Ask.schema()
+    schema: Ask.schema(),
+    output_schema:
+      Zoi.object(%{
+        state:
+          Zoi.object(%{
+            session: Jido.Session.schema(),
+            status: Zoi.enum(["idle", "ready"]),
+            last_query: Zoi.string() |> Zoi.nullable(),
+            last_delegated_query: Zoi.string() |> Zoi.nullable(),
+            request_count: Zoi.integer() |> Zoi.min(0)
+          }),
+        reply: Ask.output_schema()
+      })
 
   @impl Jido.Action
   def run(params, context) do
     with {:ok, _prepared} <- Jido.AI.Turn.prepare(context, state_key: :session),
          {:ok, answer} <- Ask.run(params, context),
-         {:ok, state, directives} <-
-           Jido.AI.Turn.complete(context, Ask, answer, state_key: :session) do
+         {:ok, %{state: state, reply: reply}} <-
+           Jido.AI.Turn.complete(
+             context,
+             {JidoAI.Examples.Proposed.ResearchAgent.Agent, "examples.proposed.research.ask"},
+             answer,
+             state_key: :session
+           ) do
       state = %{
         state
         | status: "ready",
@@ -150,7 +161,7 @@ defmodule JidoAI.Examples.Proposed.ResearchAgent.Turn do
           request_count: state.request_count + 1
       }
 
-      {:ok, state, directives}
+      {:ok, %{state: state, reply: reply}}
     end
   end
 end
@@ -284,9 +295,14 @@ defmodule JidoAI.Examples.Proposed.ResearchAgent.Agent do
   routes do
     signal_source "/examples/proposed/research"
 
-    route Ask, Turn, as: :ask
+    route "examples.proposed.research.ask", Turn, as: :ask do
+      state(from: output(:state))
+      reply("examples.proposed.research.answered", from: output(:reply))
+    end
 
-    forward("examples.proposed.research.work", to: agent(:worker))
+    route "examples.proposed.research.work" do
+      forward(to: agent(:worker))
+    end
 
     route "examples.proposed.research.work.completed", as: :work_completed do
       action %{query: query},

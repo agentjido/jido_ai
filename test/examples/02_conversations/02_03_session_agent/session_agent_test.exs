@@ -3,7 +3,7 @@ defmodule JidoAI.Examples.SessionAgentTest do
 
   alias Jido.Agent.Directive.Reply
   alias JidoAI.Examples.SessionAgent
-  alias JidoAI.Examples.SessionAgent.{Agent, Ask, Turn}
+  alias JidoAI.Examples.SessionAgent.{Agent, Turn}
 
   @moduletag :example
 
@@ -31,7 +31,7 @@ defmodule JidoAI.Examples.SessionAgentTest do
              SessionAgent.new(id: "session-agent-success")
 
     session_id = agent.state.session.id
-    request = Ask.new!(%{question: "Are you ready?"})
+    request = Agent.ask_signal!(%{question: "Are you ready?"})
 
     assert {:ok, updated, [%Reply{signal: reply}]} = Agent.cmd(agent, request)
     assert reply.type == "examples.session_agent.answered"
@@ -40,7 +40,9 @@ defmodule JidoAI.Examples.SessionAgentTest do
     assert updated.state.session.id == session_id
     assert updated.state.session.status == :open
     assert updated.state.session.metadata == %{example: "session_agent"}
-    assert updated.state.session.thread.signals == [request, reply]
+    assert [^request, recorded_reply] = updated.state.session.thread.signals
+    assert recorded_reply.type == reply.type
+    assert recorded_reply.data == reply.data
     assert updated.state.session.thread.rev == 2
   end
 
@@ -51,7 +53,7 @@ defmodule JidoAI.Examples.SessionAgentTest do
     end)
 
     assert {:ok, agent} = SessionAgent.new(id: "session-agent-failure")
-    request = Ask.new!(%{question: "Are you ready?"})
+    request = Agent.ask_signal!(%{question: "Are you ready?"})
 
     assert {:error, _reason} = Agent.cmd(agent, request)
     assert agent.state.session.thread.rev == 0
@@ -64,7 +66,7 @@ defmodule JidoAI.Examples.SessionAgentTest do
 
     {:ok, session} = Jido.Session.new!() |> Jido.Session.close()
     assert {:ok, agent} = SessionAgent.new(id: "session-agent-closed", state: %{session: session})
-    request = Ask.new!(%{question: "Are you ready?"})
+    request = Agent.ask_signal!(%{question: "Are you ready?"})
 
     assert {:error, _reason} = Agent.cmd(agent, request)
     assert agent.state.session == session

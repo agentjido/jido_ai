@@ -8,10 +8,22 @@ Each example should add one main public feature. It should use the public API,
 include one important failure case, and have a matching test. Detailed error
 matrices belong in unit and contract tests.
 
-## Implemented request-contract checkpoint
+The catalog uses the current core Jido model:
 
-The current catalog now includes these foundations:
+- `Jido.Agent.Route` owns the accepted Signal type, executable, state
+  projection, and optional correlated reply projection.
+- Actions and Flows own executable input and output schemas.
+- Standalone typed Signal Action wrappers are not part of the current design.
+- A reasoning policy is a normal Jido Flow. It can be a module or an inline
+  `reasoning do` Flow.
+- Jido Agent and AgentServer remain the only Agent runtime.
 
+## Implemented architecture and request-contract checkpoint
+
+The local core Jido compatibility update passed the technical gate below on
+October 24, 2026. The catalog includes these foundations:
+
+- typed request and reply operations through core Agent Routes
 - explicit completed and failed `Jido.AI.Result` values
 - atomic routed-turn state rules through `Jido.AI.Turn`
 - pure `preflight/2` request preparation
@@ -19,6 +31,7 @@ The current catalog now includes these foundations:
 - request-specific `visible_tools:` selection
 - correlated ordered `Jido.AI.Event` Maps
 - fresh Session and Thread data through core `initialize/2`
+- module and inline reasoning Flows through one `reasoning` declaration
 
 See `01_basics/01_06_request_contract` and
 `02_conversations/02_04_conversation_history`.
@@ -28,7 +41,7 @@ See `01_basics/01_06_request_contract` and
 | Rung | Capability | Main lesson | Current source |
 | --- | --- | --- | --- |
 | 1. Generate | Produce one answer | Agent, model, instructions, and default reasoning | `01_01_basic_agent` |
-| 2. Structure | Produce a typed reply | Signal Action reply and structured output | `01_03_structured_output` |
+| 2. Structure | Produce a typed reply | Agent Route reply projection and structured output | `01_03_structured_output` |
 | 3. Act | Use tools | Action tools, Flow tools, and the ReAct loop | `01_02_tool_flow` |
 | 4. Govern | Bound one turn | One input control, one output control, time limits, and call limits | `01_04_controls` |
 | 5. Remember | Keep conversation state | Thread, Session, `initialize/2`, and history | Current `02_*` examples |
@@ -55,9 +68,11 @@ The complete story is:
 
 ### 01_02_structured_reply
 
-- Add a Signal Action.
-- Derive the output schema from the reply contract.
+- Add a routed Action or Flow.
+- Declare a core Agent Route reply projection.
+- Derive the structured output contract from the selected executable output.
 - Return typed application data.
+- Do not add a second reply schema or a Signal-specific executable type.
 
 ### 01_03_tool_agent
 
@@ -102,7 +117,7 @@ them in the basic Agent guide or in a reference page.
 
 ### 02_03_multi_turn_agent
 
-- Append request and reply Signals.
+- Append request and correlated Route reply Signals.
 - Use prior conversation in the next turn.
 
 ### 02_04_context_projection
@@ -164,7 +179,7 @@ lessons into this sequence.
 ### 04_03_commit_and_reply
 
 - Commit Agent state first.
-- Deliver the Reply Directive after the commit.
+- Deliver the Route Reply Directive after the commit.
 - Do not repeat model or tool work after a delivery failure.
 
 ### 04_04_checkpoint_restore
@@ -226,6 +241,7 @@ Add another example only when the public contract needs a separate lesson.
 ### 08 — Reasoning strategies
 
 - Select a reasoning Flow.
+- Use the same contract for a reasoning module and `reasoning do`.
 - Use a reasoning Flow as a tool when needed.
 - Keep strategy and execution policy outside model-controlled input.
 
@@ -255,7 +271,7 @@ Retain the behavior from these old lessons, but do not retain every old
 example file:
 
 - request steering
-- completion compared with reply delivery
+- result completion compared with post-commit Route reply delivery
 - tool limits
 - incomplete response handling
 - call counts and request inspection
@@ -266,11 +282,93 @@ example file:
 Move detailed failure permutations to unit and contract tests. Keep one
 important failure in each teaching example.
 
-## Proposed next sequence
+## Gate before new feature work
 
-1. Add `04_01_failed_output`.
-2. Add `04_02_tool_limits`.
-3. Add `04_03_commit_and_reply`.
-4. Add deterministic ReAct script support.
+The local technical gate passed on October 24, 2026. Commit and merge the
+`explore/jido-ai-restart` branch before parallel feature work starts.
+
+The gate is:
+
+1. Remove all active references to the retired typed Signal Action wrapper.
+2. Compile with warnings as errors against the sibling V3 packages.
+3. Pass deterministic unit and integration tests.
+4. Pass all executable example tests.
+5. Pass Covenant checks with complete obligation coverage.
+6. Pass formatting, Credo, Doctor, Dialyzer, and the package quality gate.
+7. Build the documentation without warnings.
+8. Run the selected live AI tests when credentials are available.
+9. Confirm that direct requests and routed turns use the same prepared request
+   contract.
+10. Confirm that failed or incomplete results cannot commit Agent state or send
+    a reply.
+11. Confirm that the exploration branch has a clear merge and release path.
+
+## Stack-ranked feature backlog
+
+Build these as small independent changes. Do not change the main Agent or
+reasoning DSL unless the feature requires it.
+
+1. **Limit evidence**
+   - Add structured limit failures to Results and Events.
+   - Include the metric, actual value, configured limit, and phase.
+
+2. **Incomplete response and public error normalization**
+   - Distinguish token limits, request timeouts, invalid output, provider
+     failures, and cancellation.
+   - Use one stable public error shape with kind, phase, path, retry status,
+     and request ID.
+
+3. **Tool evidence**
+   - Record the tool name, call ID, safe arguments, duration, status, and safe
+     output.
+   - Keep tool evidence separate from the final application output.
+
+4. **Semantic tool requirements**
+   - Add `requirement :optional | :required` to `tools do`.
+   - Make `:required` apply to the complete request, not every model call.
+
+5. **Explicit model options**
+   - Support declared model options and request overrides.
+   - Reject unknown top-level options instead of passing arbitrary options to
+     ReqLLM.
+
+6. **Operation control**
+   - Add one operation control for selected tool calls and arguments.
+   - Keep it separate from input and output controls.
+
+7. **Bounded output repair**
+   - Add a small output-repair limit.
+   - Use the existing model-call, deadline, and event contracts.
+
+8. **Context report and limits**
+   - Report included and omitted Signals, omission reasons, and estimated size.
+   - Add `max_turns` and `reserve_tokens` only after the report is stable.
+
+9. **Safe trace capture**
+   - Always produce a bounded summary.
+   - Permit larger capture only through an explicit bounded option.
+
+10. **Evaluation helpers**
+    - Add typed checks for status, tool calls, output, and call limits.
+    - Use the public runtime and shared ReqLLM mock support.
+
+11. **Trusted model policy**
+    - Select models from an explicit application-owned alias list.
+    - Record the selected model and selection reason.
+
+12. **Richer control decisions**
+    - Add explicit allow, rewrite, and deny decisions.
+    - Defer review and wait decisions until core Jido owns durable suspension.
+
+Defer child-Agent inheritance, handoffs, skill loading, retrieval stores,
+context graphs, and multimodal input until the request contract and the first
+three evidence features are stable.
+
+## Next example sequence
+
+1. Add `04_01_failed_output` while implementing normalized failure evidence.
+2. Add `04_02_tool_limits` while implementing limit and tool evidence.
+3. Add `04_03_commit_and_reply` to prove the final Route commit boundary.
+4. Add deterministic ReAct script support for later evaluation examples.
 5. Add request event streaming after the core stream boundary is stable.
 6. Add active request steering and inspection.

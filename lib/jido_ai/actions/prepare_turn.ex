@@ -12,7 +12,8 @@ defmodule Jido.AI.Actions.PrepareTurn do
 
   alias Jido.AI.Turn
 
-  @state_key_schema Zoi.atom(description: "Agent state key that owns the turn")
+  @state_key_schema Zoi.any(description: "Agent state key that owns the turn")
+                    |> Zoi.transform({__MODULE__, :normalize_state_key, []})
                     |> Zoi.refine({__MODULE__, :valid_state_key, []})
 
   use Jido.Action,
@@ -20,7 +21,7 @@ defmodule Jido.AI.Actions.PrepareTurn do
     description: "Validate one Agent turn before model work",
     schema:
       Zoi.object(%{
-        state_key: @state_key_schema |> Zoi.default(:session)
+        state_key: Zoi.optional(@state_key_schema)
       }),
     output_schema:
       Zoi.object(%{
@@ -32,8 +33,17 @@ defmodule Jido.AI.Actions.PrepareTurn do
       })
 
   @doc false
+  def normalize_state_key("session", _opts), do: {:ok, :session}
+  def normalize_state_key(key, _opts), do: {:ok, key}
+
+  @doc false
   def valid_state_key(key, _opts) when key not in [nil, true, false], do: :ok
   def valid_state_key(_key, _opts), do: {:error, "must be a named Agent state key"}
+
+  @impl Jido.Action
+  def on_before_validate_params(params) when is_map(params) do
+    {:ok, Map.put_new(params, :state_key, :session)}
+  end
 
   @impl Jido.Action
   def run(%{state_key: state_key}, context) do

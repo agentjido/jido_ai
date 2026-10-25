@@ -11,23 +11,27 @@ defmodule Jido.AI.GenerateTest do
   end
 
   defmodule Reply do
-    use Jido.SignalAction,
+    use Jido.Action,
       name: "generate_test_reply",
       description: "Defines a structured test reply",
-      vsn: 1,
-      input: [
-        type: "test.generate.request",
-        default_source: "/test/generate/client",
-        schema: Zoi.object(%{question: Zoi.string()})
-      ],
-      output: [
-        type: "test.generate.response",
-        default_source: "/test/generate",
-        schema: Zoi.object(%{answer: Zoi.string()})
-      ]
+      schema: Zoi.object(%{question: Zoi.string()}),
+      output_schema: Zoi.object(%{answer: Zoi.string()})
 
     @impl Jido.Action
     def run(_params, _context), do: {:ok, %{answer: "Ready"}}
+  end
+
+  defmodule ReplyAgent do
+    use Jido.Agent, name: "generate_test_reply_agent"
+
+    routes do
+      signal_source "/test/generate"
+
+      route "test.generate.request", Reply do
+        state(:unchanged)
+        reply("test.generate.response", from: output())
+      end
+    end
   end
 
   defmodule Echo do
@@ -198,11 +202,11 @@ defmodule Jido.AI.GenerateTest do
   end
 
   test "respond requires prepared AI configuration" do
-    assert Jido.AI.respond(%{}, "Are you ready?", reply: Reply) ==
+    assert Jido.AI.respond(%{}, "Are you ready?", reply: {ReplyAgent, "test.generate.request"}) ==
              {:error, :missing_ai_config}
   end
 
-  test "respond requires a Signal Action reply contract" do
+  test "respond requires a routed reply contract" do
     context = %{
       plugin_inputs: %{
         Jido.AI.Plugin => %Jido.Plugin.Input{prepared: Jido.AI.Plugin.config(Assistant)}
@@ -239,7 +243,7 @@ defmodule Jido.AI.GenerateTest do
       }
     }
 
-    assert Jido.AI.respond(context, "Are you ready?", reply: Reply) ==
+    assert Jido.AI.respond(context, "Are you ready?", reply: {ReplyAgent, "test.generate.request"}) ==
              {:ok, %{answer: "Ready"}}
   end
 end

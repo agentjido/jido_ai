@@ -118,11 +118,12 @@ defmodule Jido.AI do
   def run(_agent, _input, opts), do: {:error, {:invalid_options, opts}}
 
   @doc """
-  Generates reply data for a standalone Signal Action.
+  Generates reply data for one routed request.
 
-  The required `:reply` option is a `Jido.SignalAction` with an output Signal.
-  Its output schema shapes the model result. This function starts the configured
-  reasoning Flow and returns the reply data.
+  The required `:reply` option is `{Agent, input_type}`. The selected route must
+  have a reply projection. The schema at the reply output path shapes the model
+  result. This function starts the configured reasoning Flow and returns the
+  reply data.
 
   Do not call this function from an Action inside another Flow. Add
   `Jido.AI.Flow.Reason` as a normal step in the parent Flow so all work remains
@@ -200,16 +201,22 @@ defmodule Jido.AI do
     context = put_plugin_input(jido_context, config)
 
     case Jido.Exec.run(Reason, params, context, timeout: config.controls.timeout) do
-      {:ok, %Result{status: :completed, usage: usage, events: events} = result}
-      when is_map(usage) and is_list(events) ->
-        {:ok, result}
+      {:ok, result} ->
+        completed_result(result)
 
-      {:ok, %Result{status: :completed, usage: usage, events: events} = result, effects}
-      when is_map(usage) and is_list(events) and is_list(effects) ->
-        {:ok, result, effects}
+      {:ok, result, effects} when is_list(effects) ->
+        with {:ok, result} <- completed_result(result), do: {:ok, result, effects}
 
       {:error, error} ->
         {:error, direct_error(error)}
+    end
+  end
+
+  defp completed_result(result) do
+    with {:ok, %Result{status: :completed} = result} <- Result.from_map(result) do
+      {:ok, result}
+    else
+      _invalid -> {:error, :invalid_reasoning_result}
     end
   end
 

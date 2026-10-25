@@ -1,24 +1,15 @@
 defmodule JidoAI.Examples.SessionAgent.Ask do
   @moduledoc "Defines the Session Agent request and reply Signals."
 
-  use Jido.SignalAction,
+  use Jido.Action,
     name: "session_agent_ask",
     description: "Ask the Session Agent one question",
-    vsn: 1,
-    input: [
-      type: "examples.session_agent.ask",
-      default_source: "/examples/session-agent/client",
-      schema: Zoi.object(%{question: Zoi.string() |> Zoi.min(1)})
-    ],
-    output: [
-      type: "examples.session_agent.answered",
-      default_source: "/examples/session-agent",
-      schema: Zoi.object(%{answer: Zoi.string() |> Zoi.min(1)})
-    ]
+    schema: Zoi.object(%{question: Zoi.string() |> Zoi.min(1)}),
+    output_schema: Zoi.object(%{answer: Zoi.string() |> Zoi.min(1)})
 
   @impl Jido.Action
   def run(%{question: question}, context),
-    do: Jido.AI.respond(context, question, reply: __MODULE__)
+    do: Jido.AI.respond(context, question, reply: {JidoAI.Examples.SessionAgent.Agent, "examples.session_agent.ask"})
 end
 
 defmodule JidoAI.Examples.SessionAgent.Turn do
@@ -30,13 +21,26 @@ defmodule JidoAI.Examples.SessionAgent.Turn do
     name: "session_agent_turn",
     description: "Generate an answer and commit one Session turn",
     schema: Ask.schema(),
-    output_schema: Zoi.object(%{session: Jido.Session.schema()})
+    output_schema:
+      Zoi.object(%{
+        state: Zoi.object(%{session: Jido.Session.schema()}),
+        reply: Ask.output_schema()
+      })
 
   @impl Jido.Action
   def run(%{question: question}, context) do
     with {:ok, _prepared} <- Jido.AI.Turn.prepare(context, state_key: :session),
-         {:ok, result} <- Jido.AI.respond_result(context, question, reply: Ask),
-         do: Jido.AI.Turn.complete(context, Ask, result, state_key: :session)
+         {:ok, result} <-
+           Jido.AI.respond_result(context, question,
+             reply: {JidoAI.Examples.SessionAgent.Agent, "examples.session_agent.ask"}
+           ),
+         do:
+           Jido.AI.Turn.complete(
+             context,
+             {JidoAI.Examples.SessionAgent.Agent, "examples.session_agent.ask"},
+             result,
+             state_key: :session
+           )
   end
 end
 
@@ -67,7 +71,10 @@ defmodule JidoAI.Examples.SessionAgent.Agent do
   routes do
     signal_source "/examples/session-agent"
 
-    route Ask, Turn, as: :ask
+    route "examples.session_agent.ask", Turn, as: :ask do
+      state(from: output(:state))
+      reply("examples.session_agent.answered", from: output(:reply))
+    end
   end
 end
 

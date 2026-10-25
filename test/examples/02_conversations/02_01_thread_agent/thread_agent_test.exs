@@ -2,7 +2,7 @@ defmodule JidoAI.Examples.ThreadAgentTest do
   use Jido.AI.Test.ReqLLMCase, async: false
 
   alias Jido.Agent.Directive.Reply
-  alias JidoAI.Examples.ThreadAgent.{Agent, Ask, Turn}
+  alias JidoAI.Examples.ThreadAgent.{Agent, Turn}
 
   @moduletag :example
 
@@ -37,13 +37,16 @@ defmodule JidoAI.Examples.ThreadAgentTest do
     assert {:ok, %Jido.Agent{module: Agent} = agent} =
              Agent.instantiate(id: "thread-agent-success")
 
-    request = Ask.new!(%{question: "Are you ready?"})
+    request = Agent.ask_signal!(%{question: "Are you ready?"})
 
     assert {:ok, updated, [%Reply{signal: reply}]} = Jido.Agent.cmd(agent, request)
     assert reply.type == "examples.thread_agent.answered"
     assert reply.data == %{answer: "Ready"}
     assert Jido.Signal.get_context(reply, "jidocausationid") == request.id
-    assert updated.state.thread.signals == [request, reply]
+    assert [^request, recorded_reply] = updated.state.thread.signals
+    assert recorded_reply.type == reply.type
+    assert recorded_reply.data == reply.data
+    assert Jido.Signal.get_context(recorded_reply, "jidocausationid") == request.id
     assert updated.state.thread.rev == 2
     assert Jido.PortableTerm.valid?(updated.state.thread)
   end
@@ -55,7 +58,7 @@ defmodule JidoAI.Examples.ThreadAgentTest do
     end)
 
     assert {:ok, agent} = Agent.instantiate(id: "thread-agent-failure")
-    request = Ask.new!(%{question: "Are you ready?"})
+    request = Agent.ask_signal!(%{question: "Are you ready?"})
 
     assert {:error, _reason} = Jido.Agent.cmd(agent, request)
     assert agent.state.thread.rev == 0

@@ -20,7 +20,7 @@ defmodule JidoAI.Examples.StructuredOutputTest do
     expect(ReqLLM, :generate_text, fn model, context, options ->
       assert model == "openai:gpt-4o-mini"
       assert %ReqLLM.Output{type: :object, schema: schema} = options[:output]
-      assert schema == Ask.__signal_action__().output.schema
+      assert schema == Ask.output_schema()
       assert options[:receive_timeout] in 1..60_000
 
       {:ok, object_response(model, context, %{"answer" => "Ready", "confidence" => 0.9}, id: "structured-example")}

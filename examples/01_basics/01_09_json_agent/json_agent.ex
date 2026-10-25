@@ -37,51 +37,25 @@ end
 defmodule JidoAI.Examples.JSONAgent.Ask do
   @moduledoc "Defines the imported request and reply contract."
 
-  use Jido.SignalAction,
+  use Jido.Action,
     name: "json_example_ask",
     description: "Ask the JSON AI Agent for one answer",
-    vsn: 1,
-    input: [
-      type: "examples.json_ai.ask",
-      default_source: "/examples/json-ai/client",
-      schema: Zoi.object(%{question: Zoi.string()})
-    ],
-    output: [
-      type: "examples.json_ai.answered",
-      default_source: "/examples/json-ai",
-      schema:
-        Zoi.object(%{
-          answer: Zoi.string(),
-          confidence: Zoi.number() |> Zoi.min(0) |> Zoi.max(1)
-        })
-    ]
+    schema: Zoi.object(%{question: Zoi.string()}),
+    output_schema:
+      Zoi.object(%{
+        answer: Zoi.string(),
+        confidence: Zoi.number() |> Zoi.min(0) |> Zoi.max(1)
+      })
 
   @impl Jido.Action
   def run(%{question: question}, context),
-    do: Jido.AI.respond(context, question, reply: __MODULE__)
-end
-
-defmodule JidoAI.Examples.JSONAgent.HandleAsk do
-  @moduledoc "Converts typed answer data to an Agent Reply Directive."
-
-  alias JidoAI.Examples.JSONAgent.Ask
-
-  use Jido.Action,
-    name: "json_example_handle_ask",
-    description: "Handle one JSON AI Agent request",
-    schema: Ask.schema()
-
-  @impl Jido.Action
-  def run(params, context) do
-    with {:ok, answer} <- Ask.run(params, context),
-         do: Jido.AI.Turn.complete_reply(context, Ask, answer)
-  end
+    do: Jido.AI.respond(context, question, reply: {JidoAI.Examples.JSONAgent.Agent, "examples.json_ai.ask"})
 end
 
 defmodule JidoAI.Examples.JSONAgent.Agent do
   @moduledoc "An AI Agent that can be exported and imported as JSON."
 
-  alias JidoAI.Examples.JSONAgent.{Add, AddFlow, Ask, HandleAsk, Permit}
+  alias JidoAI.Examples.JSONAgent.{Add, AddFlow, Ask, Permit}
 
   use Jido.AI.Agent,
     id: "examples/agents/json-ai",
@@ -108,7 +82,10 @@ defmodule JidoAI.Examples.JSONAgent.Agent do
   routes do
     signal_source "/examples/json-ai"
 
-    route Ask, HandleAsk, as: :ask
+    route "examples.json_ai.ask", Ask, as: :ask do
+      state(:unchanged)
+      reply("examples.json_ai.answered", from: output())
+    end
   end
 end
 
@@ -116,7 +93,7 @@ defmodule JidoAI.Examples.JSONAgent do
   @moduledoc "Exports and imports the complete JSON AI Agent definition."
 
   alias Jido.Authoring.Registry
-  alias JidoAI.Examples.JSONAgent.{Add, AddFlow, Agent, HandleAsk, Permit}
+  alias JidoAI.Examples.JSONAgent.{Add, AddFlow, Agent, Ask, Permit}
 
   @doc "Returns the compiled definition used to create the JSON document."
   def definition, do: Agent.definition()
@@ -128,7 +105,7 @@ defmodule JidoAI.Examples.JSONAgent do
       {"examples/schemas/json-ai-state", 1} => {:schema, definition().schema},
       {"jido.ai", 1} => {:plugin, Jido.AI.Plugin},
       {"examples/actions/json-add", 1} => {:action, Add},
-      {"examples/actions/json-handle-ask", 1} => {:action, HandleAsk},
+      {"examples/actions/json-ask", 1} => {:action, Ask},
       {"examples/flows/json-add", 1} => {:flow, AddFlow},
       {"examples/actions/json-permit", 1} => {:action, Permit},
       {"examples/atoms/ask", 1} => {:atom, :ask}

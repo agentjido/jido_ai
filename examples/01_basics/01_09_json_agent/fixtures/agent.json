@@ -82,11 +82,19 @@
         "handler": {
           "kind": "action",
           "target": {
-            "id": "examples/actions/json-handle-ask",
+            "id": "examples/actions/json-ask",
             "vsn": 1
           }
         },
-        "path": "examples.json_ai.ask"
+        "path": "examples.json_ai.ask",
+        "reply": {
+          "from": {
+            "path": [],
+            "source": "output"
+          },
+          "type": "examples.json_ai.answered"
+        },
+        "state": "unchanged"
       }
     ],
     "schema": {

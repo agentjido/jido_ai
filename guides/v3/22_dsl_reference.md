@@ -31,7 +31,12 @@ defmodule MyApp.Agent do
   end
 
   routes do
-    route MyApp.Ask, MyApp.Turn, as: :ask
+    signal_source "/my_app/agent"
+
+    route "my_app.ask", MyApp.Turn, as: :ask do
+      state from: output(:state)
+      reply "my_app.answered", from: output(:reply)
+    end
   end
 end
 ```
@@ -75,7 +80,8 @@ Jido AI owns these options:
 
 Other allowed options go to ReqLLM. Raw `:tools` is reserved and rejected.
 Structured direct requests can use ReqLLM `:output`. Routed structured replies
-derive output from the SignalAction reply schema.
+use `reply: {Agent, input_type}`. Jido AI derives the model output schema from
+the route handler output schema at the route reply path.
 
 Use Map Agent definitions for portable authoring. Module Actions, Flows,
 controls, and reasoning targets must resolve through the trusted Jido authoring

@@ -76,9 +76,8 @@ defmodule Jido.Thread do
     with :ok <- validate_id(thread.id),
          :ok <- validate_revision(thread.rev, thread.signals),
          :ok <- validate_metadata(thread.metadata),
-         :ok <- validate_signals(thread.signals),
-         :ok <- validate_portable(thread, [:thread]) do
-      :ok
+         :ok <- validate_signals(thread.signals) do
+      validate_portable(thread, [:thread])
     end
   end
 

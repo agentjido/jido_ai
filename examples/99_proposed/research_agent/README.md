@@ -7,8 +7,8 @@ The example includes:
 
 - a typed Agent state schema and metadata;
 - a fresh `Jido.Session` returned by `initialize/2` for each instance;
-- a typed request and structured reply with `Jido.SignalAction`;
-- one route Action that commits the Session and returns a Reply Directive;
+- a typed request Action and a structured route reply projection;
+- one route Action that returns Session state and reply data;
 - an inline ReAct reasoning Flow;
 - one Action tool and one Flow tool;
 - one module input control;
@@ -24,10 +24,10 @@ model provider.
 
 ```elixir
 alias JidoAI.Examples.Proposed.ResearchAgent
-alias JidoAI.Examples.Proposed.ResearchAgent.{Agent, Ask}
+alias JidoAI.Examples.Proposed.ResearchAgent.Agent
 
 {:ok, agent} = ResearchAgent.new(id: "research-1")
-request = Ask.new!(%{query: "How does the Jido Agent DSL compose?"})
+request = Agent.ask_signal!(%{query: "How does the Jido Agent DSL compose?"})
 
 {:ok, updated, directives} =
   Agent.cmd(agent, request, context: %{role: :researcher})

@@ -29,7 +29,8 @@ defmodule Jido.AI.Actions.CompleteResponse do
         })
 
       events = Enum.reverse(state.trace)
-      {:ok, Result.completed(state, output, State.usage(state), events)}
+      result = Result.completed(state, output, State.usage(state), events)
+      {:ok, Map.from_struct(result)}
     end
   end
 end

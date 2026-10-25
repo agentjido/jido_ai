@@ -7,24 +7,25 @@ defmodule Jido.AI.Context do
   request are not sent to the model.
   """
 
+  alias Jido.AI.Route
   alias Jido.{Session, Signal, Thread}
 
   @type error_reason ::
           :invalid_context_source
-          | :invalid_projection_action
+          | :invalid_projection_route
           | {:invalid_projection_options, term()}
           | {:invalid_projection_signal, non_neg_integer(), term()}
 
-  @doc "Projects complete SignalAction turns into a ReqLLM context."
-  @spec project(Session.t() | Thread.t(), module(), keyword()) ::
+  @doc "Projects complete routed request and reply pairs into a ReqLLM context."
+  @spec project(Session.t() | Thread.t(), Route.ref(), keyword()) ::
           {:ok, ReqLLM.Context.t()} | {:error, error_reason()}
-  def project(source, signal_action, opts \\ [])
+  def project(source, route, opts \\ [])
 
-  def project(source, signal_action, opts) when is_list(opts) do
+  def project(source, route, opts) when is_list(opts) do
     with {:ok, thread} <- thread(source),
-         :ok <- signal_action(signal_action),
+         {:ok, contract} <- route(route),
          {:ok, fields} <- fields(opts),
-         {:ok, pairs} <- pairs(thread.signals, signal_action, fields) do
+         {:ok, pairs} <- pairs(thread.signals, contract, fields) do
       messages =
         Enum.flat_map(pairs, fn {_index, input, output} ->
           [ReqLLM.Context.user(input), ReqLLM.Context.assistant(output)]
@@ -34,13 +35,13 @@ defmodule Jido.AI.Context do
     end
   end
 
-  def project(_source, _signal_action, opts),
+  def project(_source, _route, opts),
     do: {:error, {:invalid_projection_options, opts}}
 
   @doc "Projects complete turns or raises."
-  @spec project!(Session.t() | Thread.t(), module(), keyword()) :: ReqLLM.Context.t()
-  def project!(source, signal_action, opts \\ []) do
-    case project(source, signal_action, opts) do
+  @spec project!(Session.t() | Thread.t(), Route.ref(), keyword()) :: ReqLLM.Context.t()
+  def project!(source, route, opts \\ []) do
+    case project(source, route, opts) do
       {:ok, context} -> context
       {:error, reason} -> raise ArgumentError, "invalid AI context projection: #{inspect(reason)}"
     end
@@ -56,10 +57,11 @@ defmodule Jido.AI.Context do
 
   defp thread(_source), do: {:error, :invalid_context_source}
 
-  defp signal_action(module) do
-    if Jido.SignalAction.defined?(module) and module.__signal_action__().output != nil,
-      do: :ok,
-      else: {:error, :invalid_projection_action}
+  defp route(route) do
+    case Route.resolve(route) do
+      {:ok, contract} -> {:ok, contract}
+      {:error, _reason} -> {:error, :invalid_projection_route}
+    end
   end
 
   defp fields(opts) do
@@ -79,22 +81,19 @@ defmodule Jido.AI.Context do
   defp valid_field?(field) when is_binary(field) and byte_size(field) > 0, do: true
   defp valid_field?(_field), do: false
 
-  defp pairs(signals, signal_action, fields) do
-    input_type = signal_action.type()
-    output = signal_action.__signal_action__().output
-
+  defp pairs(signals, %Route{} = contract, fields) do
     signals
     |> Enum.with_index()
     |> Enum.reduce_while({:ok, {%{}, []}}, fn {signal, index}, {:ok, {pending, pairs}} ->
       cond do
-        signal.type == input_type ->
-          case input(signal, signal_action, fields.input) do
+        signal.type == contract.input_type ->
+          case input(signal, contract.input_schema, fields.input) do
             {:ok, value} -> {:cont, {:ok, {Map.put(pending, signal.id, {index, value}), pairs}}}
             {:error, reason} -> {:halt, {:error, {:invalid_projection_signal, index, reason}}}
           end
 
-        signal.type == output.type ->
-          case output(signal, output.schema, fields.output, pending) do
+        signal.type == contract.route.reply.type ->
+          case output(signal, contract.reply_schema, fields.output, pending) do
             {:ok, nil} ->
               {:cont, {:ok, {pending, pairs}}}
 
@@ -116,8 +115,8 @@ defmodule Jido.AI.Context do
     end
   end
 
-  defp input(%Signal{} = signal, signal_action, field) do
-    with {:ok, data} <- signal_action.validate_data(signal.data) do
+  defp input(%Signal{} = signal, schema, field) do
+    with {:ok, data} <- Zoi.parse(schema, signal.data) do
       text_field(data, field)
     end
   end

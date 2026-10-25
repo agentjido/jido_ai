@@ -4,7 +4,7 @@ defmodule JidoAI.Examples.RequestModesTest do
   alias Jido.Agent.Directive.Reply
   alias Jido.AgentServer
   alias JidoAI.Examples.RequestModes
-  alias JidoAI.Examples.RequestModes.{Agent, Ask, Turn}
+  alias JidoAI.Examples.RequestModes.{Agent, Turn}
 
   @moduletag :example
 
@@ -17,8 +17,9 @@ defmodule JidoAI.Examples.RequestModesTest do
 
   test "the request-mode example owns its Agent contract and turn Action" do
     assert Agent.definition().name == "request_modes_example"
-    assert Ask.type() == "examples.request_modes.ask"
-    assert [%{handler: %{kind: :action, target: Turn}}] = Agent.definition().routes
+    assert [route] = Agent.definition().routes
+    assert route.path == "examples.request_modes.ask"
+    assert route.handler == %{kind: :action, target: Turn}
   end
 
   test "AgentServer call and submit await commit complete Session turns", %{jido: jido} do
@@ -29,7 +30,7 @@ defmodule JidoAI.Examples.RequestModesTest do
 
     {:ok, server} = RequestModes.start(jido, id: "request-modes-success")
 
-    first = Ask.new!(%{question: "First"})
+    first = Agent.ask_signal!(%{question: "First"})
     assert {:ok, called, [%Reply{signal: first_reply}]} = AgentServer.call(server, first)
     assert_receive delivered_first, 1_000
     assert delivered_first.id == first_reply.id
@@ -39,7 +40,7 @@ defmodule JidoAI.Examples.RequestModesTest do
     assert first_reply.data == %{answer: "Answer: First"}
     assert called.state.session.thread.rev == 2
 
-    second = Ask.new!(%{question: "Second"})
+    second = Agent.ask_signal!(%{question: "Second"})
     pending = AgentServer.submit(server, second)
     assert %AgentServer.Pending{} = pending
     assert {:ok, submitted, [%Reply{signal: second_reply}]} = AgentServer.await(pending)
@@ -66,7 +67,7 @@ defmodule JidoAI.Examples.RequestModesTest do
     end)
 
     {:ok, server} = RequestModes.start(jido, id: "request-modes-cancel")
-    request = Ask.new!(%{question: "Cancel this"})
+    request = Agent.ask_signal!(%{question: "Cancel this"})
     pending = AgentServer.submit(server, request)
 
     assert_receive {:model_request_started, _worker}, 1_000
@@ -85,7 +86,7 @@ defmodule JidoAI.Examples.RequestModesTest do
     end)
 
     {:ok, server} = RequestModes.start(jido, id: "request-modes-failure")
-    request = Ask.new!(%{question: "Fail this"})
+    request = Agent.ask_signal!(%{question: "Fail this"})
 
     assert {:error, _reason} = AgentServer.call(server, request)
     assert AgentServer.status(server).state_version == 0

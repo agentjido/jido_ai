@@ -3,12 +3,12 @@ defmodule Jido.AI.Live.ConversationHistoryTest do
 
   alias Jido.Agent.Directive.Reply
   alias JidoAI.Examples.ConversationHistory
-  alias JidoAI.Examples.ConversationHistory.{Agent, Ask}
+  alias JidoAI.Examples.ConversationHistory.Agent
 
   test "a real model uses the first committed turn in the second turn" do
     {:ok, agent} = ConversationHistory.new(id: "live-conversation")
     first_input = "Remember that the project code word is violet. Confirm briefly."
-    first_request = Ask.new!(%{question: first_input})
+    first_request = Agent.ask_signal!(%{question: first_input})
 
     {first_result, _first_trace} =
       capture_live(agent, first_input, "conversation_history_first_turn", [], fn ->
@@ -23,7 +23,7 @@ defmodule Jido.AI.Live.ConversationHistoryTest do
     assert_receive {:first_turn, agent}
 
     second_input = "What is the project code word?"
-    second_request = Ask.new!(%{question: second_input})
+    second_request = Agent.ask_signal!(%{question: second_input})
 
     {second_result, _second_trace} =
       capture_live(agent, second_input, "conversation_history_second_turn", [], fn ->

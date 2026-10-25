@@ -7,7 +7,7 @@ defmodule Jido.AI.Request do
   value and adds only the active deadline and executable tool callbacks.
   """
 
-  alias Jido.AI.{Context, Controls, Deadline, Models, Plugin, ToolAdapter}
+  alias Jido.AI.{Context, Controls, Deadline, Models, Plugin, Route, ToolAdapter}
   alias Jido.AI.Reasoning.State
   alias Jido.{Session, Signal, Thread}
 
@@ -251,19 +251,19 @@ defmodule Jido.AI.Request do
   defp project_context(%ReqLLM.Context{} = context, nil), do: {:ok, context}
 
   defp project_context(source, projection) when is_list(projection) do
-    with {:ok, signal_action, fields} <- projection_options(projection),
-         do: Context.project(source, signal_action, fields)
+    with {:ok, route, fields} <- projection_options(projection),
+         do: Context.project(source, route, fields)
   end
 
   defp project_context(_source, _projection), do: {:error, :invalid_context_projection}
 
   defp projection_options(projection) do
-    expected = [:input, :output, :signal_action]
+    expected = [:input, :output, :route]
 
     if Keyword.keyword?(projection) and Enum.sort(Keyword.keys(projection)) == expected do
-      signal_action = Keyword.fetch!(projection, :signal_action)
+      route = Keyword.fetch!(projection, :route)
       fields = Keyword.take(projection, [:input, :output])
-      {:ok, signal_action, fields}
+      {:ok, route, fields}
     else
       {:error, :invalid_context_projection}
     end
@@ -326,19 +326,12 @@ defmodule Jido.AI.Request do
 
   defp output_descriptor(nil, opts), do: {:ok, Keyword.get(opts, :output)}
 
-  defp output_descriptor(module, _opts)
-       when is_atom(module) and module not in [nil, true, false] do
-    if Jido.SignalAction.defined?(module) do
-      case module.__signal_action__().output do
-        %{schema: schema} -> {:ok, ReqLLM.Output.object(schema)}
-        _other -> {:error, :invalid_reply_contract}
-      end
-    else
-      {:error, :invalid_reply_contract}
+  defp output_descriptor(route, _opts) do
+    case Route.resolve(route) do
+      {:ok, contract} -> {:ok, ReqLLM.Output.object(contract.reply_schema)}
+      {:error, _reason} -> {:error, :invalid_reply_contract}
     end
   end
-
-  defp output_descriptor(_reply, _opts), do: {:error, :invalid_reply_contract}
 
   defp valid_context_source?(nil), do: true
   defp valid_context_source?(%ReqLLM.Context{} = context), do: valid_conversation?(context)

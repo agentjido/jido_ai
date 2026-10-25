@@ -103,7 +103,10 @@ defmodule JidoAI.Examples.Proposed.ResearchAgentTest do
       assert model == "openai:gpt-4o-mini"
       assert Enum.map(options[:tools], & &1.name) == ["search_sources", "research_brief"]
       assert %ReqLLM.Output{type: :object, schema: schema} = options[:output]
-      assert schema == Ask.output_schema()
+
+      assert Zoi.to_json_schema(schema) ==
+               Zoi.to_json_schema(Ask.output_schema())
+
       assert options[:receive_timeout] in 1..30_000
 
       {:ok,
@@ -120,7 +123,7 @@ defmodule JidoAI.Examples.Proposed.ResearchAgentTest do
     end)
 
     assert {:ok, agent} = ResearchAgent.new(id: "proposed-research-success")
-    request = Ask.new!(%{query: "How does the Jido Agent DSL compose?"})
+    request = Agent.ask_signal!(%{query: "How does the Jido Agent DSL compose?"})
 
     assert {:ok, updated, [%Reply{signal: reply}]} =
              Agent.cmd(agent, request, context: %{role: :researcher})
@@ -130,7 +133,9 @@ defmodule JidoAI.Examples.Proposed.ResearchAgentTest do
     assert updated.state.status == "ready"
     assert updated.state.last_query == "How does the Jido Agent DSL compose?"
     assert updated.state.request_count == 1
-    assert updated.state.session.thread.signals == [request, reply]
+    assert [^request, recorded_reply] = updated.state.session.thread.signals
+    assert recorded_reply.type == reply.type
+    assert recorded_reply.data == reply.data
   end
 
   @tag capture_log: true
@@ -138,7 +143,7 @@ defmodule JidoAI.Examples.Proposed.ResearchAgentTest do
     reject(ReqLLM, :generate_text, 3)
 
     assert {:ok, agent} = ResearchAgent.new(id: "proposed-research-denied")
-    request = Ask.new!(%{query: "Explain the Jido Agent state boundary"})
+    request = Agent.ask_signal!(%{query: "Explain the Jido Agent state boundary"})
 
     assert {:error, _reason} = Agent.cmd(agent, request)
     assert agent.state.session.thread.signals == []

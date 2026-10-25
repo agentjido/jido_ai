@@ -1,30 +1,24 @@
 defmodule JidoAI.Examples.ConversationHistory.Ask do
   @moduledoc "Defines a stateful conversation request and reply."
 
-  @answer_type "examples.conversation.answered"
   @answer_schema Zoi.object(%{answer: Zoi.string() |> Zoi.min(1)})
 
-  use Jido.SignalAction,
+  use Jido.Action,
     name: "conversation_history_ask",
     description: "Ask one question with committed history",
-    vsn: 1,
-    input: [
-      type: "examples.conversation.ask",
-      default_source: "/examples/conversation/client",
-      schema: Zoi.object(%{question: Zoi.string() |> Zoi.min(1)})
-    ],
-    output: [
-      type: @answer_type,
-      default_source: "/examples/conversation",
-      schema: @answer_schema
-    ]
+    schema: Zoi.object(%{question: Zoi.string() |> Zoi.min(1)}),
+    output_schema: @answer_schema
 
   @impl Jido.Action
   def run(%{question: question}, context) do
     Jido.AI.respond(context, question,
-      reply: __MODULE__,
+      reply: {JidoAI.Examples.ConversationHistory.Agent, "examples.conversation.ask"},
       context: context.agent_state.session,
-      projection: [signal_action: __MODULE__, input: :question, output: :answer]
+      projection: [
+        route: {JidoAI.Examples.ConversationHistory.Agent, "examples.conversation.ask"},
+        input: :question,
+        output: :answer
+      ]
     )
   end
 end
@@ -38,18 +32,32 @@ defmodule JidoAI.Examples.ConversationHistory.Turn do
     name: "conversation_history_turn",
     description: "Generate an answer from history and commit the new turn",
     schema: Ask.schema(),
-    output_schema: Zoi.object(%{session: Jido.Session.schema()})
+    output_schema:
+      Zoi.object(%{
+        state: Zoi.object(%{session: Jido.Session.schema()}),
+        reply: Ask.output_schema()
+      })
 
   @impl Jido.Action
   def run(%{question: question}, context) do
     with {:ok, _prepared} <- Jido.AI.Turn.prepare(context, state_key: :session),
          {:ok, result} <-
            Jido.AI.respond_result(context, question,
-             reply: Ask,
+             reply: {JidoAI.Examples.ConversationHistory.Agent, "examples.conversation.ask"},
              context: context.agent_state.session,
-             projection: [signal_action: Ask, input: :question, output: :answer]
+             projection: [
+               route: {JidoAI.Examples.ConversationHistory.Agent, "examples.conversation.ask"},
+               input: :question,
+               output: :answer
+             ]
            ),
-         do: Jido.AI.Turn.complete(context, Ask, result, state_key: :session)
+         do:
+           Jido.AI.Turn.complete(
+             context,
+             {JidoAI.Examples.ConversationHistory.Agent, "examples.conversation.ask"},
+             result,
+             state_key: :session
+           )
   end
 end
 
@@ -80,7 +88,10 @@ defmodule JidoAI.Examples.ConversationHistory.Agent do
   routes do
     signal_source "/examples/conversation"
 
-    route Ask, Turn, as: :ask
+    route "examples.conversation.ask", Turn, as: :ask do
+      state(from: output(:state))
+      reply("examples.conversation.answered", from: output(:reply))
+    end
   end
 end
 

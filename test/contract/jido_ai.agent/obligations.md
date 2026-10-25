@@ -51,10 +51,10 @@ request-option propagation, traces, or streaming.
 - **kind:** security
 - **status:** active
 
-### jido_ai.agent.I6 — Keep reply shape out of the AI definition
+### jido_ai.agent.I6 — Keep reply shape on the route
 
-- **scope:** normalized and encoded AI definitions, routed `Jido.SignalAction` reply contracts
-- **must:** Store no Agent-level output contract in the AI definition. Keep a structured reply schema on the routed `Jido.SignalAction` output contract. Output control Actions are not reply schemas.
+- **scope:** normalized and encoded AI definitions, route reply projections
+- **must:** Store no Agent-level output contract in the AI definition. Keep the structured reply schema on the route handler output path selected by the reply projection. Output control Actions are not reply schemas.
 - **kind:** functional
 - **status:** active
 

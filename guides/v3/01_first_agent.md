@@ -45,7 +45,7 @@ result.events
 ```
 
 These direct calls do not start an AgentServer and do not change Agent state.
-Use a routed SignalAction turn when the application must commit Session,
-Thread, or domain state.
+Use a route with explicit `state` and `reply` projections when the application
+must commit Session, Thread, or domain state.
 
 Continue with [tools and ReAct](02_tools_and_react.md).

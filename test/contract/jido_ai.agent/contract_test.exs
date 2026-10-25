@@ -50,24 +50,15 @@ defmodule JidoAI.Contract.AgentContractTest do
   end
 
   defmodule Ask do
-    use Jido.SignalAction,
+    use Jido.Action,
       name: "contract_ask",
       description: "Ask for one structured answer",
-      vsn: 1,
-      input: [
-        type: "tests.jido_ai.ask",
-        default_source: "/tests/jido-ai/client",
-        schema: Zoi.object(%{question: Zoi.string()})
-      ],
-      output: [
-        type: "tests.jido_ai.answered",
-        default_source: "/tests/jido-ai",
-        schema:
-          Zoi.object(%{
-            answer: Zoi.string(),
-            confidence: Zoi.number() |> Zoi.min(0) |> Zoi.max(1)
-          })
-      ]
+      schema: Zoi.object(%{question: Zoi.string()}),
+      output_schema:
+        Zoi.object(%{
+          answer: Zoi.string(),
+          confidence: Zoi.number() |> Zoi.min(0) |> Zoi.max(1)
+        })
 
     @impl Jido.Action
     def run(_params, _context), do: {:ok, %{answer: "Ready", confidence: 1.0}}
@@ -77,7 +68,12 @@ defmodule JidoAI.Contract.AgentContractTest do
     use Jido.Action,
       name: "contract_observe_prepared",
       description: "Observe the prepared AI configuration",
-      schema: Ask.schema()
+      schema: Ask.schema(),
+      output_schema:
+        Zoi.object(%{
+          state: Zoi.map(),
+          reply: Ask.output_schema()
+        })
 
     @impl Jido.Action
     def run(_params, context) do
@@ -86,7 +82,11 @@ defmodule JidoAI.Contract.AgentContractTest do
         {:prepared_ai, context.plugin_inputs[Jido.AI.Plugin].prepared, Map.take(context, [:ai, :config])}
       )
 
-      {:ok, context.agent_state}
+      {:ok,
+       %{
+         state: context.agent_state,
+         reply: %{answer: "Ready", confidence: 1.0}
+       }}
     end
   end
 
@@ -126,7 +126,10 @@ defmodule JidoAI.Contract.AgentContractTest do
     routes do
       signal_source "/tests/jido-ai"
 
-      route Ask, ObservePrepared, as: :ask
+      route "tests.jido_ai.ask", ObservePrepared, as: :ask do
+        state(from: output(:state))
+        reply("tests.jido_ai.answered", from: output(:reply))
+      end
     end
   end
 
@@ -225,13 +228,14 @@ defmodule JidoAI.Contract.AgentContractTest do
   test "Plugin preparation gives the route Action the normalized AI configuration" do
     config = Jido.AI.Plugin.config(Assistant)
     agent = Assistant.instantiate!(id: "contract-prepared-input")
-    request = Ask.new!(%{question: "Are you ready?"})
+    request = Assistant.ask_signal!(%{question: "Are you ready?"})
 
-    assert {:ok, result_agent, []} =
+    assert {:ok, result_agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
              Assistant.cmd(agent, request, context: %{test_pid: self()})
 
     assert_receive {:prepared_ai, ^config, %{}}
     assert result_agent.state == %{}
+    assert reply.data == %{answer: "Ready", confidence: 1.0}
   end
 
   @tag obligation: ["jido_ai.agent.I5", "jido_ai.agent.I6"]
@@ -292,16 +296,21 @@ defmodule JidoAI.Contract.AgentContractTest do
   end
 
   @tag obligation: "jido_ai.agent.I6"
-  test "the Signal Action owns structured reply shape" do
+  test "the route owns structured reply shape" do
     config = Jido.AI.Plugin.config(Assistant)
     refute Map.has_key?(config, :output)
-
-    assert %{schema: schema, type: "tests.jido_ai.answered"} = Ask.__signal_action__().output
-    assert %Zoi.Types.Map{} = schema
 
     assert [route] = Assistant.definition().routes
     assert route.path == "tests.jido_ai.ask"
     assert route.handler == %{kind: :action, target: ObservePrepared}
+    assert route.reply.type == "tests.jido_ai.answered"
+    assert route.reply.from.path == [:reply]
+
+    assert {:ok, contract} =
+             Jido.AI.Route.resolve({Assistant, "tests.jido_ai.ask"})
+
+    assert Zoi.to_json_schema(contract.reply_schema) ==
+             Zoi.to_json_schema(Ask.output_schema())
   end
 
   @tag obligation: "jido_ai.agent.I7"

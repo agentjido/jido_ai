@@ -10,8 +10,8 @@
   driver: More routed examples are required before these runtime choices become public promises.
   approved_by: Jido AI restart architecture review
 
-- id: signal-action-owns-reply-shape
-  date: "2026-10-22"
-  decision: Keep structured reply shape on the routed SignalAction and keep it out of the Agent AI configuration.
-  driver: The Agent response can include state and Directives. It is not the same value as one model response.
+- id: route-owns-reply-shape
+  date: "2026-10-24"
+  decision: Keep structured reply shape on the route handler output schema at the reply projection path. Keep it out of the Agent AI configuration.
+  driver: Core Jido routes now own state and reply projection. The Agent response can include state and reply data. It is not the same value as one model response.
   approved_by: Jido AI restart architecture review

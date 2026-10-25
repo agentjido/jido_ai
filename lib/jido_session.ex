@@ -93,9 +93,8 @@ defmodule Jido.Session do
     with :ok <- validate_id(session.id),
          :ok <- validate_status(session.status),
          :ok <- Thread.validate(session.thread),
-         :ok <- validate_metadata(session.metadata),
-         :ok <- validate_portable(session, [:session]) do
-      :ok
+         :ok <- validate_metadata(session.metadata) do
+      validate_portable(session, [:session])
     end
   end
 

@@ -23,7 +23,7 @@ Declare core Jido executables as model tools and run the bounded ReAct Flow.
 - [Input and output controls](../../examples/01_basics/01_04_controls/README.md)
 - [Controls and limits](11_controls_and_limits.md)
 
-Derive output from a SignalAction contract. Add one input control, one output
+Derive output from a route reply projection. Add one input control, one output
 control, and total request limits.
 
 ## 4. Inspect one request

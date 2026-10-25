@@ -70,7 +70,7 @@ defmodule JidoAi.MixProject do
       {:jido, path: "../jido", override: true},
       {:jido_action, path: "../jido_action", override: true},
       {:jido_signal, path: "../jido_signal", override: true},
-      {:req_llm, "~> 1.25"},
+      {:req_llm, "~> 1.29"},
 
       # Runtime
       {:jason, "~> 1.4"},
@@ -202,6 +202,7 @@ defmodule JidoAi.MixProject do
           Jido.AI.Agent,
           Jido.AI.Plugin,
           Jido.AI.Request,
+          Jido.AI.Route,
           Jido.AI.Result,
           Jido.AI.Event,
           Jido.AI.Context,

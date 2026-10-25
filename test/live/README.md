@@ -28,7 +28,7 @@ A live test must prove behavior that a mocked ReqLLM response cannot prove:
 
 - a real text request completes;
 - a model emits valid tool calls and uses their results;
-- a provider accepts the reply schema from a routed Signal Action;
+- a provider accepts the schema from a route reply projection;
 - a stream produces content and closes;
 - an imported JSON Agent can make a routed request.
 - prepared request identity matches the real completed result;

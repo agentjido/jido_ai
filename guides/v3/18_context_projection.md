@@ -5,14 +5,16 @@ receive the raw Session or Thread.
 
 ```elixir
 {:ok, context} =
-  Jido.AI.Context.project(session, MyApp.Ask,
+  Jido.AI.Context.project(session, {MyApp.Agent, "my_app.ask"},
     input: :question,
     output: :answer
   )
 ```
 
-The SignalAction defines the request and reply Signal types and schemas. The
-field options select text from their data Maps.
+The route reference selects one Agent route by the exact request Signal type.
+The route handler input schema validates request data. The schema at the route
+reply output path validates reply data. The field options select text from the
+validated data Maps.
 
 Projection rules are:
 
@@ -30,7 +32,7 @@ Pass a Session or Thread directly to a request with the same projection:
 MyAgent.reason("What is my name?",
   context: session,
   projection: [
-    signal_action: MyApp.Ask,
+    route: {MyApp.Agent, "my_app.ask"},
     input: :question,
     output: :answer
   ]

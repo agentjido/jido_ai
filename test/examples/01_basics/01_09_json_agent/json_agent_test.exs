@@ -28,13 +28,13 @@ defmodule JidoAI.Examples.JSONAgentTest do
       assert model == "openai:gpt-4o-mini"
       assert Enum.map(options[:tools], & &1.name) == ["add_numbers", "json_example_add_flow"]
       assert %ReqLLM.Output{type: :object, schema: schema} = options[:output]
-      assert schema == Ask.__signal_action__().output.schema
+      assert schema == Ask.output_schema()
 
       {:ok, object_response(model, context, %{"answer" => "Ready", "confidence" => 0.95}, id: "json-agent-example")}
     end)
 
     agent = Jido.Agent.instantiate!(imported, id: "imported-json-ai")
-    request = Ask.new!(%{question: "Are you ready?"})
+    request = Jido.Agent.input_signal!(imported, "examples.json_ai.ask", %{question: "Are you ready?"})
 
     assert {:ok, ^agent, [%Reply{signal: reply}]} = Jido.Agent.cmd(agent, request)
     assert reply.type == "examples.json_ai.answered"

@@ -1,13 +1,13 @@
 # 01_03 — Structured output
 
-Use a routed `Jido.SignalAction` as the structured reply contract.
+Use a route reply projection as the structured reply contract.
 
 ## What you will learn
 
-- Define request and reply Signal contracts in one Action.
-- Shape the model result from the reply schema.
+- Define the request schema on the route Action.
+- Shape the model result from the schema at the route reply output path.
 - Define the Agent reasoning steps in an embedded `reasoning do` Flow.
-- Return a correlated Reply Directive from a normal route Action.
+- Let core Jido build a correlated Reply Directive from route output.
 
 ## Run it
 

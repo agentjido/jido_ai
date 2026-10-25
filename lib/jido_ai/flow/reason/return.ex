@@ -77,7 +77,7 @@ defmodule Jido.AI.Flow.Reason.Return do
 
   defp validated(result) do
     case Result.validate(result) do
-      :ok -> {:ok, result}
+      :ok -> {:ok, Map.from_struct(result)}
       {:error, reason} -> {:error, {:invalid_reasoning_result, reason}}
     end
   end

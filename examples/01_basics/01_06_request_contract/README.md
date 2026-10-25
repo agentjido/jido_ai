@@ -52,8 +52,9 @@ an explicit result.
 
 A direct request has `commit: :not_requested`. It cannot change Agent state.
 For a routed turn, `Jido.AI.Turn.complete/4` accepts only a completed result,
-builds candidate state, and returns a Reply Directive. Core Jido commits the
-candidate only after the complete route Action succeeds.
+builds candidate state and reply data, and returns route projection output.
+Core Jido commits the candidate and builds the Reply Directive only after the
+complete route Action succeeds.
 
 ## Run the example tests
 

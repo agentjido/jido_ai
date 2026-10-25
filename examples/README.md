@@ -25,7 +25,7 @@ not part of this catalog.
 2. [Action and Flow tools](01_basics/01_02_tool_flow/README.md) — expose core
    Jido executables as model tools.
 3. [Structured output](01_basics/01_03_structured_output/README.md) — derive a
-   parsed response object from a routed Signal Action reply contract.
+   parsed response object from a route reply projection.
 4. [Input and output controls](01_basics/01_04_controls/README.md) — check a
    request before and after the model call.
 5. [Streaming and cancellation](01_basics/01_05_streaming/README.md) — read

@@ -1,24 +1,15 @@
 defmodule JidoAI.Examples.ThreadAgent.Ask do
   @moduledoc "Defines the Thread Agent request and reply Signals."
 
-  use Jido.SignalAction,
+  use Jido.Action,
     name: "thread_agent_ask",
     description: "Ask the Thread Agent one question",
-    vsn: 1,
-    input: [
-      type: "examples.thread_agent.ask",
-      default_source: "/examples/thread-agent/client",
-      schema: Zoi.object(%{question: Zoi.string() |> Zoi.min(1)})
-    ],
-    output: [
-      type: "examples.thread_agent.answered",
-      default_source: "/examples/thread-agent",
-      schema: Zoi.object(%{answer: Zoi.string() |> Zoi.min(1)})
-    ]
+    schema: Zoi.object(%{question: Zoi.string() |> Zoi.min(1)}),
+    output_schema: Zoi.object(%{answer: Zoi.string() |> Zoi.min(1)})
 
   @impl Jido.Action
   def run(%{question: question}, context),
-    do: Jido.AI.respond(context, question, reply: __MODULE__)
+    do: Jido.AI.respond(context, question, reply: {JidoAI.Examples.ThreadAgent.Agent, "examples.thread_agent.ask"})
 end
 
 defmodule JidoAI.Examples.ThreadAgent.Turn do
@@ -30,13 +21,26 @@ defmodule JidoAI.Examples.ThreadAgent.Turn do
     name: "thread_agent_turn",
     description: "Generate an answer and commit one Thread turn",
     schema: Ask.schema(),
-    output_schema: Zoi.object(%{thread: Jido.Thread.schema()})
+    output_schema:
+      Zoi.object(%{
+        state: Zoi.object(%{thread: Jido.Thread.schema()}),
+        reply: Ask.output_schema()
+      })
 
   @impl Jido.Action
   def run(%{question: question}, context) do
     with {:ok, _prepared} <- Jido.AI.Turn.prepare(context, state_key: :thread),
-         {:ok, result} <- Jido.AI.respond_result(context, question, reply: Ask),
-         do: Jido.AI.Turn.complete(context, Ask, result, state_key: :thread)
+         {:ok, result} <-
+           Jido.AI.respond_result(context, question,
+             reply: {JidoAI.Examples.ThreadAgent.Agent, "examples.thread_agent.ask"}
+           ),
+         do:
+           Jido.AI.Turn.complete(
+             context,
+             {JidoAI.Examples.ThreadAgent.Agent, "examples.thread_agent.ask"},
+             result,
+             state_key: :thread
+           )
   end
 end
 
@@ -67,6 +71,9 @@ defmodule JidoAI.Examples.ThreadAgent.Agent do
   routes do
     signal_source "/examples/thread-agent"
 
-    route Ask, Turn, as: :ask
+    route "examples.thread_agent.ask", Turn, as: :ask do
+      state(from: output(:state))
+      reply("examples.thread_agent.answered", from: output(:reply))
+    end
   end
 end
