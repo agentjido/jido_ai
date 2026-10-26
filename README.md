@@ -34,12 +34,12 @@ end
 `generate/2` returns only the accepted output. `reason/2` returns a completed
 `Jido.AI.Result` with usage and events.
 
-The default behavior graph is `Jido.AI.Flow.ReAct`. Inspect it without running
+The canonical behavior graph is `Jido.AI.Reasoning.ReAct`. Inspect it without running
 a model:
 
 ```elixir
 MyApp.AnswerAgent.graph()
-#=> Jido.AI.Flow.ReAct
+#=> Jido.AI.Reasoning.ReAct
 
 MyApp.AnswerAgent.graph().flow()
 ```

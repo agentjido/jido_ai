@@ -75,15 +75,11 @@ defmodule Jido.AI.RuntimeTest do
     agent = SimpleAgent.instantiate!(id: "cache-agent")
 
     assert {:ok, result, agent} =
-             run(
-               agent,
-               %{
-                 input: "Cache this",
-                 model: "anthropic:claude-haiku-4-5",
-                 prompt_cache: %{enabled: true, ttl: "5m"}
-               },
-               context: %{jido_ai_now_ms: 1_000_000}
-             )
+             run(agent, %{
+               input: "Cache this",
+               model: "anthropic:claude-haiku-4-5",
+               prompt_cache: %{enabled: true, ttl: "5m"}
+             })
 
     assert result.usage.cache_write_tokens == 80
     assert result.usage.cache_write_tokens_by_ttl == %{"5m" => 80}
@@ -94,9 +90,12 @@ defmodule Jido.AI.RuntimeTest do
     assert attempt.prompt_cache.write_tokens == 80
 
     [write] = attempt.prompt_cache.writes
+    assert attempt.prompt_cache.observed_at_ms == write.observed_at_ms
+    assert is_integer(write.observed_at_ms) and write.observed_at_ms > 0
+    assert write.ttl == "5m"
+    assert write.ttl_ms == 300_000
     assert write.token_count == 80
-    assert write.observed_at_ms == 1_000_000
-    assert write.estimated_expires_at_ms == 1_300_000
+    assert write.estimated_expires_at_ms == write.observed_at_ms + write.ttl_ms
 
     outcome = List.last(agent.state.session.thread.entries)
     assert outcome.kind == :ai_request_outcome
@@ -133,7 +132,7 @@ defmodule Jido.AI.RuntimeTest do
              run(agent, %{
                input: "Use a fallback",
                fallback_models: ["anthropic:claude-haiku-4-5"],
-               max_retries: 0
+               limits: %{retries: 0}
              })
 
     assert result.status == :completed
@@ -181,7 +180,7 @@ defmodule Jido.AI.RuntimeTest do
     agent = SimpleAgent.instantiate!(id: "tool-retry-agent")
 
     assert {:ok, result, agent} =
-             run(agent, %{input: "Add 8 and 5", max_retries: 1})
+             run(agent, %{input: "Add 8 and 5", limits: %{retries: 1}})
 
     assert result.status == :completed
     assert result.output == "The result is 13."
@@ -257,7 +256,7 @@ defmodule Jido.AI.RuntimeTest do
     agent = SimpleAgent.instantiate!(id: "model-budget-agent")
 
     assert {:ok, result, agent} =
-             run(agent, %{input: "Add 2 and 3", max_model_calls: 1})
+             run(agent, %{input: "Add 2 and 3", limits: %{model_calls: 1}})
 
     assert result.status == :blocked
     assert result.guardrail == :limits
@@ -287,7 +286,7 @@ defmodule Jido.AI.RuntimeTest do
     agent = SimpleAgent.instantiate!(id: "tool-budget-agent")
 
     assert {:ok, result, agent} =
-             run(agent, %{input: "Use two tool rounds", max_tool_calls: 1})
+             run(agent, %{input: "Use two tool rounds", limits: %{tool_calls: 1}})
 
     assert result.status == :blocked
     assert result.guardrail == :limits
@@ -439,17 +438,21 @@ defmodule Jido.AI.RuntimeTest do
 
     agent = SimpleAgent.instantiate!(id: "stream-agent")
     dispatch = {:pid, target: self()}
+    request = SimpleAgent.request_signal!(%{input: "Stream this", stream: true})
 
-    assert {:ok, result, agent} =
-             run(agent, %{input: "Stream this", stream: true}, context: %{jido_ai_dispatch: dispatch})
+    assert {:ok, agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+             SimpleAgent.cmd(agent, request, context: %{jido_ai_dispatch: dispatch})
 
+    result = reply.data
     assert result.output == "Streamed answer"
     signals = receive_stream([])
     assert Enum.map(signals, & &1.type) |> List.first() == "jido.ai.model.stream.started"
     assert Enum.map(signals, & &1.type) |> List.last() == "jido.ai.model.stream.completed"
+    assert Enum.all?(signals, &(&1.source == SimpleAgent.definition().signal_source))
+    assert Enum.all?(signals, &(Jido.Signal.get_context(&1, "jidocausationid") == request.id))
 
     sequences = Enum.map(signals, & &1.data.sequence)
-    assert sequences == Enum.sort(sequences)
+    assert sequences == Enum.to_list(0..(length(signals) - 1))
     assert Enum.any?(signals, &(&1.type == "jido.ai.model.stream.chunk"))
 
     assistant_entries =

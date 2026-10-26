@@ -4,7 +4,9 @@ defmodule Jido.AI.Agent.Codec do
 
   Version 1 stores the normal Jido Agent definition without its generated AI
   request route or Toolset extension. The `ai` object stores trusted references
-  to the root reasoning Flow and the Agent-local tool Actions.
+  to the root reasoning Flow and the Agent-local tool Actions. When present,
+  its `config` object stores the root Flow input defaults from the reasoning
+  block.
 
   Use this codec explicitly when encoding because an AI Agent is also a normal
   `Jido.Agent` value:
@@ -30,18 +32,23 @@ defmodule Jido.AI.Agent.Codec do
           {:ok, map()} | {:error, Exception.t()}
   def encode_document(source, %Registry{} = registry) do
     with {:ok, definition} <- definition(source),
-         {:ok, reasoning} <- reasoning(definition),
+         {:ok, reasoning, config} <- reasoning(definition),
          {:ok, actions, base_extensions} <- tools(definition),
          {:ok, reasoning_reference} <- Registry.encode_reference(registry, :flow, reasoning),
          {:ok, tool_references} <- encode_tools(actions, registry),
+         {:ok, stored_config} <- encode_config(config, reasoning),
          base = %{definition | routes: [], extensions: base_extensions},
          {:ok, %{"definition" => fields}} <- Jido.Agent.Codec.encode_document(base, registry) do
+      ai =
+        %{"reasoning" => reasoning_reference, "tools" => tool_references}
+        |> put_config(stored_config)
+
       {:ok,
        %{
          "type" => "jido.ai.agent",
          "vsn" => 1,
          "definition" => fields,
-         "ai" => %{"reasoning" => reasoning_reference, "tools" => tool_references}
+         "ai" => ai
        }}
     end
   end
@@ -59,15 +66,15 @@ defmodule Jido.AI.Agent.Codec do
           {:ok, Agent.definition()} | {:error, [Issue.t()]}
   def decode_document(document, %Registry{} = registry) do
     with :ok <- document(document),
-         %{
-           "definition" => fields,
-           "ai" => %{"reasoning" => reference, "tools" => tool_references}
-         } <- document,
+         %{"definition" => fields, "ai" => ai} <- document,
+         :ok <- ai_object(ai),
+         %{"reasoning" => reference, "tools" => tool_references} <- ai,
          :ok <- empty_routes(fields),
          {:ok, base} <- decode_base(fields, registry),
          {:ok, reasoning} <- resolve_reasoning(reference, registry),
+         {:ok, config} <- decode_config(Map.get(ai, "config", %{}), reasoning),
          {:ok, actions} <- resolve_tools(tool_references, registry),
-         {:ok, definition} <- restore_ai(base, reasoning, actions) do
+         {:ok, definition} <- restore_ai(base, reasoning, config, actions) do
       {:ok, definition}
     else
       {:error, issues} when is_list(issues) -> {:error, issues}
@@ -111,7 +118,7 @@ defmodule Jido.AI.Agent.Codec do
         state: %{source: :output, path: [:state]},
         reply: %{type: @response_type, from: %{source: :output, path: [:response]}}
       } ->
-        {:ok, target}
+        {:ok, target, Map.get(route, :defaults, %{})}
 
       _route ->
         invalid_agent()
@@ -169,6 +176,19 @@ defmodule Jido.AI.Agent.Codec do
 
   defp document(_document),
     do: failure(:invalid_document, [], "Expected a jido.ai.agent document")
+
+  defp ai_object(%{} = ai) when not is_struct(ai) do
+    keys = Map.keys(ai)
+    missing = ["reasoning", "tools"] -- keys
+    unknown = keys -- ["reasoning", "tools", "config"]
+
+    if missing == [] and unknown == [],
+      do: :ok,
+      else: failure(:invalid_document, ["ai"], "Unknown or missing AI configuration fields")
+  end
+
+  defp ai_object(_ai),
+    do: failure(:invalid_document, ["ai"], "AI configuration must be a map")
 
   defp object(value, fields) when is_map(value) and not is_struct(value) do
     if Enum.sort(Map.keys(value)) == Enum.sort(fields),
@@ -229,11 +249,11 @@ defmodule Jido.AI.Agent.Codec do
   defp resolve_tools(_references, _registry),
     do: failure(:invalid_tools, ["ai", "tools"], "AI Agent tools must be a list")
 
-  defp restore_ai(%Agent{} = base, reasoning, actions) do
+  defp restore_ai(%Agent{} = base, reasoning, config, actions) do
     route = %{
       path: @request_type,
       as: :request,
-      defaults: %{},
+      defaults: config,
       handler: %{kind: :flow, target: reasoning},
       state: %{source: :output, path: [:state]},
       reply: %{type: @response_type, from: %{source: :output, path: [:response]}}
@@ -292,4 +312,41 @@ defmodule Jido.AI.Agent.Codec do
 
   defp failure(code, path, message, details \\ %{}),
     do: {:error, [Issue.new(code, path, message, details: details)]}
+
+  defp put_config(ai, config) when map_size(config) == 0, do: ai
+  defp put_config(ai, config), do: Map.put(ai, "config", config)
+
+  defp encode_config(config, reasoning) do
+    case Jido.AI.Agent.Config.encode(config, reasoning) do
+      {:ok, config} ->
+        {:ok, config}
+
+      {:error, reason} ->
+        Jido.Agent.Error.fail(
+          :invalid_ai_config,
+          [:routes, 0, :defaults],
+          "AI reasoning defaults are invalid",
+          %{reason: reason}
+        )
+    end
+  end
+
+  defp decode_config(config, reasoning) when is_map(config) and not is_struct(config) do
+    case Jido.AI.Agent.Config.decode(config, reasoning) do
+      {:ok, config} ->
+        {:ok, config}
+
+      {:error, reason} ->
+        failure(
+          :invalid_ai_config,
+          ["ai", "config"],
+          "AI reasoning configuration is invalid",
+          %{reason: inspect(reason)}
+        )
+    end
+  end
+
+  defp decode_config(_config, _reasoning) do
+    failure(:invalid_ai_config, ["ai", "config"], "AI reasoning configuration must be a map")
+  end
 end

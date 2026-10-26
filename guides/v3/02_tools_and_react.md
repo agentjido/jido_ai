@@ -25,7 +25,7 @@ defmodule MyApp.ToolAgent do
 end
 ```
 
-The default `Jido.AI.Flow.ReAct` Flow performs these steps:
+The canonical `Jido.AI.Reasoning.ReAct` Flow performs these steps:
 
 1. `CallModel` produces a portable `ModelOutcome`.
 2. `InterpretOutcome` produces an `AgentDecision`.

@@ -1,8 +1,10 @@
-defmodule Jido.AI.Actions.DecideModelNext do
+defmodule Jido.AI.Reasoning.ReAct.Actions.DecideNext do
   @moduledoc "Routes a model outcome to completion, repair, fallback, or tools."
 
   use Jido.Action,
-    name: "jido_ai_decide_model_next",
+    id: "jido.ai/reasoning/react/actions/decide-next",
+    vsn: 1,
+    name: "jido_ai_react_decide_next",
     description: "Choose the next graph after a model call",
     schema: Zoi.map(),
     output_schema: Zoi.map()

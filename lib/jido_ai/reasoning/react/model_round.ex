@@ -1,32 +1,43 @@
-defmodule Jido.AI.Flows.ModelRound do
+defmodule Jido.AI.Reasoning.ReAct.ModelRound do
   @moduledoc "Projects context and runs one guarded provider attempt."
 
+  alias Jido.AI.Reasoning.ReAct.Actions.{
+    CallModel,
+    DecideNext,
+    ExpandNext,
+    GuardOutput,
+    ProjectConversation,
+    RecordModelAttempt
+  }
+
   use Jido.Flow,
-    name: "jido_ai_model_round",
+    id: "jido.ai/reasoning/react/model-round",
+    vsn: 1,
+    name: "jido_ai_react_model_round",
     schema: Zoi.object(%{turn: Zoi.any()}),
     output_schema: Zoi.map()
 
   flow do
     step "project",
-      action: Jido.AI.Actions.ProjectConversation,
+      action: ProjectConversation,
       params: %{turn: input(:turn)}
 
     step "model",
-      action: Jido.AI.Actions.CallModel,
+      action: CallModel,
       params: %{
         turn: result("project", :turn),
         messages: result("project", :messages)
       }
 
     step "output_guard",
-      action: Jido.AI.Actions.CheckOutput,
+      action: GuardOutput,
       params: %{
         turn: result("model", :turn),
         outcome: result("model", :outcome)
       }
 
     step "record_attempt",
-      action: Jido.AI.Actions.RecordModelAttempt,
+      action: RecordModelAttempt,
       params: %{
         turn: result("model", :turn),
         outcome: result("model", :outcome),
@@ -35,8 +46,8 @@ defmodule Jido.AI.Flows.ModelRound do
       }
 
     invoke "next",
-      decision: Jido.AI.Actions.DecideModelNext,
-      expander: Jido.AI.Actions.ExpandNext,
+      decision: DecideNext,
+      expander: ExpandNext,
       params: %{turn: result("record_attempt", :turn)}
 
     output result("next")

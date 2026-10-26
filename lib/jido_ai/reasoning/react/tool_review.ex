@@ -1,14 +1,22 @@
-defmodule Jido.AI.Flows.ToolReview do
+defmodule Jido.AI.Reasoning.ReAct.ToolReview do
   @moduledoc "Waits for a durable tool approval, denial, or timeout."
 
+  alias Jido.AI.Reasoning.ReAct.Actions.{
+    ExpandNext,
+    RequestToolReview,
+    ResolveToolReview
+  }
+
   use Jido.Flow,
-    name: "jido_ai_tool_review",
+    id: "jido.ai/reasoning/react/tool-review",
+    vsn: 1,
+    name: "jido_ai_react_tool_review",
     schema: Zoi.object(%{turn: Zoi.any()}),
     output_schema: Zoi.map()
 
   flow do
     step "request",
-      action: Jido.AI.Actions.RequestToolReview,
+      action: RequestToolReview,
       params: %{turn: input(:turn)}
 
     selection "decision" do
@@ -28,8 +36,8 @@ defmodule Jido.AI.Flows.ToolReview do
     end
 
     invoke "next",
-      decision: Jido.AI.Actions.ResolveToolReview,
-      expander: Jido.AI.Actions.ExpandNext,
+      decision: ResolveToolReview,
+      expander: ExpandNext,
       params: %{
         turn: result("request", :turn),
         decision: result("decision")

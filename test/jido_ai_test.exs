@@ -14,12 +14,54 @@ defmodule Jido.AITest.InlineAgent do
   end
 end
 
+defmodule Jido.AITest.SchemaDrivenReasoning do
+  use Jido.Flow,
+    id: "jido.ai/tests/schema-driven-reasoning",
+    vsn: 1,
+    name: "schema_driven_reasoning",
+    schema:
+      Zoi.object(
+        %{
+          input: Zoi.string(),
+          confidence_threshold: Zoi.number(gte: 0, lte: 1),
+          verification:
+            Zoi.object(
+              %{rounds: Zoi.integer(gte: 1, lte: 5)},
+              unrecognized_keys: :error
+            )
+        },
+        unrecognized_keys: :error
+      ),
+    output_schema: Zoi.object(%{state: Zoi.map(), response: Zoi.map()})
+
+  flow do
+    step "answer",
+         [
+           input <- input(:input),
+           threshold <- input(:confidence_threshold),
+           verification <- input(:verification)
+         ],
+         inline: [context: context] do
+      {:ok,
+       %{
+         state: context.agent_state,
+         response: %{input: input, threshold: threshold, rounds: verification.rounds}
+       }}
+    end
+
+    output result("answer")
+  end
+end
+
 defmodule Jido.AITest do
   use ExUnit.Case, async: false
 
   import Mimic
 
-  alias Jido.AI.{Actions, Flows, Strategy, Toolset}
+  alias Jido.AI.Reasoning.ReAct
+  alias Jido.AI.Reasoning.ReAct.Actions
+  alias Jido.AI.Toolset
+  alias Jido.AITest.ConfiguredAgent
   alias Jido.AITest.SimpleAgent
   alias Jido.AITest.Tools
 
@@ -27,6 +69,30 @@ defmodule Jido.AITest do
 
   setup :set_mimic_global
   setup :verify_on_exit!
+
+  test "Agent reasoning helpers inspect and compile the root graph" do
+    assert SimpleAgent.reasoning() == ReAct
+
+    assert %{
+             agent: SimpleAgent,
+             reasoning: ReAct,
+             defaults: %{},
+             tools: [Tools.Add, Tools.Multiply],
+             flow: %Jido.Flow{}
+           } = SimpleAgent.explain()
+
+    assert {:ok,
+            %{
+              agent: SimpleAgent,
+              reasoning: ReAct,
+              params: %{input: "Inspect this request."},
+              tools: [Tools.Add, Tools.Multiply],
+              flow: %Jido.Flow{},
+              workflow: %Runic.Workflow{}
+            }} = SimpleAgent.preflight(%{input: "Inspect this request."})
+
+    assert {:error, _reason} = SimpleAgent.preflight(%{})
+  end
 
   test "the Agent route contains the explicit graph of guarded Flow components" do
     assert [
@@ -39,7 +105,7 @@ defmodule Jido.AITest do
              SimpleAgent.definition().routes
 
     program = SimpleAgent.route_executable!("jido.ai.request")
-    assert program == Strategy.ReAct
+    assert program == ReAct
 
     assert [
              %{
@@ -53,29 +119,37 @@ defmodule Jido.AITest do
              components: %{
                "start_request" => %{kind: :call, call: %{target: Actions.StartRequest}},
                "input_guard" => %{
+                 kind: :call,
+                 call: %{target: Actions.GuardInput}
+               },
+               "loop" => %{
                  kind: :invoke,
-                 decision: %{target: Actions.CheckInput},
+                 decision: %{target: Actions.DecideInput},
                  expander: %{target: Actions.ExpandNext}
+               },
+               "finalize" => %{
+                 kind: :call,
+                 call: %{target: Actions.FinalizeTurn}
                }
              }
            } = program.flow()
 
-    assert map_size(program.flow().components) == 2
+    assert map_size(program.flow().components) == 4
 
-    assert %Jido.Flow{components: model_components} = Flows.ModelRound.flow()
+    assert %Jido.Flow{components: model_components} = ReAct.ModelRound.flow()
     assert map_size(model_components) == 5
 
     assert %{
              "project" => %{kind: :call, call: %{target: Actions.ProjectConversation}},
              "model" => %{kind: :call, call: %{target: Actions.CallModel}},
-             "output_guard" => %{kind: :call, call: %{target: Actions.CheckOutput}},
+             "output_guard" => %{kind: :call, call: %{target: Actions.GuardOutput}},
              "record_attempt" => %{
                kind: :call,
                call: %{target: Actions.RecordModelAttempt}
              },
              "next" => %{
                kind: :invoke,
-               decision: %{target: Actions.DecideModelNext},
+               decision: %{target: Actions.DecideNext},
                expander: %{target: Actions.ExpandNext}
              }
            } = model_components
@@ -90,9 +164,9 @@ defmodule Jido.AITest do
                  expander: %{target: Actions.ExpandNext}
                }
              }
-           } = Flows.ToolReview.flow()
+           } = ReAct.ToolReview.flow()
 
-    assert map_size(Flows.ToolReview.flow().components) == 3
+    assert map_size(ReAct.ToolReview.flow().components) == 3
 
     input = %{
       turn: %{
@@ -135,7 +209,7 @@ defmodule Jido.AITest do
                },
                "model" => %{
                  kind: :call,
-                 call: %{kind: :flow, target: Flows.ModelRound}
+                 call: %{kind: :flow, target: ReAct.ModelRound}
                }
              }
            } = tool_flow
@@ -155,16 +229,15 @@ defmodule Jido.AITest do
     assert {:error, :invalid_tool_calls} =
              Actions.ExpandNext.run(%{kind: :tools, input: %{}}, %{})
 
-    assert {:continue, %{turn: :next}, Flows.ModelRound} =
+    assert {:continue, %{turn: :next}, ReAct.ModelRound} =
              Actions.ExpandNext.run(%{kind: :model, input: %{turn: :next}}, %{})
 
-    assert {:continue, %{turn: :review}, Flows.ToolReview} =
+    assert {:continue, %{turn: :review}, ReAct.ToolReview} =
              Actions.ExpandNext.run(%{kind: :review, input: %{turn: :review}}, %{})
 
     outcome = %{turn: :done, result: %{status: :completed}}
 
-    assert {:continue, %{outcome: ^outcome}, Actions.FinalizeTurn} =
-             Actions.ExpandNext.run(%{kind: :complete, output: outcome}, %{})
+    assert {:ok, ^outcome} = Actions.ExpandNext.run(%{kind: :complete, output: outcome}, %{})
   end
 
   test "an inline reasoning block compiles to the direct root Flow" do
@@ -185,6 +258,124 @@ defmodule Jido.AITest do
     assert unchanged.state == %{session: nil}
     assert reply.type == "jido.ai.response"
     assert reply.data == %{output: "HELLO"}
+  end
+
+  test "a configured reasoning block lowers to root Flow input defaults" do
+    assert [route] = ConfiguredAgent.definition().routes
+    assert route.handler == %{kind: :flow, target: ReAct}
+
+    assert route.defaults == %{
+             instructions: "Answer as a careful support specialist.",
+             model: "anthropic:claude-sonnet-4-5",
+             fallback_models: ["openai:gpt-5-mini"],
+             limits: %{model_calls: 6, tool_rounds: 3, tool_calls: 6, retries: 1},
+             context: %{max_messages: 32, max_bytes: 100_000},
+             prompt_cache: %{enabled: true, ttl: "5m"}
+           }
+
+    assert {:ok, params} =
+             Jido.Agent.Route.params(route, %{
+               input: "Override one setting.",
+               model: "openai:gpt-4o-mini"
+             })
+
+    assert params.model == "openai:gpt-4o-mini"
+    assert params.limits.model_calls == 6
+  end
+
+  test "a configured Agent runs the canonical ReAct graph" do
+    expect(ReqLLM, :generate_text, fn model, context, options ->
+      assert model == "anthropic:claude-sonnet-4-5"
+
+      assert %{anthropic_prompt_cache: true, anthropic_prompt_cache_ttl: "5m"} =
+               options[:provider_options]
+
+      assert [system, user] = ReqLLM.Context.to_list(context)
+      assert system.role == :system
+      assert [%{type: :text, text: "Answer as a careful support specialist."}] = system.content
+      assert user.role == :user
+      assert [%{type: :text, text: "Help me."}] = user.content
+
+      {:ok, text_response(model, context, "I can help.", "configured-answer")}
+    end)
+
+    agent = ConfiguredAgent.instantiate!(id: "configured-agent-test")
+    signal = ConfiguredAgent.request_signal!(%{input: "Help me."})
+
+    assert {:ok, next_agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+             ConfiguredAgent.cmd(agent, signal)
+
+    assert %Jido.Session{} = next_agent.state.session
+    assert reply.data.status == :completed
+    assert reply.data.output == "I can help."
+  end
+
+  test "a custom reasoning Flow defines new DSL and JSON fields through its schema" do
+    suffix = System.unique_integer([:positive])
+    name = Module.concat(Jido.AITest, "SchemaAgent#{suffix}")
+    id = "jido.ai/tests/schema-agent-#{suffix}"
+
+    source = """
+    defmodule #{inspect(name)} do
+      use Jido.AI.Agent,
+        id: #{inspect(id)},
+        vsn: 1,
+        name: "schema_agent"
+
+      ai do
+        reasoning Jido.AITest.SchemaDrivenReasoning do
+          confidence_threshold 0.85
+
+          verification do
+            rounds 2
+          end
+        end
+      end
+    end
+    """
+
+    Code.compile_string(source)
+
+    assert [%{defaults: defaults}] = name.definition().routes
+    assert defaults == %{confidence_threshold: 0.85, verification: %{rounds: 2}}
+
+    agent = name.instantiate!(id: "schema-agent-test")
+    signal = name.request_signal!(%{input: "check"})
+
+    assert {:ok, _agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+             name.cmd(agent, signal)
+
+    assert reply.data == %{input: "check", threshold: 0.85, rounds: 2}
+
+    registry =
+      Jido.Authoring.Registry.new!(%{
+        {id, 1} => {:agent, name},
+        {"jido.ai/tests/schema-driven-reasoning", 1} => {:flow, Jido.AITest.SchemaDrivenReasoning},
+        {"jido.ai/tests/schema-agent-state-#{suffix}", 1} => {:schema, name.definition().schema}
+      })
+
+    assert {:ok, json} =
+             Jido.Authoring.encode_json(name.definition(),
+               registry: registry,
+               codec: Jido.AI.Agent.Codec
+             )
+
+    assert %{
+             "ai" => %{
+               "config" => %{
+                 "confidence_threshold" => 0.85,
+                 "verification" => %{"rounds" => 2}
+               }
+             }
+           } = Jason.decode!(json)
+
+    assert {:ok, definition} =
+             Jido.Authoring.decode_json(json,
+               registry: registry,
+               codec: Jido.AI.Agent.Codec
+             )
+
+    assert definition == name.definition()
   end
 
   test "the ai block accepts exactly one reasoning declaration" do
@@ -227,16 +418,58 @@ defmodule Jido.AITest do
       use Jido.AI.Agent, name: "invalid_tools_agent"
 
       ai do
-        reasoning Jido.AI.Strategy.ReAct
+        reasoning Jido.AI.Reasoning.ReAct
 
         tools do
-          reasoning Jido.AI.Strategy.ReAct
+          reasoning Jido.AI.Reasoning.ReAct
         end
       end
     end
     """
 
     assert_raise CompileError, ~r/tools accepts only action declarations/, fn ->
+      Code.compile_string(source)
+    end
+  end
+
+  test "reasoning configuration accepts only its explicit data DSL" do
+    name = Module.concat(Jido.AITest, "InvalidReasoningConfig#{System.unique_integer([:positive])}")
+
+    source = """
+    defmodule #{inspect(name)} do
+      use Jido.AI.Agent, name: "invalid_reasoning_config"
+
+      ai do
+        reasoning Jido.AI.Reasoning.ReAct do
+          unknown_field 1
+        end
+      end
+    end
+    """
+
+    assert_raise CompileError, ~r/unknown_field/, fn ->
+      Code.compile_string(source)
+    end
+  end
+
+  test "reasoning configuration is checked against the selected Flow schema" do
+    name = Module.concat(Jido.AITest, "InvalidReasoningLimit#{System.unique_integer([:positive])}")
+
+    source = """
+    defmodule #{inspect(name)} do
+      use Jido.AI.Agent, name: "invalid_reasoning_limit"
+
+      ai do
+        reasoning Jido.AI.Reasoning.ReAct do
+          limits do
+            model_calls 99
+          end
+        end
+      end
+    end
+    """
+
+    assert_raise CompileError, ~r/reasoning configuration is invalid/, fn ->
       Code.compile_string(source)
     end
   end
@@ -249,7 +482,7 @@ defmodule Jido.AITest do
       use Jido.AI.Agent, name: "duplicate_tools_agent"
 
       ai do
-        reasoning Jido.AI.Strategy.ReAct
+        reasoning Jido.AI.Reasoning.ReAct
 
         tools do
           action Jido.AITest.Tools.Add
@@ -303,7 +536,7 @@ defmodule Jido.AITest do
     assert %{
              "type" => "jido.ai.agent",
              "ai" => %{
-               "reasoning" => %{"id" => "jido.ai/strategy/react", "vsn" => 1},
+               "reasoning" => %{"id" => "jido.ai/reasoning/react", "vsn" => 1},
                "tools" => [
                  %{"id" => "jido.ai/examples/tools/add", "vsn" => 1},
                  %{"id" => "jido.ai/examples/tools/multiply", "vsn" => 1}
@@ -319,7 +552,7 @@ defmodule Jido.AITest do
              )
 
     assert definition == SimpleAgent.definition()
-    assert [%{handler: %{kind: :flow, target: Strategy.ReAct}}] = definition.routes
+    assert [%{handler: %{kind: :flow, target: ReAct}}] = definition.routes
 
     expect(ReqLLM, :generate_text, fn model, context, _options ->
       {:ok, text_response(model, context, "Imported graph completed.", "json-agent")}
@@ -334,6 +567,45 @@ defmodule Jido.AITest do
     assert %Jido.Session{} = unchanged.state.session
     assert reply.data.status == :completed
     assert reply.data.output == "Imported graph completed."
+  end
+
+  test "configured reasoning defaults round-trip through Jido Authoring" do
+    registry = configured_agent_registry()
+
+    assert {:ok, json} =
+             Jido.Authoring.encode_json(ConfiguredAgent.definition(),
+               registry: registry,
+               codec: Jido.AI.Agent.Codec
+             )
+
+    assert %{
+             "ai" => %{
+               "config" => %{
+                 "instructions" => "Answer as a careful support specialist.",
+                 "model" => "anthropic:claude-sonnet-4-5",
+                 "fallback_models" => ["openai:gpt-5-mini"],
+                 "limits" => %{
+                   "model_calls" => 6,
+                   "tool_rounds" => 3,
+                   "tool_calls" => 6,
+                   "retries" => 1
+                 },
+                 "context" => %{
+                   "max_messages" => 32,
+                   "max_bytes" => 100_000
+                 },
+                 "prompt_cache" => %{"enabled" => true, "ttl" => "5m"}
+               }
+             }
+           } = Jason.decode!(json)
+
+    assert {:ok, definition} =
+             Jido.Authoring.decode_json(json,
+               registry: registry,
+               codec: Jido.AI.Agent.Codec
+             )
+
+    assert definition == ConfiguredAgent.definition()
   end
 
   test "AI Agent authoring rejects an untrusted reasoning Flow" do
@@ -380,9 +652,10 @@ defmodule Jido.AITest do
 
   test "Invoke decisions contain portable intent and allow repair metadata" do
     turn = %{input: "Use the tools."}
+    guard = %{allowed: true, guardrail: :none, reason: ""}
 
     assert {:ok, %{kind: :model, input: %{turn: ^turn}} = decision} =
-             Jido.Exec.run(Actions.CheckInput, %{turn: turn})
+             Jido.Exec.run(Actions.DecideInput, %{turn: turn, guard: guard})
 
     refute Map.has_key?(decision, :target)
 
@@ -512,7 +785,7 @@ defmodule Jido.AITest do
               }
             }} =
              Jido.Exec.run(
-               Strategy.ReAct,
+               ReAct,
                %{input: "Use a tool.", review_tools: true},
                %{__jido_wait_host__: :forged}
              )
@@ -529,7 +802,7 @@ defmodule Jido.AITest do
               model_calls: 1,
               guardrail: :model,
               reason: "invalid_request"
-            }, agent} = run_agent(%{input: "Fail once.", max_retries: 0})
+            }, agent} = run_agent(%{input: "Fail once.", limits: %{retries: 0}})
 
     assert %Jido.Session{} = agent.state.session
     assert {:ok, []} = Jido.AI.Thread.Projection.messages(agent.state.session)
@@ -586,7 +859,7 @@ defmodule Jido.AITest do
               retries: 0,
               guardrail: :output,
               reason: "model output is empty"
-            }, agent} = run_agent(%{input: "Say something.", max_retries: 0})
+            }, agent} = run_agent(%{input: "Say something.", limits: %{retries: 0}})
 
     assert %Jido.Session{} = agent.state.session
     assert {:ok, []} = Jido.AI.Thread.Projection.messages(agent.state.session)
@@ -608,10 +881,20 @@ defmodule Jido.AITest do
   defp simple_agent_registry do
     Jido.Authoring.Registry.new!(%{
       {"jido.ai/agents/simple", 3} => {:agent, SimpleAgent},
-      {"jido.ai/strategy/react", 1} => {:flow, Strategy.ReAct},
+      {"jido.ai/reasoning/react", 1} => {:flow, ReAct},
       {"jido.ai/examples/tools/add", 1} => {:action, Tools.Add},
       {"jido.ai/examples/tools/multiply", 1} => {:action, Tools.Multiply},
       {"jido.ai/schemas/simple-agent-state", 1} => {:schema, SimpleAgent.definition().schema}
+    })
+  end
+
+  defp configured_agent_registry do
+    Jido.Authoring.Registry.new!(%{
+      {"jido.ai/agents/configured", 1} => {:agent, ConfiguredAgent},
+      {"jido.ai/reasoning/react", 1} => {:flow, ReAct},
+      {"jido.ai/examples/tools/add", 1} => {:action, Tools.Add},
+      {"jido.ai/examples/tools/multiply", 1} => {:action, Tools.Multiply},
+      {"jido.ai/schemas/configured-agent-state", 1} => {:schema, ConfiguredAgent.definition().schema}
     })
   end
 

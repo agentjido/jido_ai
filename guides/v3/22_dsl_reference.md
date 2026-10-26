@@ -51,7 +51,7 @@ end
 | `tools` | Declared Jido Actions and Flows |
 | `controls` | Total time and call limits, one input control, one output control |
 
-The default reasoning Flow is `Jido.AI.Flow.ReAct`.
+The default reasoning Flow is `Jido.AI.Reasoning.ReAct`.
 
 Input and output control slots accept one Action each. A control can be a
 module Action or an inline Action. Controls cannot return effects.

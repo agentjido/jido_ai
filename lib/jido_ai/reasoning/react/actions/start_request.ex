@@ -1,17 +1,19 @@
-defmodule Jido.AI.Actions.StartRequest do
+defmodule Jido.AI.Reasoning.ReAct.Actions.StartRequest do
   @moduledoc "Initializes one request and appends its user message to the Session."
 
-  alias Jido.AI.{Runtime, Thread.Projection}
+  alias Jido.AI.Thread.Projection
 
   use Jido.Action,
-    name: "jido_ai_start_request",
+    id: "jido.ai/reasoning/react/actions/start-request",
+    vsn: 1,
+    name: "jido_ai_react_start_request",
     description: "Load conversation state and start one graph request",
     schema: Zoi.map(),
     output_schema: Zoi.map()
 
   @impl Jido.Action
   def run(params, context) do
-    now = Runtime.now_ms(context)
+    now = System.system_time(:millisecond)
     tools = Jido.AI.Toolset.from_context(context)
     agent_state = Map.get(context, :agent_state, %{session: nil})
     session = session(agent_state, context, now)

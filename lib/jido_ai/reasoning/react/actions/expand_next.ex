@@ -1,24 +1,27 @@
-defmodule Jido.AI.Actions.ExpandNext do
+defmodule Jido.AI.Reasoning.ReAct.Actions.ExpandNext do
   @moduledoc "Expands each trusted AI routing decision into its next executable."
 
   alias Jido.AI.Toolset
+  alias Jido.AI.Reasoning.ReAct
+  alias Jido.AI.Reasoning.ReAct.Actions.RecordToolResults
   alias Jido.Flow.Ref
 
   use Jido.Action,
-    name: "jido_ai_expand_next",
+    id: "jido.ai/reasoning/react/actions/expand-next",
+    vsn: 1,
+    name: "jido_ai_react_expand_next",
     description: "Expand a trusted AI graph routing decision",
     schema: Zoi.map(),
     output_schema: Zoi.map()
 
   @impl Jido.Action
-  def run(%{kind: :complete, output: output}, _context),
-    do: {:continue, %{outcome: output}, Jido.AI.Actions.FinalizeTurn}
+  def run(%{kind: :complete, output: output}, _context), do: {:ok, output}
 
   def run(%{kind: :model, input: input}, _context),
-    do: {:continue, input, Jido.AI.Flows.ModelRound}
+    do: {:continue, input, ReAct.ModelRound}
 
   def run(%{kind: :review, input: input}, _context),
-    do: {:continue, input, Jido.AI.Flows.ToolReview}
+    do: {:continue, input, ReAct.ToolReview}
 
   def run(%{kind: :tools, input: %{turn: turn} = input}, _context) do
     with {:ok, calls} <- resolve_calls(turn.tools, turn.model_outcome.tool_calls),
@@ -74,7 +77,7 @@ defmodule Jido.AI.Actions.ExpandNext do
     %{
       kind: :step,
       name: "record",
-      action: Jido.AI.Actions.RecordToolResults,
+      action: RecordToolResults,
       params: %{
         turn: Ref.input(:turn),
         results: result_refs(calls)
@@ -86,7 +89,7 @@ defmodule Jido.AI.Actions.ExpandNext do
     %{
       kind: :subflow,
       name: "model",
-      flow: Jido.AI.Flows.ModelRound,
+      flow: ReAct.ModelRound,
       params: %{turn: Ref.result("record", :turn)}
     }
   end

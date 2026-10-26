@@ -48,7 +48,7 @@ Inspect the Flow that defines the Agent behavior:
 
 ```elixir
 MyApp.AnswerAgent.graph()
-#=> Jido.AI.Flow.ReAct
+#=> Jido.AI.Reasoning.ReAct
 ```
 
 Use `graph MyApp.Flow` in the `ai` block to select another behavior graph.

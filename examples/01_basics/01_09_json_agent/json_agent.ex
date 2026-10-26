@@ -12,7 +12,7 @@ defmodule JidoAI.Examples.JSONSimpleAgent do
     description: "Answer one request with guardrails and multiple tools"
 
   ai do
-    reasoning Jido.AI.Strategy.ReAct
+    reasoning Jido.AI.Reasoning.ReAct
 
     tools do
       action JidoAI.Examples.Tools.Add
@@ -29,7 +29,7 @@ defmodule JidoAI.Examples.JSONAgent do
   the core Agent fields and one trusted reference to the root reasoning Flow.
   """
 
-  alias Jido.AI.Strategy
+  alias Jido.AI.Reasoning.ReAct
   alias Jido.Authoring.Registry
   alias JidoAI.Examples.JSONSimpleAgent, as: SimpleAgent
 
@@ -43,7 +43,7 @@ defmodule JidoAI.Examples.JSONAgent do
   def registry do
     Registry.new!(%{
       {"jido.ai/agents/simple", 3} => {:agent, SimpleAgent},
-      {"jido.ai/strategy/react", 1} => {:flow, Strategy.ReAct},
+      {"jido.ai/reasoning/react", 1} => {:flow, ReAct},
       {"jido.ai/examples/tools/add", 1} => {:action, JidoAI.Examples.Tools.Add},
       {"jido.ai/examples/tools/multiply", 1} => {:action, JidoAI.Examples.Tools.Multiply},
       {"jido.ai/schemas/simple-agent-state", 1} => {:schema, definition().schema}

@@ -23,6 +23,39 @@ defmodule Jido.AI.Agent do
   The reasoning Flow is the direct executable target of the Agent request
   route. Jido AI does not insert a hidden pipeline around it.
 
+  A reasoning block sets compile-time defaults for the root Flow input. Signal
+  data can override these defaults for one request:
+
+      ai do
+        reasoning Jido.AI.Reasoning.ReAct do
+          instructions "Answer as a support specialist."
+          model "anthropic:claude-sonnet-4-5"
+          fallback_models ["openai:gpt-5-mini"]
+
+          limits do
+            model_calls 8
+            tool_rounds 4
+            tool_calls 8
+            retries 1
+          end
+
+          context do
+            max_messages 64
+            max_bytes 200_000
+          end
+
+          prompt_cache do
+            enabled true
+            ttl "5m"
+          end
+        end
+      end
+
+  The reasoning block is generic nested data. The selected Flow input schema
+  defines its fields, types, defaults, and validation. Configuration changes
+  Flow input only. To change graph structure, define a different root Flow and
+  select that module with `reasoning`.
+
   `tools` is plural because the block declares the Agent's complete tool set.
   Each `action` entry names one executable `Jido.Action`. The block does not
   accept Flows or other executable kinds.
@@ -47,7 +80,8 @@ defmodule Jido.AI.Agent do
   The `ai` block lowers to the normal Jido Agent route model at compile time.
   `Jido.AI.Agent.Codec` gives this authoring boundary a versioned
   `jido.ai.agent` document. It stores the core Agent fields and trusted
-  references to the root reasoning Flow and declared tool Actions.
+  references to the root reasoning Flow, its configured defaults, and declared
+  tool Actions.
   """
 
   @request_type "jido.ai.request"
@@ -79,6 +113,17 @@ defmodule Jido.AI.Agent do
     end
 
     quote do
+      @doc "Returns this Agent's root reasoning Flow module."
+      @spec reasoning() :: module()
+      def reasoning, do: Jido.AI.Reasoning.root(__MODULE__)
+
+      @doc "Returns this Agent's root Flow, schemas, defaults, and tools."
+      @spec explain() :: map()
+      def explain, do: Jido.AI.Reasoning.explain(__MODULE__)
+
+      @doc "Validates one request and compiles the root Flow without running it."
+      @spec preflight(map() | keyword()) :: {:ok, map()} | {:error, term()}
+      def preflight(input), do: Jido.AI.Reasoning.preflight(__MODULE__, input)
     end
   end
 
@@ -92,7 +137,7 @@ defmodule Jido.AI.Agent do
 
     route =
       case reasoning do
-        {:module, target, line} -> module_reasoning(target, line, caller)
+        {:module, target, defaults, line} -> module_reasoning(target, defaults, line, caller)
         {:inline, body, line} -> inline_reasoning(body, line, caller)
       end
 
@@ -137,14 +182,19 @@ defmodule Jido.AI.Agent do
       [{:reasoning, metadata, [[do: body]]}] ->
         {:inline, body, metadata[:line]}
 
+      [{:reasoning, metadata, [target, [do: body]]}] ->
+        target = reasoning_module!(target, metadata[:line], caller)
+        defaults = Jido.AI.Agent.DSL.parse!(body, target, caller)
+        {:module, target, defaults, metadata[:line]}
+
       [{:reasoning, metadata, [target]}] ->
-        {:module, reasoning_module!(target, metadata[:line], caller), metadata[:line]}
+        {:module, reasoning_module!(target, metadata[:line], caller), %{}, metadata[:line]}
 
       [{:reasoning, metadata, arguments}] when is_list(arguments) ->
         compile_error!(
           caller,
           metadata[:line],
-          "reasoning requires one Flow module or one do block"
+          "reasoning requires one Flow module, an optional configuration block, or one inline Flow block"
         )
 
       declarations ->
@@ -220,14 +270,16 @@ defmodule Jido.AI.Agent do
     end
   end
 
-  defp module_reasoning(target, line, caller) do
+  defp module_reasoning(target, defaults, line, caller) do
     signal_source = signal_source!(caller)
 
     quote line: line do
       routes do
         signal_source unquote(signal_source)
 
-        route unquote(@request_type), unquote(target), as: :request do
+        route unquote(@request_type), unquote(target),
+          as: :request,
+          defaults: unquote(Macro.escape(defaults)) do
           state(from: output(:state))
           reply(unquote(@response_type), from: output(:response))
         end

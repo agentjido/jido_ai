@@ -1,6 +1,7 @@
 Code.require_file("simple_agent.ex", __DIR__)
 
-alias Jido.AI.{Actions, Flows}
+alias Jido.AI.Reasoning.ReAct
+alias Jido.AI.Reasoning.ReAct.Actions
 alias JidoAI.Examples.SimpleAgent
 
 program = SimpleAgent.route_executable!("jido.ai.request")
@@ -9,8 +10,8 @@ IO.puts("Agent route: jido.ai.request -> #{inspect(program)} -> jido.ai.response
 
 for flow <- [
       program,
-      Flows.ModelRound,
-      Flows.ToolReview
+      ReAct.ModelRound,
+      ReAct.ToolReview
     ] do
   IO.puts("Graph: #{inspect(flow)}")
 

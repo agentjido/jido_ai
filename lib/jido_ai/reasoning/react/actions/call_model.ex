@@ -1,10 +1,12 @@
-defmodule Jido.AI.Actions.CallModel do
+defmodule Jido.AI.Reasoning.ReAct.Actions.CallModel do
   @moduledoc "Calls one model and returns success or failure as graph data."
 
-  alias Jido.AI.{Runtime, Toolset, Usage}
+  alias Jido.AI.{Telemetry, Toolset, Usage}
 
   use Jido.Action,
-    name: "jido_ai_call_model",
+    id: "jido.ai/reasoning/react/actions/call-model",
+    vsn: 1,
+    name: "jido_ai_react_call_model",
     description: "Call or stream one text model",
     schema: Zoi.map(),
     output_schema: Zoi.map()
@@ -27,7 +29,7 @@ defmodule Jido.AI.Actions.CallModel do
 
   def run(%{turn: turn, messages: messages}, context) do
     model = Enum.at(turn.models, turn.model_index)
-    started_at = Runtime.now_ms(context)
+    started_at = System.system_time(:millisecond)
     stream_id = "stream_#{Jido.generate_id()}"
 
     result =
@@ -35,17 +37,20 @@ defmodule Jido.AI.Actions.CallModel do
         options =
           turn.options
           |> apply_prompt_cache_options(model, turn)
+          |> put_conversation_telemetry(turn)
           |> Map.to_list()
           |> Keyword.put(:tools, tools)
 
-        if turn.stream do
-          stream(model, messages, options, turn, stream_id, context)
-        else
-          generate(model, messages, options)
-        end
+        Telemetry.with_agent_span(context, fn ->
+          if turn.stream do
+            stream(model, messages, options, turn, stream_id, context)
+          else
+            generate(model, messages, options)
+          end
+        end)
       end
 
-    completed_at = Runtime.now_ms(context)
+    completed_at = System.system_time(:millisecond)
     normalize(result, turn, model, started_at, completed_at)
   end
 
@@ -55,33 +60,35 @@ defmodule Jido.AI.Actions.CallModel do
   end
 
   defp stream(model, messages, options, turn, stream_id, context) do
-    request = correlation(turn, stream_id, 0, Runtime.now_ms(context))
-    _result = Runtime.publish(context, "jido.ai.model.stream.started", request)
+    request = correlation(turn, stream_id, 0, System.system_time(:millisecond))
+    _result = dispatch_stream_signal(context, "jido.ai.model.stream.started", request)
     req_context = ReqLLM.Context.new(Enum.map(messages, &to_req_llm_message/1))
 
     case ReqLLM.stream_text(model, req_context, options) do
       {:ok, response} ->
-        {:ok, counter} = Agent.start_link(fn -> 0 end)
+        sequence_counter = :atomics.new(1, [])
 
         result =
           ReqLLM.StreamResponse.process_stream(response,
-            on_chunk: fn chunk -> publish_chunk(chunk, counter, turn, stream_id, context) end
+            on_chunk: fn chunk ->
+              sequence = :atomics.add_get(sequence_counter, 1, 1)
+              publish_chunk(chunk, sequence, turn, stream_id, context)
+            end
           )
 
-        sequence = Agent.get(counter, &(&1 + 1))
-        Agent.stop(counter)
+        sequence = :atomics.get(sequence_counter, 1) + 1
 
         case result do
           {:ok, materialized} = success ->
             classified = ReqLLM.Response.classify(materialized)
 
             data =
-              correlation(turn, stream_id, sequence, Runtime.now_ms(context))
+              correlation(turn, stream_id, sequence, System.system_time(:millisecond))
               |> Map.put(:response_id, materialized.id)
               |> Map.put(:outcome, classified.type)
               |> Map.put(:finish_reason, classified.finish_reason)
 
-            _result = Runtime.publish(context, "jido.ai.model.stream.completed", data)
+            _result = dispatch_stream_signal(context, "jido.ai.model.stream.completed", data)
             success
 
           {:error, reason} = error ->
@@ -95,24 +102,34 @@ defmodule Jido.AI.Actions.CallModel do
     end
   end
 
-  defp publish_chunk(chunk, counter, turn, stream_id, context) do
-    sequence = Agent.get_and_update(counter, fn value -> {value + 1, value + 1} end)
-
+  defp publish_chunk(chunk, sequence, turn, stream_id, context) do
     data =
-      correlation(turn, stream_id, sequence, Runtime.now_ms(context))
+      correlation(turn, stream_id, sequence, System.system_time(:millisecond))
       |> Map.put(:chunk, portable_chunk(chunk))
 
-    _result = Runtime.publish(context, "jido.ai.model.stream.chunk", data)
+    _result = dispatch_stream_signal(context, "jido.ai.model.stream.chunk", data)
     :ok
   end
 
   defp publish_stream_failure(reason, turn, stream_id, sequence, context) do
     data =
-      correlation(turn, stream_id, sequence, Runtime.now_ms(context))
+      correlation(turn, stream_id, sequence, System.system_time(:millisecond))
       |> Map.put(:reason, error_message(reason))
 
-    _result = Runtime.publish(context, "jido.ai.model.stream.failed", data)
+    _result = dispatch_stream_signal(context, "jido.ai.model.stream.failed", data)
     :ok
+  end
+
+  defp dispatch_stream_signal(context, type, data) do
+    case Map.get(context, :jido_ai_dispatch) do
+      nil ->
+        :ok
+
+      dispatch ->
+        with {:ok, signal} <- Jido.Agent.build_signal(context, type, data) do
+          Jido.Signal.Dispatch.dispatch(signal, dispatch)
+        end
+    end
   end
 
   defp portable_chunk(chunk) do
@@ -146,6 +163,7 @@ defmodule Jido.AI.Actions.CallModel do
 
   defp normalize({:ok, response}, turn, model, started_at, completed_at) do
     classified = ReqLLM.Response.classify(response)
+    call_metadata = ReqLLM.Response.call_metadata(response)
     usage = ReqLLM.Usage.normalize(ReqLLM.Response.usage(response))
     next_turn = record_call(turn, usage)
 
@@ -158,6 +176,7 @@ defmodule Jido.AI.Actions.CallModel do
          finish_reason: classified.finish_reason,
          text: classified.text,
          tool_calls: Enum.map(classified.tool_calls, &Map.take(&1, [:id, :name, :arguments])),
+         req_llm_request_id: call_metadata[:request_id],
          response_id: response.id,
          model: model,
          usage: usage,
@@ -229,6 +248,19 @@ defmodule Jido.AI.Actions.CallModel do
     else
       options
     end
+  end
+
+  defp put_conversation_telemetry(options, turn) do
+    thread_id = turn.session |> Jido.Session.decode!() |> then(& &1.thread.id)
+
+    telemetry =
+      case field(options, :telemetry) do
+        value when is_map(value) -> value
+        value when is_list(value) -> Map.new(value)
+        _other -> %{}
+      end
+
+    Map.put(options, :telemetry, Map.put(telemetry, :conversation_id, thread_id))
   end
 
   defp update_provider_options(options, key, value) do

@@ -1,7 +1,7 @@
 {
   "ai": {
     "reasoning": {
-      "id": "jido.ai/strategy/react",
+      "id": "jido.ai/reasoning/react",
       "vsn": 1
     },
     "tools": [

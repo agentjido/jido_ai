@@ -9,14 +9,14 @@ defmodule Jido.AI do
         use Jido.AI.Agent, name: "my_agent"
 
         ai do
-          reasoning Jido.AI.Strategy.ReAct
+          reasoning Jido.AI.Reasoning.ReAct
         end
       end
 
   The Agent owns the runtime boundary. The reasoning Flow is the direct target
   of its request route. Jido AI does not add a hidden orchestration pipeline.
 
-  Flow components define the control behavior. The ReAct strategy uses one
+  Flow components define the control behavior. The canonical ReAct recipe uses one
   shared Invoke expander for model, review, tool, and terminal decisions. A
   Flow Parallel component executes validated tool calls as separate Action
   nodes and joins their ordered results.

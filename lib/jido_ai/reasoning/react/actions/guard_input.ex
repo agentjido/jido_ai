@@ -1,11 +1,13 @@
-defmodule Jido.AI.Actions.CheckInput do
-  @moduledoc "Applies the input guard before model work starts."
+defmodule Jido.AI.Reasoning.ReAct.Actions.GuardInput do
+  @moduledoc "Checks one request before the ReAct loop starts."
 
   @blocked_fragments ["ignore previous instructions", "reveal your system prompt"]
 
   use Jido.Action,
-    name: "jido_ai_check_input",
-    description: "Apply the Agent input guard",
+    id: "jido.ai/reasoning/react/actions/guard-input",
+    vsn: 1,
+    name: "jido_ai_react_guard_input",
+    description: "Check one request before model work starts",
     schema: Zoi.map(),
     output_schema: Zoi.map()
 
@@ -13,13 +15,13 @@ defmodule Jido.AI.Actions.CheckInput do
   def run(%{turn: turn}, context) do
     cond do
       reason = rejection_reason(turn.input) ->
-        {:ok, complete(turn, :input, reason)}
+        {:ok, blocked(:input, reason)}
 
       Map.get(turn, :review_tools, false) and not Jido.Exec.supports?(context, :waits) ->
-        {:ok, complete(turn, :review, "execution host does not support waits")}
+        {:ok, blocked(:review, "execution host does not support waits")}
 
       true ->
-        {:ok, %{kind: :model, input: %{turn: turn}}}
+        {:ok, %{allowed: true, guardrail: :none, reason: ""}}
     end
   end
 
@@ -41,23 +43,6 @@ defmodule Jido.AI.Actions.CheckInput do
     end
   end
 
-  defp complete(turn, guardrail, reason) do
-    %{
-      kind: :complete,
-      output: %{
-        turn: turn,
-        result: %{
-          status: :blocked,
-          output: "",
-          model_calls: 0,
-          tool_rounds: 0,
-          tool_calls: 0,
-          tool_errors: 0,
-          retries: 0,
-          guardrail: guardrail,
-          reason: reason
-        }
-      }
-    }
-  end
+  defp blocked(guardrail, reason),
+    do: %{allowed: false, guardrail: guardrail, reason: reason}
 end

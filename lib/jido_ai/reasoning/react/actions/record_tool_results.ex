@@ -1,18 +1,20 @@
-defmodule Jido.AI.Actions.RecordToolResults do
+defmodule Jido.AI.Reasoning.ReAct.Actions.RecordToolResults do
   @moduledoc "Appends ordered Parallel tool results to the Session."
 
-  alias Jido.AI.{Runtime, Thread.Projection}
+  alias Jido.AI.Thread.Projection
 
   use Jido.Action,
-    name: "jido_ai_record_tool_results",
+    id: "jido.ai/reasoning/react/actions/record-tool-results",
+    vsn: 1,
+    name: "jido_ai_react_record_tool_results",
     description: "Record tool results and continue the Agent graph",
     schema: Zoi.map(),
     output_schema: Zoi.map()
 
   @impl Jido.Action
-  def run(%{turn: turn, results: results}, context) do
+  def run(%{turn: turn, results: results}, _context) do
     refs = %{request_id: turn.request_id, run_id: turn.run_id}
-    at = Runtime.now_ms(context)
+    at = System.system_time(:millisecond)
 
     session_result =
       Enum.reduce_while(results, {:ok, Jido.Session.decode!(turn.session)}, fn result, {:ok, session} ->

@@ -55,6 +55,7 @@ defmodule JidoAi.MixProject do
 
   def application do
     [
+      mod: {Jido.AI.Application, []},
       extra_applications: [:logger]
     ]
   end
@@ -72,6 +73,9 @@ defmodule JidoAi.MixProject do
 
       # Runtime
       {:jason, "~> 1.4"},
+      {:telemetry, "~> 1.3"},
+      {:telemetry_metrics, "~> 1.2"},
+      {:opentelemetry_api, "~> 1.0", optional: true},
       {:zoi, "~> 0.18.11", override: true},
 
       # Dev/Test

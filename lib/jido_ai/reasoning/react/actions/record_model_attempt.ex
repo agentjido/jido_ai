@@ -1,10 +1,12 @@
-defmodule Jido.AI.Actions.RecordModelAttempt do
+defmodule Jido.AI.Reasoning.ReAct.Actions.RecordModelAttempt do
   @moduledoc "Records one model attempt and any accepted assistant message."
 
-  alias Jido.AI.{Runtime, Thread.Projection}
+  alias Jido.AI.Thread.Projection
 
   use Jido.Action,
-    name: "jido_ai_record_model_attempt",
+    id: "jido.ai/reasoning/react/actions/record-model-attempt",
+    vsn: 1,
+    name: "jido_ai_react_record_model_attempt",
     description: "Record a model attempt in the canonical Session",
     schema: Zoi.map(),
     output_schema: Zoi.map()
@@ -21,15 +23,16 @@ defmodule Jido.AI.Actions.RecordModelAttempt do
      }}
   end
 
-  def run(params, context) do
+  def run(params, _context) do
     turn = params.turn
     outcome = params.outcome
-    at = Runtime.now_ms(context)
+    at = System.system_time(:millisecond)
     refs = %{request_id: turn.request_id, run_id: turn.run_id}
 
     attempt = %{
       status: outcome.status,
       model: outcome.model,
+      req_llm_request_id: outcome[:req_llm_request_id],
       model_index: turn.model_index,
       model_call: turn.model_calls,
       model_attempt: turn.model_attempt,
@@ -68,6 +71,7 @@ defmodule Jido.AI.Actions.RecordModelAttempt do
         tool_calls: outcome.tool_calls,
         metadata: %{
           response_id: outcome.response_id,
+          req_llm_request_id: outcome[:req_llm_request_id],
           model: outcome.model,
           finish_reason: outcome.finish_reason,
           usage: outcome.usage
@@ -87,6 +91,7 @@ defmodule Jido.AI.Actions.RecordModelAttempt do
       :finish_reason,
       :text,
       :tool_calls,
+      :req_llm_request_id,
       :response_id,
       :model,
       :usage,

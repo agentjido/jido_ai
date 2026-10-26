@@ -30,7 +30,45 @@ defmodule Jido.AITest.SimpleAgent do
     description: "Answer one request with guardrails and multiple tools"
 
   ai do
-    reasoning Jido.AI.Strategy.ReAct
+    reasoning Jido.AI.Reasoning.ReAct
+
+    tools do
+      action Jido.AITest.Tools.Add
+      action Jido.AITest.Tools.Multiply
+    end
+  end
+end
+
+defmodule Jido.AITest.ConfiguredAgent do
+  use Jido.AI.Agent,
+    id: "jido.ai/agents/configured",
+    vsn: 1,
+    name: "jido_ai_configured_agent",
+    description: "Use compile-time defaults for the canonical ReAct graph"
+
+  ai do
+    reasoning Jido.AI.Reasoning.ReAct do
+      instructions "Answer as a careful support specialist."
+      model "anthropic:claude-sonnet-4-5"
+      fallback_models ["openai:gpt-5-mini"]
+
+      limits do
+        model_calls 6
+        tool_rounds 3
+        tool_calls 6
+        retries 1
+      end
+
+      context do
+        max_messages 32
+        max_bytes 100_000
+      end
+
+      prompt_cache do
+        enabled true
+        ttl "5m"
+      end
+    end
 
     tools do
       action Jido.AITest.Tools.Add

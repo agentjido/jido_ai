@@ -12,7 +12,7 @@ defmodule JidoAI.Examples.SimpleAgent do
     description: "Answer one request with guardrails and multiple tools"
 
   ai do
-    reasoning Jido.AI.Strategy.ReAct
+    reasoning Jido.AI.Reasoning.ReAct
 
     tools do
       action JidoAI.Examples.Tools.Add

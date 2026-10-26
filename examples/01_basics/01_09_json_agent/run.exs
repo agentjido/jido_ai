@@ -1,12 +1,12 @@
 Code.require_file("json_agent.ex", __DIR__)
 
-alias Jido.AI.Strategy
+alias Jido.AI.Reasoning.ReAct
 alias JidoAI.Examples.JSONAgent
 
 {:ok, definition} = JSONAgent.import()
 
 [%{handler: %{kind: :flow, target: root_flow}}] = definition.routes
-true = root_flow == Strategy.ReAct
+true = root_flow == ReAct
 
 IO.puts("Loaded Agent from JSON: #{definition.name}")
 IO.puts("Root reasoning Flow: #{inspect(root_flow)}")
