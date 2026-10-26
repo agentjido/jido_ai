@@ -1,7 +1,5 @@
 defmodule Jido.AI.Actions.ExpandToolResults do
-  @moduledoc """
-  Expands the next model round after the Parallel tool calls complete.
-  """
+  @moduledoc "Expands the next model round after tool Actions complete."
 
   use Jido.Action,
     name: "jido_ai_expand_tool_results",
@@ -10,7 +8,6 @@ defmodule Jido.AI.Actions.ExpandToolResults do
     output_schema: Zoi.map()
 
   @impl Jido.Action
-  def run(%{kind: :continue, input: input}, _context) do
-    {:continue, input, Jido.AI.Flows.ModelRound}
-  end
+  def run(%{kind: :continue, input: input}, _context),
+    do: {:continue, input, Jido.AI.Flows.ModelRound}
 end

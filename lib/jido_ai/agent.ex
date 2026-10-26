@@ -22,8 +22,8 @@ defmodule Jido.AI.Agent do
 
       ai do
         reasoning do
-          step "answer", question <- input(:question) do
-            {:ok, %{answer: question}}
+          step "answer", question <- input(:question), inline: [context: context] do
+            {:ok, %{state: context.agent_state, response: %{answer: question}}}
           end
 
           output result("answer")
@@ -31,7 +31,9 @@ defmodule Jido.AI.Agent do
       end
 
   The generated Agent accepts `jido.ai.request` Signals and replies with a
-  `jido.ai.response` Signal. The route does not change Agent state.
+  `jido.ai.response` Signal. The root Flow returns an explicit `%{state: ...,
+  response: ...}` envelope. The route commits the state and replies with the
+  response.
 
   The `ai` block lowers to the normal Jido Agent route model at compile time.
   `Jido.AI.Agent.Codec` gives this authoring boundary a versioned
@@ -52,6 +54,10 @@ defmodule Jido.AI.Agent do
       use Jido.Agent, unquote(Macro.escape(options))
 
       import Jido.AI.Agent, only: [ai: 1]
+
+      state do
+        schema Zoi.object(%{session: Jido.AI.Thread.Projection.schema()})
+      end
 
       @before_compile Jido.AI.Agent
     end
@@ -134,8 +140,8 @@ defmodule Jido.AI.Agent do
         signal_source unquote(signal_source)
 
         route unquote(@request_type), unquote(target), as: :request do
-          state(:unchanged)
-          reply(unquote(@response_type), from: output())
+          state(from: output(:state))
+          reply(unquote(@response_type), from: output(:response))
         end
       end
     end
@@ -149,12 +155,13 @@ defmodule Jido.AI.Agent do
         signal_source unquote(signal_source)
 
         route unquote(@request_type), as: :request do
-          flow name: "reasoning" do
+          flow name: "reasoning",
+               output_schema: Zoi.object(%{state: Zoi.map(), response: Zoi.map()}) do
             unquote(body)
           end
 
-          state(:unchanged)
-          reply(unquote(@response_type), from: output())
+          state(from: output(:state))
+          reply(unquote(@response_type), from: output(:response))
         end
       end
     end

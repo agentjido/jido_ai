@@ -1,7 +1,7 @@
 defmodule Jido.AI.Actions.RecordToolResults do
-  @moduledoc """
-  Adds ordered Parallel tool results to portable history and returns to the model.
-  """
+  @moduledoc "Appends ordered Parallel tool results to the Session."
+
+  alias Jido.AI.{Conversation, Runtime, Thread.Projection}
 
   use Jido.Action,
     name: "jido_ai_record_tool_results",
@@ -10,31 +10,62 @@ defmodule Jido.AI.Actions.RecordToolResults do
     output_schema: Zoi.map()
 
   @impl Jido.Action
-  def run(params, _context) do
-    messages =
-      Enum.map(params.results, fn result ->
-        %{
+  def run(%{turn: turn, results: results}, context) do
+    refs = %{request_id: turn.request_id, run_id: turn.run_id}
+    at = Runtime.now_ms(context)
+
+    session_result =
+      Enum.reduce_while(results, {:ok, Conversation.decode!(turn.session)}, fn result, {:ok, session} ->
+        {status, output} = tool_output(result.outcome)
+
+        message = %{
           role: :tool,
+          content: "",
           name: result.name,
           tool_call_id: result.id,
-          output: result.output
+          output: output,
+          metadata: %{status: status}
         }
+
+        case Projection.append(session, message, refs, at) do
+          {:ok, next} -> {:cont, {:ok, next}}
+          error -> {:halt, error}
+        end
       end)
 
-    next_input = %{
-      allowed_tools: params.allowed_tools,
-      history: params.history ++ messages,
-      input: params.input,
-      iteration: params.iteration,
-      max_iterations: params.max_iterations,
-      max_tool_calls: params.max_tool_calls,
-      tool_call_count: params.tool_call_count + length(params.results)
-    }
+    with {:ok, session} <- session_result do
+      errors = Enum.count(results, &(tool_status(&1.outcome) == :error))
 
-    {:ok,
+      next_turn = %{
+        turn
+        | session: Conversation.encode(session),
+          model_attempt: 0,
+          tool_rounds: turn.tool_rounds + 1,
+          tool_call_count: turn.tool_call_count + length(results),
+          tool_error_count: turn.tool_error_count + errors,
+          model_outcome: nil,
+          repair_instruction: nil
+      }
+
+      {:ok, %{kind: :continue, input: %{turn: next_turn}}}
+    end
+  end
+
+  defp tool_output(%{status: :ok, value: value}), do: {:ok, value}
+
+  defp tool_output(%{status: :error, error: error}) do
+    {:error,
      %{
-       kind: :continue,
-       input: next_input
+       status: "error",
+       error: %{
+         type: field(error, :type) || "tool_error",
+         message: field(error, :message) || "tool action failed",
+         retryable: field(error, :retryable?) == true
+       }
      }}
   end
+
+  defp tool_status(%{status: status}) when status in [:ok, :error], do: status
+  defp field(map, key) when is_map(map), do: Map.get(map, key, Map.get(map, Atom.to_string(key)))
+  defp field(_value, _key), do: nil
 end

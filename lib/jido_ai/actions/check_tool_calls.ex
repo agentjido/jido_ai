@@ -1,24 +1,23 @@
 defmodule Jido.AI.Actions.CheckToolCalls do
-  @moduledoc """
-  Applies allow-list, argument, group, and request limits to tool calls.
-  """
+  @moduledoc "Applies limits and policy before a group of tool calls runs."
 
   use Jido.Action,
     name: "jido_ai_check_tool_calls",
-    description: "Apply the Agent tool guardrail",
+    description: "Apply the Agent tool guard",
     schema: Zoi.map(),
     output_schema: Zoi.map()
 
   @impl Jido.Action
-  def run(params, _context) do
-    case rejection_reason(params) do
-      nil -> {:ok, continue(params)}
-      {guardrail, reason} -> {:ok, complete(params, guardrail, reason)}
+  def run(%{turn: turn}, _context) do
+    case rejection_reason(turn) do
+      nil when turn.review_tools -> {:ok, %{kind: :review, input: %{turn: turn}}}
+      nil -> {:ok, %{kind: :continue, input: %{turn: turn}}}
+      {guardrail, reason} -> {:ok, complete(turn, guardrail, reason)}
     end
   end
 
-  defp rejection_reason(params) do
-    calls = params.tool_calls
+  defp rejection_reason(turn) do
+    calls = turn.model_outcome.tool_calls
     names = Enum.map(calls, & &1.name)
     ids = Enum.map(calls, & &1.id)
 
@@ -29,10 +28,10 @@ defmodule Jido.AI.Actions.CheckToolCalls do
       length(calls) > 4 ->
         {:tool, "one model response can contain at most 4 tool calls"}
 
-      params.tool_call_count + length(calls) > params.max_tool_calls ->
+      turn.tool_call_count + length(calls) > turn.max_tool_calls ->
         {:limits, "maximum tool calls reached"}
 
-      Enum.any?(names, &(&1 not in params.allowed_tools)) ->
+      Enum.any?(names, &(&1 not in turn.allowed_tools)) ->
         {:tool, "model requested a tool that is not allowed"}
 
       length(ids) != length(Enum.uniq(ids)) ->
@@ -52,35 +51,22 @@ defmodule Jido.AI.Actions.CheckToolCalls do
     end)
   end
 
-  defp continue(params) do
-    input =
-      Map.take(params, [
-        :allowed_tools,
-        :history,
-        :input,
-        :iteration,
-        :max_iterations,
-        :max_tool_calls,
-        :tool_call_count,
-        :tool_calls
-      ])
-
-    %{
-      kind: :continue,
-      input: input
-    }
-  end
-
-  defp complete(params, guardrail, reason) do
+  defp complete(turn, guardrail, reason) do
     %{
       kind: :complete,
-      result: %{
-        status: :blocked,
-        output: "",
-        iterations: params.iteration,
-        tool_calls: params.tool_call_count,
-        guardrail: guardrail,
-        reason: reason
+      output: %{
+        turn: turn,
+        result: %{
+          status: :blocked,
+          output: "",
+          model_calls: turn.model_calls,
+          tool_rounds: turn.tool_rounds,
+          tool_calls: turn.tool_call_count,
+          tool_errors: turn.tool_error_count,
+          retries: turn.retries,
+          guardrail: guardrail,
+          reason: reason
+        }
       }
     }
   end

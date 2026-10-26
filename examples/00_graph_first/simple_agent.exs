@@ -4,7 +4,13 @@ program = SimpleAgent.route_executable!("jido.ai.request")
 
 IO.puts("Agent route: jido.ai.request -> #{inspect(program)} -> jido.ai.response")
 
-for flow <- [program, Flows.ModelRound, Flows.ToolRound] do
+for flow <- [
+      program,
+      Flows.ModelRound,
+      Flows.ToolRound,
+      Flows.ToolReview,
+      Flows.Finalize
+    ] do
   IO.puts("Graph: #{inspect(flow)}")
 
   flow.flow().components
@@ -13,14 +19,18 @@ for flow <- [program, Flows.ModelRound, Flows.ToolRound] do
 end
 
 tool_input = %{
-  tool_calls: [
-    %{id: "add-1", name: "add", arguments: %{"left" => 2, "right" => 3}},
-    %{
-      id: "multiply-1",
-      name: "multiply",
-      arguments: %{"left" => 4, "right" => 5}
+  turn: %{
+    model_outcome: %{
+      tool_calls: [
+        %{id: "add-1", name: "add", arguments: %{"left" => 2, "right" => 3}},
+        %{
+          id: "multiply-1",
+          name: "multiply",
+          arguments: %{"left" => 4, "right" => 5}
+        }
+      ]
     }
-  ]
+  }
 }
 
 {:continue, ^tool_input, tool_flow} =
@@ -47,11 +57,34 @@ agent = SimpleAgent.instantiate!(id: "graph-first-example")
 request =
   SimpleAgent.request_signal!(%{
     input:
-      "Use add for 2 plus 3 and multiply for 4 times 5. Use both tools in the same round, then report both results."
+      "Use add for 2 plus 3 and multiply for 4 times 5. Use both tools in the same round, then report both results.",
+    stream: true
   })
 
-{:ok, unchanged_agent, [%Jido.Agent.Directive.Reply{signal: response}]} =
-  SimpleAgent.cmd(agent, request)
+{:ok, next_agent, [%Jido.Agent.Directive.Reply{signal: response}]} =
+  SimpleAgent.cmd(agent, request, context: %{jido_ai_dispatch: {:pid, target: self()}})
 
 IO.inspect(response.data, label: "Result")
-IO.inspect(unchanged_agent.state, label: "Agent state")
+
+drain = fn drain, signals ->
+  receive do
+    {:signal, signal} -> drain.(drain, [signal | signals])
+  after
+    0 -> Enum.reverse(signals)
+  end
+end
+
+stream_signals = drain.(drain, [])
+IO.inspect(Enum.map(stream_signals, & &1.type), label: "Stream Signals")
+
+session = next_agent.state.session
+
+IO.inspect(
+  %{
+    session_id: session.id,
+    thread_id: session.thread.id,
+    thread_rev: session.thread.rev,
+    entry_kinds: Enum.map(session.thread.entries, & &1.kind)
+  },
+  label: "Committed conversation"
+)

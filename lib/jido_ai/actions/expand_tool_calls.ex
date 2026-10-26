@@ -1,22 +1,24 @@
 defmodule Jido.AI.Actions.ExpandToolCalls do
-  @moduledoc """
-  Completes a rejected tool request or expands validated calls as a Parallel Flow.
-  """
+  @moduledoc "Expands validated calls as a Parallel Flow or starts a review wait."
 
   alias Jido.AI.ToolRegistry
   alias Jido.Flow.Ref
 
   use Jido.Action,
     name: "jido_ai_expand_tool_calls",
-    description: "Expand validated model tool calls as a Parallel Flow",
+    description: "Expand validated model tool calls",
     schema: Zoi.map(),
     output_schema: Zoi.map()
 
   @impl Jido.Action
-  def run(%{kind: :complete, result: result}, _context), do: {:ok, result}
+  def run(%{kind: :complete, output: output}, _context),
+    do: {:continue, output, Jido.AI.Flows.Finalize}
 
-  def run(%{kind: :continue, input: %{tool_calls: tool_calls} = input}, _context) do
-    with {:ok, calls} <- resolve_calls(tool_calls),
+  def run(%{kind: :review, input: input}, _context),
+    do: {:continue, input, Jido.AI.Flows.ToolReview}
+
+  def run(%{kind: :continue, input: %{turn: turn} = input}, _context) do
+    with {:ok, calls} <- resolve_calls(turn.model_outcome.tool_calls),
          {:ok, flow} <- build_flow(calls) do
       {:continue, input, flow}
     end
@@ -43,8 +45,8 @@ defmodule Jido.AI.Actions.ExpandToolCalls do
   defp build_flow(calls) do
     Jido.Flow.new(%{
       name: "jido_ai_tool_calls",
-      description: "Execute validated model tool calls as parallel Action nodes",
-      schema: Zoi.map(),
+      description: "Execute validated tool calls as parallel Actions",
+      schema: Zoi.object(%{turn: Zoi.any()}),
       output_schema: Zoi.map(),
       components: [parallel(calls), continuation(calls)],
       output: Ref.result("next")
@@ -55,15 +57,12 @@ defmodule Jido.AI.Actions.ExpandToolCalls do
     %{
       kind: :parallel,
       name: "tools",
+      on_error: :collect_errors,
       actions:
         calls
         |> Enum.with_index()
         |> Enum.map(fn {call, index} ->
-          %{
-            name: action_name(index),
-            action: call.action,
-            params: call.params
-          }
+          %{name: action_name(index), action: call.action, params: call.params}
         end)
     }
   end
@@ -75,14 +74,8 @@ defmodule Jido.AI.Actions.ExpandToolCalls do
       decision: Jido.AI.Actions.RecordToolResults,
       expander: Jido.AI.Actions.ExpandToolResults,
       params: %{
-        allowed_tools: Ref.input(:allowed_tools),
-        history: Ref.input(:history),
-        input: Ref.input(:input),
-        iteration: Ref.input(:iteration),
-        max_iterations: Ref.input(:max_iterations),
-        max_tool_calls: Ref.input(:max_tool_calls),
-        results: result_refs(calls),
-        tool_call_count: Ref.input(:tool_call_count)
+        turn: Ref.input(:turn),
+        results: result_refs(calls)
       }
     }
   end
@@ -91,11 +84,7 @@ defmodule Jido.AI.Actions.ExpandToolCalls do
     calls
     |> Enum.with_index()
     |> Enum.map(fn {call, index} ->
-      %{
-        id: call.id,
-        name: call.name,
-        output: Ref.result("tools", [index, :value])
-      }
+      %{id: call.id, name: call.name, outcome: Ref.result("tools", [index])}
     end)
   end
 

@@ -102,8 +102,8 @@ defmodule Jido.AI.Agent.Codec do
       %{
         path: @request_type,
         handler: %{kind: :flow, target: target},
-        state: :unchanged,
-        reply: %{type: @response_type, from: %{source: :output, path: []}}
+        state: %{source: :output, path: [:state]},
+        reply: %{type: @response_type, from: %{source: :output, path: [:response]}}
       } ->
         {:ok, target}
 
@@ -177,8 +177,8 @@ defmodule Jido.AI.Agent.Codec do
       as: :request,
       defaults: %{},
       handler: %{kind: :flow, target: reasoning},
-      state: :unchanged,
-      reply: %{type: @response_type, from: %{source: :output, path: []}}
+      state: %{source: :output, path: [:state]},
+      reply: %{type: @response_type, from: %{source: :output, path: [:response]}}
     }
 
     result =

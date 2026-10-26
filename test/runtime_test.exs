@@ -1,0 +1,645 @@
+defmodule Jido.AI.RuntimeTest do
+  use ExUnit.Case, async: false
+
+  import Mimic
+
+  alias Jido.AI.{SimpleAgent, Thread.Projection}
+  alias Jido.AgentServer, as: Server
+
+  setup :set_mimic_global
+  setup :verify_on_exit!
+
+  test "a second request projects the complete committed conversation" do
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    expect(ReqLLM, :generate_text, 2, fn model, context, _options ->
+      call = Agent.get_and_update(calls, fn count -> {count + 1, count + 1} end)
+      messages = ReqLLM.Context.to_list(context)
+
+      case call do
+        1 ->
+          assert Enum.map(messages, & &1.role) == [:system, :user]
+          {:ok, response(model, context, "First answer", "first")}
+
+        2 ->
+          assert Enum.map(messages, & &1.role) == [:system, :user, :assistant, :user]
+
+          assert Enum.map(Enum.drop(messages, 1), &message_text/1) == [
+                   "First question",
+                   "First answer",
+                   "Second question"
+                 ]
+
+          {:ok, response(model, context, "Second answer", "second")}
+      end
+    end)
+
+    agent = SimpleAgent.instantiate!(id: "conversation-agent")
+    {:ok, _first, agent} = run(agent, %{input: "First question"})
+    {:ok, second, agent} = run(agent, %{input: "Second question"})
+
+    assert second.output == "Second answer"
+    assert agent.state.session.rev == 8
+
+    messages =
+      agent.state.session.thread.entries
+      |> Enum.filter(&(&1.kind == :ai_message))
+      |> Enum.map(& &1.payload["role"])
+
+    assert messages == ["user", "assistant", "user", "assistant"]
+  end
+
+  test "prompt-cache configuration and observed lifetime remain in the result and Thread" do
+    usage = %{
+      input_tokens: 100,
+      output_tokens: 10,
+      cache_read_tokens: 0,
+      cache_write_tokens: 80,
+      cache_write_tokens_by_ttl: %{"5m" => 80},
+      input_includes_cached: true
+    }
+
+    expect(ReqLLM, :generate_text, fn model, context, options ->
+      assert options[:provider_options] == %{
+               prompt_cache_key: "session:cache-agent",
+               prompt_cache_options: %{ttl: "5m"}
+             }
+
+      {:ok, response(model, context, "Cached answer", "cache", usage)}
+    end)
+
+    agent = SimpleAgent.instantiate!(id: "cache-agent")
+
+    assert {:ok, result, agent} =
+             run(
+               agent,
+               %{input: "Cache this", prompt_cache: %{enabled: true, ttl: "5m"}},
+               context: %{jido_ai_now_ms: 1_000_000}
+             )
+
+    assert result.prompt_cache.enabled
+    assert result.prompt_cache.usage.cache_write_tokens == 80
+    [segment] = result.prompt_cache.segments
+    assert segment.token_count == 80
+    assert segment.observed_write_at_ms == 1_000_000
+    assert segment.expires_at_ms == 1_300_000
+
+    outcome = List.last(agent.state.session.thread.entries)
+    assert outcome.kind == :ai_request_outcome
+    assert get_in(outcome.payload, ["prompt_cache", "segments", Access.at(0), "ttl_ms"]) == 300_000
+  end
+
+  test "a retryable provider failure can fall back without becoming a conversation message" do
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    expect(ReqLLM, :generate_text, 2, fn model, context, _options ->
+      call = Agent.get_and_update(calls, fn count -> {count + 1, count + 1} end)
+
+      case call do
+        1 ->
+          assert model == "openai:gpt-4o-mini"
+
+          {:error,
+           ReqLLM.Error.API.Request.exception(
+             reason: "too many requests",
+             status: 429,
+             request_body: %{api_key: "must-not-be-recorded"}
+           )}
+
+        2 ->
+          assert model == "anthropic:claude-haiku-4-5"
+          assert Enum.map(ReqLLM.Context.to_list(context), & &1.role) == [:system, :user]
+          {:ok, response(model, context, "Fallback answer", "fallback")}
+      end
+    end)
+
+    agent = SimpleAgent.instantiate!(id: "fallback-agent")
+
+    assert {:ok, result, agent} =
+             run(agent, %{
+               input: "Use a fallback",
+               fallback_models: ["anthropic:claude-haiku-4-5"],
+               max_retries: 0
+             })
+
+    assert result.status == :completed
+    assert result.output == "Fallback answer"
+    assert result.model_calls == 2
+    assert result.retries == 1
+
+    roles =
+      agent.state.session.thread.entries
+      |> Enum.filter(&(&1.kind == :ai_message))
+      |> Enum.map(& &1.payload["role"])
+
+    assert roles == ["user", "assistant"]
+    attempts = Jido.Thread.filter_by_kind(agent.state.session.thread, :ai_model_attempt)
+    assert length(attempts) == 2
+    refute attempts |> hd() |> Map.fetch!(:payload) |> Jason.encode!() =~ "must-not-be-recorded"
+  end
+
+  test "a successful tool round starts a new retry budget for the next model round" do
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    expect(ReqLLM, :generate_text, 3, fn model, context, _options ->
+      call = Agent.get_and_update(calls, fn count -> {count + 1, count + 1} end)
+
+      case call do
+        1 ->
+          tool_calls = [ReqLLM.ToolCall.new("add-retry", "add", ~s({"left":8,"right":5}))]
+          {:ok, tool_response(model, context, tool_calls, "tool-request")}
+
+        2 ->
+          {:error, :timeout}
+
+        3 ->
+          assert Enum.map(ReqLLM.Context.to_list(context), & &1.role) == [
+                   :system,
+                   :user,
+                   :assistant,
+                   :tool
+                 ]
+
+          {:ok, response(model, context, "The result is 13.", "retry-complete")}
+      end
+    end)
+
+    agent = SimpleAgent.instantiate!(id: "tool-retry-agent")
+
+    assert {:ok, result, agent} =
+             run(agent, %{input: "Add 8 and 5", max_retries: 1})
+
+    assert result.status == :completed
+    assert result.output == "The result is 13."
+    assert result.model_calls == 3
+    assert result.tool_rounds == 1
+    assert result.retries == 1
+    assert result.tool_calls == 1
+    assert length(Jido.Thread.filter_by_kind(agent.state.session.thread, :ai_model_attempt)) == 3
+  end
+
+  test "two sequential tool rounds keep a valid model conversation" do
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    expect(ReqLLM, :generate_text, 3, fn model, context, _options ->
+      case Agent.get_and_update(calls, fn count -> {count + 1, count + 1} end) do
+        1 ->
+          tool_calls = [ReqLLM.ToolCall.new("add-round", "add", ~s({"left":2,"right":3}))]
+          {:ok, tool_response(model, context, tool_calls, "round-one", usage(10, 2, 3, 0))}
+
+        2 ->
+          assert roles(context) == [:system, :user, :assistant, :tool]
+
+          tool_calls = [
+            ReqLLM.ToolCall.new("multiply-round", "multiply", ~s({"left":5,"right":4}))
+          ]
+
+          {:ok, tool_response(model, context, tool_calls, "round-two", usage(20, 2, 0, 5))}
+
+        3 ->
+          assert roles(context) == [
+                   :system,
+                   :user,
+                   :assistant,
+                   :tool,
+                   :assistant,
+                   :tool
+                 ]
+
+          {:ok, response(model, context, "The result is 20.", "round-final", usage(30, 4, 2, 0))}
+      end
+    end)
+
+    agent = SimpleAgent.instantiate!(id: "multi-round-agent")
+    assert {:ok, result, agent} = run(agent, %{input: "Add 2 and 3, then multiply by 4"})
+
+    assert result.status == :completed
+    assert result.output == "The result is 20."
+    assert result.model_calls == 3
+    assert result.tool_rounds == 2
+    assert result.tool_calls == 2
+    assert result.usage.input_tokens == 60
+    assert result.usage.output_tokens == 8
+    assert result.usage.cache_read_tokens == 5
+    assert result.usage.cache_write_tokens == 5
+    assert length(result.model_attempts) == 3
+    assert length(result.prompt_cache.attempts) == 3
+
+    messages =
+      agent.state.session.thread.entries
+      |> Enum.filter(&(&1.kind == :ai_message))
+      |> Enum.map(& &1.payload["role"])
+
+    assert messages == ["user", "assistant", "tool", "assistant", "tool", "assistant"]
+  end
+
+  test "the hard model-call budget stops a continued tool loop before another provider call" do
+    expect(ReqLLM, :generate_text, fn model, context, _options ->
+      calls = [ReqLLM.ToolCall.new("budget-add", "add", ~s({"left":2,"right":3}))]
+      {:ok, tool_response(model, context, calls, "budget-tool")}
+    end)
+
+    agent = SimpleAgent.instantiate!(id: "model-budget-agent")
+
+    assert {:ok, result, _agent} =
+             run(agent, %{input: "Add 2 and 3", max_model_calls: 1})
+
+    assert result.status == :blocked
+    assert result.guardrail == :limits
+    assert result.reason == "maximum model calls reached"
+    assert result.model_calls == 1
+    assert result.tool_rounds == 1
+    assert result.tool_calls == 1
+  end
+
+  test "a tool Action failure becomes a tool result that the model can repair" do
+    expect(Jido.AI.Tools.Add, :run, fn _params, _context ->
+      {:error, Jido.Action.Error.execution_error("calculator unavailable", retry: true)}
+    end)
+
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    expect(ReqLLM, :generate_text, 2, fn model, context, _options ->
+      case Agent.get_and_update(calls, fn count -> {count + 1, count + 1} end) do
+        1 ->
+          tool_calls = [ReqLLM.ToolCall.new("failed-add", "add", ~s({"left":2,"right":3}))]
+          {:ok, tool_response(model, context, tool_calls, "failed-tool")}
+
+        2 ->
+          assert roles(context) == [:system, :user, :assistant, :tool]
+          tool_result = context |> ReqLLM.Context.to_list() |> List.last()
+
+          assert tool_result.metadata.tool_output == %{
+                   "status" => "error",
+                   "error" => %{
+                     "type" => "execution_error",
+                     "message" => "calculator unavailable",
+                     "retryable" => true
+                   }
+                 }
+
+          {:ok, response(model, context, "The calculator is unavailable.", "tool-repair")}
+      end
+    end)
+
+    agent = SimpleAgent.instantiate!(id: "tool-error-agent")
+    assert {:ok, result, _agent} = run(agent, %{input: "Add 2 and 3"})
+    assert result.status == :completed
+    assert result.tool_calls == 1
+    assert result.tool_errors == 1
+    assert result.tool_rounds == 1
+  end
+
+  test "a truncated model response starts repair and is not committed as an assistant message" do
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    expect(ReqLLM, :generate_text, 2, fn model, context, _options ->
+      case Agent.get_and_update(calls, fn count -> {count + 1, count + 1} end) do
+        1 ->
+          {:ok, response(model, context, "Partial answer", "truncated", nil, :length)}
+
+        2 ->
+          assert roles(context) == [:system, :user, :system]
+          repair = context |> ReqLLM.Context.to_list() |> List.last()
+          assert message_text(repair) =~ "token limit"
+          {:ok, response(model, context, "Complete answer", "repaired")}
+      end
+    end)
+
+    agent = SimpleAgent.instantiate!(id: "finish-repair-agent")
+    assert {:ok, result, agent} = run(agent, %{input: "Give a complete answer"})
+    assert result.status == :completed
+    assert result.output == "Complete answer"
+    assert result.model_calls == 2
+    assert result.retries == 1
+
+    assistant_messages =
+      Enum.filter(agent.state.session.thread.entries, fn entry ->
+        entry.kind == :ai_message and entry.payload["role"] == "assistant"
+      end)
+
+    assert Enum.map(assistant_messages, & &1.payload["content"]) == ["Complete answer"]
+  end
+
+  test "conversation projection removes an incomplete tool exchange but keeps later messages" do
+    session = Jido.Session.new(id: "session:projection", now: 1)
+
+    {:ok, session} =
+      Projection.append(session, %{role: :user, content: "First request"}, %{}, 2)
+
+    {:ok, session} =
+      Projection.append(
+        session,
+        %{
+          role: :assistant,
+          content: "",
+          tool_calls: [%{id: "unfinished", name: "add", arguments: %{"left" => 1, "right" => 2}}]
+        },
+        %{},
+        3
+      )
+
+    {:ok, session} =
+      Projection.append(session, %{role: :user, content: "Start again"}, %{}, 4)
+
+    {:ok, session} =
+      Projection.append(session, %{role: :assistant, content: "Ready"}, %{}, 5)
+
+    assert {:ok, messages} = Projection.messages(session)
+
+    assert Enum.map(messages, &{&1.role, &1.content}) == [
+             {:user, "First request"},
+             {:user, "Start again"},
+             {:assistant, "Ready"}
+           ]
+  end
+
+  test "conversation projection keeps complete recent turns within its configured window" do
+    session = Jido.Session.new(id: "session:bounded-projection", now: 1)
+
+    session =
+      Enum.reduce(
+        [
+          %{role: :user, content: "First question"},
+          %{role: :assistant, content: "First answer"},
+          %{role: :user, content: "Second question"},
+          %{role: :assistant, content: "Second answer"}
+        ],
+        session,
+        fn message, current ->
+          {:ok, next} = Projection.append(current, message, %{}, current.rev + 2)
+          next
+        end
+      )
+
+    assert {:ok, projection} = Projection.project(session, %{max_messages: 2, max_bytes: 10_000})
+    assert projection.available_messages == 4
+    assert projection.included_messages == 2
+    assert projection.dropped_messages == 2
+
+    assert Enum.map(projection.messages, &{&1.role, &1.content}) == [
+             {:user, "Second question"},
+             {:assistant, "Second answer"}
+           ]
+  end
+
+  test "streaming publishes ordered Jido Signals and commits one assistant message" do
+    expect(ReqLLM, :stream_text, fn model, context, _options ->
+      model_record = ReqLLM.model!(model)
+      complete = response(model, context, "Streamed answer", "streamed", %{input_tokens: 5, output_tokens: 2})
+      {:ok, ReqLLM.Cache.stream_response(complete, model_record, context)}
+    end)
+
+    agent = SimpleAgent.instantiate!(id: "stream-agent")
+    dispatch = {:pid, target: self()}
+
+    assert {:ok, result, agent} =
+             run(agent, %{input: "Stream this", stream: true}, context: %{jido_ai_dispatch: dispatch})
+
+    assert result.output == "Streamed answer"
+    signals = receive_stream([])
+    assert Enum.map(signals, & &1.type) |> List.first() == "jido.ai.model.stream.started"
+    assert Enum.map(signals, & &1.type) |> List.last() == "jido.ai.model.stream.completed"
+
+    sequences = Enum.map(signals, & &1.data.sequence)
+    assert sequences == Enum.sort(sequences)
+    assert Enum.any?(signals, &(&1.type == "jido.ai.model.stream.chunk"))
+
+    assistant_entries =
+      Enum.filter(agent.state.session.thread.entries, fn entry ->
+        entry.kind == :ai_message and entry.payload["role"] == "assistant"
+      end)
+
+    assert length(assistant_entries) == 1
+  end
+
+  test "streaming identifies each model call across a tool round" do
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    expect(ReqLLM, :stream_text, 2, fn model, context, _options ->
+      complete =
+        case Agent.get_and_update(calls, fn count -> {count + 1, count + 1} end) do
+          1 ->
+            tool_calls = [ReqLLM.ToolCall.new("stream-add", "add", ~s({"left":2,"right":3}))]
+            tool_response(model, context, tool_calls, "stream-tool")
+
+          2 ->
+            assert roles(context) == [:system, :user, :assistant, :tool]
+            response(model, context, "The result is 5.", "stream-final")
+        end
+
+      {:ok, ReqLLM.Cache.stream_response(complete, ReqLLM.model!(model), context)}
+    end)
+
+    agent = SimpleAgent.instantiate!(id: "multi-stream-agent")
+    dispatch = {:pid, target: self()}
+
+    assert {:ok, result, _agent} =
+             run(
+               agent,
+               %{input: "Add 2 and 3", stream: true},
+               context: %{jido_ai_dispatch: dispatch}
+             )
+
+    assert result.status == :completed
+    assert result.model_calls == 2
+    assert result.tool_rounds == 1
+
+    completed =
+      []
+      |> receive_available_streams()
+      |> Enum.filter(&(&1.type == "jido.ai.model.stream.completed"))
+
+    assert Enum.map(completed, & &1.data.model_call) == [1, 2]
+    assert Enum.map(completed, & &1.data.tool_rounds) == [0, 1]
+    assert Enum.map(completed, & &1.data.outcome) == [:tool_calls, :final_answer]
+    assert completed |> Enum.map(& &1.data.stream_id) |> Enum.uniq() |> length() == 2
+  end
+
+  @tag :tmp_dir
+  test "AgentServer persists conversation state and restores it for the next request", context do
+    {instance, server, persistence, id} = start_persisted_agent(context.tmp_dir, "history")
+
+    expect(ReqLLM, :generate_text, 2, fn model, llm_context, _options ->
+      roles = Enum.map(ReqLLM.Context.to_list(llm_context), & &1.role)
+
+      case roles do
+        [:system, :user] ->
+          {:ok, response(model, llm_context, "Before restart", "before")}
+
+        [:system, :user, :assistant, :user] ->
+          {:ok, response(model, llm_context, "After restart", "after")}
+      end
+    end)
+
+    assert {:ok, first_agent, _directives} =
+             Server.call(server, SimpleAgent.request_signal!(%{input: "Before"}))
+
+    assert first_agent.state.session.rev == 4
+    assert :ok = Server.hibernate(server)
+    assert {:ok, restored} = Jido.thaw(instance, SimpleAgent, id, persistence: persistence)
+    assert :ok = Server.await_ready(restored)
+
+    assert {:ok, second_agent, _directives} =
+             Server.call(restored, SimpleAgent.request_signal!(%{input: "After"}))
+
+    assert second_agent.state.session.rev == 8
+  end
+
+  @tag :tmp_dir
+  test "a tool review wait survives restart and resumes the same graph", context do
+    {instance, server, persistence, id} = start_persisted_agent(context.tmp_dir, "review")
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    expect(ReqLLM, :generate_text, 2, fn model, llm_context, _options ->
+      call = Agent.get_and_update(calls, fn count -> {count + 1, count + 1} end)
+
+      case call do
+        1 ->
+          tool_calls = [ReqLLM.ToolCall.new("add-review", "add", ~s({"left":2,"right":3}))]
+          {:ok, tool_response(model, llm_context, tool_calls, "review-tools")}
+
+        2 ->
+          assert Enum.map(ReqLLM.Context.to_list(llm_context), & &1.role) == [
+                   :system,
+                   :user,
+                   :assistant,
+                   :tool
+                 ]
+
+          {:ok, response(model, llm_context, "Approved result: 5", "review-final")}
+      end
+    end)
+
+    request = SimpleAgent.request_signal!(%{input: "Add 2 and 3", review_tools: true})
+    pending = Server.submit(server, request)
+    wait = waiting(server)
+
+    assert :ok = Server.hibernate(server)
+    assert {:error, _reason} = Server.await(pending)
+    assert {:ok, restored} = Jido.thaw(instance, SimpleAgent, id, persistence: persistence)
+    assert :ok = Server.await_ready(restored)
+
+    restored_wait = waiting(restored)
+    assert restored_wait.id == wait.id
+
+    approval =
+      Jido.Signal.new!("jido.ai.review.approved", %{request_id: request.id}, source: "/tests")
+
+    assert :ok = Server.deliver_wait(restored, restored_wait.id, approval)
+    assert :ok = Server.quiesce(restored)
+
+    session = Server.agent(restored).state.session
+    reviews = Jido.Thread.filter_by_kind(session.thread, :ai_review)
+    assert Enum.map(reviews, & &1.payload["status"]) == ["requested", "approved"]
+
+    assistant =
+      session.thread.entries
+      |> Enum.filter(&(&1.kind == :ai_message and &1.payload["role"] == "assistant"))
+      |> List.last()
+
+    assert assistant.payload["content"] == "Approved result: 5"
+  end
+
+  defp run(agent, params, opts \\ []) do
+    signal = SimpleAgent.request_signal!(params)
+
+    case SimpleAgent.cmd(agent, signal, opts) do
+      {:ok, next_agent, [%Jido.Agent.Directive.Reply{signal: reply}]} ->
+        {:ok, reply.data, next_agent}
+
+      other ->
+        other
+    end
+  end
+
+  defp response(model, context, text, id, usage \\ nil, finish_reason \\ :stop) do
+    %ReqLLM.Response{
+      id: id,
+      model: model,
+      context: context,
+      finish_reason: finish_reason,
+      message: ReqLLM.Context.assistant(text),
+      usage: usage
+    }
+  end
+
+  defp tool_response(model, context, calls, id, usage \\ nil) do
+    %ReqLLM.Response{
+      id: id,
+      model: model,
+      context: context,
+      finish_reason: :tool_calls,
+      message: ReqLLM.Context.assistant("", tool_calls: calls),
+      usage: usage
+    }
+  end
+
+  defp message_text(message), do: Enum.map_join(message.content, &(&1.text || ""))
+  defp roles(context), do: Enum.map(ReqLLM.Context.to_list(context), & &1.role)
+
+  defp usage(input, output, cache_read, cache_write) do
+    %{
+      input_tokens: input,
+      output_tokens: output,
+      cache_read_tokens: cache_read,
+      cache_write_tokens: cache_write,
+      input_includes_cached: true
+    }
+  end
+
+  defp receive_stream(signals) do
+    receive do
+      {:signal, signal} ->
+        next = signals ++ [signal]
+
+        if signal.type == "jido.ai.model.stream.completed",
+          do: next,
+          else: receive_stream(next)
+    after
+      1_000 -> flunk("stream did not publish a completed Signal")
+    end
+  end
+
+  defp receive_available_streams(signals) do
+    receive do
+      {:signal, signal} -> receive_available_streams(signals ++ [signal])
+    after
+      10 -> signals
+    end
+  end
+
+  defp start_persisted_agent(path, label) do
+    suffix = System.unique_integer([:positive])
+    instance = String.to_atom("jido_ai_runtime_#{label}_#{suffix}")
+    namespace = "jido/ai/runtime/#{label}/#{suffix}"
+    start_supervised!({Jido, name: instance, namespace: namespace}, id: instance)
+    persistence = {Jido.Persistence.File, path: path}
+    id = "#{label}-agent"
+
+    assert {:ok, server} =
+             Jido.start_agent(instance, SimpleAgent,
+               id: id,
+               persistence: persistence,
+               turn_timeout: :infinity
+             )
+
+    assert :ok = Server.await_ready(server)
+    {instance, server, persistence, id}
+  end
+
+  defp waiting(server, attempts \\ 100)
+
+  defp waiting(_server, 0), do: flunk("Agent did not enter a review wait")
+
+  defp waiting(server, attempts) do
+    case Server.status(server) do
+      %{active: %{stage: :waiting}, waits: [wait]} ->
+        wait
+
+      _status ->
+        Process.sleep(10)
+        waiting(server, attempts - 1)
+    end
+  end
+end

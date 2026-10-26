@@ -1,26 +1,19 @@
 defmodule Jido.AI.Actions.CheckInput do
-  @moduledoc """
-  Applies the input guardrail before any model work starts.
-  """
+  @moduledoc "Applies the input guard before model work starts."
 
   @blocked_fragments ["ignore previous instructions", "reveal your system prompt"]
 
   use Jido.Action,
     name: "jido_ai_check_input",
-    description: "Apply the Agent input guardrail",
-    schema:
-      Zoi.object(%{
-        input: Zoi.string(),
-        max_iterations: Zoi.integer(gte: 1, lte: 8),
-        max_tool_calls: Zoi.integer(gte: 1, lte: 16)
-      }),
+    description: "Apply the Agent input guard",
+    schema: Zoi.map(),
     output_schema: Zoi.map()
 
   @impl Jido.Action
-  def run(params, _context) do
-    case rejection_reason(params.input) do
-      nil -> {:ok, continue(params)}
-      reason -> {:ok, complete(reason)}
+  def run(%{turn: turn}, _context) do
+    case rejection_reason(turn.input) do
+      nil -> {:ok, %{kind: :continue, input: %{turn: turn}}}
+      reason -> {:ok, complete(turn, reason)}
     end
   end
 
@@ -42,36 +35,23 @@ defmodule Jido.AI.Actions.CheckInput do
     end
   end
 
-  defp continue(params) do
-    %{
-      kind: :continue,
-      input: %{
-        input: params.input,
-        history: [],
-        iteration: 0,
-        max_iterations: params.max_iterations,
-        tool_call_count: 0,
-        max_tool_calls: params.max_tool_calls,
-        allowed_tools: Jido.AI.ToolRegistry.names()
-      }
-    }
-  end
-
-  defp complete(reason) do
+  defp complete(turn, reason) do
     %{
       kind: :complete,
-      result: blocked_result(:input, reason, 0, 0)
-    }
-  end
-
-  defp blocked_result(guardrail, reason, iterations, tool_calls) do
-    %{
-      status: :blocked,
-      output: "",
-      iterations: iterations,
-      tool_calls: tool_calls,
-      guardrail: guardrail,
-      reason: reason
+      output: %{
+        turn: turn,
+        result: %{
+          status: :blocked,
+          output: "",
+          model_calls: 0,
+          tool_rounds: 0,
+          tool_calls: 0,
+          tool_errors: 0,
+          retries: 0,
+          guardrail: :input,
+          reason: reason
+        }
+      }
     }
   end
 end

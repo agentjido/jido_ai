@@ -1,7 +1,5 @@
 defmodule Jido.AI.Actions.ExpandModelNext do
-  @moduledoc """
-  Completes a model outcome or expands its guarded tool round.
-  """
+  @moduledoc "Expands completion, another model round, or a tool round."
 
   use Jido.Action,
     name: "jido_ai_expand_model_next",
@@ -10,9 +8,12 @@ defmodule Jido.AI.Actions.ExpandModelNext do
     output_schema: Zoi.map()
 
   @impl Jido.Action
-  def run(%{kind: :complete, result: result}, _context), do: {:ok, result}
+  def run(%{kind: :complete, output: output}, _context),
+    do: {:continue, output, Jido.AI.Flows.Finalize}
 
-  def run(%{kind: :continue, input: input}, _context) do
-    {:continue, input, Jido.AI.Flows.ToolRound}
-  end
+  def run(%{kind: :model, input: input}, _context),
+    do: {:continue, input, Jido.AI.Flows.ModelRound}
+
+  def run(%{kind: :tools, input: input}, _context),
+    do: {:continue, input, Jido.AI.Flows.ToolRound}
 end
