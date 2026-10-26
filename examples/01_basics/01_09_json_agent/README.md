@@ -1,47 +1,36 @@
-# 01_09 — JSON AI Agent
+# 01_09 — JSON SimpleAgent
 
-Export and import a complete graph-based AI Agent definition through
-`Jido.Authoring`, then run it with a real model.
+This example stores and loads `Jido.AI.SimpleAgent` through `Jido.Authoring`.
+It then runs the imported Agent definition with a live model.
 
-## What you will learn
+The `ai do` block lowers `reasoning Jido.AI.Strategy.ReAct` to a normal Jido
+Agent route. `Jido.AI.Agent.Codec` stores the AI authoring form as a versioned
+`jido.ai.agent` document. On import, it restores the reasoning Flow as the
+direct request route.
 
-- Store the AI plugin data inside a core Agent JSON document.
-- Select the Agent's workflow graph in JSON.
-- Use trusted Registry references for Actions, Flows, and controls.
-- Import a direct provider model name from JSON.
-- Run the imported Agent graph to an explicit completed result.
+The JSON document contains data and Registry references. It does not contain
+Elixir code. The application-owned Registry decides which Agent, Flow, and
+schema references the importer can use.
 
 ## Run it
 
-First, add `OPENAI_API_KEY` to `.env`. The saved JSON selects
-`openai:gpt-4o-mini` directly.
-
-Run the complete live example:
+Add `OPENAI_API_KEY` to `.env`, then run:
 
 ```sh
+set -a
+source .env
+set +a
 mix run examples/01_basics/01_09_json_agent/run.exs
 ```
 
-Run the offline authoring checks:
+Run the offline test:
 
 ```sh
-mix test test/examples/01_basics/01_09_json_agent --include example --seed 0
+mix test test/jido_ai_test.exs --seed 0
 ```
-
-Run the automated live check:
-
-```sh
-mix test.live test/live/json_agent_test.exs --seed 0
-```
-
-The Registry is an allowlist. Import fails when the document refers to an
-Action, Flow, plugin, schema, or Agent that is not in this Registry. Inline
-Actions are implementation details and cannot be imported by reference. Use a
-named Action for a portable tool or control.
 
 ## Files
 
-- [Agent and Registry](json_agent.ex)
-- [Saved JSON](fixtures/agent.json)
-- [Live Runner](run.exs)
-- [Test](../../../test/examples/01_basics/01_09_json_agent/json_agent_test.exs)
+- [Registry and import](json_agent.ex)
+- [Stored Agent](fixtures/agent.json)
+- [Live runner](run.exs)

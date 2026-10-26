@@ -183,6 +183,78 @@ defmodule Jido.AITest do
     end
   end
 
+  test "the graph-first Agent round-trips through Jido Authoring" do
+    registry = simple_agent_registry()
+
+    assert {:ok, json} =
+             Jido.Authoring.encode_json(SimpleAgent.definition(),
+               registry: registry,
+               codec: Jido.AI.Agent.Codec
+             )
+
+    fixture =
+      File.read!(
+        Path.expand(
+          "../examples/01_basics/01_09_json_agent/fixtures/agent.json",
+          __DIR__
+        )
+      )
+
+    assert Jason.decode!(fixture) == Jason.decode!(json)
+
+    assert %{
+             "type" => "jido.ai.agent",
+             "ai" => %{
+               "reasoning" => %{"id" => "jido.ai/strategy/react", "vsn" => 1}
+             },
+             "definition" => %{"routes" => []}
+           } = Jason.decode!(json)
+
+    assert {:ok, definition} =
+             Jido.Authoring.decode_json(fixture,
+               registry: registry,
+               codec: Jido.AI.Agent.Codec
+             )
+
+    assert definition == SimpleAgent.definition()
+    assert [%{handler: %{kind: :flow, target: Strategy.ReAct}}] = definition.routes
+
+    expect(ReqLLM, :generate_text, fn model, context, _options ->
+      {:ok, text_response(model, context, "Imported graph completed.", "json-agent")}
+    end)
+
+    agent = Jido.Agent.instantiate!(definition, id: "json-agent-test")
+    signal = Jido.Agent.input_signal!(definition, "jido.ai.request", %{input: "Complete."})
+
+    assert {:ok, unchanged, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+             Jido.Agent.cmd(agent, signal)
+
+    assert unchanged.state == %{}
+    assert reply.data.status == :completed
+    assert reply.data.output == "Imported graph completed."
+  end
+
+  test "AI Agent authoring rejects an untrusted reasoning Flow" do
+    fixture =
+      Path.expand(
+        "../examples/01_basics/01_09_json_agent/fixtures/agent.json",
+        __DIR__
+      )
+      |> File.read!()
+      |> Jason.decode!()
+      |> put_in(["ai", "reasoning", "id"], "unknown/reasoning")
+      |> Jason.encode!()
+
+    assert {:error, [issue]} =
+             Jido.Authoring.decode_json(fixture,
+               registry: simple_agent_registry(),
+               codec: Jido.AI.Agent.Codec
+             )
+
+    assert issue.code == :reference
+    assert Enum.take(issue.path, 2) == ["ai", "reasoning"]
+  end
+
   test "dispatch decisions contain portable intent and allow repair metadata" do
     assert {:ok, %{kind: :continue, input: turn} = decision} =
              Jido.Exec.run(Actions.CheckInput, %{
@@ -321,6 +393,14 @@ defmodule Jido.AITest do
       other ->
         other
     end
+  end
+
+  defp simple_agent_registry do
+    Jido.Authoring.Registry.new!(%{
+      {"jido.ai/agents/simple", 3} => {:agent, SimpleAgent},
+      {"jido.ai/strategy/react", 1} => {:flow, Strategy.ReAct},
+      {"jido.ai/schemas/simple-agent-state", 1} => {:schema, SimpleAgent.definition().schema}
+    })
   end
 
   defp text_response(model, context, text, id) do

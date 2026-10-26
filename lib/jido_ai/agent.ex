@@ -32,6 +32,11 @@ defmodule Jido.AI.Agent do
 
   The generated Agent accepts `jido.ai.request` Signals and replies with a
   `jido.ai.response` Signal. The route does not change Agent state.
+
+  The `ai` block lowers to the normal Jido Agent route model at compile time.
+  `Jido.AI.Agent.Codec` gives this authoring boundary a versioned
+  `jido.ai.agent` document. It stores the core Agent fields and a trusted
+  reference to the root reasoning Flow.
   """
 
   @request_type "jido.ai.request"

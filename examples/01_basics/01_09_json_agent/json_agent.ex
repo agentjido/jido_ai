@@ -1,127 +1,50 @@
-defmodule JidoAI.Examples.JSONAgent.Add do
-  @moduledoc "Adds two integers for the JSON Agent example."
-
-  use Jido.Action,
-    name: "json_example_add",
-    description: "Add two integers",
-    schema: Zoi.object(%{left: Zoi.integer(), right: Zoi.integer()})
-
-  def run(%{left: left, right: right}, _context), do: {:ok, %{sum: left + right}}
-end
-
-defmodule JidoAI.Examples.JSONAgent.AddFlow do
-  @moduledoc "Runs the addition Action through a Flow."
-
-  use Jido.Flow,
-    name: "json_example_add_flow",
-    description: "Add two integers through a Flow",
-    schema: Zoi.object(%{left: Zoi.integer(), right: Zoi.integer()})
-
-  flow do
-    step "add", action: JidoAI.Examples.JSONAgent.Add, params: input()
-    output result("add")
-  end
-end
-
-defmodule JidoAI.Examples.JSONAgent.Permit do
-  @moduledoc "Permits one imported AI request."
-
-  use Jido.Action,
-    name: "json_example_permit",
-    description: "Permit an AI request",
-    schema: Zoi.object(%{input: Zoi.string()})
-
-  def run(_params, _context), do: {:ok, %{allowed: true}}
-end
-
-defmodule JidoAI.Examples.JSONAgent.Ask do
-  @moduledoc "Defines the imported request and reply contract."
-
-  use Jido.Action,
-    name: "json_example_ask",
-    description: "Ask the JSON AI Agent for one answer",
-    schema: Zoi.object(%{question: Zoi.string()}),
-    output_schema:
-      Zoi.object(%{
-        answer: Zoi.string(),
-        confidence: Zoi.number() |> Zoi.min(0) |> Zoi.max(1)
-      })
-
-  @impl Jido.Action
-  def run(%{question: question}, context),
-    do: Jido.AI.respond(context, question, reply: {JidoAI.Examples.JSONAgent.Agent, "examples.json_ai.ask"})
-end
-
-defmodule JidoAI.Examples.JSONAgent.Agent do
-  @moduledoc "An AI Agent that can be exported and imported as JSON."
-
-  alias JidoAI.Examples.JSONAgent.{Add, AddFlow, Ask, Permit}
-
-  use Jido.AI.Agent,
-    id: "examples/agents/json-ai",
-    name: "json_ai_example"
-
-  ai do
-    model "openai:gpt-4o-mini"
-    instructions "Use a tool when arithmetic is required."
-
-    tools do
-      action Add, as: :add_numbers
-      flow AddFlow
-    end
-
-    controls do
-      timeout 30_000
-      max_iterations 3
-      max_model_calls 4
-      max_tool_calls 5
-      input Permit
-    end
-  end
-
-  routes do
-    signal_source "/examples/json-ai"
-
-    route "examples.json_ai.ask", Ask, as: :ask do
-      state(:unchanged)
-      reply("examples.json_ai.answered", from: output())
-    end
-  end
-end
-
 defmodule JidoAI.Examples.JSONAgent do
-  @moduledoc "Exports and imports the complete JSON AI Agent definition."
+  @moduledoc """
+  Stores and loads the graph-first SimpleAgent with `Jido.Authoring`.
 
+  The AI DSL lowers to a normal Agent route before execution. Its codec stores
+  the core Agent fields and one trusted reference to the root reasoning Flow.
+  """
+
+  alias Jido.AI.{SimpleAgent, Strategy}
   alias Jido.Authoring.Registry
-  alias JidoAI.Examples.JSONAgent.{Add, AddFlow, Agent, Ask, Permit}
 
-  @doc "Returns the compiled definition used to create the JSON document."
-  def definition, do: Agent.definition()
+  @request_type "jido.ai.request"
+  @fixture Path.join(__DIR__, "fixtures/agent.json")
 
-  @doc "Returns the trusted references allowed in the document."
+  @doc "Returns the compiled graph-first Agent definition."
+  def definition, do: SimpleAgent.definition()
+
+  @doc "Returns the allowlist used to encode and decode the Agent document."
   def registry do
     Registry.new!(%{
-      {"examples/agents/json-ai", 1} => {:agent, Agent},
-      {"examples/schemas/json-ai-state", 1} => {:schema, definition().schema},
-      {"jido.ai", 1} => {:plugin, Jido.AI.Plugin},
-      {"examples/actions/json-add", 1} => {:action, Add},
-      {"examples/actions/json-ask", 1} => {:action, Ask},
-      {"examples/flows/json-add", 1} => {:flow, AddFlow},
-      {"examples/actions/json-permit", 1} => {:action, Permit},
-      {"examples/atoms/ask", 1} => {:atom, :ask}
+      {"jido.ai/agents/simple", 3} => {:agent, SimpleAgent},
+      {"jido.ai/strategy/react", 1} => {:flow, Strategy.ReAct},
+      {"jido.ai/schemas/simple-agent-state", 1} => {:schema, definition().schema}
     })
   end
 
-  @doc "Exports the current Agent definition as JSON."
+  @doc "Encodes the SimpleAgent definition with the AI Agent codec."
   def encode_json do
-    Jido.Authoring.encode_json(definition(), registry: registry(), codec: Jido.Agent.Codec)
+    Jido.Authoring.encode_json(definition(),
+      registry: registry(),
+      codec: Jido.AI.Agent.Codec
+    )
   end
 
-  @doc "Reads the saved JSON definition."
-  def fixture_json, do: File.read!(Path.join(__DIR__, "fixtures/agent.json"))
+  @doc "Reads the stored SimpleAgent document."
+  def fixture_json, do: File.read!(@fixture)
 
-  @doc "Imports the saved JSON without starting an Agent or calling a model."
+  @doc "Decodes and validates the stored SimpleAgent definition."
   def import do
-    Jido.Authoring.decode_json(fixture_json(), registry: registry(), codec: Jido.Agent.Codec)
+    Jido.Authoring.decode_json(fixture_json(),
+      registry: registry(),
+      codec: Jido.AI.Agent.Codec
+    )
+  end
+
+  @doc "Builds the standard AI request Signal for an imported definition."
+  def request_signal!(definition, params) do
+    Jido.Agent.input_signal!(definition, @request_type, params)
   end
 end

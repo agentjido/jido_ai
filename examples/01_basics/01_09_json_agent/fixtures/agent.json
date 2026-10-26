@@ -1,60 +1,13 @@
 {
+  "ai": {
+    "reasoning": {
+      "id": "jido.ai/strategy/react",
+      "vsn": 1
+    }
+  },
   "definition": {
-    "description": null,
-    "extensions": [
-      {
-        "data": {
-          "controls": {
-            "input": {
-              "id": "examples/actions/json-permit",
-              "vsn": 1
-            },
-            "max_iterations": 3,
-            "max_model_calls": 4,
-            "max_tool_calls": 5,
-            "output": null,
-            "timeout": 30000
-          },
-          "instructions": "Use a tool when arithmetic is required.",
-          "model": {
-            "kind": "direct",
-            "value": "openai:gpt-4o-mini"
-          },
-          "graph": {
-            "kind": "builtin",
-            "name": "react"
-          },
-          "tools": [
-            {
-              "description": "Add two integers",
-              "kind": "action",
-              "name": "add_numbers",
-              "target": {
-                "id": "examples/actions/json-add",
-                "vsn": 1
-              },
-              "timeout": 5000
-            },
-            {
-              "description": "Add two integers through a Flow",
-              "kind": "flow",
-              "name": "json_example_add_flow",
-              "target": {
-                "id": "examples/flows/json-add",
-                "vsn": 1
-              },
-              "timeout": 5000
-            }
-          ]
-        },
-        "id": "jido.ai",
-        "provider": {
-          "id": "jido.ai",
-          "vsn": 1
-        },
-        "vsn": 1
-      }
-    ],
+    "description": "Answer one request with guardrails and multiple tools",
+    "extensions": [],
     "initial_state": {
       "$type": "map",
       "entries": []
@@ -64,50 +17,22 @@
       "entries": []
     },
     "module": {
-      "id": "examples/agents/json-ai",
-      "vsn": 1
+      "id": "jido.ai/agents/simple",
+      "vsn": 3
     },
-    "name": "json_ai_example",
-    "routes": [
-      {
-        "as": {
-          "$type": "atom",
-          "id": "examples/atoms/ask",
-          "vsn": 1
-        },
-        "defaults": {
-          "$type": "map",
-          "entries": []
-        },
-        "handler": {
-          "kind": "action",
-          "target": {
-            "id": "examples/actions/json-ask",
-            "vsn": 1
-          }
-        },
-        "path": "examples.json_ai.ask",
-        "reply": {
-          "from": {
-            "path": [],
-            "source": "output"
-          },
-          "type": "examples.json_ai.answered"
-        },
-        "state": "unchanged"
-      }
-    ],
+    "name": "jido_ai_simple_agent",
+    "routes": [],
     "schema": {
-      "id": "examples/schemas/json-ai-state",
+      "id": "jido.ai/schemas/simple-agent-state",
       "vsn": 1
     },
-    "signal_source": "/examples/json-ai",
+    "signal_source": "/jido.ai/agents/simple",
     "topology": {
       "agents": [],
       "connections": []
     },
-    "vsn": 1
+    "vsn": 3
   },
-  "type": "jido.agent.definition",
+  "type": "jido.ai.agent",
   "vsn": 1
 }

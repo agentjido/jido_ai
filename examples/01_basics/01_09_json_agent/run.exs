@@ -1,32 +1,25 @@
-alias Jido.AI.Result
-alias JidoAI.Examples.JSONAgent, as: Example
+Code.require_file("json_agent.ex", __DIR__)
 
-{:ok, definition} = Example.import()
-{:ok, graph} = Jido.AI.graph(definition)
+alias Jido.AI.Strategy
+alias JidoAI.Examples.JSONAgent
+
+{:ok, definition} = JSONAgent.import()
+
+[%{handler: %{kind: :flow, target: root_flow}}] = definition.routes
+true = root_flow == Strategy.ReAct
 
 IO.puts("Loaded Agent from JSON: #{definition.name}")
-IO.puts("Selected graph: #{inspect(graph)}")
-IO.puts("Root graph nodes:")
+IO.puts("Root reasoning Flow: #{inspect(root_flow)}")
 
-graph.flow().components
-|> Enum.sort_by(&elem(&1, 0))
-|> Enum.each(fn {name, component} ->
-  IO.puts("  #{name}: #{component.kind}")
-end)
+agent = Jido.Agent.instantiate!(definition, id: "json-simple-agent")
 
-agent = Jido.Agent.instantiate!(definition, id: "json-graph-example")
-input = "Reply in one short sentence that confirms the graph completed. Do not call a tool."
+signal =
+  JSONAgent.request_signal!(definition, %{
+    input: "Use add for 2 plus 3 and multiply for 4 times 5. Report both results."
+  })
 
-{:ok, %Result{status: :completed} = result} =
-  Jido.AI.run(agent, input,
-    max_tokens: 32,
-    temperature: 0.0,
-    receive_timeout: 30_000
-  )
+{:ok, unchanged_agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+  Jido.Agent.cmd(agent, signal)
 
-event_path = result.events |> Enum.map(& &1.type) |> Enum.join(" -> ")
-
-IO.puts("Status: #{result.status}")
-IO.puts("Output: #{result.output}")
-IO.puts("Events: #{event_path}")
-IO.inspect(result.usage, label: "Usage")
+IO.inspect(reply.data, label: "Result")
+IO.inspect(unchanged_agent.state, label: "Agent state")
