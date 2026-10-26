@@ -1,77 +1,76 @@
 defmodule Jido.AI.Actions.CallModel do
   @moduledoc """
-  Runs one bounded model call for a reasoning Flow.
-
-  The Action accepts the portable `Jido.AI.Reasoning.State` map and returns an
-  updated state. It does not execute tools or select the next reasoning step.
+  Calls one text model from portable messages.
   """
-
-  alias Jido.AI.Deadline
-  alias Jido.AI.Reasoning.State
 
   use Jido.Action,
     name: "jido_ai_call_model",
-    description: "Run one bounded AI model call"
+    description: "Call one text model",
+    schema: Zoi.map(),
+    output_schema: Zoi.map()
 
   @impl Jido.Action
-  def run(%{__jido_ai_reasoning__: true} = state, _context) do
-    private = State.private(state)
-    started_at = System.monotonic_time(:millisecond)
+  def run(params, _context) do
+    messages = Enum.map(params.messages, &to_req_llm_message/1)
+    context = ReqLLM.Context.new(messages)
+    options = Map.to_list(params.options)
 
-    with :ok <- model_call_allowed(state),
-         {:ok, options} <- request_options(private),
-         {:ok, response} <- ReqLLM.generate_text(private.model, private.conversation, options) do
-      call = state.model_calls + 1
-      duration_ms = System.monotonic_time(:millisecond) - started_at
-      tool_calls = ReqLLM.Response.tool_calls(response)
-      call_metadata = ReqLLM.Response.call_metadata(response)
+    with {:ok, tools} <- Jido.AI.ToolRegistry.definitions(params.allowed_tools),
+         {:ok, response} <-
+           ReqLLM.generate_text(params.model, context, Keyword.put(options, :tools, tools)) do
+      outcome = ReqLLM.Response.classify(response)
+      assistant = portable_assistant(outcome)
 
-      data =
-        call_metadata
-        |> Map.take([
-          :response_id,
-          :request_id,
-          :model,
-          :finish_reason,
-          :attempts,
-          :timings,
-          :warnings
-        ])
-        |> Map.merge(%{
-          call: call,
-          duration_ms: duration_ms,
-          tool_calls: Enum.map(tool_calls, &tool_trace/1),
-          usage: State.normalize_usage(response.usage)
-        })
-
-      state =
-        state
-        |> State.put_private(%{private | response: response})
-        |> State.add_usage(response.usage)
-        |> Map.put(:model_calls, call)
-        |> State.trace(:model_completed, data)
-
-      {:ok, state}
+      {:ok,
+       %{
+         allowed_tools: params.allowed_tools,
+         history: params.history ++ [assistant],
+         input: params.input,
+         iteration: params.iteration + 1,
+         kind: outcome.type,
+         max_iterations: params.max_iterations,
+         max_tool_calls: params.max_tool_calls,
+         text: outcome.text,
+         tool_call_count: params.tool_call_count,
+         tool_calls: outcome.tool_calls
+       }}
+    else
+      {:error, reason} -> {:error, reason}
     end
   end
 
-  defp tool_trace(call), do: %{id: call.id, name: ReqLLM.ToolCall.name(call)}
+  defp to_req_llm_message(%{role: :system, content: content}),
+    do: ReqLLM.Context.system(content)
 
-  defp model_call_allowed(state) do
-    if state.model_calls < state.controls.max_model_calls,
-      do: :ok,
-      else: {:error, {:limit_exceeded, :max_model_calls}}
+  defp to_req_llm_message(%{role: :user, content: content}),
+    do: ReqLLM.Context.user(content)
+
+  defp to_req_llm_message(%{role: :assistant, content: content, tool_calls: calls}) do
+    tool_calls =
+      Enum.map(calls, fn call ->
+        ReqLLM.ToolCall.new(call.id, call.name, Jason.encode!(call.arguments))
+      end)
+
+    ReqLLM.Context.assistant(content, tool_calls: tool_calls)
   end
 
-  defp request_options(private) do
-    configured_timeout =
-      case Keyword.get(private.request_options, :receive_timeout) do
-        timeout when is_integer(timeout) and timeout > 0 -> timeout
-        _other -> private.deadline.timeout
-      end
+  defp to_req_llm_message(%{role: :assistant, content: content}),
+    do: ReqLLM.Context.assistant(content)
 
-    with {:ok, timeout} <- Deadline.cap(private.deadline, configured_timeout) do
-      {:ok, Keyword.put(private.request_options, :receive_timeout, timeout)}
-    end
+  defp to_req_llm_message(%{
+         role: :tool,
+         name: name,
+         tool_call_id: tool_call_id,
+         output: output
+       }) do
+    ReqLLM.Context.tool_result_message(name, tool_call_id, output)
+  end
+
+  defp portable_assistant(outcome) do
+    %{
+      role: :assistant,
+      content: outcome.text,
+      tool_calls: Enum.map(outcome.tool_calls, &Map.take(&1, [:id, :name, :arguments]))
+    }
   end
 end

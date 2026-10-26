@@ -30,7 +30,7 @@ defmodule JidoAI.Examples.StructuredOutput.Agent do
     model :fast
     instructions "Return a concise assessment."
 
-    reasoning do
+    graph do
       step "model",
         action: Jido.AI.Actions.CallModel,
         params: input(:request)

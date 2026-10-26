@@ -62,7 +62,7 @@ defmodule JidoAI.Examples.JSONAgent.Agent do
     name: "json_ai_example"
 
   ai do
-    model :fast
+    model "openai:gpt-4o-mini"
     instructions "Use a tool when arithmetic is required."
 
     tools do

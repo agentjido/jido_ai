@@ -1,29 +1,62 @@
-# Architecture And Runtime Flow
+# Architecture and runtime Flow
 
 This guide shows how one AI request moves through Jido AI V3.
 
 ## Runtime Flow
 
 1. An Agent receives a routed query signal.
-2. The AI route selects one validated `Jido.AI.Profile`.
-3. `Jido.AI.Orchestration` admits the request and stores its request record.
-4. The common reasoning Flow runs the selected method.
-5. AI Actions call ReqLLM and execute declared tools through `Jido.Exec`.
-6. The Session records model, tool, usage, and terminal events.
-7. The final candidate Agent state passes core validation and commits once.
+2. Jido AI prepares the model, context, visible tools, output contract, and
+   limits.
+3. `Jido.AI.Flow.Reason` selects the Flow returned by `Agent.graph/0`.
+4. `CallModel` produces a portable `ModelOutcome`.
+5. `InterpretOutcome` produces an `AgentDecision`.
+6. A dispatch node expands the decision into a known completion or tool Flow.
+7. Tool planning adds only tools declared by the Agent.
+8. The graph returns one `Jido.AI.Result`.
+9. For a routed turn, core Jido validates and commits candidate Agent state.
 
 There is no private Jido AI Directive executor in V3. Core Jido Directives are
 still valid for post-commit effects. Model and tool work that must finish before
 the Agent commit runs through Actions and Flows.
 
+The Agent behavior is the Flow graph. `AgentServer` can host and resume work,
+but it does not define AI behavior.
+
+```text
+prepared request
+      |
+      v
+  CallModel --------> ModelOutcome
+                          |
+                          v
+                  InterpretOutcome
+                          |
+                          v
+                    AgentDecision
+                     /          \
+                    v            v
+              Complete       PlanTools
+                                  |
+                                  v
+                              ToolPlan
+                                  |
+                                  v
+                       tool nodes -> observe
+                                  |
+                                  +----> CallModel
+```
+
 ## Main Boundaries
 
 - `Jido.AI.Models` resolves optional application model aliases.
-- `Jido.AI.Profile`, `Jido.AI.DSL`, and `Jido.AI.Authoring` define inert AI configuration.
-- `Jido.AI.Orchestration` owns live request admission, work, events, and completion.
-- The reasoning layer prepares the selected method for the shared execution Flow.
-- `Jido.AI.Actions.*` owns model, tool, planning, retrieval, and quota operations.
-- `Jido.AI.Signal.*` owns typed public event data.
+- `Jido.AI.Plugin` stores inert Agent graph configuration.
+- `Jido.AI.Request` prepares inspectable input without model work.
+- `Jido.AI.Flow.Reason` composes controls around the selected Agent graph.
+- `Jido.AI.Flow.ReAct` is the default explicit AI graph.
+- `Jido.AI.ModelOutcome`, `AgentDecision`, and `ToolPlan` are portable graph
+  contracts.
+- `Jido.AI.Actions.*` owns bounded model interpretation and planning work.
+- `Jido.AI.Result` and `Jido.AI.Event` own public completion data.
 
 ## Minimal Trace Setup
 
@@ -47,9 +80,10 @@ the Agent commit runs through Actions and Flows.
 
 - Fix model selection and provider options at the ReqLLM request boundary.
 - Fix tool input and output behavior in the Action or `Jido.Exec` call path.
-- Fix request ownership, cancellation, and completion in `Jido.AI.Orchestration`.
+- Fix branch selection in `InterpretOutcome`, `ExpandDecision`, or
+  `ExpandTools`.
 - Fix domain state validation and commit behavior in the Agent boundary.
-- Fix reasoning policy in the selected method implementation.
+- Fix behavior policy in the selected Agent graph.
 
 ## Compile-Cycle Triage
 
@@ -67,6 +101,5 @@ compile-time cost.
 
 ## Next
 
-- [Strategy Internals](strategy_internals.md)
 - [Signals, Namespaces, Contracts](signals_namespaces_contracts.md)
 - [Plugins And Actions Composition](plugins_and_actions_composition.md)

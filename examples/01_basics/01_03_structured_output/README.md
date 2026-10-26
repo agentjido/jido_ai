@@ -6,7 +6,7 @@ Use a route reply projection as the structured reply contract.
 
 - Define the request schema on the route Action.
 - Shape the model result from the schema at the route reply output path.
-- Define the Agent reasoning steps in an embedded `reasoning do` Flow.
+- Define the Agent behavior in an embedded `graph do` Flow.
 - Let core Jido build a correlated Reply Directive from route output.
 
 ## Run it

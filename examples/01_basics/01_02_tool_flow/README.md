@@ -22,8 +22,8 @@ Flow, and ReqLLM tool adapters.
 
 ## Important behavior
 
-A valid tool batch runs, and its correlated results enter the next model call.
-If any call in a batch is invalid, no tool in that batch runs. The model gets
+A valid set of tool calls runs in one Parallel component, and its correlated
+results enter the next model call. If any call is invalid, no requested tool runs. The model gets
 one correlated error result for each call and can correct the request within
 the configured limits.
 

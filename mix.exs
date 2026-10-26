@@ -10,7 +10,6 @@ defmodule JidoAi.MixProject do
       version: @version,
       elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
-      test_ignore_filters: [~r/test\/authoring\/support\//],
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases(),
@@ -60,8 +59,6 @@ defmodule JidoAi.MixProject do
     ]
   end
 
-  defp elixirc_paths(:test), do: ["lib", "test/support", "examples"]
-  defp elixirc_paths(:dev), do: ["lib", "examples"]
   defp elixirc_paths(_), do: ["lib"]
 
   defp deps do

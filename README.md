@@ -3,10 +3,10 @@
 [![CI](https://github.com/agentjido/jido_ai/actions/workflows/ci.yml/badge.svg)](https://github.com/agentjido/jido_ai/actions/workflows/ci.yml)
 [![License](https://img.shields.io/hexpm/l/jido_ai.svg)](LICENSE)
 
-Jido AI adds model calls, tool use, reasoning Flows, and AI request controls to
-Jido Agents. Core Jido owns Agent state, processes, commits, and directives.
-Jido AI owns model preparation, model tools, AI limits, AI results, and AI
-events.
+Jido AI adds explicit AI workflow graphs to Jido Agents. A graph contains model
+calls, decisions, tool plans, tool execution, controls, and completion. Core
+Jido owns Agent state, processes, commits, and directives. Jido AI owns model
+preparation, model tools, AI limits, AI results, and AI events.
 
 This branch is active V3 work. Use it with the compatible sibling V3 packages
 in this folder.
@@ -33,6 +33,29 @@ end
 
 `generate/2` returns only the accepted output. `reason/2` returns a completed
 `Jido.AI.Result` with usage and events.
+
+The default behavior graph is `Jido.AI.Flow.ReAct`. Inspect it without running
+a model:
+
+```elixir
+MyApp.AnswerAgent.graph()
+#=> Jido.AI.Flow.ReAct
+
+MyApp.AnswerAgent.graph().flow()
+```
+
+Select another Flow when the Agent needs another graph:
+
+```elixir
+ai do
+  model "openai:gpt-4o-mini"
+  graph MyApp.SupportGraph
+end
+```
+
+The graph exchanges portable `Jido.AI.ModelOutcome`,
+`Jido.AI.AgentDecision`, and `Jido.AI.ToolPlan` data. Provider structs remain
+behind named adapter fields. There is no private reasoning-state blob.
 
 ## Prepare before execution
 

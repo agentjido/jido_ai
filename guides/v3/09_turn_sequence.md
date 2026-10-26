@@ -7,16 +7,16 @@ One routed AI turn has these steps:
 3. Jido AI prepares the model, messages, visible tools, output contract, and
    limits.
 4. The input control runs.
-5. The configured reasoning Flow runs model and tool work.
+5. The configured Agent graph runs model, decision, and tool nodes.
 6. The output control checks the final output.
-7. The reasoning Flow returns a completed `Jido.AI.Result`.
+7. The Agent graph returns a completed `Jido.AI.Result`.
 8. `Jido.AI.Turn.complete/4` validates the route reply data and builds route
    output.
 9. Core Jido projects and commits the candidate state.
 10. Core Jido builds and delivers the correlated Reply Directive after commit.
 
 ```text
-Signal -> prepare -> input control -> reasoning Flow -> output control
+Signal -> prepare -> input control -> Agent graph -> output control
        -> completed result -> candidate state and reply -> core commit
 ```
 

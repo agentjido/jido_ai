@@ -17,10 +17,10 @@
           },
           "instructions": "Use a tool when arithmetic is required.",
           "model": {
-            "kind": "alias",
-            "value": "fast"
+            "kind": "direct",
+            "value": "openai:gpt-4o-mini"
           },
-          "reasoning": {
+          "graph": {
             "kind": "builtin",
             "name": "react"
           },

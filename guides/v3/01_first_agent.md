@@ -44,6 +44,16 @@ result.usage
 result.events
 ```
 
+Inspect the Flow that defines the Agent behavior:
+
+```elixir
+MyApp.AnswerAgent.graph()
+#=> Jido.AI.Flow.ReAct
+```
+
+Use `graph MyApp.Flow` in the `ai` block to select another behavior graph.
+The older `reasoning` declaration remains available as a compatibility alias.
+
 These direct calls do not start an AgentServer and do not change Agent state.
 Use a route with explicit `state` and `reply` projections when the application
 must commit Session, Thread, or domain state.

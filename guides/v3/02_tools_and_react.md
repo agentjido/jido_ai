@@ -27,11 +27,17 @@ end
 
 The default `Jido.AI.Flow.ReAct` Flow performs these steps:
 
-1. Call the model with visible tool definitions.
-2. Validate the complete tool-call batch.
-3. Run valid Actions and Flows as child Flow components.
-4. Append correlated tool results to the active model Context.
-5. Continue until the model returns final output or a limit stops the request.
+1. `CallModel` produces a portable `ModelOutcome`.
+2. `InterpretOutcome` produces an `AgentDecision`.
+3. `ExpandDecision` selects the completion Flow or the tool-round Flow.
+4. `PlanTools` validates the complete tool-call batch and produces a
+   `ToolPlan`.
+5. `ExpandTools` adds only declared Actions and Flows as child graph nodes.
+6. An observation node appends correlated tool results to the model Context.
+7. The graph continues until it reaches completion or a limit.
+
+The model supplies data. It cannot select an arbitrary module or execute a
+tool directly.
 
 One request can reduce the visible set:
 

@@ -250,13 +250,17 @@ defmodule JidoAI.Examples.Proposed.ResearchAgent.Agent do
     Return an answer, at least one source, and a confidence value.
     """
 
-    reasoning do
-      dispatch "react",
-        decision: Jido.AI.Actions.CallModel,
-        expander: Jido.AI.Flow.ReAct.Route,
+    graph do
+      step "model",
+        action: Jido.AI.Actions.CallModel,
         params: input(:request)
 
-      output result("react")
+      dispatch "decision",
+        decision: Jido.AI.Actions.InterpretOutcome,
+        expander: Jido.AI.Flow.ReAct.ExpandDecision,
+        params: result("model")
+
+      output result("decision")
     end
 
     tools do

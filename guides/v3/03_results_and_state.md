@@ -3,6 +3,11 @@
 Model output, an AI request result, and committed Agent state are different
 values.
 
+During execution, model output becomes a portable `Jido.AI.ModelOutcome`.
+`Jido.AI.Actions.InterpretOutcome` converts it to an `AgentDecision`. The Flow
+then expands that decision into known graph nodes. Request state uses named
+fields. It does not use one encoded private state value.
+
 `generate/2` returns only accepted output:
 
 ```elixir
