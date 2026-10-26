@@ -1,7 +1,7 @@
 defmodule Jido.AI.Actions.CallModel do
   @moduledoc "Calls one model and returns success or failure as graph data."
 
-  alias Jido.AI.{Conversation, PromptCache, Runtime, Usage}
+  alias Jido.AI.{Runtime, Toolset, Usage}
 
   use Jido.Action,
     name: "jido_ai_call_model",
@@ -10,12 +10,10 @@ defmodule Jido.AI.Actions.CallModel do
     output_schema: Zoi.map()
 
   @impl Jido.Action
-  def run(%{turn: turn, prompt_cache: cache}, _context)
-      when turn.model_calls >= turn.max_model_calls do
+  def run(%{turn: turn}, _context) when turn.model_calls >= turn.max_model_calls do
     {:ok,
      %{
        turn: turn,
-       prompt_cache: cache,
        outcome: %{
          status: :budget,
          category: :limits,
@@ -27,16 +25,16 @@ defmodule Jido.AI.Actions.CallModel do
      }}
   end
 
-  def run(%{turn: turn, messages: messages, prompt_cache: cache}, context) do
+  def run(%{turn: turn, messages: messages}, context) do
     model = Enum.at(turn.models, turn.model_index)
     started_at = Runtime.now_ms(context)
     stream_id = "stream_#{Jido.generate_id()}"
 
     result =
-      with {:ok, tools} <- Jido.AI.ToolRegistry.definitions(turn.allowed_tools) do
+      with {:ok, tools} <- Toolset.definitions(turn.tools) do
         options =
           turn.options
-          |> PromptCache.apply_options(cache)
+          |> apply_prompt_cache_options(model, turn)
           |> Map.to_list()
           |> Keyword.put(:tools, tools)
 
@@ -48,7 +46,7 @@ defmodule Jido.AI.Actions.CallModel do
       end
 
     completed_at = Runtime.now_ms(context)
-    normalize(result, turn, cache, model, started_at, completed_at)
+    normalize(result, turn, model, started_at, completed_at)
   end
 
   defp generate(model, messages, options) do
@@ -128,7 +126,7 @@ defmodule Jido.AI.Actions.CallModel do
   end
 
   defp correlation(turn, stream_id, sequence, at) do
-    session = Conversation.decode!(turn.session)
+    session = Jido.Session.decode!(turn.session)
 
     %{
       session_id: session.id,
@@ -146,17 +144,14 @@ defmodule Jido.AI.Actions.CallModel do
     }
   end
 
-  defp normalize({:ok, response}, turn, cache, model, started_at, completed_at) do
+  defp normalize({:ok, response}, turn, model, started_at, completed_at) do
     classified = ReqLLM.Response.classify(response)
     usage = ReqLLM.Usage.normalize(ReqLLM.Response.usage(response))
-    cache = PromptCache.observe(cache, usage, completed_at)
-
-    next_turn = record_call(turn, usage, cache)
+    next_turn = record_call(turn, usage)
 
     {:ok,
      %{
        turn: next_turn,
-       prompt_cache: cache,
        outcome: %{
          status: :ok,
          kind: classified.type,
@@ -166,22 +161,20 @@ defmodule Jido.AI.Actions.CallModel do
          response_id: response.id,
          model: model,
          usage: usage,
+         prompt_cache: Usage.cache_observation(turn.prompt_cache, usage, completed_at),
          started_at_ms: started_at,
          completed_at_ms: completed_at
        }
      }}
   end
 
-  defp normalize({:error, reason}, turn, cache, model, started_at, completed_at) do
+  defp normalize({:error, reason}, turn, model, started_at, completed_at) do
     usage = ReqLLM.Usage.normalize(nil)
-    cache = PromptCache.observe(cache, usage, completed_at)
-
-    next_turn = record_call(turn, usage, cache)
+    next_turn = record_call(turn, usage)
 
     {:ok,
      %{
        turn: next_turn,
-       prompt_cache: cache,
        outcome: %{
          status: :error,
          category: category(reason),
@@ -189,19 +182,70 @@ defmodule Jido.AI.Actions.CallModel do
          reason: error_message(reason),
          model: model,
          usage: usage,
+         prompt_cache: Usage.cache_observation(turn.prompt_cache, usage, completed_at),
          started_at_ms: started_at,
          completed_at_ms: completed_at
        }
      }}
   end
 
-  defp record_call(turn, usage, cache) do
+  defp record_call(turn, usage) do
     turn
     |> Map.update!(:model_calls, &(&1 + 1))
     |> Map.update!(:model_attempt, &(&1 + 1))
     |> Map.update!(:usage, &Usage.add(&1, usage))
-    |> Map.update!(:prompt_cache_observations, &(&1 ++ [cache]))
   end
+
+  defp apply_prompt_cache_options(options, model, turn) do
+    config = turn.prompt_cache
+
+    if field(config, :enabled) == true do
+      provider = model |> String.split(":", parts: 2) |> hd()
+      ttl = field(config, :ttl)
+
+      case provider do
+        "openai" ->
+          cache_options = if ttl, do: %{ttl: ttl}, else: %{}
+          session_id = turn.session |> Jido.Session.decode!() |> Map.fetch!(:id)
+          key = field(config, :key) || session_id
+
+          options
+          |> update_provider_options(:prompt_cache_key, key)
+          |> maybe_put_provider_options(:prompt_cache_options, cache_options)
+
+        "anthropic" ->
+          options
+          |> update_provider_options(:anthropic_prompt_cache, true)
+          |> maybe_put_provider_option(:anthropic_prompt_cache_ttl, ttl)
+
+        provider when provider in ["amazon_bedrock", "bedrock"] ->
+          options
+          |> update_provider_options(:prompt_cache, true)
+          |> maybe_put_provider_option(:prompt_cache_ttl, ttl)
+
+        _provider ->
+          options
+      end
+    else
+      options
+    end
+  end
+
+  defp update_provider_options(options, key, value) do
+    provider_options = options |> field(:provider_options) |> provider_options_map()
+    Map.put(options, :provider_options, Map.put(provider_options, key, value))
+  end
+
+  defp maybe_put_provider_option(options, _key, nil), do: options
+  defp maybe_put_provider_option(options, key, value), do: update_provider_options(options, key, value)
+  defp maybe_put_provider_options(options, _key, value) when value == %{}, do: options
+  defp maybe_put_provider_options(options, key, value), do: update_provider_options(options, key, value)
+  defp provider_options_map(nil), do: %{}
+  defp provider_options_map(options) when is_map(options), do: options
+  defp provider_options_map(options) when is_list(options), do: Map.new(options)
+  defp field(nil, _key), do: nil
+  defp field(map, key) when is_map(map), do: Map.get(map, key, Map.get(map, Atom.to_string(key)))
+  defp field(_value, _key), do: nil
 
   defp to_req_llm_message(%{role: :system, content: content}), do: ReqLLM.Context.system(content)
   defp to_req_llm_message(%{role: :user, content: content}), do: ReqLLM.Context.user(content)

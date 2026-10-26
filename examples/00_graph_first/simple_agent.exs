@@ -1,4 +1,7 @@
-alias Jido.AI.{Actions, Flows, SimpleAgent}
+Code.require_file("simple_agent.ex", __DIR__)
+
+alias Jido.AI.{Actions, Flows}
+alias JidoAI.Examples.SimpleAgent
 
 program = SimpleAgent.route_executable!("jido.ai.request")
 
@@ -7,9 +10,7 @@ IO.puts("Agent route: jido.ai.request -> #{inspect(program)} -> jido.ai.response
 for flow <- [
       program,
       Flows.ModelRound,
-      Flows.ToolRound,
-      Flows.ToolReview,
-      Flows.Finalize
+      Flows.ToolReview
     ] do
   IO.puts("Graph: #{inspect(flow)}")
 
@@ -34,7 +35,7 @@ tool_input = %{
 }
 
 {:continue, ^tool_input, tool_flow} =
-  Actions.ExpandToolCalls.run(%{kind: :continue, input: tool_input}, %{})
+  Actions.ExpandNext.run(%{kind: :tools, input: tool_input}, %{})
 
 IO.puts("Graph: runtime Parallel tool calls")
 

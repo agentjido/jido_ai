@@ -27,9 +27,9 @@ defmodule Jido.AI.Flows.ToolReview do
       timer("expired", after_ms: 300_000)
     end
 
-    dispatch "next",
+    invoke "next",
       decision: Jido.AI.Actions.ResolveToolReview,
-      expander: Jido.AI.Actions.ExpandToolCalls,
+      expander: Jido.AI.Actions.ExpandNext,
       params: %{
         turn: result("request", :turn),
         decision: result("decision")

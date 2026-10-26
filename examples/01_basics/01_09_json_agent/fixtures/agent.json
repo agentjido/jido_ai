@@ -3,7 +3,17 @@
     "reasoning": {
       "id": "jido.ai/strategy/react",
       "vsn": 1
-    }
+    },
+    "tools": [
+      {
+        "id": "jido.ai/examples/tools/add",
+        "vsn": 1
+      },
+      {
+        "id": "jido.ai/examples/tools/multiply",
+        "vsn": 1
+      }
+    ]
   },
   "definition": {
     "description": "Answer one request with guardrails and multiple tools",

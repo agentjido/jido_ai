@@ -10,10 +10,16 @@ defmodule Jido.AI.Actions.CheckInput do
     output_schema: Zoi.map()
 
   @impl Jido.Action
-  def run(%{turn: turn}, _context) do
-    case rejection_reason(turn.input) do
-      nil -> {:ok, %{kind: :continue, input: %{turn: turn}}}
-      reason -> {:ok, complete(turn, reason)}
+  def run(%{turn: turn}, context) do
+    cond do
+      reason = rejection_reason(turn.input) ->
+        {:ok, complete(turn, :input, reason)}
+
+      Map.get(turn, :review_tools, false) and not Jido.Exec.supports?(context, :waits) ->
+        {:ok, complete(turn, :review, "execution host does not support waits")}
+
+      true ->
+        {:ok, %{kind: :model, input: %{turn: turn}}}
     end
   end
 
@@ -35,7 +41,7 @@ defmodule Jido.AI.Actions.CheckInput do
     end
   end
 
-  defp complete(turn, reason) do
+  defp complete(turn, guardrail, reason) do
     %{
       kind: :complete,
       output: %{
@@ -48,7 +54,7 @@ defmodule Jido.AI.Actions.CheckInput do
           tool_calls: 0,
           tool_errors: 0,
           retries: 0,
-          guardrail: :input,
+          guardrail: guardrail,
           reason: reason
         }
       }

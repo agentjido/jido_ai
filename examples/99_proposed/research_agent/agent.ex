@@ -255,7 +255,7 @@ defmodule JidoAI.Examples.Proposed.ResearchAgent.Agent do
         action: Jido.AI.Actions.CallModel,
         params: input(:request)
 
-      dispatch "decision",
+      invoke "decision",
         decision: Jido.AI.Actions.InterpretOutcome,
         expander: Jido.AI.Flow.ReAct.ExpandDecision,
         params: result("model")

@@ -10,7 +10,8 @@ This guide shows how one AI request moves through Jido AI V3.
 3. `Jido.AI.Flow.Reason` selects the Flow returned by `Agent.graph/0`.
 4. `CallModel` produces a portable `ModelOutcome`.
 5. `InterpretOutcome` produces an `AgentDecision`.
-6. A dispatch node expands the decision into a known completion or tool Flow.
+6. An Invoke node uses one trusted mapper to select the next model, review,
+   tool, or terminal executable.
 7. Tool planning adds only tools declared by the Agent.
 8. The graph returns one `Jido.AI.Result`.
 9. For a routed turn, core Jido validates and commits candidate Agent state.

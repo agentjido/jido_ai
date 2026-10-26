@@ -3,8 +3,8 @@ defmodule Jido.AI.Agent.Codec do
   Stores the authoring boundary of a graph-first AI Agent.
 
   Version 1 stores the normal Jido Agent definition without its generated AI
-  request route. The `ai` object stores one trusted reference to the root
-  reasoning Flow. Import restores that Flow as the direct request route.
+  request route or Toolset extension. The `ai` object stores trusted references
+  to the root reasoning Flow and the Agent-local tool Actions.
 
   Use this codec explicitly when encoding because an AI Agent is also a normal
   `Jido.Agent` value:
@@ -31,15 +31,17 @@ defmodule Jido.AI.Agent.Codec do
   def encode_document(source, %Registry{} = registry) do
     with {:ok, definition} <- definition(source),
          {:ok, reasoning} <- reasoning(definition),
+         {:ok, actions, base_extensions} <- tools(definition),
          {:ok, reasoning_reference} <- Registry.encode_reference(registry, :flow, reasoning),
-         base = %{definition | routes: []},
+         {:ok, tool_references} <- encode_tools(actions, registry),
+         base = %{definition | routes: [], extensions: base_extensions},
          {:ok, %{"definition" => fields}} <- Jido.Agent.Codec.encode_document(base, registry) do
       {:ok,
        %{
          "type" => "jido.ai.agent",
          "vsn" => 1,
          "definition" => fields,
-         "ai" => %{"reasoning" => reasoning_reference}
+         "ai" => %{"reasoning" => reasoning_reference, "tools" => tool_references}
        }}
     end
   end
@@ -57,11 +59,15 @@ defmodule Jido.AI.Agent.Codec do
           {:ok, Agent.definition()} | {:error, [Issue.t()]}
   def decode_document(document, %Registry{} = registry) do
     with :ok <- document(document),
-         %{"definition" => fields, "ai" => %{"reasoning" => reference}} <- document,
+         %{
+           "definition" => fields,
+           "ai" => %{"reasoning" => reference, "tools" => tool_references}
+         } <- document,
          :ok <- empty_routes(fields),
          {:ok, base} <- decode_base(fields, registry),
          {:ok, reasoning} <- resolve_reasoning(reference, registry),
-         {:ok, definition} <- restore_route(base, reasoning) do
+         {:ok, actions} <- resolve_tools(tool_references, registry),
+         {:ok, definition} <- restore_ai(base, reasoning, actions) do
       {:ok, definition}
     else
       {:error, issues} when is_list(issues) -> {:error, issues}
@@ -113,6 +119,32 @@ defmodule Jido.AI.Agent.Codec do
   end
 
   defp reasoning(%Agent{}), do: invalid_agent()
+
+  defp tools(%Agent{extensions: extensions}) do
+    {toolsets, other} = Enum.split_with(extensions, &(&1.provider == Jido.AI.Toolset))
+
+    case toolsets do
+      [%{data: %{actions: actions}}] ->
+        with :ok <- Jido.AI.Toolset.validate(actions), do: {:ok, actions, other}
+
+      _other ->
+        invalid_agent()
+    end
+  end
+
+  defp encode_tools(actions, registry) do
+    actions
+    |> Enum.reduce_while({:ok, []}, fn action, {:ok, references} ->
+      case Registry.encode_reference(registry, :action, action) do
+        {:ok, reference} -> {:cont, {:ok, [reference | references]}}
+        {:error, error} -> {:halt, {:error, error}}
+      end
+    end)
+    |> then(fn
+      {:ok, references} -> {:ok, Enum.reverse(references)}
+      error -> error
+    end)
+  end
 
   defp invalid_agent do
     Jido.Agent.Error.fail(
@@ -171,7 +203,33 @@ defmodule Jido.AI.Agent.Codec do
     end
   end
 
-  defp restore_route(%Agent{} = base, reasoning) do
+  defp resolve_tools(references, registry) when is_list(references) do
+    references
+    |> Enum.with_index()
+    |> Enum.reduce_while({:ok, []}, fn {reference, index}, {:ok, actions} ->
+      case Registry.decode_reference(registry, reference, :action) do
+        {:ok, action} -> {:cont, {:ok, [action | actions]}}
+        {:error, error} -> {:halt, {:error, [issue(error, ["ai", "tools", index])]}}
+      end
+    end)
+    |> then(fn
+      {:ok, actions} ->
+        actions = Enum.reverse(actions)
+
+        case Jido.AI.Toolset.validate(actions) do
+          :ok -> {:ok, actions}
+          {:error, reason} -> failure(:invalid_tools, ["ai", "tools"], inspect(reason))
+        end
+
+      error ->
+        error
+    end)
+  end
+
+  defp resolve_tools(_references, _registry),
+    do: failure(:invalid_tools, ["ai", "tools"], "AI Agent tools must be a list")
+
+  defp restore_ai(%Agent{} = base, reasoning, actions) do
     route = %{
       path: @request_type,
       as: :request,
@@ -181,10 +239,18 @@ defmodule Jido.AI.Agent.Codec do
       reply: %{type: @response_type, from: %{source: :output, path: [:response]}}
     }
 
+    toolset = %{
+      id: Jido.AI.Toolset.id(),
+      provider: Jido.AI.Toolset,
+      vsn: Jido.AI.Toolset.vsn(),
+      data: %{actions: actions}
+    }
+
     result =
       base
       |> Map.from_struct()
       |> Map.put(:routes, [route])
+      |> Map.update!(:extensions, &(&1 ++ [toolset]))
       |> Agent.define()
 
     case result do

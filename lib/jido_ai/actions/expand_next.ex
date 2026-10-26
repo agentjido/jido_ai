@@ -1,35 +1,38 @@
-defmodule Jido.AI.Actions.ExpandToolCalls do
-  @moduledoc "Expands validated calls as a Parallel Flow or starts a review wait."
+defmodule Jido.AI.Actions.ExpandNext do
+  @moduledoc "Expands each trusted AI routing decision into its next executable."
 
-  alias Jido.AI.ToolRegistry
+  alias Jido.AI.Toolset
   alias Jido.Flow.Ref
 
   use Jido.Action,
-    name: "jido_ai_expand_tool_calls",
-    description: "Expand validated model tool calls",
+    name: "jido_ai_expand_next",
+    description: "Expand a trusted AI graph routing decision",
     schema: Zoi.map(),
     output_schema: Zoi.map()
 
   @impl Jido.Action
   def run(%{kind: :complete, output: output}, _context),
-    do: {:continue, output, Jido.AI.Flows.Finalize}
+    do: {:continue, %{outcome: output}, Jido.AI.Actions.FinalizeTurn}
+
+  def run(%{kind: :model, input: input}, _context),
+    do: {:continue, input, Jido.AI.Flows.ModelRound}
 
   def run(%{kind: :review, input: input}, _context),
     do: {:continue, input, Jido.AI.Flows.ToolReview}
 
-  def run(%{kind: :continue, input: %{turn: turn} = input}, _context) do
-    with {:ok, calls} <- resolve_calls(turn.model_outcome.tool_calls),
+  def run(%{kind: :tools, input: %{turn: turn} = input}, _context) do
+    with {:ok, calls} <- resolve_calls(turn.tools, turn.model_outcome.tool_calls),
          {:ok, flow} <- build_flow(calls) do
       {:continue, input, flow}
     end
   end
 
-  def run(%{kind: :continue}, _context), do: {:error, :invalid_tool_calls}
+  def run(%{kind: :tools}, _context), do: {:error, :invalid_tool_calls}
 
-  defp resolve_calls(calls) when is_list(calls) and calls != [] do
+  defp resolve_calls(tools, calls) when is_list(calls) and calls != [] do
     calls
     |> Enum.reduce_while({:ok, []}, fn call, {:ok, resolved} ->
-      case ToolRegistry.resolve_call(call) do
+      case Toolset.resolve_call(tools, call) do
         {:ok, value} -> {:cont, {:ok, [value | resolved]}}
         {:error, reason} -> {:halt, {:error, reason}}
       end
@@ -40,7 +43,7 @@ defmodule Jido.AI.Actions.ExpandToolCalls do
     end
   end
 
-  defp resolve_calls(calls), do: {:error, {:invalid_tool_calls, calls}}
+  defp resolve_calls(_tools, calls), do: {:error, {:invalid_tool_calls, calls}}
 
   defp build_flow(calls) do
     Jido.Flow.new(%{
@@ -48,8 +51,8 @@ defmodule Jido.AI.Actions.ExpandToolCalls do
       description: "Execute validated tool calls as parallel Actions",
       schema: Zoi.object(%{turn: Zoi.any()}),
       output_schema: Zoi.map(),
-      components: [parallel(calls), continuation(calls)],
-      output: Ref.result("next")
+      components: [parallel(calls), record(calls), model()],
+      output: Ref.result("model")
     })
   end
 
@@ -67,16 +70,24 @@ defmodule Jido.AI.Actions.ExpandToolCalls do
     }
   end
 
-  defp continuation(calls) do
+  defp record(calls) do
     %{
-      kind: :dispatch,
-      name: "next",
-      decision: Jido.AI.Actions.RecordToolResults,
-      expander: Jido.AI.Actions.ExpandToolResults,
+      kind: :step,
+      name: "record",
+      action: Jido.AI.Actions.RecordToolResults,
       params: %{
         turn: Ref.input(:turn),
         results: result_refs(calls)
       }
+    }
+  end
+
+  defp model do
+    %{
+      kind: :subflow,
+      name: "model",
+      flow: Jido.AI.Flows.ModelRound,
+      params: %{turn: Ref.result("record", :turn)}
     }
   end
 

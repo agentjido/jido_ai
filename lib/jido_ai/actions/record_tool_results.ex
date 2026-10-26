@@ -1,7 +1,7 @@
 defmodule Jido.AI.Actions.RecordToolResults do
   @moduledoc "Appends ordered Parallel tool results to the Session."
 
-  alias Jido.AI.{Conversation, Runtime, Thread.Projection}
+  alias Jido.AI.{Runtime, Thread.Projection}
 
   use Jido.Action,
     name: "jido_ai_record_tool_results",
@@ -15,7 +15,7 @@ defmodule Jido.AI.Actions.RecordToolResults do
     at = Runtime.now_ms(context)
 
     session_result =
-      Enum.reduce_while(results, {:ok, Conversation.decode!(turn.session)}, fn result, {:ok, session} ->
+      Enum.reduce_while(results, {:ok, Jido.Session.decode!(turn.session)}, fn result, {:ok, session} ->
         {status, output} = tool_output(result.outcome)
 
         message = %{
@@ -38,7 +38,7 @@ defmodule Jido.AI.Actions.RecordToolResults do
 
       next_turn = %{
         turn
-        | session: Conversation.encode(session),
+        | session: Jido.Session.encode(session),
           model_attempt: 0,
           tool_rounds: turn.tool_rounds + 1,
           tool_call_count: turn.tool_call_count + length(results),
@@ -47,7 +47,7 @@ defmodule Jido.AI.Actions.RecordToolResults do
           repair_instruction: nil
       }
 
-      {:ok, %{kind: :continue, input: %{turn: next_turn}}}
+      {:ok, %{turn: next_turn}}
     end
   end
 

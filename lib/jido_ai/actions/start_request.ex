@@ -1,7 +1,7 @@
 defmodule Jido.AI.Actions.StartRequest do
   @moduledoc "Initializes one request and appends its user message to the Session."
 
-  alias Jido.AI.{Conversation, Runtime, Thread.Projection}
+  alias Jido.AI.{Runtime, Thread.Projection}
 
   use Jido.Action,
     name: "jido_ai_start_request",
@@ -12,6 +12,7 @@ defmodule Jido.AI.Actions.StartRequest do
   @impl Jido.Action
   def run(params, context) do
     now = Runtime.now_ms(context)
+    tools = Jido.AI.Toolset.from_context(context)
     agent_state = Map.get(context, :agent_state, %{session: nil})
     session = session(agent_state, context, now)
     request_id = request_id(context)
@@ -23,7 +24,7 @@ defmodule Jido.AI.Actions.StartRequest do
       {:ok,
        %{
          agent_state: Map.delete(agent_state, :session),
-         session: Conversation.encode(session),
+         session: Jido.Session.encode(session),
          request_id: request_id,
          run_id: run_id,
          started_at_ms: now,
@@ -37,7 +38,7 @@ defmodule Jido.AI.Actions.StartRequest do
          max_retries: params.max_retries,
          retries: 0,
          options: params.options,
-         prompt_cache_config: params.prompt_cache,
+         prompt_cache: params.prompt_cache,
          stream: params.stream,
          review_tools: params.review_tools,
          repair_instruction: nil,
@@ -47,11 +48,10 @@ defmodule Jido.AI.Actions.StartRequest do
          tool_call_count: 0,
          tool_error_count: 0,
          max_tool_calls: params.max_tool_calls,
-         allowed_tools: Jido.AI.ToolRegistry.names(),
+         tools: tools,
          model_outcome: nil,
          usage: Jido.AI.Usage.zero(),
-         model_attempts: [],
-         prompt_cache_observations: []
+         model_attempts: []
        }}
     end
   end

@@ -1,16 +1,17 @@
 # 01_09 — JSON SimpleAgent
 
-This example stores and loads `Jido.AI.SimpleAgent` through `Jido.Authoring`.
+This example defines and loads its own SimpleAgent through `Jido.Authoring`.
 It then runs the imported Agent definition with a live model.
 
 The `ai do` block lowers `reasoning Jido.AI.Strategy.ReAct` to a normal Jido
 Agent route. `Jido.AI.Agent.Codec` stores the AI authoring form as a versioned
 `jido.ai.agent` document. On import, it restores the reasoning Flow as the
-direct request route.
+direct request route. The plural `tools` field stores the ordered Action
+references declared by the Agent's `tools do` block.
 
 The JSON document contains data and Registry references. It does not contain
-Elixir code. The application-owned Registry decides which Agent, Flow, and
-schema references the importer can use.
+Elixir code. The application-owned Registry decides which Agent, Flow, Action,
+and schema references the importer can use.
 
 ## Run it
 

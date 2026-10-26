@@ -1,7 +1,7 @@
 defmodule Jido.AI.Actions.RecordModelAttempt do
   @moduledoc "Records one model attempt and any accepted assistant message."
 
-  alias Jido.AI.{Conversation, Runtime, Thread.Projection}
+  alias Jido.AI.{Runtime, Thread.Projection}
 
   use Jido.Action,
     name: "jido_ai_record_model_attempt",
@@ -37,12 +37,12 @@ defmodule Jido.AI.Actions.RecordModelAttempt do
       output_allowed: params.output_allowed,
       output_reason: params.output_reason,
       outcome: portable_outcome(outcome),
-      prompt_cache: params.prompt_cache
+      prompt_cache: outcome.prompt_cache
     }
 
     session =
       turn.session
-      |> Conversation.decode!()
+      |> Jido.Session.decode!()
       |> Projection.observe(:ai_model_attempt, attempt, refs, at)
 
     with {:ok, session} <- maybe_append_assistant(session, outcome, params.output_allowed, refs, at) do
@@ -50,7 +50,7 @@ defmodule Jido.AI.Actions.RecordModelAttempt do
        %{
          turn:
            turn
-           |> Map.put(:session, Conversation.encode(session))
+           |> Map.put(:session, Jido.Session.encode(session))
            |> Map.update!(:model_attempts, &(&1 ++ [attempt]))
            |> Map.put(:model_outcome, outcome)
            |> Map.put(:output_allowed, params.output_allowed)

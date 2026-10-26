@@ -26,8 +26,14 @@ defmodule Jido.AI.Actions.DecideModelNext do
     {:ok, complete(turn, blocked(turn, :limits, "maximum tool rounds reached"))}
   end
 
+  def run(%{turn: %{model_outcome: %{kind: :tool_calls, tool_calls: calls}} = turn}, _context)
+      when turn.tool_call_count + length(calls) > turn.max_tool_calls do
+    {:ok, complete(turn, blocked(turn, :limits, "maximum tool calls reached"))}
+  end
+
   def run(%{turn: %{model_outcome: %{kind: :tool_calls}} = turn}, _context) do
-    {:ok, %{kind: :tools, input: %{turn: %{turn | repair_instruction: nil}}}}
+    kind = if turn.review_tools, do: :review, else: :tools
+    {:ok, %{kind: kind, input: %{turn: %{turn | repair_instruction: nil}}}}
   end
 
   def run(%{turn: %{model_outcome: %{kind: :final_answer}} = turn}, _context) do

@@ -11,20 +11,11 @@ defmodule Jido.AI.Flows.ModelRound do
       action: Jido.AI.Actions.ProjectConversation,
       params: %{turn: input(:turn)}
 
-    step "prompt_cache",
-      action: Jido.AI.Actions.PlanPromptCache,
-      params: %{
-        turn: result("project", :turn),
-        messages: result("project", :messages),
-        projection: result("project", :projection)
-      }
-
     step "model",
       action: Jido.AI.Actions.CallModel,
       params: %{
-        turn: result("prompt_cache", :turn),
-        messages: result("prompt_cache", :messages),
-        prompt_cache: result("prompt_cache", :prompt_cache)
+        turn: result("project", :turn),
+        messages: result("project", :messages)
       }
 
     step "output_guard",
@@ -39,14 +30,13 @@ defmodule Jido.AI.Flows.ModelRound do
       params: %{
         turn: result("model", :turn),
         outcome: result("model", :outcome),
-        prompt_cache: result("model", :prompt_cache),
         output_allowed: result("output_guard", :allowed),
         output_reason: result("output_guard", :reason)
       }
 
-    dispatch "next",
+    invoke "next",
       decision: Jido.AI.Actions.DecideModelNext,
-      expander: Jido.AI.Actions.ExpandModelNext,
+      expander: Jido.AI.Actions.ExpandNext,
       params: %{turn: result("record_attempt", :turn)}
 
     output result("next")

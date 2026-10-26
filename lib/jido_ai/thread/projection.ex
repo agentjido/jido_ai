@@ -2,9 +2,11 @@ defmodule Jido.AI.Thread.Projection do
   @moduledoc """
   Projects the canonical `Jido.Session` Thread into portable model messages.
 
-  Only `:ai_message` entries enter the model context. Runtime observations,
-  review records, and request outcomes stay in the Thread but outside prompts.
-  Incomplete tool exchanges are also excluded.
+  Only eligible `:ai_message` entries enter the model context. Runtime
+  observations, review records, and request outcomes stay in the Thread but
+  outside prompts. Messages from failed or blocked requests stay available for
+  inspection but do not enter later model requests. Incomplete tool exchanges
+  are also excluded.
   """
 
   alias Jido.{Session, Thread}
@@ -46,7 +48,7 @@ defmodule Jido.AI.Thread.Projection do
   def project(%Session{thread: thread}, config) when is_map(config) do
     with {:ok, _thread} <- Thread.validate(thread) do
       thread.entries
-      |> Enum.filter(&(&1.kind in [:ai_message, "ai_message"]))
+      |> context_entries()
       |> Enum.reduce_while({:ok, []}, fn entry, {:ok, messages} ->
         case decode_message(entry.payload) do
           {:ok, message} -> {:cont, {:ok, [{entry, message} | messages]}}
@@ -82,7 +84,7 @@ defmodule Jido.AI.Thread.Projection do
   @spec breakpoint(Session.t()) :: non_neg_integer() | nil
   def breakpoint(%Session{thread: thread}) do
     thread.entries
-    |> Enum.filter(&(&1.kind in [:ai_message, "ai_message"]))
+    |> context_entries()
     |> complete_exchange_entries()
     |> List.last()
     |> case do
@@ -102,6 +104,37 @@ defmodule Jido.AI.Thread.Projection do
     |> case do
       {:ok, pairs} -> pairs |> Enum.reverse() |> complete_exchanges() |> Enum.map(&elem(&1, 0))
       {:error, _reason} -> []
+    end
+  end
+
+  defp context_entries(entries) do
+    outcomes = request_outcomes(entries)
+
+    Enum.filter(entries, fn entry ->
+      entry.kind in [:ai_message, "ai_message"] and context_entry?(entry, outcomes)
+    end)
+  end
+
+  defp request_outcomes(entries) do
+    Enum.reduce(entries, %{}, fn entry, outcomes ->
+      if entry.kind in [:ai_request_outcome, "ai_request_outcome"] do
+        case field(entry.refs, :run_id) do
+          run_id when is_binary(run_id) and run_id != "" ->
+            Map.put(outcomes, run_id, field(entry.payload, :status) in [:completed, "completed"])
+
+          _other ->
+            outcomes
+        end
+      else
+        outcomes
+      end
+    end)
+  end
+
+  defp context_entry?(entry, outcomes) do
+    case field(entry.refs, :run_id) do
+      run_id when is_binary(run_id) and run_id != "" -> Map.get(outcomes, run_id, true)
+      _other -> true
     end
   end
 

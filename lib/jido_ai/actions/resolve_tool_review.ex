@@ -1,7 +1,7 @@
 defmodule Jido.AI.Actions.ResolveToolReview do
   @moduledoc "Turns a durable wait result into an explicit graph decision."
 
-  alias Jido.AI.{Conversation, Runtime, Thread.Projection}
+  alias Jido.AI.{Runtime, Thread.Projection}
 
   use Jido.Action,
     name: "jido_ai_resolve_tool_review",
@@ -16,17 +16,17 @@ defmodule Jido.AI.Actions.ResolveToolReview do
 
     session =
       Projection.observe(
-        Conversation.decode!(turn.session),
+        Jido.Session.decode!(turn.session),
         :ai_review,
         %{status: status, selected: decision.selected},
         %{request_id: turn.request_id, run_id: turn.run_id},
         at
       )
 
-    turn = %{turn | session: Conversation.encode(session)}
+    turn = %{turn | session: Jido.Session.encode(session)}
 
     case status do
-      :approved -> {:ok, %{kind: :continue, input: %{turn: turn}}}
+      :approved -> {:ok, %{kind: :tools, input: %{turn: turn}}}
       :denied -> {:ok, complete(turn, "tool use was denied")}
       :expired -> {:ok, complete(turn, "tool review expired")}
     end

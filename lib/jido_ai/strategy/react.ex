@@ -1,7 +1,7 @@
 defmodule Jido.AI.Strategy.ReAct do
   @moduledoc "The default graph-first reasoning Flow."
 
-  @default_instructions "Answer concisely. Use the available tools for arithmetic. You can request multiple tools in one response."
+  @default_instructions "Answer concisely. Use the available tools when they help. You can request multiple tools in one response."
 
   use Jido.Flow,
     id: "jido.ai/strategy/react",
@@ -52,9 +52,9 @@ defmodule Jido.AI.Strategy.ReAct do
         max_retries: input(:max_retries)
       }
 
-    dispatch "input_guard",
+    invoke "input_guard",
       decision: Jido.AI.Actions.CheckInput,
-      expander: Jido.AI.Actions.ExpandInput,
+      expander: Jido.AI.Actions.ExpandNext,
       params: %{turn: result("start_request")}
 
     output result("input_guard")

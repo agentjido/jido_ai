@@ -1,4 +1,4 @@
 Mimic.copy(ReqLLM)
-Mimic.copy(Jido.AI.Tools.Add)
+Mimic.copy(Jido.AITest.Tools.Add)
 
 ExUnit.start()

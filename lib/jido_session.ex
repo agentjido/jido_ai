@@ -172,6 +172,15 @@ defmodule Jido.Session do
 
   def decode(_value), do: {:error, :invalid_session}
 
+  @doc "Decodes and validates a portable Session map or raises on invalid data."
+  @spec decode!(t() | map()) :: t()
+  def decode!(value) do
+    case decode(value) do
+      {:ok, session} -> session
+      {:error, reason} -> raise ArgumentError, "invalid session: #{inspect(reason)}"
+    end
+  end
+
   @doc false
   @spec validate(t()) :: {:ok, t()} | {:error, :invalid_session}
   def validate(%__MODULE__{} = session) do

@@ -43,12 +43,12 @@ defmodule Jido.AI.Actions.CheckOutput do
       length(ids) != length(Enum.uniq(ids)) ->
         "tool call IDs must be unique"
 
-      Enum.any?(calls, &(&1.name not in turn.allowed_tools)) ->
+      Enum.any?(calls, &(&1.name not in Jido.AI.Toolset.names(turn.tools))) ->
         "model requested a tool that is not allowed"
 
       true ->
         Enum.find_value(calls, fn call ->
-          case Jido.AI.ToolRegistry.validate_call(call) do
+          case Jido.AI.Toolset.validate_call(turn.tools, call) do
             :ok -> nil
             {:error, reason} -> "invalid tool call: #{inspect(reason)}"
           end

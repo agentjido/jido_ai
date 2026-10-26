@@ -16,15 +16,12 @@ defmodule Jido.AI do
   The Agent owns the runtime boundary. The reasoning Flow is the direct target
   of its request route. Jido AI does not add a hidden orchestration pipeline.
 
-  Flow components define the control behavior. `Jido.AI.SimpleAgent` expands
-  guarded model and tool Flows through terminal Dispatch components. A Flow
-  Parallel component executes validated tool calls as separate Action nodes
-  and joins their ordered results.
+  Flow components define the control behavior. The ReAct strategy uses one
+  shared Invoke expander for model, review, tool, and terminal decisions. A
+  Flow Parallel component executes validated tool calls as separate Action
+  nodes and joins their ordered results.
 
-  The first Agent is `Jido.AI.SimpleAgent`. Send it a request Signal:
-
-      agent = Jido.AI.SimpleAgent.instantiate!(id: "example")
-      signal = Jido.AI.SimpleAgent.request_signal!(%{input: "Say hello."})
-      Jido.AI.SimpleAgent.cmd(agent, signal)
+  Applications define their own Agent modules. A complete runnable Agent is in
+  `examples/00_graph_first`.
   """
 end

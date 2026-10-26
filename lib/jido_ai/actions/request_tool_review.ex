@@ -1,7 +1,7 @@
 defmodule Jido.AI.Actions.RequestToolReview do
   @moduledoc "Publishes one review request before the durable Flow wait."
 
-  alias Jido.AI.{Conversation, Runtime, Thread.Projection}
+  alias Jido.AI.{Runtime, Thread.Projection}
 
   use Jido.Action,
     name: "jido_ai_request_tool_review",
@@ -12,7 +12,7 @@ defmodule Jido.AI.Actions.RequestToolReview do
   @impl Jido.Action
   def run(%{turn: turn}, context) do
     at = Runtime.now_ms(context)
-    session = Conversation.decode!(turn.session)
+    session = Jido.Session.decode!(turn.session)
 
     data = %{
       session_id: session.id,
@@ -34,6 +34,6 @@ defmodule Jido.AI.Actions.RequestToolReview do
         at
       )
 
-    {:ok, %{turn: %{turn | session: Conversation.encode(next_session)}}}
+    {:ok, %{turn: %{turn | session: Jido.Session.encode(next_session)}}}
   end
 end
