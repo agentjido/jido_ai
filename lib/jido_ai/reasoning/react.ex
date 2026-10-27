@@ -7,8 +7,8 @@ defmodule Jido.AI.Reasoning.ReAct do
   review, and all recipe Actions are public modules under this namespace.
   """
 
-  alias Jido.AI.Reasoning.Actions.{FinalizeTurn, GuardInput, StartRequest}
-  alias Jido.AI.Reasoning.ReAct.Actions.{DecideInput, ExpandNext}
+  alias Jido.AI.Reasoning.Actions.{DecideInput, FinalizeTurn, GuardInput, StartRequest}
+  alias Jido.AI.Reasoning.ReAct.Actions.ExpandNext
 
   @default_instructions "Answer concisely. Use the available tools when they help. You can request multiple tools in one response."
 
@@ -20,7 +20,7 @@ defmodule Jido.AI.Reasoning.ReAct do
     schema:
       Zoi.object(
         %{
-          input: Zoi.string(),
+          input: Zoi.union([Zoi.string(), Zoi.list(Zoi.map())]),
           instructions: Zoi.string() |> Zoi.default(@default_instructions),
           model: Zoi.string() |> Zoi.default("openai:gpt-4o-mini"),
           fallback_models: Zoi.list(Zoi.string()) |> Zoi.default([]),
@@ -39,6 +39,7 @@ defmodule Jido.AI.Reasoning.ReAct do
             )
             |> Zoi.default(%{enabled: false}),
           stream: Zoi.boolean() |> Zoi.default(false),
+          output_schema: Zoi.map() |> Zoi.nullable() |> Zoi.default(nil),
           review_tools: Zoi.boolean() |> Zoi.default(false),
           tool_policy:
             Zoi.object(
@@ -106,12 +107,14 @@ defmodule Jido.AI.Reasoning.ReAct do
     step "start_request",
       action: StartRequest,
       params: %{
+        flow: %{id: "jido.ai/reasoning/react", vsn: 1},
         input: input(:input),
         instructions: input(:instructions),
         model: input(:model),
         fallback_models: input(:fallback_models),
         options: input(:options),
         prompt_cache: input(:prompt_cache),
+        output_schema: input(:output_schema),
         stream: input(:stream),
         review_tools: input(:review_tools),
         tool_policy: input(:tool_policy),

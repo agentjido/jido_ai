@@ -1,7 +1,7 @@
 defmodule Jido.AI.Reasoning.ReAct.Actions.ResolveToolReview do
   @moduledoc "Turns a durable wait result into an explicit graph decision."
 
-  alias Jido.AI.Thread.Projection
+  alias Jido.AI.{Reasoning.Result, Thread.Projection}
 
   use Jido.Action,
     id: "jido.ai/reasoning/react/actions/resolve-tool-review",
@@ -21,6 +21,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ResolveToolReview do
         Jido.Session.decode!(turn.session),
         :ai_review,
         %{
+          version: 1,
           status: status,
           selected: decision.selected,
           review_id: turn.review_id,
@@ -54,17 +55,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ResolveToolReview do
       kind: :complete,
       output: %{
         turn: turn,
-        result: %{
-          status: :blocked,
-          output: "",
-          model_calls: turn.model_calls,
-          tool_rounds: turn.tool_rounds,
-          tool_calls: turn.tool_call_count,
-          tool_errors: turn.tool_error_count,
-          retries: turn.retries,
-          guardrail: :review,
-          reason: reason
-        }
+        result: Result.blocked(:review, reason)
       }
     }
   end

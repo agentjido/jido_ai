@@ -2,7 +2,6 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
   @moduledoc "Calls one model and returns success or failure as graph data."
 
   alias Jido.AI.Context, as: AIContext
-  alias Jido.AI.Context.ReqLLM, as: ContextRequest
   alias Jido.AI.{Budget, Telemetry, Toolset, Usage}
 
   use Jido.Action,
@@ -71,21 +70,41 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
       |> put_conversation_telemetry(turn)
       |> put_budget_timeout(turn, started_at)
 
-    patch = %{
-      model: model,
-      tools: tools || [],
-      options: options,
-      tool_choice: tool_choice(turn),
-      prompt_cache: turn.prompt_cache
-    }
-
     operation_id = "model-request:#{turn.model_calls + 1}"
 
-    with {:ok, configured} <- AIContext.configure(context, patch, op_id: operation_id),
-         {:ok, prepared} <- AIContext.prepare(configured),
-         {:ok, request} <- ContextRequest.render(prepared) do
-      {:ok, prepared, request}
+    with {:ok, transformed} <-
+           AIContext.transform(context, operation_id, fn req_llm_context ->
+             %{req_llm_context | tools: tools || []}
+           end),
+         {:ok, prepared} <-
+           AIContext.prepare(transformed,
+             model: model,
+             options: req_llm_options(options, turn, tools || [])
+           ) do
+      {:ok, prepared, prepared.request}
     end
+  end
+
+  defp req_llm_options(options, turn, tools) do
+    options
+    |> Map.to_list()
+    |> put_tools(tools)
+    |> put_option(:tool_choice, tool_choice(turn))
+    |> put_output(Map.get(turn, :output_schema))
+  end
+
+  defp put_tools(options, []), do: options
+  defp put_tools(options, tools), do: Keyword.put(options, :tools, tools)
+
+  defp put_option(options, _key, nil), do: options
+  defp put_option(options, key, value), do: Keyword.put(options, key, value)
+
+  defp put_output(options, nil), do: options
+
+  defp put_output(options, schema) when is_map(schema) do
+    options
+    |> Keyword.put(:output, ReqLLM.Output.object(schema))
+    |> Keyword.put(:output_validation, :strict)
   end
 
   defp model_tools(turn, true) do
@@ -274,6 +293,7 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
       kind: classified.type,
       finish_reason: classified.finish_reason,
       text: classified.text,
+      output: Map.get(response, :object),
       tool_calls: Enum.map(classified.tool_calls, &Map.take(&1, [:id, :name, :arguments])),
       req_llm_request_id: call_metadata[:request_id] || observed_request_id,
       response_id: response.id,
@@ -284,7 +304,8 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
       completed_at_ms: completed_at
     }
 
-    with {:ok, completed_context} <- AIContext.complete(context, outcome) do
+    with {:ok, completed_context} <-
+           AIContext.complete(context, {:ok, response}, req_llm_request_id: outcome.req_llm_request_id) do
       {:ok, %{turn: next_turn, outcome: outcome, context: completed_context}}
     end
   end
@@ -314,7 +335,8 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
       completed_at_ms: completed_at
     }
 
-    with {:ok, completed_context} <- AIContext.complete(context, outcome) do
+    with {:ok, completed_context} <-
+           AIContext.complete(context, {:error, reason}, req_llm_request_id: outcome.req_llm_request_id) do
       {:ok, %{turn: next_turn, outcome: outcome, context: completed_context}}
     end
   end

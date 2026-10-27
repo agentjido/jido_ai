@@ -1,7 +1,8 @@
 defmodule Jido.AI.Context.Snapshot do
-  @moduledoc "A portable inspection record for one context lifecycle stage."
+  @moduledoc "A portable inspection record for one Context lifecycle stage."
 
   alias Jido.AI.Context
+  alias ReqLLM.Message
 
   @schema Zoi.struct(
             __MODULE__,
@@ -11,14 +12,11 @@ defmodule Jido.AI.Context.Snapshot do
               context_id: Zoi.string(),
               stage: Zoi.enum([:open, :prepared, :completed]),
               digest: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),
-              source: Zoi.map() |> Zoi.default(%{}),
-              call: Zoi.map() |> Zoi.default(%{}),
               request: Zoi.map() |> Zoi.default(%{}),
-              shape: Zoi.map() |> Zoi.default(%{}),
-              items: Zoi.list(Zoi.map()) |> Zoi.default([]),
-              decisions: Zoi.list(Zoi.map()) |> Zoi.default([]),
-              usage: Zoi.any() |> Zoi.default(nil),
               response: Zoi.any() |> Zoi.default(nil),
+              metadata: Zoi.map() |> Zoi.default(%{}),
+              operations: Zoi.map() |> Zoi.default(%{}),
+              shape: Zoi.map() |> Zoi.default(%{}),
               content: Zoi.enum([:none, :redacted, :full]) |> Zoi.default(:redacted),
               captured_at_ms: Zoi.integer()
             },
@@ -27,6 +25,7 @@ defmodule Jido.AI.Context.Snapshot do
           )
 
   @type t :: unquote(Zoi.type_spec(@schema))
+
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
 
@@ -39,7 +38,7 @@ defmodule Jido.AI.Context.Snapshot do
   def new(%Context{} = context, opts \\ []) do
     content = Keyword.get(opts, :content, :redacted)
     stage = snapshot_stage(context, Keyword.get(opts, :stage))
-    included = Enum.filter(context.items, &(&1.state == :included))
+    req_llm_context = context.request.context
 
     %__MODULE__{
       type: "jido.ai.context.snapshot",
@@ -47,14 +46,11 @@ defmodule Jido.AI.Context.Snapshot do
       context_id: context.id,
       stage: stage,
       digest: context.digest,
-      source: portable(context.source),
-      call: portable(context.call),
       request: request_summary(context.request, content),
-      shape: shape(context.items, included),
-      items: Enum.map(context.items, &item_summary(&1, content)),
-      decisions: portable(context.decisions),
-      usage: stage |> snapshot_result(context) |> field(:usage) |> portable(),
-      response: stage |> snapshot_result(context) |> response_summary(content),
+      response: response_summary(snapshot_result(context, stage), content, context.metadata),
+      metadata: portable(context.metadata),
+      operations: portable(context.operations),
+      shape: context_shape(req_llm_context),
       content: content,
       captured_at_ms: captured_at(context, stage)
     }
@@ -91,58 +87,138 @@ defmodule Jido.AI.Context.Snapshot do
     end
   end
 
-  @doc "Compares two snapshots by item, request, decision, usage, and response changes."
+  @doc "Compares two lifecycle snapshots."
   @spec diff(t(), t()) :: map()
   def diff(%__MODULE__{} = before, %__MODULE__{} = later) do
-    before_items = Map.new(before.items, &{field(&1, :id), &1})
-    after_items = Map.new(later.items, &{field(&1, :id), &1})
-    before_ids = MapSet.new(Map.keys(before_items))
-    after_ids = MapSet.new(Map.keys(after_items))
-
-    shared = MapSet.intersection(before_ids, after_ids)
+    before_messages = get_in(before.request, [:context, :messages]) || []
+    after_messages = get_in(later.request, [:context, :messages]) || []
 
     %{
       before: %{stage: before.stage, digest: before.digest},
       after: %{stage: later.stage, digest: later.digest},
-      added_items: after_ids |> MapSet.difference(before_ids) |> values(after_items),
-      removed_items: before_ids |> MapSet.difference(after_ids) |> values(before_items),
-      changed_items:
-        shared
-        |> Enum.filter(&(Map.fetch!(before_items, &1) != Map.fetch!(after_items, &1)))
-        |> Enum.sort()
-        |> Enum.map(&%{before: Map.fetch!(before_items, &1), after: Map.fetch!(after_items, &1)}),
       request_changed: before.request != later.request,
-      decisions_changed: before.decisions != later.decisions,
-      usage_changed: before.usage != later.usage,
-      response_changed: before.response != later.response
+      messages_changed: before_messages != after_messages,
+      message_count: %{before: length(before_messages), after: length(after_messages)},
+      response_changed: before.response != later.response,
+      metadata_changed: before.metadata != later.metadata,
+      operations_changed: before.operations != later.operations,
+      shape_changed: before.shape != later.shape
     }
   end
 
-  defp values(ids, items), do: ids |> Enum.sort() |> Enum.map(&Map.fetch!(items, &1))
-
-  defp snapshot_stage(%Context{stage: :completed}, :prepared), do: :prepared
-  defp snapshot_stage(%Context{stage: stage}, nil), do: stage
-  defp snapshot_stage(%Context{stage: stage}, stage), do: stage
-
-  defp snapshot_stage(_context, stage) do
-    raise ArgumentError, "context has no #{inspect(stage)} snapshot"
+  @doc false
+  @spec request_identity(Context.request()) :: map()
+  def request_identity(request) do
+    %{
+      model: portable(request.model),
+      context: req_llm_identity(request.context),
+      options: options_summary(request.options, :full)
+    }
   end
 
-  defp snapshot_result(:completed, context), do: context.result
-  defp snapshot_result(_stage, _context), do: nil
-
-  defp captured_at(context, :open), do: context.created_at_ms
-  defp captured_at(context, :prepared), do: context.prepared_at_ms || context.created_at_ms
-
-  defp captured_at(context, :completed),
-    do: context.completed_at_ms || context.prepared_at_ms || context.created_at_ms
+  @doc false
+  @spec req_llm_identity(ReqLLM.Context.t()) :: map()
+  def req_llm_identity(%ReqLLM.Context{} = context) do
+    %{
+      messages: Enum.map(context.messages, &message_identity/1),
+      tools: Enum.map(context.tools, &tool_summary(&1, :full))
+    }
+  end
 
   defp request_summary(request, content) do
-    request
-    |> Map.take([:model, :tool_choice, :options, :output_schema, :prompt_cache])
-    |> Map.put(:tools, Enum.map(Map.get(request, :tools) || [], &tool_summary(&1, content)))
+    %{
+      model: portable(request.model),
+      context: req_llm_summary(request.context, content),
+      options: options_summary(request.options, content)
+    }
+  end
+
+  defp options_summary(options, content) do
+    options
+    |> Map.new()
+    |> Map.update(:tools, nil, fn tools -> Enum.map(tools || [], &tool_summary(&1, content)) end)
+    |> Map.update(:output, nil, &output_summary(&1, content))
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+    |> Map.new()
     |> portable()
   end
+
+  defp output_summary(%ReqLLM.Output{} = output, :full), do: portable(output)
+
+  defp output_summary(%ReqLLM.Output{} = output, _content) do
+    contract = output.schema || output.element || output.choices
+
+    %{
+      type: output.type,
+      name: output.name,
+      description: output.description,
+      contract_digest: Context.term_digest(contract)
+    }
+  end
+
+  defp output_summary(output, _content), do: portable(output)
+
+  defp req_llm_summary(%ReqLLM.Context{} = context, content) do
+    %{
+      messages: Enum.map(context.messages, &message_summary(&1, content)),
+      tools: Enum.map(context.tools, &tool_summary(&1, content))
+    }
+  end
+
+  defp message_summary(%Message{} = message, content) do
+    base = %{
+      role: message.role,
+      name: message.name,
+      tool_call_id: message.tool_call_id,
+      metadata: portable(message.metadata),
+      content_digest: Context.term_digest(portable(message.content)),
+      content_shape: content_shape(message.content),
+      tool_calls: Enum.map(message.tool_calls || [], &tool_call_summary(&1, content)),
+      reasoning_details_count: length(message.reasoning_details || [])
+    }
+
+    case content do
+      :none ->
+        base
+
+      :redacted ->
+        if message.content == [], do: base, else: Map.put(base, :content, "[REDACTED]")
+
+      :full ->
+        base
+        |> Map.put(:content, portable(message.content))
+        |> Map.put(:reasoning_details, portable(message.reasoning_details))
+    end
+  end
+
+  defp message_identity(%Message{} = message) do
+    %{
+      role: message.role,
+      content: portable(message.content),
+      name: message.name,
+      tool_call_id: message.tool_call_id,
+      tool_calls: portable(message.tool_calls),
+      metadata: portable(message.metadata),
+      reasoning_details: portable(message.reasoning_details)
+    }
+  end
+
+  defp tool_call_summary(call, :full), do: portable(call)
+
+  defp tool_call_summary(call, _content) do
+    %{
+      id: field(call, :id),
+      name: tool_call_name(call),
+      arguments_digest: Context.term_digest(tool_call_arguments(call)),
+      metadata: portable(ReqLLM.ToolCall.metadata(call))
+    }
+  end
+
+  defp tool_call_name(%ReqLLM.ToolCall{function: function}), do: field(function, :name)
+  defp tool_call_name(call), do: field(call, :name)
+
+  defp tool_call_arguments(%ReqLLM.ToolCall{function: function}), do: field(function, :arguments)
+  defp tool_call_arguments(call), do: field(call, :arguments)
 
   defp tool_summary(%ReqLLM.Tool{} = tool, content) do
     schema = ReqLLM.Tool.to_json_schema(tool)
@@ -151,6 +227,7 @@ defmodule Jido.AI.Context.Snapshot do
       name: tool.name,
       description: tool.description,
       strict: tool.strict,
+      provider_options: portable(tool.provider_options),
       schema_digest: Context.term_digest(schema)
     }
 
@@ -170,98 +247,111 @@ defmodule Jido.AI.Context.Snapshot do
     }
   end
 
-  defp response_summary(nil, _content), do: nil
-  defp response_summary(result, :full), do: portable(result)
+  defp response_summary(nil, _content, _metadata), do: nil
 
-  defp response_summary(result, _content) when is_map(result) do
-    result
-    |> Map.take([
-      :status,
-      :kind,
-      :category,
-      :finish_reason,
-      :retryable,
-      :reason,
-      :req_llm_request_id,
-      :response_id,
-      :model,
-      :prompt_cache,
-      :started_at_ms,
-      :completed_at_ms
-    ])
-    |> Map.put(:digest, Context.term_digest(result))
-    |> portable()
-  end
+  defp response_summary({:ok, %ReqLLM.Response{} = response}, content, metadata) do
+    call_metadata =
+      response
+      |> ReqLLM.Response.call_metadata()
+      |> put_observed_request_id(metadata)
+      |> portable()
 
-  defp response_summary(result, _content), do: portable(result)
-
-  defp shape(items, included) do
-    %{
-      item_count: length(items),
-      included_item_count: length(included),
-      excluded_item_count: length(items) - length(included),
-      message_count: Enum.count(included, &(&1.role in [:system, :user, :assistant, :tool])),
-      content_bytes: Enum.sum(Enum.map(included, &content_bytes/1)),
-      kinds: frequencies(included, & &1.kind),
-      placements: frequencies(included, & &1.placement),
-      roles: frequencies(included, & &1.role)
-    }
-  end
-
-  defp frequencies(values, key) do
-    values
-    |> Enum.map(key)
-    |> Enum.reject(&is_nil/1)
-    |> Enum.frequencies()
-  end
-
-  defp content_bytes(item) do
-    %{content: item.content, output: item.output, tool_calls: item.tool_calls}
-    |> Jason.encode!()
-    |> byte_size()
-  rescue
-    _error -> byte_size(:erlang.term_to_binary(item.content))
-  end
-
-  defp item_summary(item, content) do
-    base = %{
-      id: item.id,
-      kind: item.kind,
-      role: item.role,
-      placement: item.placement,
-      priority: item.priority,
-      required: item.required,
-      order: item.order,
-      state: item.state,
-      reason: portable(item.reason),
-      source: portable(item.source),
-      content_digest: item.content_digest,
-      content_shape: content_shape(item.content),
-      name: item.name,
-      tool_call_id: item.tool_call_id,
-      tool_call_count: length(item.tool_calls)
+    summary = %{
+      status: :ok,
+      call_metadata: call_metadata,
+      context: response_context(response, content)
     }
 
-    case content do
-      :none ->
-        base
-
-      :redacted ->
-        Map.put(base, :content, "[REDACTED]")
-
-      :full ->
-        base
-        |> Map.put(:content, portable(item.content))
-        |> Map.put(:output, portable(item.output))
-        |> Map.put(:metadata, portable(item.metadata))
-        |> Map.put(:tool_calls, portable(item.tool_calls))
+    case {content, response.object} do
+      {:full, output} when not is_nil(output) -> Map.put(summary, :output, portable(output))
+      {:redacted, output} when not is_nil(output) -> Map.put(summary, :output, "[REDACTED]")
+      _other -> summary
     end
   end
 
-  defp content_shape(value) when is_binary(value), do: %{type: :text, bytes: byte_size(value)}
-  defp content_shape(value) when is_list(value), do: %{type: :parts, count: length(value)}
-  defp content_shape(nil), do: %{type: :none}
-  defp content_shape(_value), do: %{type: :term}
+  defp response_summary({:error, reason}, :full, metadata) do
+    %{status: :error, error: portable(reason), call_metadata: error_call_metadata(metadata)}
+  end
+
+  defp response_summary({:error, reason}, _content, metadata) do
+    %{status: :error, error: error_summary(reason), call_metadata: error_call_metadata(metadata)}
+  end
+
+  defp put_observed_request_id(call_metadata, metadata) do
+    case field(call_metadata, :request_id) do
+      request_id when is_binary(request_id) and request_id != "" -> call_metadata
+      _other -> maybe_put(call_metadata, :request_id, completion_request_id(metadata))
+    end
+  end
+
+  defp error_call_metadata(metadata) do
+    %{}
+    |> maybe_put(:request_id, completion_request_id(metadata))
+    |> portable()
+  end
+
+  defp completion_request_id(metadata) do
+    metadata |> field(:completion) |> field(:req_llm_request_id)
+  end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, _key, ""), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  defp response_context(%ReqLLM.Response{context: %ReqLLM.Context{} = context}, content) do
+    req_llm_summary(context, content)
+  end
+
+  defp response_context(_response, _content), do: nil
+
+  defp error_summary(reason) when is_exception(reason) do
+    %{type: inspect(reason.__struct__), message: Exception.message(reason)}
+  end
+
+  defp error_summary(reason), do: %{type: inspect(reason)}
+
+  defp context_shape(%ReqLLM.Context{} = context) do
+    %{
+      message_count: length(context.messages),
+      tool_count: length(context.tools),
+      content_part_count: Enum.sum(Enum.map(context.messages, &length(&1.content || []))),
+      content_bytes: Enum.sum(Enum.map(context.messages, &content_bytes/1)),
+      roles: context.messages |> Enum.map(& &1.role) |> Enum.frequencies(),
+      reasoning_message_count: Enum.count(context.messages, fn message -> (message.reasoning_details || []) != [] end)
+    }
+  end
+
+  defp content_shape(parts) when is_list(parts) do
+    %{count: length(parts), types: parts |> Enum.map(&field(&1, :type)) |> Enum.frequencies()}
+  end
+
+  defp content_shape(_content), do: %{count: 0, types: %{}}
+
+  defp content_bytes(message) do
+    message.content
+    |> portable()
+    |> Jason.encode!()
+    |> byte_size()
+  rescue
+    _error -> byte_size(:erlang.term_to_binary(message.content))
+  end
+
+  defp snapshot_stage(%Context{stage: :completed}, :prepared), do: :prepared
+  defp snapshot_stage(%Context{stage: stage}, nil), do: stage
+  defp snapshot_stage(%Context{stage: stage}, stage), do: stage
+
+  defp snapshot_stage(_context, stage) do
+    raise ArgumentError, "context has no #{inspect(stage)} snapshot"
+  end
+
+  defp snapshot_result(%Context{result: result}, :completed), do: result
+  defp snapshot_result(_context, _stage), do: nil
+
+  defp captured_at(context, :open), do: context.created_at_ms
+  defp captured_at(context, :prepared), do: context.prepared_at_ms || context.created_at_ms
+
+  defp captured_at(context, :completed),
+    do: context.completed_at_ms || context.prepared_at_ms || context.created_at_ms
 
   defp portable(nil), do: nil
   defp portable(value) when is_binary(value) or is_number(value) or is_boolean(value), do: value
@@ -272,7 +362,6 @@ defmodule Jido.AI.Context.Snapshot do
   defp portable(value) when is_port(value), do: "[PORT]"
   defp portable(value) when is_tuple(value), do: value |> Tuple.to_list() |> Enum.map(&portable/1)
   defp portable(value) when is_list(value), do: Enum.map(value, &portable/1)
-
   defp portable(%_module{} = value), do: value |> Map.from_struct() |> portable()
 
   defp portable(value) when is_map(value) do

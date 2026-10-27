@@ -101,10 +101,12 @@ defmodule Jido.AI.RuntimeTest do
     before_context = Jido.AI.Context.Snapshot.decode!(attempt.context.before)
     after_context = Jido.AI.Context.Snapshot.decode!(attempt.context.after)
     assert before_context["stage"] == "prepared"
-    assert before_context["usage"] == nil
+    assert before_context["response"] == nil
     assert after_context["stage"] == "completed"
-    assert after_context["usage"]["input_tokens"] == 100
-    assert after_context["request"]["prompt_cache"]["enabled"]
+    assert after_context["response"]["call_metadata"]["usage"]["input_tokens"] == 100
+
+    assert get_in(after_context, ["request", "options", "provider_options", "anthropic_prompt_cache"])
+
     assert after_context["shape"]["message_count"] == 2
 
     outcome = List.last(agent.state.session.thread.entries)
@@ -269,7 +271,7 @@ defmodule Jido.AI.RuntimeTest do
              run(agent, %{input: "Add 2 and 3", limits: %{model_calls: 1}})
 
     assert result.status == :blocked
-    assert result.guardrail == :limits
+    assert result.reason_code == :limits
     assert result.reason == "maximum model calls reached"
     assert result.model_calls == 1
     assert result.tool_rounds == 1
@@ -299,7 +301,7 @@ defmodule Jido.AI.RuntimeTest do
              run(agent, %{input: "Use two tool rounds", limits: %{tool_calls: 1}})
 
     assert result.status == :blocked
-    assert result.guardrail == :limits
+    assert result.reason_code == :limits
     assert result.reason == "maximum tool calls reached"
     assert result.model_calls == 2
     assert result.tool_rounds == 1
@@ -388,7 +390,7 @@ defmodule Jido.AI.RuntimeTest do
              run(agent, %{input: "Add 2 and 3", limits: %{total_tokens: 10}})
 
     assert result.status == :blocked
-    assert result.guardrail == :limits
+    assert result.reason_code == :limits
     assert result.reason == "maximum total tokens reached"
     assert result.tool_calls == 0
     assert result.usage.total_tokens == 15
@@ -719,10 +721,14 @@ defmodule Jido.AI.RuntimeTest do
              Server.await(pending)
 
     assert reply.data.status == :blocked
-    assert reply.data.guardrail == :review
+    assert reply.data.reason_code == :review
     assert %Jido.Session{} = agent.state.session
     assert Server.agent(server).state == agent.state
     assert {:ok, []} = Projection.messages(agent.state.session)
+
+    reviews = Jido.Thread.filter_by_kind(agent.state.session.thread, :ai_review)
+    assert length(reviews) == 2
+    assert Enum.all?(reviews, &(&1.payload["version"] == 1))
 
     assert %{payload: %{"status" => "blocked"}} =
              agent.state.session.thread
@@ -806,7 +812,13 @@ defmodule Jido.AI.RuntimeTest do
       Jido.Signal.new!("jido.ai.review.approved", review_match(restored_wait, "approved"), source: "/tests")
 
     assert :ok = Server.deliver_wait(restored, restored_wait.id, approval)
-    assert :ok = Server.quiesce(restored)
+    IO.inspect(Server.status(restored), label: "status after approval")
+    quiesce = Server.quiesce(restored)
+    IO.inspect(quiesce, label: "quiesce result")
+    status_after_quiesce = Server.status(restored)
+    IO.inspect(status_after_quiesce, label: "status after quiesce")
+    IO.inspect(Process.info(status_after_quiesce.active.worker_pid, :current_stacktrace), label: "worker stack")
+    assert :ok = quiesce
 
     session = Server.agent(restored).state.session
     reviews = Jido.Thread.filter_by_kind(session.thread, :ai_review)

@@ -7,6 +7,11 @@ defmodule Jido.AI.ToolResult do
   @spec normalize(map(), pos_integer()) :: map()
   def normalize(outcome, max_bytes \\ @default_max_bytes)
 
+  def normalize(%{status: :ok, value: %ReqLLM.ToolResult{} = result}, max_bytes)
+      when is_integer(max_bytes) and max_bytes > 0 do
+    normalize_content_result(result, :ok, max_bytes)
+  end
+
   def normalize(%{status: :ok, value: value}, max_bytes)
       when is_integer(max_bytes) and max_bytes > 0 do
     {model_content, metadata} = project(value, max_bytes)
@@ -15,9 +20,16 @@ defmodule Jido.AI.ToolResult do
       status: :ok,
       value: value,
       model_content: model_content,
+      content_parts: nil,
+      result_metadata: %{},
       error: nil,
       metadata: metadata
     }
+  end
+
+  def normalize(%{status: :error, error: %ReqLLM.ToolResult{} = result}, max_bytes)
+      when is_integer(max_bytes) and max_bytes > 0 do
+    normalize_content_result(result, :error, max_bytes)
   end
 
   def normalize(%{status: :error, error: error}, max_bytes)
@@ -37,6 +49,8 @@ defmodule Jido.AI.ToolResult do
       status: :error,
       value: nil,
       model_content: model_content,
+      content_parts: nil,
+      result_metadata: %{},
       error: safe_error["error"],
       metadata: metadata
     }
@@ -83,6 +97,102 @@ defmodule Jido.AI.ToolResult do
 
         {content, %{bytes: nil, max_bytes: max_bytes, truncated: false}}
     end
+  end
+
+  defp normalize_content_result(result, status, max_bytes) do
+    case project_content_result(result, max_bytes) do
+      {:ok, content_parts, model_content, result_metadata, metadata} ->
+        %{
+          status: status,
+          value: result.output,
+          model_content: model_content,
+          content_parts: content_parts,
+          result_metadata: result_metadata,
+          error: content_result_error(status, result.output),
+          metadata: metadata
+        }
+
+      {:truncated, model_content, metadata} ->
+        %{
+          status: status,
+          value: result.output,
+          model_content: model_content,
+          content_parts: nil,
+          result_metadata: %{},
+          error: content_result_error(status, result.output),
+          metadata: metadata
+        }
+
+      {:error, reason} ->
+        normalize(
+          %{
+            status: :error,
+            error: %{type: :invalid_tool_result, message: reason, retryable?: false}
+          },
+          max_bytes
+        )
+    end
+  end
+
+  defp project_content_result(result, max_bytes) do
+    with :ok <- validate_content_parts(result.content || []),
+         {:ok, encoded} <-
+           Jason.encode(%{
+             content: result.content || [],
+             output: result.output,
+             metadata: result.metadata || %{}
+           }) do
+      bytes = byte_size(encoded)
+
+      if bytes <= max_bytes do
+        decoded = Jason.decode!(encoded)
+
+        {:ok, result.content || [], decoded["output"], decoded["metadata"] || %{},
+         %{
+           bytes: bytes,
+           max_bytes: max_bytes,
+           truncated: false,
+           content_parts: length(result.content || [])
+         }}
+      else
+        content = %{
+          "status" => "truncated",
+          "message" => "tool result exceeded the model-content limit",
+          "original_bytes" => bytes,
+          "max_bytes" => max_bytes
+        }
+
+        {:truncated, content,
+         %{bytes: bytes, max_bytes: max_bytes, truncated: true, content_parts: 0}}
+      end
+    else
+      {:error, _reason} -> {:error, "tool result content parts are invalid"}
+    end
+  end
+
+  defp validate_content_parts(parts) when is_list(parts) do
+    if List.improper?(parts) do
+      {:error, :invalid_content_parts}
+    else
+      Enum.reduce_while(parts, :ok, fn part, :ok ->
+        case Zoi.parse(ReqLLM.Message.ContentPart.schema(), part) do
+          {:ok, _part} -> {:cont, :ok}
+          {:error, _reason} -> {:halt, {:error, :invalid_content_part}}
+        end
+      end)
+    end
+  end
+
+  defp validate_content_parts(_parts), do: {:error, :invalid_content_parts}
+
+  defp content_result_error(:ok, _output), do: nil
+
+  defp content_result_error(:error, output) do
+    %{
+      "type" => safe_type(field(output, :type)),
+      "message" => safe_message(field(output, :message)),
+      "retryable" => field(output, :retryable?) == true
+    }
   end
 
   defp safe_type(value) when is_atom(value), do: Atom.to_string(value)

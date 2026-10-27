@@ -18,17 +18,30 @@ end
 ```
 
 Linear methods such as Chain of Thought and Chain of Draft shape one line of
-reasoning. Tree and graph methods explore several candidates and can cost more
-model calls. Adaptive selection chooses a method by policy. These methods do
-not all expose the same tool behavior or result shape. Read each method's
-contract before replacing ReAct in a tool agent.
+reasoning in one structured model call. Tree generates alternatives, evaluates
+and selects them, then synthesizes an answer in three calls. Graph builds
+thought nodes and relationships, then synthesizes from that graph in two calls.
+TRM runs one bounded draft, critique, and revision cycle in three calls.
+Adaptive selection chooses a method by local policy. These methods do not all
+expose the same tool behavior or reasoning detail. Read each method's contract
+before you replace ReAct in a tool agent.
+
+All built-in methods accept the same base request fields: `input`,
+`instructions`, `model`, `options`, `prompt_cache`, `context`, and `limits`.
+ReAct adds fields for tools, review, streaming, and its output schema.
+
+All methods also return the same base result fields. `status` reports whether
+the request completed, was blocked, or failed. `reason_code` gives a stable
+cause. `reason` gives readable detail. `reasoning` contains method-specific
+data or `nil`. The Session Thread gets one versioned `:ai_request_outcome`
+entry with the same result and run summary. An external evaluation system can
+use this entry without adding evaluation policy to Jido AI.
 
 Compare methods on a measured task: quality of final result, provider calls,
 latency, and whether tool evidence reaches later calls. Do not infer quality
-from a method name. Set a budget that fits the selected method. A tree with a
-one-call limit is not a useful tree; an unbounded search is not a production
-control. Keep the Agent's public route stable while changing the method so
-your comparison measures the method rather than a different application path.
+from a method name. Keep the Agent's public route stable while changing the
+method so your comparison measures the method rather than a different
+application path.
 
 The [reasoning examples](../../examples/09_reasoning/README.md) cover current
 methods. Run [Compare reasoning methods](../livebooks/reasoning_methods.livemd)

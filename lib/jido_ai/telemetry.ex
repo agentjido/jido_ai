@@ -587,7 +587,7 @@ defmodule Jido.AI.Telemetry do
 
     metadata =
       summary
-      |> Map.take([:status, :run_id, :session_id, :thread_id, :guardrail])
+      |> Map.take([:status, :run_id, :session_id, :thread_id, :reason_code])
       |> compact()
 
     %{measurements: measurements, metadata: metadata}
@@ -822,7 +822,7 @@ defmodule Jido.AI.Telemetry do
       :tool_call_id,
       :tool_name,
       :status,
-      :guardrail,
+      :reason_code,
       :error_type,
       :error_code,
       :retryable?

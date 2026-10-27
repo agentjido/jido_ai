@@ -4,7 +4,6 @@ defmodule Jido.AI.ChainOfThoughtTest do
   import Mimic
 
   alias Jido.AI.Reasoning.ChainOfThought
-  alias Jido.AI.Reasoning.ChainOfThought.Actions.ParseResult
   alias Jido.AITest.ChainOfThoughtAgent
   alias Jido.Agent.Directive.Reply
   alias Jido.AgentServer
@@ -17,14 +16,7 @@ defmodule Jido.AI.ChainOfThoughtTest do
 
     assert ChainOfThought.default_instructions() == """
            You are a helpful AI assistant that thinks through problems step by step.
-
-           When solving problems:
-           1. Break down the problem into clear, logical steps
-           2. Show your reasoning for each step
-           3. Number your steps (Step 1:, Step 2:, etc.)
-           4. After all steps, provide your final answer clearly marked as "Conclusion:" or "Answer:"
-
-           Think carefully and explain your reasoning at each step.
+           Return an ordered list of clear reasoning steps and one concise conclusion.
            """
 
     assert %Jido.Flow{
@@ -42,7 +34,7 @@ defmodule Jido.AI.ChainOfThoughtTest do
                "model" => %{kind: :call},
                "output_guard" => %{kind: :call},
                "record_attempt" => %{kind: :call},
-               "parse" => %{kind: :call}
+               "complete" => %{kind: :call}
              }
            } = ChainOfThought.ModelRound.flow()
 
@@ -92,28 +84,7 @@ defmodule Jido.AI.ChainOfThoughtTest do
              definition.routes
   end
 
-  test "the parser accepts a variable number of numbered steps" do
-    assert {three_steps, "79 markers remain."} =
-             ParseResult.parse("""
-             Step 1: Find the starting total.
-             Step 2: Multiply 12 by 8 to get 96.
-             Step 3: Subtract 17 from 96.
-             Conclusion: 79 markers remain.
-             """)
-
-    assert Enum.map(three_steps, & &1.number) == [1, 2, 3]
-
-    assert {two_steps, "Ready."} =
-             ParseResult.parse("""
-             1. Check the input.
-             2. Return the result.
-             Answer: Ready.
-             """)
-
-    assert Enum.map(two_steps, & &1.number) == [1, 2]
-  end
-
-  test "one model call returns parsed steps and clean correlated telemetry" do
+  test "one model call returns structured steps and clean correlated telemetry" do
     owner = self()
     handler_id = "jido-ai-cot-test-#{System.unique_integer([:positive])}"
 
@@ -137,22 +108,21 @@ defmodule Jido.AI.ChainOfThoughtTest do
     expect(ReqLLM, :generate_text, fn model, context, options ->
       assert model == "openai:gpt-4o-mini"
       refute Keyword.has_key?(options, :tools)
+      assert %ReqLLM.Output{type: :object} = options[:output]
+      assert options[:output_validation] == :strict
 
       [system | _rest] = ReqLLM.Context.to_list(context)
       assert message_text(system) == ChainOfThought.default_instructions()
 
       {:ok,
-       response(
-         model,
-         context,
-         """
-         Step 1: There are 12 boxes with 8 markers each.
-         Step 2: The initial total is 12 times 8, which is 96.
-         Step 3: Subtracting 17 from 96 gives 79.
-         Conclusion: 79 markers remain.
-         """,
-         "cot-response"
-       )}
+       response(model, context, %{
+         "steps" => [
+           %{"number" => 1, "content" => "There are 12 boxes with 8 markers each."},
+           %{"number" => 2, "content" => "The initial total is 96."},
+           %{"number" => 3, "content" => "Subtracting 17 gives 79."}
+         ],
+         "conclusion" => "79 markers remain."
+       })}
     end)
 
     instance = String.to_atom("jido_ai_cot_#{System.unique_integer([:positive])}")
@@ -194,7 +164,7 @@ defmodule Jido.AI.ChainOfThoughtTest do
     assert before_context["stage"] == "prepared"
     assert after_context["stage"] == "completed"
     assert after_context["shape"]["message_count"] == 2
-    assert before_context["request"]["tools"] == []
+    assert before_context["request"]["context"]["tools"] == []
 
     events = receive_events([])
     {_, _, agent_start} = find_event(events, [:jido, :ai, :agent, :start])
@@ -222,7 +192,7 @@ defmodule Jido.AI.ChainOfThoughtTest do
     assert reply.data.status == :failed
     assert reply.data.output == ""
     assert reply.data.model_calls == 1
-    assert reply.data.guardrail == :model
+    assert reply.data.reason_code == :model
     assert reply.data.reasoning.steps == []
   end
 
@@ -242,13 +212,13 @@ defmodule Jido.AI.ChainOfThoughtTest do
     ChainOfThoughtAgent.cmd(agent, ChainOfThoughtAgent.request_signal!(%{input: input}))
   end
 
-  defp response(model, context, text, id) do
+  defp response(model, context, object) do
     %ReqLLM.Response{
-      id: id,
+      id: "cot-response",
       model: model,
       context: context,
+      object: object,
       finish_reason: :stop,
-      message: ReqLLM.Context.assistant(text),
       usage: %{input_tokens: 10, output_tokens: 5}
     }
   end

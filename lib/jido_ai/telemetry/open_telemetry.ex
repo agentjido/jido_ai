@@ -348,6 +348,7 @@ defmodule Jido.AI.Telemetry.OpenTelemetry do
       "jido.ai.session.id" => metadata[:session_id],
       "jido.ai.turn.id" => metadata[:turn_id],
       "jido.ai.status" => value(metadata[:status]),
+      "jido.ai.reason.code" => value(metadata[:reason_code]),
       "jido.ai.model.calls" => measurements[:model_calls],
       "jido.ai.tool.calls" => measurements[:tool_calls],
       "jido.ai.reasoning.steps" => measurements[:reasoning_steps]

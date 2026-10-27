@@ -2,28 +2,20 @@ defmodule Jido.AI.Reasoning.ChainOfThought do
   @moduledoc """
   The canonical graph-first Chain of Thought reasoning recipe.
 
-  The model produces a variable number of numbered reasoning steps and one
-  conclusion in a single model call. The graph parses that response into
-  explicit result data. It does not expose or depend on provider-hidden
-  reasoning state.
+  The model produces a variable number of ordered reasoning steps and one
+  conclusion in a single structured model call. It does not expose or depend
+  on provider-hidden reasoning state.
 
   This recipe does not execute tools. Use `Jido.AI.Reasoning.ReAct` when the
   model must select and run Agent tools.
   """
 
-  alias Jido.AI.Reasoning.Actions.{FinalizeTurn, GuardInput, StartRequest}
-  alias Jido.AI.Reasoning.ChainOfThought.Actions.{DecideInput, ExpandNext}
+  alias Jido.AI.Reasoning.Actions.{DecideInput, FinalizeTurn, GuardInput, StartRequest}
+  alias Jido.AI.Reasoning.ChainOfThought.Actions.ExpandNext
 
   @default_instructions """
   You are a helpful AI assistant that thinks through problems step by step.
-
-  When solving problems:
-  1. Break down the problem into clear, logical steps
-  2. Show your reasoning for each step
-  3. Number your steps (Step 1:, Step 2:, etc.)
-  4. After all steps, provide your final answer clearly marked as "Conclusion:" or "Answer:"
-
-  Think carefully and explain your reasoning at each step.
+  Return an ordered list of clear reasoning steps and one concise conclusion.
   """
 
   use Jido.Flow,
@@ -34,7 +26,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought do
     schema:
       Zoi.object(
         %{
-          input: Zoi.string(),
+          input: Zoi.union([Zoi.string(), Zoi.list(Zoi.map())]),
           instructions: Zoi.string() |> Zoi.default(@default_instructions),
           model: Zoi.string() |> Zoi.default("openai:gpt-4o-mini"),
           options:
@@ -91,11 +83,33 @@ defmodule Jido.AI.Reasoning.ChainOfThought do
     step "start_request",
       action: StartRequest,
       params: %{
+        flow: %{id: "jido.ai/reasoning/chain-of-thought", vsn: 1},
         input: input(:input),
         instructions: input(:instructions),
         model: input(:model),
         fallback_models: [],
         options: input(:options),
+        output_schema: %{
+          "type" => "object",
+          "properties" => %{
+            "steps" => %{
+              "type" => "array",
+              "minItems" => 1,
+              "items" => %{
+                "type" => "object",
+                "properties" => %{
+                  "number" => %{"type" => "integer"},
+                  "content" => %{"type" => "string", "minLength" => 1}
+                },
+                "required" => ["number", "content"],
+                "additionalProperties" => false
+              }
+            },
+            "conclusion" => %{"type" => "string", "minLength" => 1}
+          },
+          "required" => ["steps", "conclusion"],
+          "additionalProperties" => false
+        },
         prompt_cache: input(:prompt_cache),
         context_window: input(:context),
         max_model_calls: 1,

@@ -3,7 +3,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExpandNext do
 
   alias Jido.AI.{Telemetry, Toolset}
   alias Jido.AI.Reasoning.ReAct
-  alias Jido.AI.Reasoning.ReAct.Actions.RecordToolResults
+  alias Jido.AI.Reasoning.ReAct.Actions.{DetectToolCycle, ExecuteTool, RecordToolResults}
   alias Jido.Flow.Ref
 
   use Jido.Action,
@@ -55,7 +55,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExpandNext do
       description: "Execute validated tool calls as parallel Actions",
       schema: Zoi.object(%{turn: Zoi.any()}),
       output_schema: Zoi.map(),
-      components: [parallel(calls), record(calls), model()],
+      components: [parallel(calls), record(calls), detect_cycle(), model()],
       output: Ref.result("model")
     })
   end
@@ -69,7 +69,14 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExpandNext do
         calls
         |> Enum.with_index()
         |> Enum.map(fn {call, index} ->
-          %{name: action_name(index), action: call.action, params: call.params}
+          %{
+            name: action_name(index),
+            action: ExecuteTool,
+            params: %{
+              call: Map.take(call, [:id, :name, :arguments]),
+              tools: Ref.input([:turn, :tools])
+            }
+          }
         end)
     }
   end
@@ -86,12 +93,24 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExpandNext do
     }
   end
 
+  defp detect_cycle do
+    %{
+      kind: :step,
+      name: "detect_cycle",
+      action: DetectToolCycle,
+      params: %{
+        turn: Ref.result("record", :turn),
+        calls: Ref.input([:turn, :model_outcome, :tool_calls])
+      }
+    }
+  end
+
   defp model do
     %{
       kind: :subflow,
       name: "model",
       flow: ReAct.ModelRound,
-      params: %{turn: Ref.result("record", :turn)}
+      params: %{turn: Ref.result("detect_cycle", :turn)}
     }
   end
 

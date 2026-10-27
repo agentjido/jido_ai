@@ -1,5 +1,5 @@
 defmodule Jido.AI.Reasoning.ChainOfThought.ModelRound do
-  @moduledoc "Runs and parses one Chain of Thought model response."
+  @moduledoc "Runs one structured Chain of Thought model response."
 
   alias Jido.AI.Reasoning.Actions.{
     CallModel,
@@ -8,7 +8,7 @@ defmodule Jido.AI.Reasoning.ChainOfThought.ModelRound do
     RecordModelAttempt
   }
 
-  alias Jido.AI.Reasoning.ChainOfThought.Actions.ParseResult
+  alias Jido.AI.Reasoning.ChainOfThought.Actions.Complete
 
   use Jido.Flow,
     id: "jido.ai/reasoning/chain-of-thought/model-round",
@@ -49,10 +49,10 @@ defmodule Jido.AI.Reasoning.ChainOfThought.ModelRound do
         reasoning: %{method: :chain_of_thought}
       }
 
-    step "parse",
-      action: ParseResult,
+    step "complete",
+      action: Complete,
       params: %{turn: result("record_attempt", :turn)}
 
-    output result("parse")
+    output result("complete")
   end
 end

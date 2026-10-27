@@ -21,19 +21,20 @@ defmodule Jido.AI.Reasoning.Actions.GuardInput do
         {:ok, blocked(:review, "execution host does not support waits")}
 
       true ->
-        {:ok, %{allowed: true, guardrail: :none, reason: ""}}
+        {:ok, %{allowed: true, reason_code: :none, reason: nil}}
     end
   end
 
   defp rejection_reason(input) do
-    normalized = String.downcase(input)
+    text = input_text(input)
+    normalized = String.downcase(text)
 
     cond do
-      String.trim(input) == "" ->
+      empty_input?(input, text) ->
         "input is empty"
 
-      String.length(input) > 2_000 ->
-        "input is longer than 2000 characters"
+      reason = size_reason(input) ->
+        reason
 
       Enum.any?(@blocked_fragments, &String.contains?(normalized, &1)) ->
         "input contains a blocked instruction pattern"
@@ -43,6 +44,39 @@ defmodule Jido.AI.Reasoning.Actions.GuardInput do
     end
   end
 
-  defp blocked(guardrail, reason),
-    do: %{allowed: false, guardrail: guardrail, reason: reason}
+  defp input_text(input) when is_binary(input), do: input
+
+  defp input_text(input) when is_list(input) do
+    Enum.map_join(input, " ", fn part ->
+      case Map.get(part, :text, Map.get(part, "text")) do
+        text when is_binary(text) -> text
+        _other -> ""
+      end
+    end)
+  end
+
+  defp empty_input?(input, text) when is_binary(input), do: String.trim(text) == ""
+
+  defp empty_input?(input, text) when is_list(input) do
+    String.trim(text) == "" and
+      not Enum.any?(input, fn part ->
+        Enum.any?([:url, :data, :file_id], fn key ->
+          value = Map.get(part, key, Map.get(part, Atom.to_string(key)))
+          is_binary(value) and value != ""
+        end)
+      end)
+  end
+
+  defp size_reason(input) when is_binary(input) do
+    if String.length(input) > 2_000,
+      do: "input is longer than 2000 characters"
+  end
+
+  defp size_reason(input) when is_list(input) do
+    if byte_size(:erlang.term_to_binary(input)) > 2_000_000,
+      do: "input is larger than 2 MB"
+  end
+
+  defp blocked(reason_code, reason),
+    do: %{allowed: false, reason_code: reason_code, reason: reason}
 end

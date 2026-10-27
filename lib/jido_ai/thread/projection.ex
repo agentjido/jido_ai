@@ -18,7 +18,8 @@ defmodule Jido.AI.Thread.Projection do
   def schema, do: Session.state_schema() |> Zoi.nullable() |> Zoi.default(nil)
 
   @doc "Appends one portable model message to a Session."
-  @spec append(Session.t(), map(), map(), integer()) :: {:ok, Session.t()} | {:error, term()}
+  @spec append(Session.t(), ReqLLM.Message.t() | map(), map(), integer()) ::
+          {:ok, Session.t()} | {:error, term()}
   def append(%Session{} = session, message, refs \\ %{}, at \\ System.system_time(:millisecond)) do
     with {:ok, payload} <- encode_message(message) do
       entry = Thread.Entry.new(kind: :ai_message, payload: payload, refs: refs, at: at)
@@ -42,6 +43,23 @@ defmodule Jido.AI.Thread.Projection do
       {:ok, projection.messages}
     end
   end
+
+  @doc "Projects a Session into the canonical ReqLLM context and its decisions."
+  @spec context(Session.t(), map()) :: {:ok, map()} | {:error, :invalid_context}
+  def context(session, config \\ %{})
+
+  def context(%Session{} = session, config) when is_map(config) do
+    with {:ok, explanation} <- explain(session, config),
+         {:ok, messages} <- req_llm_messages(explanation.entries),
+         req_llm_context = ReqLLM.Context.new(messages),
+         {:ok, req_llm_context} <- ReqLLM.Context.validate(req_llm_context) do
+      {:ok, Map.put(explanation, :context, req_llm_context)}
+    else
+      _other -> {:error, :invalid_context}
+    end
+  end
+
+  def context(_session, _config), do: {:error, :invalid_context}
 
   @doc "Projects a bounded set of complete conversation turns from a Session."
   @spec project(Session.t(), map()) :: {:ok, map()} | {:error, :invalid_context}
@@ -303,6 +321,18 @@ defmodule Jido.AI.Thread.Projection do
   defp sequence(nil), do: nil
   defp sequence({entry, _message}), do: entry.seq
 
+  defp encode_message(%ReqLLM.Message{} = message) do
+    encode_message(%{
+      role: message.role,
+      content: portable_content(message.content),
+      name: message.name,
+      tool_call_id: message.tool_call_id,
+      tool_calls: message.tool_calls || [],
+      metadata: message.metadata,
+      reasoning_details: message.reasoning_details
+    })
+  end
+
   defp encode_message(message) when is_map(message) do
     with role when role in @roles <- role(field(message, :role)),
          content when is_binary(content) or is_list(content) <- field(message, :content) || "",
@@ -316,7 +346,8 @@ defmodule Jido.AI.Thread.Projection do
          "tool_call_id" => field(message, :tool_call_id),
          "tool_calls" => tool_calls,
          "output" => field(message, :output),
-         "metadata" => field(message, :metadata) || %{}
+         "metadata" => field(message, :metadata) || %{},
+         "reasoning_details" => field(message, :reasoning_details)
        })}
     else
       _other -> {:error, :invalid_message}
@@ -337,7 +368,8 @@ defmodule Jido.AI.Thread.Projection do
          tool_call_id: payload["tool_call_id"],
          tool_calls: tool_calls,
          output: payload["output"],
-         metadata: payload["metadata"] || %{}
+         metadata: payload["metadata"] || %{},
+         reasoning_details: payload["reasoning_details"]
        }}
     else
       _other -> {:error, :invalid_message}
@@ -364,13 +396,28 @@ defmodule Jido.AI.Thread.Projection do
 
   defp decode_tool_calls(calls), do: encode_tool_calls(calls)
 
+  defp tool_call(%ReqLLM.ToolCall{} = call) do
+    normalized = ReqLLM.ToolCall.to_map(call)
+    metadata = ReqLLM.ToolCall.metadata(call)
+    metadata = if ReqLLM.ToolCall.builtin?(call), do: Map.put(metadata, :builtin?, true), else: metadata
+
+    if map_size(metadata) > 0,
+      do: {:ok, Map.put(normalized, :metadata, json(metadata))},
+      else: {:ok, normalized}
+  end
+
   defp tool_call(call) when is_map(call) do
     id = field(call, :id)
     name = field(call, :name)
     arguments = field(call, :arguments)
 
     if is_binary(id) and id != "" and is_binary(name) and name != "" and is_map(arguments) do
-      {:ok, %{id: id, name: name, arguments: json(arguments)}}
+      normalized = %{id: id, name: name, arguments: json(arguments)}
+      metadata = field(call, :metadata)
+
+      if is_map(metadata) and map_size(metadata) > 0,
+        do: {:ok, Map.put(normalized, :metadata, json(metadata))},
+        else: {:ok, normalized}
     else
       {:error, :invalid_message}
     end
@@ -384,6 +431,128 @@ defmodule Jido.AI.Thread.Projection do
   defp role("assistant"), do: :assistant
   defp role("tool"), do: :tool
   defp role(_value), do: nil
+
+  defp req_llm_messages(entries) do
+    Enum.reduce_while(entries, {:ok, []}, fn entry, {:ok, messages} ->
+      with {:ok, message} <- req_llm_message(entry.message) do
+        {:cont, {:ok, [put_thread_source(message, entry) | messages]}}
+      else
+        _error -> {:halt, {:error, :invalid_context}}
+      end
+    end)
+    |> case do
+      {:ok, messages} -> {:ok, Enum.reverse(messages)}
+      error -> error
+    end
+  end
+
+  defp req_llm_message(%{role: :tool, tool_call_id: id} = message)
+       when is_binary(id) and id != "" do
+    output = tool_result_input(message)
+
+    {:ok,
+     ReqLLM.Context.tool_result_message(
+       message.name,
+       id,
+       output,
+       message.metadata || %{}
+     )}
+  rescue
+    _error -> {:error, :invalid_context}
+  end
+
+  defp req_llm_message(%{role: :assistant, tool_calls: calls} = message)
+       when is_list(calls) and calls != [] do
+    with {:ok, %ReqLLM.Context{messages: [assistant]}} <- ReqLLM.Context.normalize(message),
+         {:ok, tool_calls} <- req_llm_tool_calls(calls) do
+      {:ok, %{assistant | tool_calls: tool_calls}}
+    else
+      _other -> {:error, :invalid_context}
+    end
+  rescue
+    _error -> {:error, :invalid_context}
+  end
+
+  defp req_llm_message(message) do
+    case ReqLLM.Context.normalize(message) do
+      {:ok, %ReqLLM.Context{messages: [message]}} -> {:ok, message}
+      _other -> {:error, :invalid_context}
+    end
+  rescue
+    _error -> {:error, :invalid_context}
+  end
+
+  defp tool_result_input(%{content: content} = message) when is_list(content) and content != [] do
+    metadata = message.metadata || %{}
+    result_metadata = field(metadata, :tool_result_metadata) || %{}
+
+    %ReqLLM.ToolResult{
+      content: normalize_content_parts(content),
+      output: message.output,
+      metadata: result_metadata
+    }
+  end
+
+  defp tool_result_input(message), do: message.output || message.content
+
+  defp normalize_content_parts(content) do
+    case ReqLLM.Context.normalize(%{role: :user, content: content}) do
+      {:ok, %ReqLLM.Context{messages: [%ReqLLM.Message{content: parts}]}} -> parts
+      _other -> raise ArgumentError, "invalid tool result content"
+    end
+  end
+
+  defp req_llm_tool_calls(calls) do
+    Enum.reduce_while(calls, {:ok, []}, fn call, {:ok, normalized} ->
+      case req_llm_tool_call(call) do
+        {:ok, tool_call} -> {:cont, {:ok, [tool_call | normalized]}}
+        error -> {:halt, error}
+      end
+    end)
+    |> case do
+      {:ok, normalized} -> {:ok, Enum.reverse(normalized)}
+      error -> error
+    end
+  end
+
+  defp req_llm_tool_call(call) do
+    id = field(call, :id)
+    name = field(call, :name)
+    arguments = field(call, :arguments)
+    metadata = field(call, :metadata) || %{}
+    encoded = if is_binary(arguments), do: arguments, else: Jason.encode!(arguments)
+
+    tool_call =
+      if field(metadata, :builtin?) == true,
+        do: ReqLLM.ToolCall.new_builtin(id, name, encoded),
+        else: ReqLLM.ToolCall.new(id, name, encoded)
+
+    {:ok, ReqLLM.ToolCall.put_metadata(tool_call, Map.delete(metadata, :builtin?))}
+  rescue
+    _error -> {:error, :invalid_context}
+  end
+
+  defp put_thread_source(message, entry) do
+    metadata = message.metadata || %{}
+    jido = field(metadata, :jido) || %{}
+
+    source = %{
+      type: :thread_entry,
+      entry_id: entry.id,
+      seq: entry.seq,
+      at: entry.at,
+      refs: entry.refs
+    }
+
+    %{message | metadata: Map.put(metadata, :jido, Map.put(jido, :source, source))}
+  end
+
+  defp portable_content([%ReqLLM.Message.ContentPart{type: :text, text: text}])
+       when is_binary(text),
+       do: text
+
+  defp portable_content(content), do: content
+
   defp field(map, key), do: Map.get(map, key, Map.get(map, Atom.to_string(key)))
   defp json(value), do: value |> Jason.encode!() |> Jason.decode!()
 end

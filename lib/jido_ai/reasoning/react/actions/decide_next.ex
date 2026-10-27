@@ -1,7 +1,7 @@
 defmodule Jido.AI.Reasoning.ReAct.Actions.DecideNext do
   @moduledoc "Routes a model outcome to completion, repair, fallback, or tools."
 
-  alias Jido.AI.Budget
+  alias Jido.AI.{Budget, Reasoning.Result}
 
   use Jido.Action,
     id: "jido.ai/reasoning/react/actions/decide-next",
@@ -12,8 +12,8 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.DecideNext do
     output_schema: Zoi.map()
 
   @impl Jido.Action
-  def run(%{turn: %{model_outcome: %{status: :budget}} = turn}, _context) do
-    {:ok, complete(turn, blocked(turn, :limits, "maximum model calls reached"))}
+  def run(%{turn: %{model_outcome: %{status: :budget, reason: reason}} = turn}, _context) do
+    {:ok, complete(turn, Result.blocked(:limits, reason))}
   end
 
   def run(%{turn: %{model_outcome: %{status: :error}} = turn}, _context) do
@@ -27,12 +27,12 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.DecideNext do
 
   def run(%{turn: %{model_outcome: %{kind: :tool_calls}} = turn}, _context)
       when turn.tool_rounds >= turn.max_tool_rounds do
-    {:ok, complete(turn, blocked(turn, :limits, "maximum tool rounds reached"))}
+    {:ok, complete(turn, Result.blocked(:limits, "maximum tool rounds reached"))}
   end
 
   def run(%{turn: %{model_outcome: %{kind: :tool_calls, tool_calls: calls}} = turn}, _context)
       when turn.tool_call_count + length(calls) > turn.max_tool_calls do
-    {:ok, complete(turn, blocked(turn, :limits, "maximum tool calls reached"))}
+    {:ok, complete(turn, Result.blocked(:limits, "maximum tool calls reached"))}
   end
 
   def run(%{turn: %{model_outcome: %{kind: :tool_calls}} = turn}, _context) do
@@ -42,30 +42,19 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.DecideNext do
         {:ok, %{kind: kind, input: %{turn: %{turn | repair_instruction: nil}}}}
 
       {:error, _budget, reason} ->
-        {:ok, complete(turn, blocked(turn, :limits, reason))}
+        {:ok, complete(turn, Result.blocked(:limits, reason))}
     end
   end
 
   def run(%{turn: %{model_outcome: %{kind: :final_answer}} = turn}, _context) do
-    result = %{
-      status: :completed,
-      output: turn.model_outcome.text,
-      model_calls: turn.model_calls,
-      tool_rounds: turn.tool_rounds,
-      tool_calls: turn.tool_call_count,
-      tool_errors: turn.tool_error_count,
-      retries: turn.retries,
-      guardrail: :none,
-      reason: ""
-    }
-
-    {:ok, complete(turn, result)}
+    output = Map.get(turn.model_outcome, :output) || turn.model_outcome.text
+    {:ok, complete(turn, Result.completed(output))}
   end
 
-  defp recover_or_fail(turn, guardrail, reason) do
+  defp recover_or_fail(turn, reason_code, reason) do
     case Budget.before_model(turn) do
       {:error, _budget, budget_reason} ->
-        complete(turn, blocked(turn, :limits, budget_reason))
+        complete(turn, Result.blocked(:limits, budget_reason))
 
       :ok ->
         cond do
@@ -83,7 +72,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.DecideNext do
             %{kind: :model, input: %{turn: next}}
 
           true ->
-            complete(turn, failed(turn, guardrail, reason))
+            complete(turn, Result.failed(reason_code, reason))
         end
     end
   end
@@ -91,7 +80,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.DecideNext do
   defp recover_or_block(turn, instruction) do
     case Budget.before_model(turn) do
       {:error, _budget, budget_reason} ->
-        complete(turn, blocked(turn, :limits, budget_reason))
+        complete(turn, Result.blocked(:limits, budget_reason))
 
       :ok ->
         cond do
@@ -111,7 +100,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.DecideNext do
             %{kind: :model, input: %{turn: next}}
 
           true ->
-            complete(turn, blocked(turn, :output, turn.output_reason))
+            complete(turn, Result.blocked(:output, turn.output_reason))
         end
     end
   end
@@ -119,34 +108,6 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.DecideNext do
   defp review_required?(turn) do
     review = Map.get(turn, :review_tools, [])
     Enum.any?(turn.model_outcome.tool_calls, &(&1.name in review))
-  end
-
-  defp blocked(turn, guardrail, reason) do
-    %{
-      status: :blocked,
-      output: "",
-      model_calls: turn.model_calls,
-      tool_rounds: turn.tool_rounds,
-      tool_calls: turn.tool_call_count,
-      tool_errors: turn.tool_error_count,
-      retries: turn.retries,
-      guardrail: guardrail,
-      reason: reason
-    }
-  end
-
-  defp failed(turn, guardrail, reason) do
-    %{
-      status: :failed,
-      output: "",
-      model_calls: turn.model_calls,
-      tool_rounds: turn.tool_rounds,
-      tool_calls: turn.tool_call_count,
-      tool_errors: turn.tool_error_count,
-      retries: turn.retries,
-      guardrail: guardrail,
-      reason: reason
-    }
   end
 
   defp complete(turn, result), do: %{kind: :complete, output: %{turn: turn, result: result}}

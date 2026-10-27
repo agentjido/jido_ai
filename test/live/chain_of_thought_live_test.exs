@@ -73,8 +73,8 @@ defmodule Jido.AI.ChainOfThoughtLiveTest do
     assert before_context["stage"] == "prepared"
     assert before_context["shape"]["message_count"] == 2
     assert after_context["stage"] == "completed"
-    assert after_context["usage"]["input_tokens"] > 0
-    assert after_context["usage"]["output_tokens"] > 0
+    assert after_context["response"]["call_metadata"]["usage"]["input_tokens"] > 0
+    assert after_context["response"]["call_metadata"]["usage"]["output_tokens"] > 0
 
     reasoning_stops = events_named(trace, [:jido, :ai, :reasoning, :stop])
     request_stops = events_named(trace, [:req_llm, :request, :stop])
@@ -86,7 +86,7 @@ defmodule Jido.AI.ChainOfThoughtLiveTest do
 
     assert reasoning_stop.reasoning_method == :chain_of_thought
     assert reasoning_stop.status == :ok
-    assert after_context["response"]["req_llm_request_id"] == request_stop.request_id
+    assert after_context["response"]["call_metadata"]["request_id"] == request_stop.request_id
     assert reasoning_measurements.duration > 0
     assert agent_stop.status == :completed
     assert agent_measurements.model_calls == 1

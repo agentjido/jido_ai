@@ -51,8 +51,8 @@ defmodule Jido.AI.ReqLLMMockTest do
 
     assert first_before["stage"] == "prepared"
     assert first_after["stage"] == "completed"
-    assert first_after["usage"]["input_tokens"] == 20
-    assert is_binary(first_after["response"]["req_llm_request_id"])
+    assert first_after["response"]["call_metadata"]["usage"]["input_tokens"] == 20
+    assert is_binary(first_after["response"]["call_metadata"]["request_id"])
     assert second_before["shape"]["message_count"] == 4
 
     assistant =
@@ -74,7 +74,14 @@ defmodule Jido.AI.ReqLLMMockTest do
         conn,
         "req-mock-cot",
         text_response(
-          "Step 1: Read the value.\nStep 2: Add one.\nStep 3: Check it.\nConclusion: 4",
+          Jason.encode!(%{
+            steps: [
+              %{number: 1, content: "Read the value."},
+              %{number: 2, content: "Add one."},
+              %{number: 3, content: "Check it."}
+            ],
+            conclusion: "4"
+          }),
           18,
           12
         )
@@ -94,11 +101,12 @@ defmodule Jido.AI.ReqLLMMockTest do
     assert_receive {:req_llm_request, request}
     assert Enum.map(request["input"], & &1["role"]) == ["system", "user"]
     refute Map.has_key?(request, "tools")
+    assert request["text"]["format"]["type"] == "json_schema"
 
     assert [attempt] = reply.data.model_attempts
     after_context = Snapshot.decode!(attempt.context.after)
-    assert after_context["usage"]["input_tokens"] == 18
-    assert is_binary(after_context["response"]["req_llm_request_id"])
+    assert after_context["response"]["call_metadata"]["usage"]["input_tokens"] == 18
+    assert is_binary(after_context["response"]["call_metadata"]["request_id"])
   end
 
   defp with_req_llm_mock(params) do

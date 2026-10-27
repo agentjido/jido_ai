@@ -1,6 +1,8 @@
 defmodule Jido.AI.Reasoning.Actions.GuardOutput do
   @moduledoc "Applies final-answer guards to one model outcome."
 
+  alias Jido.AI.Toolset
+
   use Jido.Action,
     id: "jido.ai/reasoning/actions/guard-output",
     vsn: 1,
@@ -22,20 +24,26 @@ defmodule Jido.AI.Reasoning.Actions.GuardOutput do
   end
 
   def run(%{turn: turn, outcome: %{kind: :final_answer, text: text} = outcome}, _context) do
+    output = Map.get(outcome, :output)
+    content = output_content(text, output)
+
     reason =
       finish_reason(outcome.finish_reason) ||
         cond do
-          not Jido.AI.Toolset.requirement_satisfied?(
+          not Toolset.requirement_satisfied?(
             turn.tool_requirement,
             turn.tool_rounds,
             turn.tools
           ) ->
             "tool use is required before a final answer"
 
-          String.trim(text) == "" ->
+          not is_nil(Map.get(turn, :output_schema)) and is_nil(output) ->
+            "model output is missing required structured data"
+
+          String.trim(content) == "" ->
             "model output is empty"
 
-          String.length(text) > 4_000 ->
+          String.length(content) > 4_000 ->
             "model output is too long"
 
           true ->
@@ -57,12 +65,12 @@ defmodule Jido.AI.Reasoning.Actions.GuardOutput do
       length(ids) != length(Enum.uniq(ids)) ->
         "tool call IDs must be unique"
 
-      Enum.any?(calls, &(&1.name not in Jido.AI.Toolset.names(turn.tools))) ->
+      Enum.any?(calls, &(&1.name not in Toolset.names(turn.tools))) ->
         "model requested a tool that is not allowed"
 
       true ->
         Enum.find_value(calls, fn call ->
-          case Jido.AI.Toolset.validate_call(turn.tools, call) do
+          case Toolset.validate_call(turn.tools, call) do
             :ok -> nil
             {:error, reason} -> "invalid tool call: #{inspect(reason)}"
           end
@@ -77,6 +85,9 @@ defmodule Jido.AI.Reasoning.Actions.GuardOutput do
   defp finish_reason(:incomplete), do: "model output was incomplete"
   defp finish_reason(:error), do: "model returned an error finish reason"
   defp finish_reason(_reason), do: "model returned an unknown finish reason"
+
+  defp output_content(text, nil), do: text
+  defp output_content(_text, output), do: Jason.encode!(output)
 
   defp decision(nil), do: %{allowed: true, reason: ""}
   defp decision(reason), do: %{allowed: false, reason: reason}

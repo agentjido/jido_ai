@@ -40,6 +40,7 @@ defmodule Jido.AI.Reasoning.Actions.RecordModelAttempt do
       |> Context.Snapshot.encode()
 
     attempt = %{
+      version: 1,
       status: outcome.status,
       reasoning: Map.get(params, :reasoning),
       model: outcome.model,
@@ -70,6 +71,7 @@ defmodule Jido.AI.Reasoning.Actions.RecordModelAttempt do
            maybe_append_assistant(
              session,
              outcome,
+             params.context,
              params.output_allowed and persist_message,
              refs,
              at
@@ -87,12 +89,23 @@ defmodule Jido.AI.Reasoning.Actions.RecordModelAttempt do
     end
   end
 
-  defp maybe_append_assistant(session, %{status: :ok} = outcome, true, refs, at) do
+  defp maybe_append_assistant(
+         session,
+         %{status: :ok},
+         %Context{result: {:ok, %ReqLLM.Response{message: %ReqLLM.Message{} = message}}},
+         true,
+         refs,
+         at
+       ) do
+    Projection.append(session, message, refs, at)
+  end
+
+  defp maybe_append_assistant(session, %{status: :ok} = outcome, _context, true, refs, at) do
     Projection.append(
       session,
       %{
         role: :assistant,
-        content: outcome.text,
+        content: assistant_content(outcome),
         tool_calls: outcome.tool_calls,
         metadata: %{
           response_id: outcome.response_id,
@@ -107,7 +120,8 @@ defmodule Jido.AI.Reasoning.Actions.RecordModelAttempt do
     )
   end
 
-  defp maybe_append_assistant(session, _outcome, _allowed, _refs, _at), do: {:ok, session}
+  defp maybe_append_assistant(session, _outcome, _context, _allowed, _refs, _at),
+    do: {:ok, session}
 
   defp portable_outcome(%{status: :ok} = outcome) do
     Map.take(outcome, [
@@ -115,6 +129,7 @@ defmodule Jido.AI.Reasoning.Actions.RecordModelAttempt do
       :kind,
       :finish_reason,
       :text,
+      :output,
       :tool_calls,
       :req_llm_request_id,
       :response_id,
@@ -137,4 +152,8 @@ defmodule Jido.AI.Reasoning.Actions.RecordModelAttempt do
       :completed_at_ms
     ])
   end
+
+  defp assistant_content(%{text: text}) when is_binary(text) and text != "", do: text
+  defp assistant_content(%{output: output}) when not is_nil(output), do: Jason.encode!(output)
+  defp assistant_content(_outcome), do: ""
 end

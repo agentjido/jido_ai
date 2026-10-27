@@ -38,6 +38,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.RequestToolReview do
         session,
         :ai_review,
         %{
+          version: 1,
           status: :requested,
           review_id: review_id,
           expires_at_ms: expires_at_ms,
