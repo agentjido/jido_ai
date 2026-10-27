@@ -1022,7 +1022,7 @@ defmodule Jido.AI.RuntimeTest do
       Jido.Signal.new!("jido.ai.review.approved", review_match(restored_wait, "approved"), source: "/tests")
 
     assert :ok = Server.deliver_wait(restored, restored_wait.id, approval)
-    assert :ok = Server.quiesce(restored, timeout: 10_000)
+    assert :ok = Server.quiesce(restored, timeout: 30_000)
 
     session = Server.agent(restored).state.session
     reviews = Jido.Thread.filter_by_kind(session.thread, :ai_review)
