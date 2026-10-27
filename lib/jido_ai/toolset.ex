@@ -1,9 +1,10 @@
 defmodule Jido.AI.Toolset do
   @moduledoc """
-  The Actions selected for one AI Agent.
+  The tools selected for one AI Agent.
 
-  Discovery can resolve available Actions for authoring. A Toolset is narrower:
-  it is the capability allowlist owned by one Agent definition.
+  A Toolset is the capability allowlist owned by one Agent definition. Static
+  tools are Action or Flow modules. Trusted runtime sources can add portable
+  tools before request policy narrows that allowlist.
   """
 
   use Jido.Plugin,
@@ -12,7 +13,8 @@ defmodule Jido.AI.Toolset do
     option_keys: [agent: [:reasoning, :defaults, :tools]]
 
   alias Jido.AI.ToolSource
-  alias Jido.AI.ToolSource.Tool
+
+  @type runtime_tool :: module() | ToolSource.tool()
 
   @doc false
   @impl Jido.Agent.Extension
@@ -34,7 +36,7 @@ defmodule Jido.AI.Toolset do
     with :ok <- validate(actions), do: {:ok, actions}
   end
 
-  @doc "Returns the Actions from the protected Agent plugin input."
+  @doc "Returns the static tools from the protected Agent plugin input."
   @spec from_context(map()) :: [module()]
   def from_context(context) when is_map(context) do
     case get_in(context, [:plugin_inputs, __MODULE__]) do
@@ -45,21 +47,21 @@ defmodule Jido.AI.Toolset do
 
   @doc "Validates an ordered Agent Toolset."
   @spec validate(term()) :: :ok | {:error, term()}
-  def validate(actions) when is_list(actions) do
-    with :ok <- validate_actions(actions),
-         :ok <- unique(actions, & &1) do
-      unique(actions, & &1.name())
+  def validate(tools) when is_list(tools) do
+    with :ok <- validate_modules(tools),
+         :ok <- unique(tools, & &1) do
+      unique(tools, & &1.name())
     end
   end
 
   def validate(_actions), do: {:error, :invalid_toolset}
 
   @doc "Returns the model tool names in declaration order."
-  @spec names([module() | Tool.t()]) :: [String.t()]
+  @spec names([runtime_tool()]) :: [String.t()]
   def names(tools) when is_list(tools), do: Enum.map(tools, &tool_name/1)
 
   @doc "Selects a request tool subset below the protected Agent allowlist."
-  @spec select([module() | Tool.t()], map()) :: {:ok, map()} | {:error, term()}
+  @spec select([runtime_tool()], map()) :: {:ok, map()} | {:error, term()}
   def select(tools, policy \\ %{})
 
   def select(tools, policy) when is_list(tools) and is_map(policy) do
@@ -68,14 +70,15 @@ defmodule Jido.AI.Toolset do
     review = field(policy, :review) || []
     requirement = field(policy, :requirement) || :optional
     reason = field(policy, :reason)
+
     with :ok <- validate_runtime_tools(tools) do
       allowed = names(tools)
 
       with :ok <- validate_name_list(:visible, visible),
-         :ok <- validate_name_list(:hidden, hidden),
-         :ok <- validate_name_list(:review, review),
-         :ok <- known_names(visible ++ hidden ++ review, allowed),
-         :ok <- validate_requirement(requirement) do
+           :ok <- validate_name_list(:hidden, hidden),
+           :ok <- validate_name_list(:review, review),
+           :ok <- known_names(visible ++ hidden ++ review, allowed),
+           :ok <- validate_requirement(requirement) do
         selected = select_tools(tools, visible, hidden, requirement)
         selected_names = names(selected)
 
@@ -105,7 +108,7 @@ defmodule Jido.AI.Toolset do
   def select(_actions, _policy), do: {:error, :invalid_tool_policy}
 
   @doc "Lowers semantic tool-use policy to one provider tool-choice value."
-  @spec provider_tool_choice(atom(), non_neg_integer(), [module() | Tool.t()]) :: atom() | nil
+  @spec provider_tool_choice(atom(), non_neg_integer(), [runtime_tool()]) :: atom() | nil
   def provider_tool_choice(:disabled, _tool_rounds, _tools), do: :none
   def provider_tool_choice(_requirement, _tool_rounds, []), do: nil
   def provider_tool_choice(:optional, _tool_rounds, _tools), do: nil
@@ -114,13 +117,13 @@ defmodule Jido.AI.Toolset do
   def provider_tool_choice(:per_turn, _tool_rounds, _tools), do: :required
 
   @doc "Checks whether one final answer satisfies semantic tool-use policy."
-  @spec requirement_satisfied?(atom(), non_neg_integer(), [module() | Tool.t()]) :: boolean()
+  @spec requirement_satisfied?(atom(), non_neg_integer(), [runtime_tool()]) :: boolean()
   def requirement_satisfied?(:required, 0, [_ | _]), do: false
   def requirement_satisfied?(:per_turn, _tool_rounds, [_ | _]), do: false
   def requirement_satisfied?(_requirement, _tool_rounds, _tools), do: true
 
   @doc "Builds ReqLLM definitions for an Agent Toolset."
-  @spec definitions([module() | Tool.t()]) :: {:ok, [ReqLLM.Tool.t()]} | {:error, term()}
+  @spec definitions([runtime_tool()]) :: {:ok, [ReqLLM.Tool.t()]} | {:error, term()}
   def definitions(tools) when is_list(tools) do
     case validate_runtime_tools(tools) do
       :ok -> build_definitions(tools)
@@ -129,21 +132,22 @@ defmodule Jido.AI.Toolset do
   end
 
   @doc "Validates one portable model tool call against an Agent Toolset."
-  @spec validate_call([module() | Tool.t()], map()) :: :ok | {:error, term()}
+  @spec validate_call([runtime_tool()], map()) :: :ok | {:error, term()}
   def validate_call(tools, call) do
     with {:ok, _resolved} <- resolve_call(tools, call), do: :ok
   end
 
   @doc "Resolves one portable model tool call against an Agent Toolset."
-  @spec resolve_call([module() | Tool.t()], map()) ::
+  @spec resolve_call([runtime_tool()], map()) ::
           {:ok,
            %{
              id: String.t(),
              name: String.t(),
              arguments: map(),
              params: map(),
-             executor: {:action, module()} | {:source, Tool.t()},
-             tool: map()
+             executor: map(),
+             tool: map(),
+             description: String.t()
            }}
           | {:error, term()}
   def resolve_call(tools, %{id: id, name: name, arguments: arguments})
@@ -158,7 +162,8 @@ defmodule Jido.AI.Toolset do
          arguments: arguments,
          params: params,
          executor: executor(tool),
-         tool: identity(tool)
+         tool: identity(tool),
+         description: tool_description(tool)
        }}
     end
   end
@@ -172,35 +177,37 @@ defmodule Jido.AI.Toolset do
   @spec execution_boundary(map()) :: {:error, atom()}
   def execution_boundary(_arguments), do: {:error, :tool_must_run_in_agent_graph}
 
-  defp validate_actions(actions) do
-    case Enum.find(actions, &(not action?(&1))) do
+  defp validate_modules(tools) do
+    case Enum.find(tools, &(not module_tool?(&1))) do
       nil -> :ok
-      action -> {:error, {:invalid_tool_action, action}}
+      tool -> {:error, {:invalid_tool, tool}}
     end
   end
 
-  defp action?(action) when is_atom(action) and action not in [nil, true, false] do
-    match?({:ok, %{kind: :action, target: ^action}}, Jido.Instruction.resolve(action))
+  defp module_tool?(target) when is_atom(target) and target not in [nil, true, false] do
+    match?({:ok, _kind}, tool_kind(target))
   end
 
-  defp action?(_action), do: false
+  defp module_tool?(_target), do: false
+
+  defp action?(target), do: tool_kind(target) == {:ok, :action}
 
   defp unique(actions, key) do
     values = Enum.map(actions, key)
     if values == Enum.uniq(values), do: :ok, else: {:error, :duplicate_tools}
   end
 
-  defp definition(action) when is_atom(action) do
+  defp definition(target) when is_atom(target) do
     ReqLLM.Tool.new(
-      name: action.name(),
-      description: action.description() || "",
-      parameter_schema: action.schema(),
+      name: target.name(),
+      description: target.description() || "",
+      parameter_schema: target.schema(),
       callback: {__MODULE__, :execution_boundary},
       strict: true
     )
   end
 
-  defp definition(%Tool{definition: definition}), do: {:ok, definition}
+  defp definition(%{kind: :source} = tool), do: ToolSource.definition(tool)
 
   defp build_definitions(tools) do
     Enum.reduce_while(tools, {:ok, []}, fn tool, {:ok, definitions} ->
@@ -218,18 +225,18 @@ defmodule Jido.AI.Toolset do
   defp fetch(tools, name) do
     case Enum.find(tools, &(tool_name(&1) == name)) do
       nil -> {:error, {:unknown_tool, name}}
-      action -> {:ok, action}
+      tool -> {:ok, tool}
     end
   end
 
-  defp decode_arguments(action, arguments) when is_atom(action) do
-    case Zoi.parse(action.schema(), arguments, coerce: true) do
-      {:ok, params} -> action.validate_params(params)
-      {:error, _reason} -> {:error, {:invalid_tool_arguments, action.name()}}
+  defp decode_arguments(target, arguments) when is_atom(target) do
+    case Zoi.parse(target.schema(), arguments, coerce: true) do
+      {:ok, params} -> target.validate_params(params)
+      {:error, _reason} -> {:error, {:invalid_tool_arguments, target.name()}}
     end
   end
 
-  defp decode_arguments(%Tool{} = tool, arguments) do
+  defp decode_arguments(%{kind: :source} = tool, arguments) do
     case ToolSource.validate_input(tool, arguments) do
       {:ok, params} -> {:ok, params}
       {:error, _reason} -> {:error, {:invalid_tool_arguments, tool_name(tool)}}
@@ -251,27 +258,47 @@ defmodule Jido.AI.Toolset do
     end
   end
 
-  defp runtime_tool?(%Tool{definition: %ReqLLM.Tool{}}), do: true
-  defp runtime_tool?(tool), do: action?(tool)
+  defp runtime_tool?(%{kind: :source, source: %{module: module}} = tool)
+       when is_atom(module) do
+    is_binary(tool_name(tool))
+  end
 
-  defp tool_name(%Tool{definition: definition}), do: definition.name
-  defp tool_name(action) when is_atom(action), do: action.name()
+  defp runtime_tool?(tool), do: module_tool?(tool)
 
-  defp executor(%Tool{} = tool), do: {:source, tool}
-  defp executor(action) when is_atom(action), do: {:action, action}
+  defp tool_name(%{kind: :source, name: name}), do: name
+  defp tool_name(target) when is_atom(target), do: target.name()
 
-  defp identity(%Tool{} = tool), do: ToolSource.identity(tool)
+  defp tool_description(%{kind: :source, description: description}), do: description
+  defp tool_description(target) when is_atom(target), do: target.description() || ""
 
-  defp identity(action) when is_atom(action) do
-    contract = action.authoring_contract()
+  defp executor(%{kind: :source} = tool), do: ToolSource.executor(tool)
+  defp executor(target) when is_atom(target), do: %{kind: tool_kind!(target), target: target}
+
+  defp identity(%{kind: :source} = tool), do: ToolSource.identity(tool)
+
+  defp identity(target) when is_atom(target) do
+    kind = tool_kind!(target)
+    manifest = target.__jido_authoring__()
 
     %{
-      kind: :action,
-      name: action.name(),
-      action: Atom.to_string(action),
-      id: contract["id"],
-      vsn: contract["vsn"]
+      kind: kind,
+      name: target.name(),
+      id: manifest.id,
+      vsn: manifest.vsn
     }
+    |> Map.put(kind, Atom.to_string(target))
+  end
+
+  defp tool_kind(target) do
+    case Jido.Instruction.resolve(target) do
+      {:ok, %{kind: kind, target: ^target}} when kind in [:action, :flow] -> {:ok, kind}
+      _other -> :error
+    end
+  end
+
+  defp tool_kind!(target) do
+    {:ok, kind} = tool_kind(target)
+    kind
   end
 
   defp validate_name_list(_field, values) when is_list(values) do

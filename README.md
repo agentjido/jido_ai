@@ -80,7 +80,7 @@ waiting, or committed state across requests.
 
 ## Add tools
 
-Static tools are Jido Actions. The Agent declaration is the protected static
+Static tools are Jido Actions or Flows. The Agent declaration is the protected static
 tool list.
 
 ```elixir

@@ -3,7 +3,7 @@ defmodule Jido.AI.Agent do
   Defines a graph-first AI Agent with a Spark-backed Agent extension.
 
   An AI Agent selects one root reasoning Flow and an optional ordered set of
-  tool Actions:
+  tool Actions and Flows:
 
       defmodule MyApp.SupportAgent do
         use Jido.AI.Agent, name: "support_agent"
@@ -48,9 +48,9 @@ defmodule Jido.AI.Agent do
         end
       end
 
-  The `ai`, `reasoning`, and `tools` declarations lower through
-  `Jido.AI.Agent.Extension`. The extension contributes the normal Agent route
-  and stores its authoring data in the normal `Jido.Agent.Codec` document.
+  The `ai`, `reasoning`, and `tools` declarations lower through an internal
+  extension. The extension contributes the normal Agent route and stores its
+  authoring data in the normal Agent codec document.
   Registered Flow and Action references are required when the Agent is stored
   as JSON.
   """

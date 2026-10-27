@@ -293,7 +293,6 @@ defmodule Jido.AI.Context do
   defp options_map(_opts), do: %{}
 
   defp field(map, key) when is_map(map), do: Map.get(map, key, Map.get(map, Atom.to_string(key)))
-  defp field(_map, _key), do: nil
 end
 
 defimpl Runic.Identity.Projectable, for: Jido.AI.Context do

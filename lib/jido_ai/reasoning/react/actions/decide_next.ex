@@ -39,7 +39,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.DecideNext do
     case Budget.resources(turn) do
       :ok ->
         kind = if review_required?(turn), do: :review, else: :tools
-        {:ok, %{kind: kind, input: %{turn: %{turn | repair_instruction: nil}}}}
+        {:ok, %{kind: kind, input: %{turn: turn}}}
 
       {:error, _budget, reason} ->
         {:ok, complete(turn, Result.blocked(:limits, reason))}

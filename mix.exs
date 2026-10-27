@@ -4,6 +4,66 @@ defmodule JidoAi.MixProject do
   @version "2.3.0"
   @source_url "https://github.com/agentjido/jido_ai"
   @description "AI integration layer for the Jido ecosystem - Actions, Workflows, and LLM orchestration"
+  @guide_toc [
+    {"Start Here",
+     [
+       {"guides/getting-started.livemd", "Getting Started"},
+       {"guides/core-concepts.md", "Core Concepts"},
+       {"guides/choose-a-reasoning-flow.md", "Choose a Reasoning Flow"}
+     ]},
+    {"Author AI Agents",
+     [
+       {"guides/define-an-ai-agent.livemd", "Define an AI Agent"},
+       {"guides/agent-authoring.md", "Agent Authoring"},
+       {"guides/structured-output.livemd", "Structured Output"},
+       {"guides/pure-or-live-execution.md", "Pure or Live Execution"}
+     ]},
+    {"Context and Conversation",
+     [
+       {"guides/sessions-and-threads.md", "Sessions and Threads"},
+       {"guides/project-a-thread.livemd", "Project a Thread"},
+       {"guides/context-lifecycle.md", "Context Lifecycle"},
+       {"guides/inspect-model-context.livemd", "Inspect Model Context"}
+     ]},
+    {"Use Models",
+     [
+       {"guides/models-and-options.md", "Models and Options"},
+       {"guides/embeddings.livemd", "Embeddings"},
+       {"guides/stream-model-output.livemd", "Stream Model Output"}
+     ]},
+    {"Use Tools",
+     [
+       {"guides/action-tools.livemd", "Action Tools"},
+       {"guides/dynamic-tool-sources.md", "Dynamic Tool Sources"},
+       {"guides/skills.md", "SKILL.md Instructions"},
+       {"guides/tool-execution-and-results.md", "Tool Execution and Results"},
+       {"guides/tool-review-and-cycle-limits.livemd", "Tool Review and Cycle Limits"}
+     ]},
+    {"Reasoning Flows",
+     [
+       {"guides/react.livemd", "ReAct"},
+       {"guides/single-call-reasoning.livemd", "Single-Call Reasoning"},
+       {"guides/multi-stage-reasoning.livemd", "Multi-Stage Reasoning"},
+       {"guides/adaptive-reasoning.livemd", "Adaptive Reasoning"}
+     ]},
+    {"Custom Flows", [{"guides/custom-flows.livemd", "Custom Flows"}]},
+    {"Run and Operate",
+     [
+       {"guides/budgets-retries-and-fallbacks.md", "Budgets, Retries, and Fallbacks"},
+       {"guides/usage-cache-and-cost.md", "Usage, Cache, and Cost"},
+       {"guides/telemetry-and-tracing.livemd", "Telemetry and Tracing"},
+       {"guides/errors-and-recovery.md", "Errors and Recovery"},
+       {"guides/security-and-portability.md", "Security and Portability"}
+     ]},
+    {"Test Jido AI",
+     [
+       {"guides/test-ai-agents.livemd", "Test AI Agents"},
+       {"guides/mock-model-calls-with-reqllm.livemd", "Mock Model Calls with ReqLLM"}
+     ]},
+    {"Reference", [{"guides/public-api-reference.md", "Public API Reference"}]},
+    {"Upgrade", [{"guides/v2-to-v3-migration.md", "Migrating from V2"}]}
+  ]
+
   def project do
     [
       app: :jido_ai,
@@ -73,6 +133,7 @@ defmodule JidoAi.MixProject do
 
       # Runtime
       {:jason, "~> 1.4"},
+      {:yaml_elixir, "~> 2.12"},
       {:telemetry, "~> 1.3"},
       {:telemetry_metrics, "~> 1.2"},
       {:opentelemetry_api, "~> 1.0", optional: true},
@@ -147,80 +208,71 @@ defmodule JidoAi.MixProject do
   defp docs do
     [
       main: "readme",
+      api_reference: true,
       formatters: ["html", "markdown"],
       filter_modules: fn module, _metadata ->
         not String.starts_with?(Atom.to_string(module), "Elixir.JidoAI.Examples.")
       end,
       source_ref: "v#{@version}",
-      extras: [
-        "README.md",
-        "LICENSE",
-        "CHANGELOG.md",
-        "guides/v3/learning_path.md",
-        "guides/v3/01_first_agent.md",
-        "guides/livebooks/first_answer.livemd",
-        "guides/v3/02_tools_and_react.md",
-        "guides/livebooks/three_tool_rounds.livemd",
-        "guides/v3/03_results_and_state.md",
-        "guides/v3/04_dsl_map.md",
-        "guides/v3/05_models_profiles_instructions.md",
-        "guides/v3/06_tool_contracts.md",
-        "guides/v3/07_structured_results.md",
-        "guides/livebooks/repair_result.livemd",
-        "guides/v3/08_reasoning_methods.md",
-        "guides/livebooks/reasoning_methods.livemd",
-        "guides/v3/09_turn_sequence.md",
-        "guides/v3/10_long_running_turns.md",
-        "guides/livebooks/long_turn.livemd",
-        "guides/v3/11_controls_and_limits.md",
-        "guides/v3/12_stream_steer_cancel.md",
-        "guides/livebooks/steer_turn.livemd",
-        "guides/v3/13_failures_and_recovery.md",
-        "guides/v3/14_tool_policy.md",
-        "guides/livebooks/tool_policy.livemd",
-        "guides/v3/15_budgets_and_quotas.md",
-        "guides/v3/16_observability.md",
-        "guides/v3/17_session_thread_context.md",
-        "guides/livebooks/two_requests.livemd",
-        "guides/v3/18_context_projection.md",
-        "guides/v3/19_multiple_contexts.md",
-        "guides/livebooks/switch_context.livemd",
-        "guides/v3/20_checkpoint_resume.md",
-        "guides/livebooks/resume_context.livemd",
-        "guides/v3/21_testing_agents.md",
-        "guides/v3/22_dsl_reference.md"
-      ],
-      groups_for_extras: [
-        {"Start Here", ~r/guides\/(v3\/(learning_path|0[1-3]_)|livebooks\/(first_answer|three_tool_rounds)\.)/},
-        {"Author the Agent", ~r/guides\/(v3\/0[4-8]_|livebooks\/(repair_result|reasoning_methods)\.)/},
-        {"Understand a Turn", ~r/guides\/(v3\/(09_|1[0-3]_)|livebooks\/(long_turn|steer_turn)\.)/},
-        {"Govern and Inspect", ~r/guides\/(v3\/1[4-6]_|livebooks\/tool_policy\.)/},
-        {"Work with Context",
-         ~r/guides\/(v3\/1[7-9]_|v3\/20_|livebooks\/(two_requests|switch_context|resume_context)\.)/},
-        {"Reference", ~r/guides\/v3\/2[1-2]_/}
-      ],
+      source_url: @source_url,
+      groups_for_extras: project_groups() ++ guide_groups(),
+      extras: project_extras() ++ guide_extras(),
+      extra_section: "Guides",
       groups_for_modules: [
         Core: [
           Jido.AI,
           Jido.AI.Agent,
-          Jido.AI.Plugin,
-          Jido.AI.Request,
-          Jido.AI.Route,
-          Jido.AI.Result,
-          Jido.AI.Event,
-          Jido.AI.Context,
-          Jido.Thread,
-          Jido.Session,
-          Jido.AI.Turn,
-          Jido.AI.ToolAdapter,
-          Jido.AI.Controls,
-          Jido.AI.Deadline,
-          Jido.AI.Models
+          Jido.AI.Reasoning
         ],
-        Actions: [~r/Jido\.AI\.Actions\..*/],
-        Flows: [~r/Jido\.AI\.Flow\..*/],
+        "Context and Conversation": [
+          Jido.AI.Context,
+          Jido.AI.Context.Snapshot,
+          Jido.Thread,
+          Jido.Thread.Entry,
+          Jido.Session,
+          Jido.AI.Thread.Projection
+        ],
+        "Tools and Model Calls": [
+          Jido.AI.Actions.Embed,
+          Jido.AI.Skill,
+          Jido.AI.Toolset,
+          Jido.AI.ToolSource,
+          Jido.AI.ToolSource.Tool,
+          Jido.AI.ToolResult
+        ],
+        "Limits and Observability": [
+          Jido.AI.Budget,
+          Jido.AI.Usage,
+          Jido.AI.Telemetry
+        ],
         Reasoning: [~r/Jido\.AI\.Reasoning\..*/]
       ]
     ]
+  end
+
+  defp project_groups do
+    [Project: ["README.md", "CHANGELOG.md", "LICENSE"]]
+  end
+
+  defp project_extras do
+    [
+      {"README.md", title: "Home"},
+      {"CHANGELOG.md", title: "Changelog"},
+      {"LICENSE", title: "Apache 2.0 License"}
+    ]
+  end
+
+  defp guide_groups do
+    Enum.flat_map(@guide_toc, fn {group, guides} ->
+      paths = for {path, _title} <- guides, File.regular?(path), do: path
+      if paths == [], do: [], else: [{group, paths}]
+    end)
+  end
+
+  defp guide_extras do
+    for {_group, guides} <- @guide_toc,
+        {path, title} <- guides,
+        File.regular?(path),
+        do: {path, title: title}
   end
 end

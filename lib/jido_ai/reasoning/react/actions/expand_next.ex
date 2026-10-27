@@ -3,7 +3,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExpandNext do
 
   alias Jido.AI.{Telemetry, Toolset}
   alias Jido.AI.Reasoning.ReAct
-  alias Jido.AI.Reasoning.ReAct.Actions.{DetectToolCycle, ExecuteTool, RecordToolResults}
+  alias Jido.AI.Reasoning.ReAct.Actions.{ExecuteTool, RecordToolResults}
   alias Jido.Flow.Ref
 
   use Jido.Action,
@@ -55,7 +55,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExpandNext do
       description: "Execute validated tool calls as parallel Actions",
       schema: Zoi.object(%{turn: Zoi.any()}),
       output_schema: Zoi.map(),
-      components: [parallel(calls), record(calls), detect_cycle(), model()],
+      components: [parallel(calls), record(calls), model()],
       output: Ref.result("model")
     })
   end
@@ -72,10 +72,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExpandNext do
           %{
             name: action_name(index),
             action: ExecuteTool,
-            params: %{
-              call: Map.take(call, [:id, :name, :arguments]),
-              tools: Ref.input([:turn, :tools])
-            }
+            params: %{call: Map.take(call, [:id, :name, :arguments, :params, :executor, :tool])}
           }
         end)
     }
@@ -93,24 +90,12 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExpandNext do
     }
   end
 
-  defp detect_cycle do
-    %{
-      kind: :step,
-      name: "detect_cycle",
-      action: DetectToolCycle,
-      params: %{
-        turn: Ref.result("record", :turn),
-        calls: Ref.input([:turn, :model_outcome, :tool_calls])
-      }
-    }
-  end
-
   defp model do
     %{
       kind: :subflow,
       name: "model",
       flow: ReAct.ModelRound,
-      params: %{turn: Ref.result("detect_cycle", :turn)}
+      params: %{turn: Ref.result("record", :turn)}
     }
   end
 
@@ -125,8 +110,19 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExpandNext do
   defp tool_call_index(calls) do
     calls
     |> Enum.with_index()
-    |> Map.new(fn {call, index} -> {action_name(index), Map.take(call, [:id, :name])} end)
+    |> Map.new(fn {call, index} ->
+      telemetry =
+        call
+        |> Map.take([:id, :name, :description])
+        |> Map.put(:action, tool_action(call.executor))
+
+      {action_name(index), telemetry}
+    end)
   end
+
+  defp tool_action(%{kind: :action, target: action}), do: action
+  defp tool_action(%{kind: :flow, target: flow}), do: flow
+  defp tool_action(%{kind: :source, module: module}), do: module
 
   defp action_name(index), do: "tool_#{index}"
 end

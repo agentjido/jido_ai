@@ -33,7 +33,8 @@ defmodule Jido.AI.Agent.Extension do
     args: [:target],
     schema: [target: [type: :atom, required: true]]
   }
-  @tools %Spark.Dsl.Section{name: :__tools__, entities: [@tool]}
+  @flow_tool %{@tool | name: :flow}
+  @tools %Spark.Dsl.Section{name: :__tools__, entities: [@tool, @flow_tool]}
   @ai %Spark.Dsl.Section{name: :__ai__, entities: [@reasoning], sections: [@tools]}
 
   use Jido.Agent.Extension,
@@ -114,9 +115,8 @@ defmodule Jido.AI.Agent.Extension do
     with :ok <- authoring_object(data),
          {:ok, reasoning} <- resolve_reference(data["reasoning"], :flow, registry, ["reasoning"]),
          {:ok, defaults} <- decode_defaults(data["config"], reasoning),
-         {:ok, tools} <- decode_tools(data["tools"], registry),
-         {:ok, normalized} <- normalize_authoring(reasoning, defaults, tools) do
-      {:ok, normalized}
+         {:ok, tools} <- decode_tools(data["tools"], registry) do
+      normalize_authoring(reasoning, defaults, tools)
     end
   end
 
@@ -171,7 +171,7 @@ defmodule Jido.AI.Agent.Extension do
   defp encode_tools(tools, registry) do
     tools
     |> Enum.reduce_while({:ok, []}, fn tool, {:ok, encoded} ->
-      case Registry.encode_reference(registry, :action, tool) do
+      case Registry.encode_reference(registry, [:action, :flow], tool) do
         {:ok, reference} -> {:cont, {:ok, [reference | encoded]}}
         {:error, _error} = error -> {:halt, error}
       end
@@ -218,7 +218,7 @@ defmodule Jido.AI.Agent.Extension do
     values
     |> Enum.with_index()
     |> Enum.reduce_while({:ok, []}, fn {value, index}, {:ok, tools} ->
-      case resolve_reference(value, :action, registry, ["tools", index]) do
+      case resolve_reference(value, [:action, :flow], registry, ["tools", index]) do
         {:ok, tool} -> {:cont, {:ok, [tool | tools]}}
         {:error, _issue} = error -> {:halt, error}
       end

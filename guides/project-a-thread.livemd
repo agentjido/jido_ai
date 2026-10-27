@@ -1,0 +1,365 @@
+# Project a Thread
+
+## Overview
+
+Your support Agent's Thread holds every message, failed request, and runtime
+record it has ever seen. The model must see only the part that forms a valid,
+bounded conversation. `Jido.AI.Thread.Projection` makes that selection and
+records why each message was kept or dropped:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{:ok, projection} = Projection.context(session, %{max_messages: 64})
+
+Enum.map(projection.decisions, &{&1.seq, &1.state, &1.reason})
+# => [
+#      {0, :included, :projected},
+#      {2, :included, :projected},
+#      {3, :included, :projected},
+#      {4, :included, :projected},
+#      {6, :excluded, :request_not_completed},
+#      {8, :excluded, :incomplete_tool_exchange},
+#      {9, :included, :projected}
+#    ]
+```
+
+You'll build one support-desk Thread by hand, project it, and read each
+decision. No model call runs in this notebook.
+
+## Install
+
+```elixir
+Mix.install([{:jido_ai, "~> 3.0.0-beta.1"}, {:plug, "~> 1.0"}])
+```
+
+## Start a Session
+
+An AI Agent keeps its conversation in `state.session`. Here you create the
+same value directly, with fixed timestamps so the results repeat:
+
+```elixir
+alias Jido.AI.Thread.Projection
+
+session = Jido.Session.new(id: "session:support-1", now: 1_000)
+
+{session.rev, Jido.Thread.entry_count(session.thread)}
+```
+
+The result is `{0, 0}`.
+
+## Record a Completed Turn
+
+`Projection.append/4` stores one model message as an `:ai_message` entry.
+`Projection.observe/5` stores any other record. The refs tie entries to the
+request that wrote them. This turn asks about an order, calls
+`lookup_order`, and answers:
+
+```elixir
+run_1 = %{request_id: "req-1", run_id: "run-1"}
+
+{:ok, session} =
+  Projection.append(session, %{role: :user, content: "Where is order A-1001?"}, run_1, 1_001)
+
+session = Projection.observe(session, :ai_model_attempt, %{status: :ok}, run_1, 1_002)
+
+{:ok, session} =
+  Projection.append(
+    session,
+    %{
+      role: :assistant,
+      content: "",
+      tool_calls: [%{id: "call-1", name: "lookup_order", arguments: %{order_id: "A-1001"}}]
+    },
+    run_1,
+    1_003
+  )
+
+{:ok, session} =
+  Projection.append(
+    session,
+    %{
+      role: :tool,
+      name: "lookup_order",
+      tool_call_id: "call-1",
+      content: ~s({"eta":"2026-11-02","order_id":"A-1001","status":"shipped"})
+    },
+    run_1,
+    1_004
+  )
+
+{:ok, session} =
+  Projection.append(
+    session,
+    %{role: :assistant, content: "Order A-1001 shipped. It arrives on 2026-11-02."},
+    run_1,
+    1_005
+  )
+
+session = Projection.observe(session, :ai_request_outcome, %{status: :completed}, run_1, 1_006)
+
+Enum.map(session.thread.entries, &{&1.seq, &1.kind})
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+[
+  {0, :ai_message},
+  {1, :ai_model_attempt},
+  {2, :ai_message},
+  {3, :ai_message},
+  {4, :ai_message},
+  {5, :ai_request_outcome}
+]
+```
+
+The Thread assigns `seq` from 0. Only `:ai_message` entries can reach the
+model.
+
+## Add a Failed Request
+
+A second request asks for a refund and fails. Its user message stays in the
+Thread for inspection. The `:ai_request_outcome` entry with
+`status: :failed` marks every message with `run_id: "run-2"` as ineligible:
+
+```elixir
+run_2 = %{request_id: "req-2", run_id: "run-2"}
+
+{:ok, session} =
+  Projection.append(session, %{role: :user, content: "Refund order A-1001."}, run_2, 1_010)
+
+session = Projection.observe(session, :ai_request_outcome, %{status: :failed}, run_2, 1_011)
+
+session.rev
+```
+
+The result is `8`.
+
+## Add an Open Tool Call
+
+An assistant message that asks for `issue_refund` but never gets a matching
+tool result is an incomplete exchange. Sending it would make the provider
+reject the request:
+
+```elixir
+{:ok, session} =
+  Projection.append(
+    session,
+    %{
+      role: :assistant,
+      content: "",
+      tool_calls: [
+        %{id: "call-2", name: "issue_refund", arguments: %{order_id: "A-1001", amount_cents: 2_500}}
+      ]
+    },
+    %{},
+    1_020
+  )
+
+{:ok, session} =
+  Projection.append(session, %{role: :user, content: "When will it arrive?"}, %{}, 1_021)
+
+Jido.Thread.entry_count(session.thread)
+```
+
+The result is `10`.
+
+## Project the Thread
+
+`Projection.context/2` returns the canonical `ReqLLM.Context` and the
+decisions behind it:
+
+```elixir
+{:ok, projection} = Projection.context(session, %{max_messages: 64, max_bytes: 200_000})
+
+Enum.map(projection.context.messages, & &1.role)
+```
+
+The result is `[:user, :assistant, :tool, :assistant, :user]`. The failed
+refund request and the open `issue_refund` call are gone.
+
+```elixir
+Enum.map(projection.decisions, &{&1.seq, &1.state, &1.reason})
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+[
+  {0, :included, :projected},
+  {2, :included, :projected},
+  {3, :included, :projected},
+  {4, :included, :projected},
+  {6, :excluded, :request_not_completed},
+  {8, :excluded, :incomplete_tool_exchange},
+  {9, :included, :projected}
+]
+```
+
+There is one decision per `:ai_message` entry. Observations at seq 1, 5, and
+7 never become candidates.
+
+| Reason | Meaning |
+| --- | --- |
+| `:projected` | Sent to the model. |
+| `:request_not_completed` | Its `run_id` has an `:ai_request_outcome` whose status isn't `:completed`. |
+| `:incomplete_tool_exchange` | An assistant tool call without a result for every call ID, or a tool result without its call. |
+| `:outside_context_window` | Valid, but older than the limits allow. |
+| `:not_eligible` | Excluded for another reason. |
+
+Messages with no `run_id`, or whose run has no outcome yet, are eligible.
+That is how the current request's user message reaches the model before
+its outcome exists.
+
+## Read the Counts
+
+```elixir
+Map.take(projection, [
+  :available_messages,
+  :included_messages,
+  :dropped_messages,
+  :first_seq,
+  :last_seq
+])
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  available_messages: 5,
+  included_messages: 5,
+  dropped_messages: 0,
+  first_seq: 0,
+  last_seq: 9
+}
+```
+
+`available_messages` counts messages that passed eligibility and the
+tool-exchange check. `dropped_messages` counts only messages cut by the
+limits.
+
+## Apply Limits
+
+Limits drop whole turns, oldest first. A turn starts at a user message and
+runs until the next one, so a tool call never loses its result:
+
+```elixir
+{:ok, bounded} = Projection.context(session, %{max_messages: 2})
+
+{Enum.map(bounded.context.messages, & &1.role), bounded.dropped_messages}
+```
+
+The result is `{[:user], 4}`. The first turn has four messages, so it no
+longer fits beside the newest turn.
+
+```elixir
+bounded.decisions
+|> Enum.filter(&(&1.reason == :outside_context_window))
+|> Enum.map(& &1.seq)
+```
+
+The result is `[0, 2, 3, 4]`.
+
+| Key | Effect |
+| --- | --- |
+| `max_messages` | Most messages to include. |
+| `max_bytes` | Most bytes of JSON-encoded messages to include. |
+
+A missing or non-positive limit means no limit. The newest turn is always
+included, even when it alone exceeds a limit. The ReAct Flow passes its
+`context` input here, with defaults `max_messages: 64` and
+`max_bytes: 200_000`.
+
+## Trace a Message
+
+Each projected `ReqLLM.Message` carries its Thread source in
+`metadata.jido.source`:
+
+```elixir
+[_user, _call, tool_result | _rest] = projection.context.messages
+
+Map.take(tool_result.metadata.jido.source, [:type, :seq, :refs])
+```
+
+The result is
+`%{type: :thread_entry, seq: 3, refs: %{request_id: "req-1", run_id: "run-1"}}`.
+
+The tool call keeps its ID and decoded arguments:
+
+```elixir
+[_user, call | _rest] = projection.context.messages
+[tool_call] = call.tool_calls
+
+{tool_call.id, tool_call.function.name, tool_call.function.arguments}
+```
+
+The result is `{"call-1", "lookup_order", ~s({"order_id":"A-1001"})}`.
+
+## Other Projections
+
+`Projection.messages/1` returns portable message maps with no limits:
+
+```elixir
+{:ok, messages} = Projection.messages(session)
+
+Enum.map(messages, &{&1.role, &1.content})
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+[
+  user: "Where is order A-1001?",
+  assistant: "",
+  tool: ~s({"eta":"2026-11-02","order_id":"A-1001","status":"shipped"}),
+  assistant: "Order A-1001 shipped. It arrives on 2026-11-02.",
+  user: "When will it arrive?"
+]
+```
+
+`Projection.breakpoint/1` returns the last sequence a projection can
+include:
+
+```elixir
+Projection.breakpoint(session)
+```
+
+The result is `9`.
+
+| Function | Returns |
+| --- | --- |
+| `Projection.context/2` | `ReqLLM.Context`, decisions, counts, and portable entries |
+| `Projection.explain/2` | Decisions, counts, and portable entries without a `ReqLLM.Context` |
+| `Projection.project/2` | Message maps and counts |
+| `Projection.messages/1` | Message maps with no limits |
+| `Projection.breakpoint/1` | The last includable `seq`, or `nil` |
+
+Each returns `{:error, :invalid_context}` for a Thread that fails
+validation or a stored message it can't decode.
+
+## Summary
+
+- Only `:ai_message` entries can reach the model. Observations stay in the
+  Thread.
+- A request outcome other than `:completed` removes every message from that
+  run.
+- Tool calls reach the model only with a result for every call ID.
+- `max_messages` and `max_bytes` drop whole turns, oldest first, and always
+  keep the newest turn.
+- Every message maps back to its Thread entry through
+  `metadata.jido.source`.
+
+## Next
+
+[Context Lifecycle](context-lifecycle.md) shows what happens to the
+projected `ReqLLM.Context` before and after the model call.

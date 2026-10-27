@@ -1,0 +1,520 @@
+# Tool Review and Cycle Limits
+
+## Overview
+
+Your support Agent can issue refunds, and nobody wants a model to move money
+without a person signing off. You'll make ReAct stop before
+`MyApp.IssueRefund` runs, approve one refund and deny another, and then
+bound the loop with tool-round limits and repeated-call detection. By the
+end, this works offline:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+:ok = Jido.AgentServer.deliver_wait(server, wait.id, approval)
+```
+
+and the refund runs only after that line.
+
+| Part | What it does |
+| --- | --- |
+| `tool_policy.review` | Names the tools that need approval in this request. |
+| `Jido.AI.Reasoning.ReAct.ToolReview` | The Flow that waits for `approved`, `denied`, or a 5-minute timer. |
+| `jido.ai.review.requested` | The Signal your approval UI receives. |
+| `limits.tool_rounds` | Stops the loop after N tool rounds. |
+| Cycle detection | Warns the model when it repeats the same calls. |
+
+Review needs a live Agent. A waiting turn suspends inside an AgentServer and
+resumes when you deliver a decision.
+
+## Install
+
+```elixir
+Mix.install([{:jido_ai, "~> 3.0.0-beta.1"}, {:plug, "~> 1.0"}])
+```
+
+## Define the Agent
+
+```elixir
+defmodule MyApp.LookupOrder do
+  use Jido.Action,
+    id: "my_app/lookup_order",
+    name: "lookup_order",
+    description: "Look up the shipping status of one order.",
+    schema: Zoi.object(%{order_id: Zoi.string()}),
+    output_schema: Zoi.map()
+
+  @impl Jido.Action
+  def run(%{order_id: order_id}, _context) do
+    {:ok, %{order_id: order_id, status: "shipped", eta: "2026-11-02"}}
+  end
+end
+
+defmodule MyApp.IssueRefund do
+  use Jido.Action,
+    id: "my_app/issue_refund",
+    name: "issue_refund",
+    description: "Refund part or all of one order.",
+    schema: Zoi.object(%{order_id: Zoi.string(), amount_cents: Zoi.integer(gte: 1)}),
+    output_schema: Zoi.map()
+
+  @impl Jido.Action
+  def run(%{order_id: order_id, amount_cents: amount}, _context) do
+    {:ok, %{refund_id: "R-#{order_id}", amount_cents: amount}}
+  end
+end
+
+defmodule MyApp.SupportAgent do
+  use Jido.AI.Agent,
+    id: "my_app/support_agent",
+    vsn: 1,
+    name: "support_agent"
+
+  ai do
+    reasoning Jido.AI.Reasoning.ReAct do
+      model "openai:gpt-4o-mini"
+    end
+
+    tools do
+      action MyApp.LookupOrder
+      action MyApp.IssueRefund
+    end
+  end
+end
+```
+
+## Offline Model
+
+The model runs inside the AgentServer process, so the stubs use shared mode:
+
+```elixir
+defmodule MyApp.FakeOpenAI do
+  def function_call(call_id, name, arguments) do
+    response([
+      %{
+        "type" => "function_call",
+        "id" => "fc-#{call_id}",
+        "call_id" => call_id,
+        "name" => name,
+        "arguments" => Jason.encode!(arguments),
+        "status" => "completed"
+      }
+    ])
+  end
+
+  def text(text) do
+    response([
+      %{
+        "type" => "message",
+        "id" => "msg-text",
+        "role" => "assistant",
+        "status" => "completed",
+        "content" => [%{"type" => "output_text", "text" => text, "annotations" => []}]
+      }
+    ])
+  end
+
+  def stub(body), do: Req.Test.expect(MyApp.LLM, &Req.Test.json(&1, body))
+
+  defp response(output) do
+    %{
+      "id" => "resp-#{System.unique_integer([:positive])}",
+      "object" => "response",
+      "created_at" => 1,
+      "model" => "gpt-4o-mini-2024-07-18",
+      "status" => "completed",
+      "error" => nil,
+      "incomplete_details" => nil,
+      "parallel_tool_calls" => true,
+      "output" => output,
+      "usage" => %{
+        "input_tokens" => 20,
+        "input_tokens_details" => %{"cached_tokens" => 0},
+        "output_tokens" => 5,
+        "output_tokens_details" => %{"reasoning_tokens" => 0},
+        "total_tokens" => 25
+      }
+    }
+  end
+end
+
+Req.Test.set_req_test_to_shared()
+
+offline = %{
+  api_key: "offline-test-key",
+  max_retries: 0,
+  req_http_options: [plug: {Req.Test, MyApp.LLM}]
+}
+```
+
+## Review Needs a Wait Host
+
+`cmd/2` runs the Flow as plain data. It can't suspend, so a review request
+stops before the model runs:
+
+```elixir
+agent = MyApp.SupportAgent.instantiate!(id: "support-data")
+
+request =
+  MyApp.SupportAgent.request_signal!(%{
+    input: "Refund order A-1001",
+    options: offline,
+    tool_policy: %{review: ["issue_refund"]}
+  })
+
+{:ok, _agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+  MyApp.SupportAgent.cmd(agent, request)
+
+Map.take(reply.data, [:status, :reason_code, :reason, :model_calls])
+```
+
+The result is
+`%{status: :blocked, reason_code: :review, reason: "execution host does not support waits", model_calls: 0}`.
+
+## Start a Live Agent
+
+```elixir
+{:ok, _jido} = Jido.start(namespace: "my_app/support")
+
+{:ok, server} =
+  Jido.start_agent(MyApp.SupportAgent,
+    id: "support-live",
+    persistence: {Jido.Persistence.ETS, table: :support_reviews},
+    turn_timeout: :infinity
+  )
+
+:ok = Jido.AgentServer.await_ready(server)
+```
+
+| Option | Why |
+| --- | --- |
+| `namespace:` | Persistence keys need a stable instance namespace. Without one, the Agent stops with `:stable_namespace_required`. |
+| `persistence:` | A wait is part of a durable turn. Without persistence, the turn can't suspend and review is blocked the same way as with `cmd/2`. `Jido.Persistence.ETS` keeps it in memory for this notebook. |
+| `turn_timeout: :infinity` | The default turn timeout is 60,000 ms, wait time included. Let the review timer own expiry instead. |
+
+## Request a Refund
+
+Queue the model's refund call:
+
+```elixir
+MyApp.FakeOpenAI.stub(
+  MyApp.FakeOpenAI.function_call("call-refund", "issue_refund", %{
+    order_id: "A-1001",
+    amount_cents: 2_500
+  })
+)
+```
+
+Submit the request. `tool_policy.review` marks `issue_refund` for approval.
+`jido_ai_dispatch` in the execution context tells ReAct where to send the
+review request. A durable turn stores its context, so the target must be
+portable: a registered name, not a pid. This notebook registers itself as the
+review inbox:
+
+```elixir
+Process.register(self(), :review_inbox)
+
+request =
+  MyApp.SupportAgent.request_signal!(%{
+    input: "Refund $25 on order A-1001",
+    options: offline,
+    tool_policy: %{review: ["issue_refund"], reason: "refunds need a supervisor"}
+  })
+
+pending =
+  Jido.AgentServer.submit(server, request,
+    context: %{jido_ai_dispatch: {:named, target: {:name, :review_inbox}}}
+  )
+```
+
+`submit/3` returns at once. The turn calls the model, sees `issue_refund`,
+and suspends.
+
+## Read the Review Request
+
+```elixir
+review =
+  receive do
+    {:signal, %Jido.Signal{type: "jido.ai.review.requested"} = signal} -> signal.data
+  after
+    10_000 -> :no_review
+  end
+
+Map.take(review, [:review_id, :options, :policy_reason, :tool_calls])
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  review_id: "review:run_...:1",
+  options: [:approved, :denied],
+  policy_reason: "refunds need a supervisor",
+  tool_calls: [
+    %{
+      id: "call-refund",
+      name: "issue_refund",
+      arguments: %{"amount_cents" => 2500, "order_id" => "A-1001"}
+    }
+  ]
+}
+```
+
+The Signal also carries `request_id`, `run_id`, `session_id`, `thread_id`,
+and `expires_at_ms`, which is 300,000 ms after the request. Show the calls
+to the reviewer. Nothing has run yet.
+
+ReAct sends the Signal just before the turn suspends. Poll `status/2` until
+the wait is open:
+
+```elixir
+open_wait = fn server ->
+  Enum.find_value(1..3_000, fn _ ->
+    case Jido.AgentServer.status(server) do
+      %{waits: [wait]} -> wait
+      _status -> Process.sleep(10) && nil
+    end
+  end)
+end
+
+wait = open_wait.(server)
+
+{is_binary(wait.id), Enum.map(wait.options, & &1.name)}
+```
+
+The result is `{true, ["approved", "denied", "expired"]}`.
+
+## Approve
+
+Queue the model's final answer, then deliver an approval. The Signal `data`
+must contain the same `review_id`, `request_id`, and `run_id`. `actor_id`
+and `reason` are optional and go into the record:
+
+```elixir
+MyApp.FakeOpenAI.stub(MyApp.FakeOpenAI.text("Refund R-A-1001 for $25.00 is issued."))
+
+approval =
+  Jido.Signal.new!(
+    "jido.ai.review.approved",
+    review
+    |> Map.take([:review_id, :request_id, :run_id])
+    |> Map.merge(%{actor_id: "supervisor-7", reason: "within policy"}),
+    source: "/my_app/review_ui"
+  )
+
+:ok = Jido.AgentServer.deliver_wait(server, wait.id, approval)
+
+{:ok, _agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+  Jido.AgentServer.await(pending, 30_000)
+
+{reply.data.status, reply.data.output, hd(reply.data.tool_attempts).review}
+```
+
+The result is
+`{:completed, "Refund R-A-1001 for $25.00 is issued.", %{required: true, status: :approved}}`.
+
+The Session records both sides of the review as `:ai_review` entries:
+
+```elixir
+session = Jido.AgentServer.agent(server).state.session
+
+session.thread
+|> Jido.Thread.filter_by_kind(:ai_review)
+|> Enum.map(&{&1.payload["status"], &1.payload["decision"]})
+```
+
+The result is
+`[{"requested", nil}, {"approved", %{"actor_id" => "supervisor-7", "reason" => "within policy", ...}}]`.
+
+## Deny
+
+A denial ends the request. The tool doesn't run and the model isn't called
+again:
+
+```elixir
+MyApp.FakeOpenAI.stub(
+  MyApp.FakeOpenAI.function_call("call-refund-2", "issue_refund", %{
+    order_id: "A-1002",
+    amount_cents: 90_000
+  })
+)
+
+pending =
+  Jido.AgentServer.submit(server, request,
+    context: %{jido_ai_dispatch: {:named, target: {:name, :review_inbox}}}
+  )
+
+review =
+  receive do
+    {:signal, %Jido.Signal{type: "jido.ai.review.requested"} = signal} -> signal.data
+  after
+    10_000 -> :no_review
+  end
+
+wait = open_wait.(server)
+
+denial =
+  Jido.Signal.new!(
+    "jido.ai.review.denied",
+    Map.take(review, [:review_id, :request_id, :run_id]),
+    source: "/my_app/review_ui"
+  )
+
+:ok = Jido.AgentServer.deliver_wait(server, wait.id, denial)
+
+{:ok, _agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+  Jido.AgentServer.await(pending, 30_000)
+
+Map.take(reply.data, [:status, :reason_code, :reason, :tool_calls, :model_calls])
+```
+
+The result is
+`%{status: :blocked, reason_code: :review, reason: "tool use was denied", tool_calls: 0, model_calls: 1}`.
+
+## Timeouts
+
+The `expired` option is a 300,000 ms timer that starts when the wait opens.
+When it fires first, the request ends with
+`status: :blocked, reason_code: :review, reason: "tool review expired"`.
+The timeout is fixed in `Jido.AI.Reasoning.ReAct.ToolReview`. The request
+schema has no field for it.
+
+A review wait is durable. With AgentServer persistence configured, the wait
+survives a hibernate or restart and keeps the same wait ID. Deliver the
+decision to the thawed server, and the same graph resumes without repeating
+the model call.
+
+## Review Scope
+
+| Request field | Tools reviewed |
+| --- | --- |
+| `tool_policy: %{review: ["issue_refund"]}` | Only `issue_refund` |
+| `review_tools: true` | Every visible tool |
+
+Review is per round. When any call in a model response needs review, the
+whole round waits, and approval runs every call in it. Each later round that
+calls a reviewed tool asks again, with a new `review_id` ending in the round
+number. A name in `review` must be visible in the request, or the request
+fails with `{:review_tool_not_visible, name}`.
+
+Stop the live Agent before the loop examples:
+
+```elixir
+:ok = Jido.stop_agent("support-live")
+```
+
+## Limit Tool Rounds
+
+`limits.tool_rounds` (default `4`, range `0..8`) caps how many rounds one
+request can run. When the model asks for a round past the limit, the request
+ends before those calls run:
+
+```elixir
+MyApp.FakeOpenAI.stub(
+  MyApp.FakeOpenAI.function_call("call-1", "lookup_order", %{order_id: "A-1001"})
+)
+
+MyApp.FakeOpenAI.stub(
+  MyApp.FakeOpenAI.function_call("call-2", "lookup_order", %{order_id: "A-1002"})
+)
+
+agent = MyApp.SupportAgent.instantiate!(id: "support-rounds")
+
+request =
+  MyApp.SupportAgent.request_signal!(%{
+    input: "Check orders A-1001 and A-1002",
+    options: offline,
+    limits: %{tool_rounds: 1}
+  })
+
+{:ok, _agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+  MyApp.SupportAgent.cmd(agent, request)
+
+Map.take(reply.data, [:status, :reason_code, :reason, :tool_rounds, :tool_calls, :model_calls])
+```
+
+The result is
+`%{status: :blocked, reason_code: :limits, reason: "maximum tool rounds reached", tool_rounds: 1, tool_calls: 1, model_calls: 2}`.
+
+`limits.tool_calls` (default `8`) caps the total calls in the request the
+same way, with `"maximum tool calls reached"`.
+
+## Repeated Calls
+
+`Jido.AI.Reasoning.ReAct.Actions.DetectToolCycle` runs after every model
+response. When a round has the same tool names and arguments as the round
+before, ignoring call IDs, it counts one cycle and adds a system message to
+the next model call:
+
+```text
+The previous tool calls repeated with the same arguments. Do not repeat them again. Use the available results for a final answer, or use a different approach.
+```
+
+The model asks for `A-1001` twice in a row, then answers:
+
+```elixir
+MyApp.FakeOpenAI.stub(
+  MyApp.FakeOpenAI.function_call("call-1", "lookup_order", %{order_id: "A-1001"})
+)
+
+MyApp.FakeOpenAI.stub(
+  MyApp.FakeOpenAI.function_call("call-2", "lookup_order", %{order_id: "A-1001"})
+)
+
+MyApp.FakeOpenAI.stub(MyApp.FakeOpenAI.text("Order A-1001 has shipped."))
+
+agent = MyApp.SupportAgent.instantiate!(id: "support-cycle")
+
+request =
+  MyApp.SupportAgent.request_signal!(%{
+    input: "Where is order A-1001?",
+    options: offline
+  })
+
+{:ok, agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+  MyApp.SupportAgent.cmd(agent, request)
+
+Map.take(reply.data, [:status, :tool_rounds, :tool_calls, :tool_cycles, :model_calls])
+```
+
+The result is
+`%{status: :completed, tool_rounds: 2, tool_calls: 2, tool_cycles: 1, model_calls: 3}`.
+
+Cycle detection warns. It doesn't stop the request or skip the repeated
+calls: the second round ran. A model that ignores the warning keeps going
+until `limits.tool_rounds`, `limits.tool_calls`, or `limits.model_calls`
+stops it. Read `tool_cycles` in the reply, or in the `:ai_request_outcome`
+entry, to find requests that looped.
+
+## Clean Up
+
+```elixir
+:ok = Jido.stop()
+```
+
+## Summary
+
+- `tool_policy.review` or `review_tools: true` makes ReAct wait before a
+  round with a reviewed tool runs.
+- Review needs an AgentServer. `cmd/2` returns
+  `"execution host does not support waits"`.
+- The `jido.ai.review.requested` Signal goes to the `jido_ai_dispatch` target
+  in the execution context.
+- Deliver `jido.ai.review.approved` or `jido.ai.review.denied` with matching
+  `review_id`, `request_id`, and `run_id` through
+  `Jido.AgentServer.deliver_wait/3`.
+- An unanswered review expires after 300,000 ms.
+- `limits.tool_rounds` and `limits.tool_calls` stop new tool work with
+  `reason_code: :limits`.
+- Repeated identical rounds add a warning and count in `tool_cycles`. They
+  don't stop the request.
+
+## Next
+
+- [Budgets, Retries, and Fallbacks](budgets-retries-and-fallbacks.md) – every
+  request limit in one place.
+- [Security and Portability](security-and-portability.md) – tool trust,
+  allowlists, and effect idempotency.
+- [ReAct](react.livemd) – the full ReAct loop.

@@ -1,0 +1,440 @@
+# Inspect Model Context
+
+## Overview
+
+Your support Agent answered, and you need to know what it actually sent to
+the model: how many messages, which tools, how many tokens, whether the
+prompt cache hit, and which provider request it was. Every model call
+records two `Jido.AI.Context.Snapshot` documents, one before the call and
+one after. By the end of this notebook you'll read them like this:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+[first, second] = reply.data.model_attempts
+before = Jido.AI.Context.Snapshot.decode!(second.context.before)
+
+{before["stage"], before["shape"]["message_count"], before["shape"]["roles"]}
+# => {"prepared", 4, %{"assistant" => 1, "system" => 1, "tool" => 1, "user" => 1}}
+```
+
+The whole notebook runs offline against a mocked provider.
+
+## Install
+
+```elixir
+Mix.install([{:jido_ai, "~> 3.0.0-beta.1"}, {:plug, "~> 1.0"}])
+```
+
+## Offline Model
+
+ReqLLM sends its HTTP request through a `Req.Test` plug instead of the
+network. These helpers build OpenAI Responses API bodies:
+
+```elixir
+defmodule MyApp.FakeLLM do
+  def options do
+    %{
+      api_key: "offline-test-key",
+      max_retries: 0,
+      req_http_options: [plug: {Req.Test, MyApp.LLM}]
+    }
+  end
+
+  def tool_call(name, arguments, input_tokens, output_tokens) do
+    response(
+      "resp-tool",
+      [
+        %{
+          "type" => "function_call",
+          "id" => "fc-1",
+          "call_id" => "call-1",
+          "name" => name,
+          "arguments" => Jason.encode!(arguments),
+          "status" => "completed"
+        }
+      ],
+      input_tokens,
+      output_tokens,
+      0
+    )
+  end
+
+  def text(text, input_tokens, output_tokens, cached_tokens) do
+    response(
+      "resp-text",
+      [
+        %{
+          "type" => "message",
+          "id" => "msg-1",
+          "role" => "assistant",
+          "status" => "completed",
+          "content" => [%{"type" => "output_text", "text" => text, "annotations" => []}]
+        }
+      ],
+      input_tokens,
+      output_tokens,
+      cached_tokens
+    )
+  end
+
+  defp response(id, output, input_tokens, output_tokens, cached_tokens) do
+    %{
+      "id" => id,
+      "object" => "response",
+      "created_at" => 1,
+      "model" => "gpt-4o-mini-2024-07-18",
+      "status" => "completed",
+      "output" => output,
+      "usage" => %{
+        "input_tokens" => input_tokens,
+        "input_tokens_details" => %{"cached_tokens" => cached_tokens},
+        "output_tokens" => output_tokens,
+        "total_tokens" => input_tokens + output_tokens
+      }
+    }
+  end
+end
+```
+
+## Define the Agent
+
+```elixir
+defmodule MyApp.LookupOrder do
+  use Jido.Action,
+    name: "lookup_order",
+    description: "Look up one order by ID.",
+    schema: Zoi.object(%{order_id: Zoi.string()})
+
+  @impl true
+  def run(%{order_id: order_id}, _context) do
+    {:ok, %{order_id: order_id, status: "shipped", eta: "2026-11-02"}}
+  end
+end
+
+defmodule MyApp.SupportAgent do
+  use Jido.AI.Agent,
+    id: "my_app/support_agent",
+    vsn: 1,
+    name: "support_agent"
+
+  ai do
+    reasoning Jido.AI.Reasoning.ReAct
+
+    tools do
+      action MyApp.LookupOrder
+    end
+  end
+end
+```
+
+## Run One Request
+
+The provider answers twice: first with a `lookup_order` call, then with
+text. The second response reports 64 cached input tokens:
+
+```elixir
+Req.Test.expect(MyApp.LLM, fn conn ->
+  Req.Test.json(conn, MyApp.FakeLLM.tool_call("lookup_order", %{order_id: "A-1001"}, 120, 18))
+end)
+
+Req.Test.expect(MyApp.LLM, fn conn ->
+  Req.Test.json(conn, MyApp.FakeLLM.text("Order A-1001 arrives on 2026-11-02.", 180, 14, 64))
+end)
+
+agent = MyApp.SupportAgent.instantiate!(id: "support-1")
+
+signal =
+  MyApp.SupportAgent.request_signal!(%{
+    input: "Where is order A-1001?",
+    options: MyApp.FakeLLM.options()
+  })
+
+{:ok, agent, [%Jido.Agent.Directive.Reply{signal: reply}]} = MyApp.SupportAgent.cmd(agent, signal)
+
+{reply.data.status, reply.data.model_calls, reply.data.output}
+```
+
+The result is `{:completed, 2, "Order A-1001 arrives on 2026-11-02."}`.
+
+## Find the Snapshots
+
+`reply.data.model_attempts` has one entry per model call. Each one holds
+two snapshots as JSON strings:
+
+```elixir
+[first, second] = reply.data.model_attempts
+
+{first.context.format, is_binary(first.context.before), is_binary(first.context.after)}
+```
+
+The result is `{"jido.ai.context.snapshot+json", true, true}`.
+
+The same attempts are committed to the Thread as `:ai_model_attempt`
+entries, so you can read them later from `agent.state.session` without the
+reply:
+
+```elixir
+agent.state.session.thread
+|> Jido.Thread.filter_by_kind(:ai_model_attempt)
+|> Enum.map(& &1.payload["context"]["format"])
+```
+
+The result is
+`["jido.ai.context.snapshot+json", "jido.ai.context.snapshot+json"]`.
+
+## Decode
+
+`Jido.AI.Context.Snapshot.decode!/1` checks the `type` and `version` and
+returns a map with string keys:
+
+```elixir
+alias Jido.AI.Context.Snapshot
+
+before_1 = Snapshot.decode!(first.context.before)
+after_1 = Snapshot.decode!(first.context.after)
+
+{before_1["stage"], after_1["stage"], before_1["content"]}
+```
+
+The result is `{"prepared", "completed", "none"}`. The runtime stores
+snapshots with `content: :none`, so no message text is kept.
+
+Both snapshots describe one Context. They share its ID and request digest:
+
+```elixir
+{before_1["context_id"] == after_1["context_id"], before_1["digest"] == after_1["digest"]}
+```
+
+The result is `{true, true}`.
+
+A document of another type fails:
+
+```elixir
+Snapshot.decode(~s({"type": "something.else", "version": 1}))
+```
+
+The result is `{:error, :invalid_context_snapshot}`.
+
+## Compare Before and After
+
+Only three top-level fields differ between the two snapshots of one call:
+
+```elixir
+before_1
+|> Map.keys()
+|> Enum.reject(&(before_1[&1] == after_1[&1]))
+|> Enum.sort()
+```
+
+The result is `["captured_at_ms", "response", "stage"]`. The request,
+shape, operations, and metadata are identical, which shows ReqLLM received
+what was prepared. `response` is `nil` before the call.
+
+## Compare Shapes
+
+`shape` counts the request without its content. Compare the two model
+calls:
+
+```elixir
+before_2 = Snapshot.decode!(second.context.before)
+
+{before_1["shape"], before_2["shape"]}
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{%{
+   "content_bytes" => 353,
+   "content_part_count" => 2,
+   "message_count" => 2,
+   "reasoning_message_count" => 0,
+   "roles" => %{"system" => 1, "user" => 1},
+   "tool_count" => 1
+ },
+ %{
+   "content_bytes" => 539,
+   "content_part_count" => 3,
+   "message_count" => 4,
+   "reasoning_message_count" => 0,
+   "roles" => %{"assistant" => 1, "system" => 1, "tool" => 1, "user" => 1},
+   "tool_count" => 1
+ }}
+```
+
+The second call added the assistant tool call and the tool result. The
+assistant message has no text part, so `content_part_count` grows by one.
+
+## Read the Messages
+
+Each message summary keeps its role, a content digest, and its source:
+
+```elixir
+Enum.map(before_2["request"]["context"]["messages"], fn message ->
+  {message["role"], message["metadata"]["jido"]["source"]["type"], Map.has_key?(message, "content")}
+end)
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+[
+  {"system", "agent_instructions", false},
+  {"user", "thread_entry", false},
+  {"assistant", "thread_entry", false},
+  {"tool", "thread_entry", false}
+]
+```
+
+`"agent_instructions"` is the Flow's `instructions`. `"thread_entry"`
+messages came from the Thread; their source also holds the entry `seq`
+and refs. `content_digest` lets you check that two calls sent the same
+text without storing it.
+
+Tools and options are summarized the same way. Credentials are replaced:
+
+```elixir
+options = before_1["request"]["options"]
+
+{before_1["request"]["model"], Enum.map(options["tools"], & &1["name"]), options["api_key"]}
+```
+
+The result is `{"openai:gpt-4o-mini", ["lookup_order"], "[REDACTED]"}`.
+
+## Projection Facts
+
+The Context metadata records which Thread revision the call was built
+from and how the projection chose messages:
+
+```elixir
+projection = before_2["metadata"]["projection"]
+
+{before_2["metadata"]["source"]["thread_rev"], projection["included_messages"],
+ projection["dropped_messages"], projection["limits"]}
+```
+
+The result is
+`{5, 3, 0, %{"max_bytes" => 200000, "max_messages" => 64}}`. The Thread
+had five entries: the user message, the first `:ai_model_attempt`, the
+assistant tool call, an `:ai_tool_attempt`, and the tool result. Three are
+messages, and all three were included. The system message isn't from the
+Thread.
+[Project a Thread](project-a-thread.livemd) explains each decision.
+
+## Token Counts
+
+The after snapshot keeps ReqLLM's normalized usage for that call:
+
+```elixir
+after_2 = Snapshot.decode!(second.context.after)
+
+for snapshot <- [after_1, after_2] do
+  usage = snapshot["response"]["call_metadata"]["usage"]
+  {usage["input_tokens"], usage["output_tokens"], usage["cached_tokens"]}
+end
+```
+
+The result is `[{120, 18, 0}, {180, 14, 64}]`. The reply sums them:
+
+```elixir
+Map.take(reply.data.usage, [:input_tokens, :output_tokens, :cached_tokens, :total_tokens])
+```
+
+The result is
+`%{cached_tokens: 64, input_tokens: 300, output_tokens: 32, total_tokens: 332}`.
+
+## Cache Facts
+
+Each attempt also records what the call observed about the prompt cache:
+
+```elixir
+for attempt <- [first, second] do
+  Map.take(attempt.prompt_cache, [:requested, :read_tokens, :write_tokens])
+end
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+[
+  %{requested: false, read_tokens: 0, write_tokens: 0},
+  %{requested: false, read_tokens: 64, write_tokens: 0}
+]
+```
+
+`requested` is `false` because this request didn't set `prompt_cache`.
+The provider can still report cached tokens.
+[Usage, Cache, and Cost](usage-cache-and-cost.md) covers cache requests
+and cost data.
+
+## Request IDs
+
+Four IDs connect a call to everything else:
+
+```elixir
+call = before_1["metadata"]["call"]
+call_metadata = after_1["response"]["call_metadata"]
+
+%{
+  request_id: call["request_id"] == reply.data.request_id,
+  run_id: call["run_id"] == reply.data.run_id,
+  model_call: call["model_call"],
+  req_llm_request_id: call_metadata["request_id"] == first.req_llm_request_id
+}
+```
+
+The result is
+`%{model_call: 1, request_id: true, req_llm_request_id: true, run_id: true}`.
+
+| ID | Identifies |
+| --- | --- |
+| `request_id` | The request Signal. Also in every Thread entry's refs. |
+| `run_id` | One request run. Also in every Thread entry's refs. |
+| `model_call` | The call's position in the request, from 1. |
+| `req_llm_request_id` | The ReqLLM request. Use it to match ReqLLM telemetry. |
+
+A failed call has no response body, so the runtime copies the ReqLLM
+request ID into `response.call_metadata.request_id` from completion
+metadata.
+
+## Provider Metadata
+
+`call_metadata` also holds the provider's own response facts:
+
+```elixir
+Map.take(call_metadata, ["model", "response_id", "finish_reason"])
+```
+
+The result is
+`%{"finish_reason" => "tool_calls", "model" => "gpt-4o-mini-2024-07-18", "response_id" => "resp-tool"}`.
+
+```elixir
+Map.take(call_metadata["provider_metadata"], ["api_type", "status"])
+```
+
+The result is `%{"api_type" => "responses", "status" => "completed"}`.
+`model` here is the provider's resolved model, while
+`request.model` is the model you asked for.
+
+## Summary
+
+- Each entry in `reply.data.model_attempts` and each `:ai_model_attempt`
+  Thread entry holds `context.before` and `context.after` JSON snapshots.
+- Decode them with `Jido.AI.Context.Snapshot.decode!/1`. Keys are strings.
+- `shape` gives message, tool, role, part, and byte counts without content.
+- Usage and provider facts are in `response.call_metadata` of the after
+  snapshot. Cache observations are in the attempt's `prompt_cache`.
+- `request_id`, `run_id`, and `model_call` in `metadata.call` tie the
+  snapshot to the request and the Thread.
+
+## Next
+
+[Models and Options](models-and-options.md) shows the model names and
+request options that appear in these snapshots.

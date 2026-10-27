@@ -8,11 +8,15 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.DetectToolCycle do
     vsn: 1,
     name: "jido_ai_react_detect_tool_cycle",
     description: "Detect one repeated ReAct tool-call batch",
-    schema: Zoi.object(%{turn: Zoi.any(), calls: Zoi.list(Zoi.map())}),
+    schema: Zoi.object(%{turn: Zoi.any()}),
     output_schema: Zoi.object(%{turn: Zoi.any()})
 
   @impl Jido.Action
-  def run(%{turn: turn, calls: calls}, _context) when calls != [] do
+  def run(
+        %{turn: %{model_outcome: %{kind: :tool_calls, tool_calls: calls}} = turn},
+        _context
+      )
+      when calls != [] do
     signature = signature(calls)
     repeated = turn.previous_tool_signature == signature
 

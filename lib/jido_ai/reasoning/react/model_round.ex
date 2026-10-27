@@ -8,7 +8,7 @@ defmodule Jido.AI.Reasoning.ReAct.ModelRound do
     RecordModelAttempt
   }
 
-  alias Jido.AI.Reasoning.ReAct.Actions.{DecideNext, ExpandNext}
+  alias Jido.AI.Reasoning.ReAct.Actions.{DecideNext, DetectToolCycle, ExpandNext}
 
   use Jido.Flow,
     id: "jido.ai/reasoning/react/model-round",
@@ -46,10 +46,14 @@ defmodule Jido.AI.Reasoning.ReAct.ModelRound do
         output_reason: result("output_guard", :reason)
       }
 
+    step "detect_cycle",
+      action: DetectToolCycle,
+      params: %{turn: result("record_attempt", :turn)}
+
     invoke "next",
       decision: DecideNext,
       expander: ExpandNext,
-      params: %{turn: result("record_attempt", :turn)}
+      params: %{turn: result("detect_cycle", :turn)}
 
     output result("next")
   end

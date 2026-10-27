@@ -1,0 +1,332 @@
+# Adaptive Reasoning
+
+## Overview
+
+Your support desk gets order lookups, one-line policy questions, and requests
+to compare options. `Jido.AI.Reasoning.Adaptive` picks one reasoning Flow per
+request with a local keyword rule, so no model call is spent on routing. A
+caller can also name the Flow:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+ask.(%{input: "Please look up order A-1001."}).data.flow
+# => %{id: "jido.ai/reasoning/react", vsn: 1}
+
+ask.(%{input: "Please look up order A-1001.", strategy: :chain_of_thought}).data.flow
+# => %{id: "jido.ai/reasoning/chain-of-thought", vsn: 1}
+```
+
+You'll read the exact selection rule, run selected Flows offline, and override
+the choice. Run the cells from top to bottom.
+
+## Install
+
+```elixir
+Mix.install([{:jido_ai, "~> 3.0.0-beta.1"}, {:plug, "~> 1.0"}])
+```
+
+## Define the Agent
+
+```elixir
+defmodule MyApp.LookupOrder do
+  use Jido.Action,
+    name: "lookup_order",
+    description: "Look up the status and delivery estimate for one order.",
+    schema: Zoi.object(%{order_id: Zoi.string()}),
+    output_schema: Zoi.object(%{order_id: Zoi.string(), status: Zoi.string(), eta: Zoi.string()})
+
+  @impl true
+  def run(%{order_id: order_id}, _context) do
+    {:ok, %{order_id: order_id, status: "shipped", eta: "2026-11-02"}}
+  end
+end
+
+defmodule MyApp.SupportAgent do
+  use Jido.AI.Agent, id: "my_app/support_agent", vsn: 1, name: "support_agent"
+
+  ai do
+    reasoning Jido.AI.Reasoning.Adaptive do
+      model "openai:gpt-4o-mini"
+    end
+
+    tools do
+      action MyApp.LookupOrder
+    end
+  end
+end
+```
+
+The tools stay on the Agent. Only ReAct sends them to the model; the other
+Flows ignore them.
+
+## The Graph
+
+```elixir
+Jido.AI.Reasoning.Adaptive.flow().components
+|> Enum.map(fn {name, component} -> {name, component.kind} end)
+```
+
+The result is `[{"reason", :invoke}]`. One `invoke` component runs
+`Jido.AI.Reasoning.Adaptive.Actions.Select` as its decision and
+`Jido.AI.Reasoning.Adaptive.Actions.Expand` as its expander. `Select` returns
+a strategy atom and the request input. `Expand` maps the atom to a module and
+continues into that Flow. Everything after that is the selected Flow, so the
+reply has its `flow`, `reasoning`, and result shape.
+
+## The Selection Rule
+
+With no `strategy`, `Select` lowercases the input, splits it on every
+character other than `a-z`, `0-9`, and `-`, and tests the words in this order.
+The first match wins:
+
+| Order | Any word in | Flow |
+| --- | --- | --- |
+| 1 | `puzzle riddle iterate improve refine recursive` | `:trm` |
+| 2 | `synthesize combine merge integrate relationships perspectives` | `:graph_of_thoughts` |
+| 3 | `search find lookup fetch calculate compute execute run tool` | `:react` |
+| 4 | `algorithm backtrack search-space optimize` | `:algorithm_of_thoughts` |
+| 5 | `analyze explore compare evaluate alternatives options` | `:tree_of_thoughts` |
+| 6 | Fewer than 12 words | `:chain_of_draft` |
+| 7 | Anything else | `:chain_of_thought` |
+
+Matching is by whole word. `look` and `lookups` don't match `lookup`, and a
+multi-part input contributes only its `text` parts.
+
+Run the decision Action directly to see the choice for each input:
+
+```elixir
+alias Jido.AI.Reasoning.Adaptive.Actions.Select
+
+inputs = [
+  "Please look up order A-1001.",
+  "Please lookup order A-1001.",
+  "Can you find order A-1001?",
+  "When will my refund post?",
+  "Compare a refund, a reship, and a coupon for this late order.",
+  "Combine the shipping and refund policies into one answer.",
+  "Improve this reply to the customer.",
+  "The customer says the box arrived damaged and the item inside is missing a part, what should we tell them?"
+]
+
+for input <- inputs do
+  {:ok, %{strategy: strategy}} = Select.run(%{input: input}, %{})
+  {input, strategy}
+end
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+[
+  {"Please look up order A-1001.", :chain_of_draft},
+  {"Please lookup order A-1001.", :react},
+  {"Can you find order A-1001?", :react},
+  {"When will my refund post?", :chain_of_draft},
+  {"Compare a refund, a reship, and a coupon for this late order.", :tree_of_thoughts},
+  {"Combine the shipping and refund policies into one answer.", :graph_of_thoughts},
+  {"Improve this reply to the customer.", :trm},
+  {"The customer says the box arrived damaged and the item inside is missing a part, what should we tell them?",
+   :chain_of_thought}
+]
+```
+
+"look up" is two words, so the first input goes to Chain of Draft and can't
+call `lookup_order`. When a request must use a tool, set `strategy: :react`.
+
+## Offline Model
+
+```elixir
+defmodule MyApp.LLM do
+  def options do
+    %{
+      api_key: "offline-test-key",
+      max_retries: 0,
+      max_tokens: 512,
+      temperature: 0.0,
+      req_http_options: [plug: {Req.Test, __MODULE__}]
+    }
+  end
+
+  def object(conn, object), do: text(conn, Jason.encode!(object))
+
+  def text(conn, text) do
+    respond(conn, %{
+      "type" => "message",
+      "id" => "msg_1",
+      "role" => "assistant",
+      "status" => "completed",
+      "content" => [%{"type" => "output_text", "text" => text, "annotations" => []}]
+    })
+  end
+
+  def tool_call(conn, id, name, arguments) do
+    respond(conn, %{
+      "type" => "function_call",
+      "id" => "fc_" <> id,
+      "call_id" => id,
+      "name" => name,
+      "arguments" => Jason.encode!(arguments),
+      "status" => "completed"
+    })
+  end
+
+  defp respond(conn, output) do
+    Req.Test.json(conn, %{
+      "id" => "resp_#{System.unique_integer([:positive])}",
+      "object" => "response",
+      "created_at" => 1,
+      "model" => "gpt-4o-mini-2024-07-18",
+      "status" => "completed",
+      "output" => [output],
+      "usage" => %{
+        "input_tokens" => 40,
+        "input_tokens_details" => %{"cached_tokens" => 0},
+        "output_tokens" => 10,
+        "output_tokens_details" => %{"reasoning_tokens" => 0},
+        "total_tokens" => 50
+      }
+    })
+  end
+end
+```
+
+`ask` runs one request on a fresh Agent:
+
+```elixir
+ask = fn params ->
+  agent = MyApp.SupportAgent.instantiate!(id: "support-#{System.unique_integer([:positive])}")
+  signal = MyApp.SupportAgent.request_signal!(Map.put(params, :options, MyApp.LLM.options()))
+
+  case MyApp.SupportAgent.cmd(agent, signal) do
+    {:ok, _agent, [%Jido.Agent.Directive.Reply{signal: reply}]} -> reply
+    {:error, error} -> {:error, error}
+  end
+end
+```
+
+## Run Selected Flows
+
+"lookup" selects ReAct, which runs the tool and answers:
+
+```elixir
+Req.Test.expect(MyApp.LLM, fn conn ->
+  MyApp.LLM.tool_call(conn, "call_1", "lookup_order", %{order_id: "A-1001"})
+end)
+
+Req.Test.expect(MyApp.LLM, fn conn ->
+  MyApp.LLM.text(conn, "Order A-1001 has shipped and arrives 2026-11-02.")
+end)
+
+reply = ask.(%{input: "Please lookup order A-1001."})
+
+{reply.data.flow, reply.data.output, reply.data.model_calls, reply.data.tool_rounds}
+```
+
+The result is
+`{%{id: "jido.ai/reasoning/react", vsn: 1}, "Order A-1001 has shipped and arrives 2026-11-02.", 2, 1}`.
+
+A short policy question selects Chain of Draft, which expects `drafts` and
+`answer`:
+
+```elixir
+Req.Test.expect(MyApp.LLM, fn conn ->
+  MyApp.LLM.object(conn, %{
+    drafts: ["refund approved", "card: 5 business days"],
+    answer: "Refunds post to your card within 5 business days."
+  })
+end)
+
+reply = ask.(%{input: "When will my refund post?"})
+
+{reply.data.flow, reply.data.output, reply.data.reasoning.method}
+```
+
+The result is
+`{%{id: "jido.ai/reasoning/chain-of-draft", vsn: 1}, "Refunds post to your card within 5 business days.", :chain_of_draft}`.
+
+## Override the Flow
+
+`strategy` skips the rule. It accepts `:react`, `:chain_of_thought`,
+`:chain_of_draft`, `:algorithm_of_thoughts`, `:tree_of_thoughts`,
+`:graph_of_thoughts`, `:trm`, or `nil` (default, use the rule):
+
+```elixir
+Req.Test.expect(MyApp.LLM, fn conn ->
+  MyApp.LLM.object(conn, %{
+    steps: [
+      %{number: 1, content: "The customer wants to know where order A-1001 is."},
+      %{number: 2, content: "No tool is available in this Flow, so ask for tracking."}
+    ],
+    conclusion: "Please share your tracking number so we can check order A-1001."
+  })
+end)
+
+reply = ask.(%{input: "Please lookup order A-1001.", strategy: :chain_of_thought})
+
+{reply.data.flow, reply.data.reasoning.steps_count}
+```
+
+The result is `{%{id: "jido.ai/reasoning/chain-of-thought", vsn: 1}, 2}`.
+An atom outside the list fails Adaptive's input validation.
+
+To pin a strategy for every request, set it in the Agent's `reasoning` block
+(`strategy :react`) or, better, select that Flow directly with
+`reasoning Jido.AI.Reasoning.ReAct`.
+
+## Pass-Through Inputs
+
+`Select` removes `strategy` and passes every other key to the selected Flow.
+Adaptive's own schema marks the common fields optional and keeps unknown keys,
+so each selected Flow applies its own defaults and its own validation.
+
+| Key | Adaptive validates | Selected Flow |
+| --- | --- | --- |
+| `input` | Required, string or list of parts | Same |
+| `instructions`, `model`, `options` | Type only, no default | Applies its default when absent |
+| `prompt_cache`, `context` | Shape, when present | Applies its default when absent |
+| `limits` | `elapsed_ms` and token or cost budgets; keeps other keys | Rejects keys it doesn't define |
+| Other keys | Kept | ReAct accepts its own fields; every Flow rejects unknown keys |
+
+A ReAct-only field works when ReAct is selected and fails for any other Flow.
+No model call happens:
+
+```elixir
+{:error, error} =
+  ask.(%{input: "When will my refund post?", limits: %{tool_rounds: 2}})
+
+{error.__struct__, Exception.message(error)}
+```
+
+The result is
+`{Jido.Action.Error.InvalidInputError, "unrecognized key: tool_rounds, at limits"}`,
+and Jido logs a warning for the failed node. Send ReAct fields such as `fallback_models`,
+`tool_policy`, `review_tools`, `stream`, `output_schema`, and
+`limits.tool_rounds` only together with `strategy: :react`.
+
+Each Flow's `instructions` default also asks for its own output format. If
+you set `instructions` on an Adaptive Agent, every selected Flow gets the same
+text, so the structured Flows lose their format request while their JSON
+schema still applies.
+
+## Summary
+
+- Adaptive is one `invoke`: `Select` picks a strategy, `Expand` runs that
+  Flow. The reply is the selected Flow's reply.
+- The rule is local and ordered: TRM, Graph of Thoughts, ReAct, Algorithm of
+  Thoughts, Tree of Thoughts, then Chain of Draft for fewer than 12 words,
+  else Chain of Thought.
+- Words match whole, after splitting on characters other than `a-z`, `0-9`,
+  and `-`.
+- `strategy` overrides the rule per request.
+- Other inputs pass through and are validated by the selected Flow.
+
+## Next
+
+- [Choose a Reasoning Flow](choose-a-reasoning-flow.md) – pick a fixed Flow
+  when the request type is known.
+- [ReAct](react.livemd) – the only Flow that runs tools.
+- [Budgets, Retries, and Fallbacks](budgets-retries-and-fallbacks.md) – limits
+  across all Flows.

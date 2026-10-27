@@ -1,0 +1,255 @@
+# Embeddings
+
+## Overview
+
+You have a handful of help-center articles and want to match a customer's
+question to the closest one. `Jido.AI.Actions.Embed` turns text into vectors
+through ReqLLM. It takes one string or a list of strings:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{:ok, result} = Jido.Exec.run(Jido.AI.Actions.Embed, %{input: ["Refund policy", "Shipping times"]})
+
+result.embedding
+# => [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
+```
+
+This notebook embeds one question, embeds a batch of articles, ranks the
+articles, and reads the errors. Every call runs offline against a fake
+OpenAI embeddings endpoint.
+
+## Install
+
+```elixir
+Mix.install([{:jido_ai, "~> 3.0.0-beta.1"}, {:plug, "~> 1.0"}])
+```
+
+`plug` provides the `Req.Test` HTTP mock.
+
+## Offline Model
+
+The fake endpoint answers OpenAI's `/embeddings` request with a
+three-dimensional vector per input. Each dimension marks one topic: refunds,
+shipping, and passwords. A real model returns 1,536 floats for
+`text-embedding-3-small`, but the response shape is the same.
+
+```elixir
+defmodule MyApp.OfflineEmbeddings do
+  @topics ["refund", "ship", "password"]
+
+  def handle(conn) do
+    {:ok, body, conn} = Plug.Conn.read_body(conn)
+    request = Jason.decode!(body)
+    inputs = List.wrap(request["input"])
+    tokens = inputs |> Enum.map(&length(String.split(&1))) |> Enum.sum()
+
+    data =
+      inputs
+      |> Enum.with_index()
+      |> Enum.map(fn {text, index} ->
+        %{"object" => "embedding", "index" => index, "embedding" => vector(text)}
+      end)
+
+    Req.Test.json(conn, %{
+      "object" => "list",
+      "data" => data,
+      "model" => request["model"],
+      "usage" => %{"prompt_tokens" => tokens, "total_tokens" => tokens}
+    })
+  end
+
+  defp vector(text) do
+    text = String.downcase(text)
+    Enum.map(@topics, &if(String.contains?(text, &1), do: 1.0, else: 0.0))
+  end
+end
+
+Req.Test.stub(MyApp.LLM, &MyApp.OfflineEmbeddings.handle/1)
+
+offline = %{
+  api_key: "offline-test-key",
+  req_http_options: [plug: {Req.Test, MyApp.LLM}]
+}
+```
+
+`offline` is the `options` map for every call below. `api_key` satisfies
+ReqLLM's key lookup, and `req_http_options` sends the HTTP request to the stub.
+Remove both to call OpenAI with your `OPENAI_API_KEY`.
+
+## Embed One Question
+
+`Embed` is a normal Jido Action. Run it with `Jido.Exec.run/2`:
+
+```elixir
+{:ok, question} =
+  Jido.Exec.run(Jido.AI.Actions.Embed, %{
+    input: "When will my order ship?",
+    options: offline
+  })
+
+question.embedding
+```
+
+The result is `[0.0, 1.0, 0.0]`. A string input returns one flat list of
+floats.
+
+The Action has three input fields:
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `input` | required | One string or a list of strings. |
+| `model` | `"openai:text-embedding-3-small"` | A ReqLLM embedding model. |
+| `options` | `%{}` | ReqLLM embedding options. |
+
+## Read Usage
+
+The result has exactly two keys, `embedding` and `usage`. `usage` is the
+normalized map from `Jido.AI.Usage.normalize/1`, the same shape that model
+calls report:
+
+```elixir
+{Enum.sort(Map.keys(question)), question.usage.input_tokens, question.usage.total_tokens}
+```
+
+The result is `{[:embedding, :usage], 5, 5}`. The offline model counts words
+as tokens. Embedding calls report `output_tokens: 0`.
+
+## Embed A Batch
+
+Pass a list to embed several texts in one HTTP request:
+
+```elixir
+articles = [
+  %{title: "Request a refund", body: "How to request a refund for a damaged item."},
+  %{title: "Shipping times", body: "Standard shipping takes 3 to 5 business days."},
+  %{title: "Reset your password", body: "Reset your password from the account page."}
+]
+
+{:ok, batch} =
+  Jido.Exec.run(Jido.AI.Actions.Embed, %{
+    input: Enum.map(articles, & &1.body),
+    options: offline
+  })
+
+batch.embedding
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+```
+
+A list input returns a list of vectors in input order. ReqLLM sorts the
+provider's `data` entries by `index`, so position `n` is always the vector for
+input `n`. `batch.usage` covers the whole request: `input_tokens` is `24`.
+
+## Rank The Articles
+
+Vectors are plain lists, so ranking is ordinary Elixir. Cosine similarity
+compares the question with each article:
+
+```elixir
+cosine = fn left, right ->
+  dot = Enum.zip_with(left, right, &(&1 * &2)) |> Enum.sum()
+  norm = fn vector -> :math.sqrt(Enum.sum(Enum.map(vector, &(&1 * &1)))) end
+  dot / (norm.(left) * norm.(right))
+end
+
+articles
+|> Enum.zip(batch.embedding)
+|> Enum.map(fn {article, vector} -> {article.title, cosine.(question.embedding, vector)} end)
+|> Enum.max_by(&elem(&1, 1))
+```
+
+The result is `{"Shipping times", 1.0}`. Store article vectors once, then
+embed only the incoming question.
+
+## Errors
+
+`Embed` returns ReqLLM's error unchanged. Jido also logs a warning for each
+failed Action.
+
+Empty input fails before any HTTP request:
+
+```elixir
+{:error, error} = Jido.Exec.run(Jido.AI.Actions.Embed, %{input: "", options: offline})
+
+{error.__struct__, error.parameter}
+```
+
+The result is `{ReqLLM.Error.Invalid.Parameter, "text: cannot be empty"}`. An
+empty list returns `"texts: cannot be empty"`.
+
+A chat model can't embed:
+
+```elixir
+{:error, error} =
+  Jido.Exec.run(Jido.AI.Actions.Embed, %{
+    input: "Where is my refund?",
+    model: "openai:gpt-4o-mini",
+    options: offline
+  })
+
+error.parameter
+```
+
+The result is `"model: openai:gpt-4o-mini does not support embedding operations"`.
+
+`dimensions` asks for a vector length. ReqLLM checks every returned vector
+against it. The offline model always returns three values:
+
+```elixir
+{:error, error} =
+  Jido.Exec.run(Jido.AI.Actions.Embed, %{
+    input: "Where is my refund?",
+    options: Map.put(offline, :dimensions, 8)
+  })
+
+error.reason
+```
+
+The result is `"Embedding dimension mismatch: expected 8, got 3"`.
+
+A provider error returns `ReqLLM.Error.API.Request` with the HTTP status:
+
+```elixir
+Req.Test.stub(MyApp.LLM, fn conn ->
+  conn
+  |> Plug.Conn.put_status(401)
+  |> Req.Test.json(%{"error" => %{"message" => "Incorrect API key provided"}})
+end)
+
+{:error, error} =
+  Jido.Exec.run(Jido.AI.Actions.Embed, %{input: "Where is my refund?", options: offline})
+
+{error.__struct__, error.status}
+```
+
+The result is `{ReqLLM.Error.API.Request, 401}`.
+
+Embedding options are narrower than text-generation options. ReqLLM 1.29
+accepts `dimensions`, `encoding_format`, `user`, `provider_options`,
+`req_http_options`, `telemetry`, and `total_timeout`, plus `api_key`. Any
+other key, such as `max_retries`, returns `ReqLLM.Error.Unknown.Unknown`
+wrapping a `NimbleOptions.ValidationError`.
+
+## Summary
+
+- `Jido.AI.Actions.Embed` takes `input`, `model`, and `options`, and runs like
+  any Jido Action.
+- A string returns one vector. A list returns vectors in input order.
+- The result is `%{embedding: ..., usage: ...}` with normalized usage.
+- Errors are ReqLLM errors: `Invalid.Parameter` before the request,
+  `API.Request` with `status` from the provider.
+- Embedding options are a smaller set than model-call options.
+
+## Next
+
+- [Models and Options](models-and-options.md) – model names, credentials, and
+  per-request options.
+- [Usage, Cache, and Cost](usage-cache-and-cost.md) – the normalized usage
+  fields.

@@ -3,11 +3,37 @@ defmodule Jido.AI.ToolResult do
 
   @default_max_bytes 16_384
 
+  @doc false
+  @spec portable_outcome(map()) :: map()
+  def portable_outcome(%{status: :ok, value: %ReqLLM.ToolResult{} = result} = outcome),
+    do: %{outcome | value: portable_content_result(result)}
+
+  def portable_outcome(%{status: :error, error: %ReqLLM.ToolResult{} = result} = outcome),
+    do: %{outcome | error: portable_content_result(result)}
+
+  def portable_outcome(outcome), do: outcome
+
   @doc "Normalizes one local Action outcome without putting its value in model context."
   @spec normalize(map(), pos_integer()) :: map()
   def normalize(outcome, max_bytes \\ @default_max_bytes)
 
   def normalize(%{status: :ok, value: %ReqLLM.ToolResult{} = result}, max_bytes)
+      when is_integer(max_bytes) and max_bytes > 0 do
+    normalize_content_result(result, :ok, max_bytes)
+  end
+
+  def normalize(
+        %{status: :ok, value: %{__jido_ai_tool_result__: 1} = result},
+        max_bytes
+      )
+      when is_integer(max_bytes) and max_bytes > 0 do
+    normalize_content_result(result, :ok, max_bytes)
+  end
+
+  def normalize(
+        %{status: :ok, value: %{"__jido_ai_tool_result__" => 1} = result},
+        max_bytes
+      )
       when is_integer(max_bytes) and max_bytes > 0 do
     normalize_content_result(result, :ok, max_bytes)
   end
@@ -28,6 +54,22 @@ defmodule Jido.AI.ToolResult do
   end
 
   def normalize(%{status: :error, error: %ReqLLM.ToolResult{} = result}, max_bytes)
+      when is_integer(max_bytes) and max_bytes > 0 do
+    normalize_content_result(result, :error, max_bytes)
+  end
+
+  def normalize(
+        %{status: :error, error: %{__jido_ai_tool_result__: 1} = result},
+        max_bytes
+      )
+      when is_integer(max_bytes) and max_bytes > 0 do
+    normalize_content_result(result, :error, max_bytes)
+  end
+
+  def normalize(
+        %{status: :error, error: %{"__jido_ai_tool_result__" => 1} = result},
+        max_bytes
+      )
       when is_integer(max_bytes) and max_bytes > 0 do
     normalize_content_result(result, :error, max_bytes)
   end
@@ -104,22 +146,22 @@ defmodule Jido.AI.ToolResult do
       {:ok, content_parts, model_content, result_metadata, metadata} ->
         %{
           status: status,
-          value: result.output,
+          value: field(result, :output),
           model_content: model_content,
           content_parts: content_parts,
           result_metadata: result_metadata,
-          error: content_result_error(status, result.output),
+          error: content_result_error(status, field(result, :output)),
           metadata: metadata
         }
 
       {:truncated, model_content, metadata} ->
         %{
           status: status,
-          value: result.output,
+          value: field(result, :output),
           model_content: model_content,
           content_parts: nil,
           result_metadata: %{},
-          error: content_result_error(status, result.output),
+          error: content_result_error(status, field(result, :output)),
           metadata: metadata
         }
 
@@ -135,24 +177,28 @@ defmodule Jido.AI.ToolResult do
   end
 
   defp project_content_result(result, max_bytes) do
-    with :ok <- validate_content_parts(result.content || []),
+    content = field(result, :content) || []
+    output = field(result, :output)
+    result_metadata = field(result, :metadata) || %{}
+
+    with :ok <- validate_content_parts(content),
          {:ok, encoded} <-
            Jason.encode(%{
-             content: result.content || [],
-             output: result.output,
-             metadata: result.metadata || %{}
+             content: content,
+             output: output,
+             metadata: result_metadata
            }) do
       bytes = byte_size(encoded)
 
       if bytes <= max_bytes do
         decoded = Jason.decode!(encoded)
 
-        {:ok, result.content || [], decoded["output"], decoded["metadata"] || %{},
+        {:ok, decoded["content"] || [], decoded["output"], decoded["metadata"] || %{},
          %{
            bytes: bytes,
            max_bytes: max_bytes,
            truncated: false,
-           content_parts: length(result.content || [])
+           content_parts: length(content)
          }}
       else
         content = %{
@@ -162,8 +208,7 @@ defmodule Jido.AI.ToolResult do
           "max_bytes" => max_bytes
         }
 
-        {:truncated, content,
-         %{bytes: bytes, max_bytes: max_bytes, truncated: true, content_parts: 0}}
+        {:truncated, content, %{bytes: bytes, max_bytes: max_bytes, truncated: true, content_parts: 0}}
       end
     else
       {:error, _reason} -> {:error, "tool result content parts are invalid"}
@@ -175,9 +220,12 @@ defmodule Jido.AI.ToolResult do
       {:error, :invalid_content_parts}
     else
       Enum.reduce_while(parts, :ok, fn part, :ok ->
-        case Zoi.parse(ReqLLM.Message.ContentPart.schema(), part) do
-          {:ok, _part} -> {:cont, :ok}
-          {:error, _reason} -> {:halt, {:error, :invalid_content_part}}
+        case ReqLLM.Context.normalize(%{role: :user, content: [part]}) do
+          {:ok, %ReqLLM.Context{messages: [%ReqLLM.Message{content: [_one]}]}} ->
+            {:cont, :ok}
+
+          _other ->
+            {:halt, {:error, :invalid_content_part}}
         end
       end)
     end
@@ -195,7 +243,7 @@ defmodule Jido.AI.ToolResult do
     }
   end
 
-  defp safe_type(value) when is_atom(value), do: Atom.to_string(value)
+  defp safe_type(value) when is_atom(value) and value not in [nil, true, false], do: Atom.to_string(value)
   defp safe_type(value) when is_binary(value) and value != "", do: truncate(value, 128)
   defp safe_type(_value), do: "tool_error"
 
@@ -212,6 +260,32 @@ defmodule Jido.AI.ToolResult do
         do: {:halt, output},
         else: {:cont, output <> codepoint}
     end)
+  end
+
+  defp portable_content_result(result) do
+    case Jason.encode(%{
+           content: field(result, :content) || [],
+           output: field(result, :output),
+           metadata: field(result, :metadata) || %{}
+         }) do
+      {:ok, encoded} ->
+        decoded = Jason.decode!(encoded)
+
+        %{
+          __jido_ai_tool_result__: 1,
+          content: decoded["content"] || [],
+          output: decoded["output"],
+          metadata: decoded["metadata"] || %{}
+        }
+
+      {:error, _reason} ->
+        %{
+          __jido_ai_tool_result__: 1,
+          content: :invalid,
+          output: nil,
+          metadata: %{}
+        }
+    end
   end
 
   defp field(map, key) when is_map(map), do: Map.get(map, key, Map.get(map, Atom.to_string(key)))

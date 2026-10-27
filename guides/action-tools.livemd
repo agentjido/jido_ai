@@ -1,0 +1,434 @@
+# Action Tools
+
+## Overview
+
+Your support Agent needs live order data, and you already have a Jido Action
+that fetches it. You'll expose that Action as a model tool, run one request
+that calls it, and narrow the tool set for a single request. By the end, this
+works offline:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{:ok, _agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+  MyApp.SupportAgent.cmd(agent, request)
+
+{reply.data.status, reply.data.tool_calls, reply.data.output}
+# => {:completed, 1, "Order A-1001 has shipped. It should arrive on 2026-11-02."}
+```
+
+| Part | What it is |
+| --- | --- |
+| `tools` block | The Agent's static, ordered allowlist of Actions. |
+| Tool definition | Name, description, and JSON Schema built from the Action. |
+| Tool round | One model response with tool calls, the Action runs, then the next model call. |
+| `tool_policy` | Request data that can hide tools. It can't add any. |
+
+## Install
+
+```elixir
+Mix.install([{:jido_ai, "~> 3.0.0-beta.1"}, {:plug, "~> 1.0"}])
+```
+
+`plug` is required by `Req.Test`, which this notebook uses in place of a
+provider.
+
+## Define the Tools
+
+A tool is a Jido Action or Flow. Its `name`, `description`, and Zoi `schema`
+become the model-facing definition. Both use the same execution contract:
+
+```elixir
+defmodule MyApp.LookupOrder do
+  use Jido.Action,
+    id: "my_app/lookup_order",
+    name: "lookup_order",
+    description: "Look up the shipping status of one order.",
+    schema: Zoi.object(%{order_id: Zoi.string(description: "Order ID such as A-1001")}),
+    output_schema: Zoi.map()
+
+  @impl Jido.Action
+  def run(%{order_id: order_id}, _context) do
+    {:ok, %{order_id: order_id, status: "shipped", eta: "2026-11-02"}}
+  end
+end
+
+defmodule MyApp.IssueRefund do
+  use Jido.Action,
+    id: "my_app/issue_refund",
+    name: "issue_refund",
+    description: "Refund part or all of one order.",
+    schema: Zoi.object(%{order_id: Zoi.string(), amount_cents: Zoi.integer(gte: 1)}),
+    output_schema: Zoi.map()
+
+  @impl Jido.Action
+  def run(%{order_id: order_id, amount_cents: amount}, _context) do
+    {:ok, %{refund_id: "R-#{order_id}", amount_cents: amount}}
+  end
+end
+```
+
+Write the `description` for the model. It's the only prose the model reads
+about the tool.
+
+## What the Model Sees
+
+`Jido.AI.Toolset.definitions/1` builds the ReqLLM tools that go into each
+model request:
+
+```elixir
+{:ok, [lookup, _refund]} = Jido.AI.Toolset.definitions([MyApp.LookupOrder, MyApp.IssueRefund])
+
+ReqLLM.Tool.to_schema(lookup, :openai)
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  "type" => "function",
+  "function" => %{
+    "name" => "lookup_order",
+    "description" => "Look up the shipping status of one order.",
+    "strict" => true,
+    "parameters" => %{
+      "$schema" => "https://json-schema.org/draft/2020-12/schema",
+      "type" => "object",
+      "properties" => %{
+        "order_id" => %{"type" => "string", "description" => "Order ID such as A-1001"}
+      },
+      "required" => ["order_id"],
+      "additionalProperties" => false,
+      "propertyOrdering" => ["order_id"]
+    }
+  }
+}
+```
+
+Every definition is `strict: true`. The Action's `id`, module, and `run/2` never
+reach the provider.
+
+## Declare the Agent
+
+List the Actions in the `tools` block:
+
+```elixir
+defmodule MyApp.SupportAgent do
+  use Jido.AI.Agent,
+    id: "my_app/support_agent",
+    vsn: 1,
+    name: "support_agent"
+
+  ai do
+    reasoning Jido.AI.Reasoning.ReAct do
+      model "openai:gpt-4o-mini"
+    end
+
+    tools do
+      action MyApp.LookupOrder
+      action MyApp.IssueRefund
+    end
+  end
+end
+
+MyApp.SupportAgent.explain().tools
+```
+
+The result is `[MyApp.LookupOrder, MyApp.IssueRefund]`. Declaration order is
+the order the model sees.
+
+The block is the Agent's static allowlist. A bad declaration fails the build
+with a `Spark.Error.DslError` ("Invalid Agent tools"). The reason comes from
+`Jido.AI.Toolset.validate/1`:
+
+| Declaration | `validate/1` reason |
+| --- | --- |
+| A module that isn't a Jido Action or Flow | `{:invalid_tool, module}` |
+| The same module twice, or two tools with the same `name` | `:duplicate_tools` |
+
+Any entry other than `action` or `flow` inside `tools` fails with
+`tools accepts only action or flow declarations`.
+
+## Offline Model
+
+These helpers stand in for the OpenAI Responses API. The first returns one
+`function_call`; the second returns a text answer. Each stub also sends the
+decoded request body to this notebook so you can inspect it:
+
+```elixir
+defmodule MyApp.FakeOpenAI do
+  def function_call(call_id, name, arguments) do
+    response("resp-tool", [
+      %{
+        "type" => "function_call",
+        "id" => "fc-#{call_id}",
+        "call_id" => call_id,
+        "name" => name,
+        "arguments" => Jason.encode!(arguments),
+        "status" => "completed"
+      }
+    ])
+  end
+
+  def text(text) do
+    response("resp-text", [
+      %{
+        "type" => "message",
+        "id" => "msg-text",
+        "role" => "assistant",
+        "status" => "completed",
+        "content" => [%{"type" => "output_text", "text" => text, "annotations" => []}]
+      }
+    ])
+  end
+
+  def reply(owner, body) do
+    fn conn ->
+      {:ok, raw, conn} = Plug.Conn.read_body(conn)
+      send(owner, {:model_request, Jason.decode!(raw)})
+      Req.Test.json(conn, body)
+    end
+  end
+
+  defp response(id, output) do
+    %{
+      "id" => id,
+      "object" => "response",
+      "created_at" => 1,
+      "model" => "gpt-4o-mini-2024-07-18",
+      "status" => "completed",
+      "error" => nil,
+      "incomplete_details" => nil,
+      "parallel_tool_calls" => true,
+      "output" => output,
+      "usage" => %{
+        "input_tokens" => 20,
+        "input_tokens_details" => %{"cached_tokens" => 0},
+        "output_tokens" => 5,
+        "output_tokens_details" => %{"reasoning_tokens" => 0},
+        "total_tokens" => 25
+      }
+    }
+  end
+end
+
+offline = %{
+  api_key: "offline-test-key",
+  max_retries: 0,
+  req_http_options: [plug: {Req.Test, MyApp.LLM}]
+}
+```
+
+Pass `offline` as the request `options`. To call a real provider, drop
+`req_http_options` and `api_key` and set `OPENAI_API_KEY`.
+
+## Run Two Rounds
+
+Queue the two model responses, in order:
+
+```elixir
+Req.Test.expect(
+  MyApp.LLM,
+  MyApp.FakeOpenAI.reply(self(), MyApp.FakeOpenAI.function_call("call-1", "lookup_order", %{order_id: "A-1001"}))
+)
+
+Req.Test.expect(
+  MyApp.LLM,
+  MyApp.FakeOpenAI.reply(
+    self(),
+    MyApp.FakeOpenAI.text("Order A-1001 has shipped. It should arrive on 2026-11-02.")
+  )
+)
+```
+
+Run one request as data with `cmd/2`:
+
+```elixir
+agent = MyApp.SupportAgent.instantiate!(id: "support-1")
+
+request =
+  MyApp.SupportAgent.request_signal!(%{
+    input: "Where is order A-1001?",
+    options: offline
+  })
+
+{:ok, agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+  MyApp.SupportAgent.cmd(agent, request)
+
+{reply.data.status, reply.data.model_calls, reply.data.tool_rounds, reply.data.tool_calls,
+ reply.data.output}
+```
+
+The result is
+`{:completed, 2, 1, 1, "Order A-1001 has shipped. It should arrive on 2026-11-02."}`.
+
+ReAct made one model call, validated the `lookup_order` call against the
+Action schema, ran `MyApp.LookupOrder`, recorded the result, and made a second
+model call.
+
+## Inspect the Requests
+
+Read the two request bodies that the stubs captured:
+
+```elixir
+requests =
+  for _ <- 1..2 do
+    receive do
+      {:model_request, body} -> body
+    after
+      1_000 -> :missing
+    end
+  end
+
+[first, second] = requests
+
+{Enum.map(first["tools"], & &1["name"]),
+ Enum.map(second["input"], &(&1["type"] || &1["role"]))}
+```
+
+The result is
+`{["lookup_order", "issue_refund"], ["system", "user", "function_call", "function_call_output"]}`.
+
+The second request carries the model's `function_call` and the correlated
+`function_call_output`:
+
+```elixir
+second["input"] |> List.last() |> Map.take(["call_id", "output"])
+```
+
+The result is
+`%{"call_id" => "call-1", "output" => ~s({"eta":"2026-11-02","order_id":"A-1001","status":"shipped"})}`.
+
+## Read the Tool Attempt
+
+The reply lists each executed call:
+
+```elixir
+[attempt] = reply.data.tool_attempts
+
+Map.take(attempt, [:tool_call_id, :tool_name, :status, :input, :output, :tool_round])
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  tool_call_id: "call-1",
+  tool_name: "lookup_order",
+  status: :ok,
+  input: %{"order_id" => "A-1001"},
+  output: %{"eta" => "2026-11-02", "order_id" => "A-1001", "status" => "shipped"},
+  tool_round: 1
+}
+```
+
+The same record is in the committed Session as an `:ai_tool_attempt` entry.
+[Tool Execution and Results](tool-execution-and-results.md) covers its
+fields, error results, and size limits.
+
+## Narrow One Request
+
+`tool_policy` is part of the ReAct request schema. It selects a subset of the
+allowlist for one request:
+
+| Field | Default | Effect |
+| --- | --- | --- |
+| `visible` | `[]` | Keep only these names. `[]` keeps all. |
+| `hidden` | `[]` | Remove these names after `visible`. |
+| `review` | `[]` | Require approval before these run. |
+| `requirement` | `:optional` | `:optional`, `:required`, `:per_turn`, or `:disabled`. |
+| `reason` | `nil` | Text recorded with the selection and shown in review requests. |
+
+Hide the refund tool from a status question:
+
+```elixir
+Req.Test.expect(
+  MyApp.LLM,
+  MyApp.FakeOpenAI.reply(self(), MyApp.FakeOpenAI.text("I can only look up orders here."))
+)
+
+request =
+  MyApp.SupportAgent.request_signal!(%{
+    input: "Refund order A-1001",
+    options: offline,
+    tool_policy: %{hidden: ["issue_refund"], reason: "status questions only"}
+  })
+
+{:ok, agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+  MyApp.SupportAgent.cmd(agent, request)
+
+receive do
+  {:model_request, body} -> {reply.data.status, Enum.map(body["tools"], & &1["name"])}
+end
+```
+
+The result is `{:completed, ["lookup_order"]}`. A hidden tool isn't sent, and
+a call to it fails validation before any Action runs.
+
+`requirement` maps to the provider's tool choice:
+
+| `requirement` | First model call | After a tool round | Final answer allowed |
+| --- | --- | --- | --- |
+| `:optional` | no `tool_choice` | no `tool_choice` | always |
+| `:required` | `:required` | `:auto` | after one tool round |
+| `:per_turn` | `:required` | `:required` | never while tools are visible |
+| `:disabled` | `:none`, no tools sent | — | always |
+
+A `tool_choice` in `options` is ignored. Set the requirement instead.
+
+## Requests Can't Add Tools
+
+Every name in `tool_policy` must already be in the allowlist. An unknown name
+fails the request before the model runs:
+
+```elixir
+request =
+  MyApp.SupportAgent.request_signal!(%{
+    input: "Close my account",
+    options: offline,
+    tool_policy: %{visible: ["delete_account"]}
+  })
+
+{:error, error} = MyApp.SupportAgent.cmd(agent, request)
+{error.__struct__, error.details.reason}
+```
+
+The result is
+`{Jido.Action.Error.ExecutionFailureError, {:unknown_tool, "delete_account"}}`.
+The `start_request` step failed, so no model call was made. Jido also logs a
+warning for the failed step.
+
+Other selection errors:
+
+| Policy | Error reason |
+| --- | --- |
+| `requirement: :required` with every tool hidden | `{:tool_requirement_without_visible_tools, :required}` |
+| `review: ["issue_refund"]` with `issue_refund` hidden | `{:review_tool_not_visible, "issue_refund"}` |
+| The same name twice in one list | `:duplicate_tool_policy_names` |
+
+A trusted execution host can add tools at run time.
+[Dynamic Tool Sources](dynamic-tool-sources.md) covers that path. Request data
+never can.
+
+## Summary
+
+- A model tool is a Jido Action or Flow listed in the Agent's `tools` block.
+- The model sees the target's `name`, `description`, and a strict JSON Schema
+  built from its Zoi `schema`.
+- The `tools` block accepts Actions and Flows, with unique modules and names.
+- One tool round is a model call with tool calls, the Actions, then another
+  model call that carries the correlated results.
+- `tool_policy` can hide, require, or review tools for one request. Any name it
+  uses must already be allowed.
+
+## Next
+
+- [Tool Execution and Results](tool-execution-and-results.md) – validation,
+  parallel calls, error results, and bounded output.
+- [Tool Review and Cycle Limits](tool-review-and-cycle-limits.livemd) – approve
+  `issue_refund` before it runs.
+- [Dynamic Tool Sources](dynamic-tool-sources.md) – add tools from a trusted host.

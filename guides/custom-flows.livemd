@@ -1,0 +1,1261 @@
+# Custom Flows
+
+## Overview
+
+Your refund desk needs rules that the model can't talk its way around: no
+refund without an order, no refund on an order above the desk limit, and no
+refund larger than the order total. This Livebook builds that desk as your own
+root reasoning Flow, `MyApp.RefundFlow`, from the public Jido AI Actions plus
+three Actions of your own. By the end, this works:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+signal =
+  MyApp.SupportAgent.request_signal!(%{
+    input: "The blender in order A-1001 arrived broken. Please refund it.",
+    order_id: "A-1001",
+    options: MyApp.OfflineModel.options()
+  })
+
+{:ok, _agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+  MyApp.SupportAgent.cmd(agent, signal)
+
+{reply.data.status, reply.data.output["amount_cents"]}
+# => {:completed, 4500}
+```
+
+A built-in Flow such as `Jido.AI.Reasoning.ReAct` fixes its steps. A custom
+Flow lets you put deterministic checks before and after the model call, give
+the model extra facts, and decide which outcomes reach the Session.
+[Choose a Reasoning Flow](choose-a-reasoning-flow.md) covers when a built-in
+Flow is enough.
+
+## Install
+
+```elixir
+Mix.install([{:jido_ai, "~> 3.0.0-beta.1"}, {:plug, "~> 1.0"}])
+```
+
+`plug` provides `Req.Test`, which the offline model uses.
+
+## The Root Flow Contract
+
+The Agent's `jido.ai.request` route runs the root Flow directly. Any Flow
+module can be the root if it meets this contract:
+
+| Part | Requirement |
+| --- | --- |
+| Input schema | A Zoi object with an `input` field. It owns every request field, its default, and its validation. |
+| `reasoning` defaults | Each name in the Agent's `reasoning MyFlow do ... end` block must be a field of the input schema. `input` can't be a default. |
+| Output | `%{state: map(), response: map()}`. `state` becomes the next Agent state; `response` becomes the `jido.ai.response` reply data. |
+| Session | To keep the conversation, read `state.session` and return the updated Session in `state.session`. |
+
+`Jido.AI.Reasoning.Actions.StartRequest` and
+`Jido.AI.Reasoning.Actions.FinalizeTurn` handle the last two rows for you.
+
+## The Building Blocks
+
+Every built-in Flow is assembled from these public Actions. Read
+`Jido.AI.Reasoning.ChainOfThought` and `Jido.AI.Reasoning.ChainOfThought.ModelRound`
+for the smallest complete example.
+
+| Action | Takes | Returns |
+| --- | --- | --- |
+| `StartRequest` | Request fields and budgets | The turn: a map that carries the Session, model, options, budgets, and counters through the Flow |
+| `GuardInput` | `turn` | `%{allowed: boolean, reason_code: atom, reason: string \| nil}` |
+| `DecideInput` | `turn`, `guard` | `%{kind: :model, input: %{turn: turn}}` or `%{kind: :complete, output: %{turn: turn, result: result}}` |
+| `ProjectConversation` | `turn` | `%{turn: turn, context: %Jido.AI.Context{}}` with instructions and projected Thread messages |
+| `CallModel` | `turn`, `context`, optional `tools: false` | `%{turn: turn, outcome: outcome, context: context}` |
+| `GuardOutput` | `turn`, `outcome` | `%{allowed: boolean, reason: string}` |
+| `RecordModelAttempt` | `turn`, `outcome`, `context`, `output_allowed`, `output_reason` | `%{turn: turn}`; appends the assistant message only when `output_allowed` is `true` |
+| `FinalizeTurn` | `outcome: %{turn: turn, result: result}` | `%{state: state, response: response}` |
+
+The `result` in each terminal outcome comes from `Jido.AI.Reasoning.Result`:
+`completed/2`, `blocked/3`, `failed/3`, or `new/5`. `FinalizeTurn` copies its
+`status`, `output`, `reason_code`, `reason`, and `reasoning` into the reply.
+
+`StartRequest` accepts these params:
+
+| Param | Required | Default when absent |
+| --- | --- | --- |
+| `input`, `instructions`, `model`, `options`, `context_window`, `max_model_calls` | Yes | — |
+| `flow` | No | `nil`; reported as `reply.data.flow` |
+| `fallback_models` | No | `[]` |
+| `output_schema` | No | `nil`; a JSON Schema map turns on strict structured output |
+| `max_retries` | No | `0` |
+| `max_elapsed_ms`, `max_input_tokens`, `max_output_tokens`, `max_total_tokens`, `max_total_cost` | No | `nil` (no limit) |
+| `prompt_cache` | No | `%{enabled: false}` |
+| `stream` | No | `false` |
+| `tool_policy`, `review_tools`, `max_tool_rounds`, `max_tool_calls`, `max_tool_output_bytes` | No | Tool settings; this desk has no tools |
+
+`context_window` is `%{max_messages: integer, max_bytes: integer}`.
+`CallModel` checks `max_model_calls` and the time, token, and cost budgets
+before it sends a request, and returns a `status: :budget` outcome instead of
+calling the model when one is spent.
+
+## Offline Model
+
+This is the fake provider from [Getting Started](getting-started.livemd),
+with one addition: each request body is sent to this notebook so you can read
+what the model received.
+
+```elixir
+defmodule MyApp.OfflineModel do
+  @moduledoc "Queues fake OpenAI Responses API replies for ReqLLM."
+
+  @doc "Request options that send model calls to this module."
+  def options do
+    %{
+      api_key: "offline-test-key",
+      max_retries: 0,
+      max_tokens: 256,
+      temperature: 0.0,
+      req_http_options: [plug: {Req.Test, MyApp.LLM}]
+    }
+  end
+
+  @doc "Queues one reply per model call and reports each request body."
+  def respond_with(bodies) do
+    owner = self()
+
+    Enum.each(bodies, fn body ->
+      Req.Test.expect(MyApp.LLM, fn conn ->
+        {:ok, request, conn} = Plug.Conn.read_body(conn)
+        send(owner, {:model_request, Jason.decode!(request)})
+        Req.Test.json(conn, body)
+      end)
+    end)
+  end
+
+  @doc "A final text answer. Structured output arrives as JSON text."
+  def text(text) do
+    %{
+      "id" => "resp_1",
+      "object" => "response",
+      "created_at" => 1,
+      "model" => "gpt-4o-mini-2024-07-18",
+      "status" => "completed",
+      "error" => nil,
+      "incomplete_details" => nil,
+      "parallel_tool_calls" => true,
+      "output" => [
+        %{
+          "type" => "message",
+          "id" => "msg_1",
+          "role" => "assistant",
+          "status" => "completed",
+          "content" => [%{"type" => "output_text", "text" => text, "annotations" => []}]
+        }
+      ],
+      "usage" => %{
+        "input_tokens" => 20,
+        "input_tokens_details" => %{"cached_tokens" => 0},
+        "output_tokens" => 5,
+        "output_tokens_details" => %{"reasoning_tokens" => 0},
+        "total_tokens" => 25
+      }
+    }
+  end
+
+  @doc "Returns the request bodies received so far."
+  def requests(acc \\ []) do
+    receive do
+      {:model_request, body} -> requests([body | acc])
+    after
+      0 -> Enum.reverse(acc)
+    end
+  end
+end
+```
+
+## Orders and Output
+
+The desk reads orders from your system. Here it is a fixed map:
+
+```elixir
+defmodule MyApp.Orders do
+  @orders %{
+    "A-1001" => %{order_id: "A-1001", status: "delivered", total_cents: 4_500},
+    "A-2002" => %{order_id: "A-2002", status: "delivered", total_cents: 89_000}
+  }
+
+  def fetch(order_id), do: Map.fetch(@orders, order_id)
+end
+```
+
+The model answers with one refund decision. Define it once in Zoi and send
+the JSON Schema form to the model:
+
+```elixir
+defmodule MyApp.RefundDecision do
+  @schema Zoi.object(
+            %{
+              decision: Zoi.enum(refund: "refund", deny: "deny"),
+              amount_cents: Zoi.integer(gte: 0),
+              message: Zoi.string() |> Zoi.min(1)
+            },
+            coerce: true,
+            unrecognized_keys: :error
+          )
+
+  def schema, do: @schema
+  def json_schema, do: Zoi.to_json_schema(@schema)
+end
+```
+
+`StartRequest` takes `output_schema` as a JSON Schema map. A Zoi struct there
+isn't a JSON Schema.
+
+## Pre-Model Policy
+
+The first guardrail runs before any model work. It reads the `GuardInput`
+result, then checks the order:
+
+```elixir
+defmodule MyApp.Refund.CheckPolicy do
+  @moduledoc "Blocks refund requests that break desk policy before the model runs."
+
+  use Jido.Action,
+    id: "my_app/refund/check_policy",
+    vsn: 1,
+    name: "refund_check_policy",
+    schema:
+      Zoi.object(%{
+        guard: Zoi.map(),
+        order_id: Zoi.string() |> Zoi.nullable(),
+        max_cents: Zoi.integer(gte: 0)
+      }),
+    output_schema: Zoi.map()
+
+  @impl Jido.Action
+  def run(%{guard: %{allowed: false} = guard}, _context),
+    do: {:ok, Map.put(guard, :order, nil)}
+
+  def run(%{order_id: nil}, _context),
+    do: {:ok, blocked("a refund request needs an order_id")}
+
+  def run(%{order_id: order_id, max_cents: max_cents}, _context) do
+    case MyApp.Orders.fetch(order_id) do
+      :error ->
+        {:ok, blocked("order #{order_id} was not found")}
+
+      {:ok, %{total_cents: total}} when total > max_cents ->
+        {:ok, blocked("order total #{total} cents is above the desk limit of #{max_cents} cents")}
+
+      {:ok, order} ->
+        {:ok, %{allowed: true, reason_code: :none, reason: nil, order: order}}
+    end
+  end
+
+  defp blocked(reason), do: %{allowed: false, reason_code: :policy, reason: reason, order: nil}
+end
+```
+
+It returns the `GuardInput` shape plus the order. `DecideInput` would pass
+only the turn to the model round, and the round needs the order, so the desk
+has its own decision and expander for an `invoke`:
+
+```elixir
+defmodule MyApp.Refund.Route do
+  @moduledoc "Starts the model round or ends the turn with the policy result."
+
+  alias Jido.AI.Reasoning.Result
+
+  use Jido.Action,
+    id: "my_app/refund/route",
+    vsn: 1,
+    name: "refund_route",
+    schema: Zoi.object(%{turn: Zoi.any(), policy: Zoi.map()}),
+    output_schema: Zoi.map()
+
+  @impl Jido.Action
+  def run(%{turn: turn, policy: %{allowed: true, order: order}}, _context),
+    do: {:ok, %{kind: :model, input: %{turn: turn, order: order}}}
+
+  def run(%{turn: turn, policy: policy}, _context) do
+    result = Result.blocked(policy.reason_code, policy.reason)
+    {:ok, %{kind: :complete, output: %{turn: turn, result: result}}}
+  end
+end
+
+defmodule MyApp.Refund.Expand do
+  @moduledoc "Expands the route decision into its next executable."
+
+  use Jido.Action,
+    id: "my_app/refund/expand",
+    vsn: 1,
+    name: "refund_expand",
+    schema: Zoi.map(),
+    output_schema: Zoi.map()
+
+  @impl Jido.Action
+  def run(%{kind: :complete, output: output}, _context), do: {:ok, output}
+  def run(%{kind: :model, input: input}, _context), do: {:continue, input, MyApp.RefundRound}
+end
+```
+
+An `invoke` runs the decision, then lets the expander return a final value
+or `{:continue, input, target}`. Only the selected target runs, so a blocked
+request never reaches the model. A `choice` can't do this: its options must
+be Action modules, and the model round is a Flow.
+
+## Post-Model Checks
+
+Three Actions run inside the model round. The first gives the model the order
+facts through a stable `Jido.AI.Context.transform/3` operation:
+
+```elixir
+defmodule MyApp.Refund.AddOrderFacts do
+  @moduledoc "Adds the order facts to the open model context."
+
+  use Jido.Action,
+    id: "my_app/refund/add_order_facts",
+    vsn: 1,
+    name: "refund_add_order_facts",
+    schema: Zoi.object(%{context: Zoi.any(), order: Zoi.map()}),
+    output_schema: Zoi.map()
+
+  @impl Jido.Action
+  def run(%{context: context, order: order}, _context) do
+    facts =
+      "Order #{order.order_id} is #{order.status}. Its total is #{order.total_cents} cents."
+
+    with {:ok, context} <-
+           Jido.AI.Context.transform(context, "refund-order-facts", fn req_llm_context ->
+             %{req_llm_context | messages: req_llm_context.messages ++ [ReqLLM.Context.system(facts)]}
+           end) do
+      {:ok, %{context: context}}
+    end
+  end
+end
+```
+
+The second checks the structured output against the order. It runs after
+`GuardOutput` and before `RecordModelAttempt`, so a rejected decision never
+becomes an assistant message in the Session:
+
+```elixir
+defmodule MyApp.Refund.CheckAmount do
+  @moduledoc "Rejects a refund larger than the order total."
+
+  use Jido.Action,
+    id: "my_app/refund/check_amount",
+    vsn: 1,
+    name: "refund_check_amount",
+    schema: Zoi.object(%{guard: Zoi.map(), outcome: Zoi.map(), order: Zoi.map()}),
+    output_schema:
+      Zoi.object(%{allowed: Zoi.boolean(), reason: Zoi.string(), over_total: Zoi.boolean()})
+
+  @impl Jido.Action
+  def run(%{guard: %{allowed: false, reason: reason}}, _context),
+    do: {:ok, %{allowed: false, reason: reason, over_total: false}}
+
+  def run(%{outcome: %{output: %{"amount_cents" => amount}}, order: order}, _context)
+      when amount > order.total_cents do
+    reason = "refund of #{amount} cents exceeds the order total of #{order.total_cents} cents"
+    {:ok, %{allowed: false, reason: reason, over_total: true}}
+  end
+
+  def run(_params, _context), do: {:ok, %{allowed: true, reason: "", over_total: false}}
+end
+```
+
+The third turns the recorded attempt into the terminal outcome. `Escalate`
+handles the over-total case; `Complete` handles everything else, the same way
+the Chain of Thought round does:
+
+```elixir
+defmodule MyApp.Refund.Complete do
+  @moduledoc "Builds the terminal result from one recorded model attempt."
+
+  alias Jido.AI.Reasoning.Result
+
+  use Jido.Action,
+    id: "my_app/refund/complete",
+    vsn: 1,
+    name: "refund_complete",
+    schema: Zoi.object(%{turn: Zoi.any()}),
+    output_schema: Zoi.map()
+
+  @impl Jido.Action
+  def run(%{turn: %{model_outcome: %{status: :error, reason: reason}} = turn}, _context),
+    do: {:ok, %{turn: turn, result: Result.failed(:model, reason)}}
+
+  def run(%{turn: %{model_outcome: %{status: :budget, reason: reason}} = turn}, _context),
+    do: {:ok, %{turn: turn, result: Result.blocked(:limits, reason)}}
+
+  def run(%{turn: %{output_allowed: false} = turn}, _context),
+    do: {:ok, %{turn: turn, result: Result.blocked(:output, turn.output_reason)}}
+
+  def run(%{turn: turn}, _context),
+    do: {:ok, %{turn: turn, result: Result.completed(turn.model_outcome.output)}}
+end
+
+defmodule MyApp.Refund.Escalate do
+  @moduledoc "Ends the turn when the model offers more than the order total."
+
+  alias Jido.AI.Reasoning.Result
+
+  use Jido.Action,
+    id: "my_app/refund/escalate",
+    vsn: 1,
+    name: "refund_escalate",
+    schema: Zoi.object(%{turn: Zoi.any()}),
+    output_schema: Zoi.map()
+
+  @impl Jido.Action
+  def run(%{turn: turn}, _context),
+    do: {:ok, %{turn: turn, result: Result.blocked(:policy, turn.output_reason)}}
+end
+```
+
+## The Model Round
+
+The round is a Flow. It projects the Session, adds the order facts, calls the
+model once without tools, runs both output checks, records the attempt, and
+picks the terminal outcome with a `choice`:
+
+```elixir
+defmodule MyApp.RefundRound do
+  @moduledoc "Runs one guarded refund decision model call."
+
+  alias Jido.AI.Reasoning.Actions.{CallModel, GuardOutput, ProjectConversation, RecordModelAttempt}
+  alias MyApp.Refund.{AddOrderFacts, CheckAmount, Complete, Escalate}
+
+  use Jido.Flow,
+    id: "my_app/refund_round",
+    vsn: 1,
+    name: "my_app_refund_round",
+    schema: Zoi.object(%{turn: Zoi.any(), order: Zoi.map()}),
+    output_schema: Zoi.map()
+
+  flow do
+    step "project",
+      action: ProjectConversation,
+      params: %{turn: input(:turn)}
+
+    step "order_facts",
+      action: AddOrderFacts,
+      params: %{context: result("project", :context), order: input(:order)}
+
+    step "model",
+      action: CallModel,
+      params: %{
+        turn: result("project", :turn),
+        context: result("order_facts", :context),
+        tools: false
+      }
+
+    step "output_guard",
+      action: GuardOutput,
+      params: %{turn: result("model", :turn), outcome: result("model", :outcome)}
+
+    step "amount_check",
+      action: CheckAmount,
+      params: %{
+        guard: result("output_guard"),
+        outcome: result("model", :outcome),
+        order: input(:order)
+      }
+
+    step "record_attempt",
+      action: RecordModelAttempt,
+      params: %{
+        turn: result("model", :turn),
+        outcome: result("model", :outcome),
+        context: result("model", :context),
+        output_allowed: result("amount_check", :allowed),
+        output_reason: result("amount_check", :reason)
+      }
+
+    choice "finish" do
+      option "over_total",
+        condition: result("amount_check", :over_total),
+        action: Escalate,
+        params: %{turn: result("record_attempt", :turn)}
+
+      otherwise action: Complete, params: %{turn: result("record_attempt", :turn)}
+    end
+
+    output result("finish")
+  end
+end
+```
+
+A `choice` runs the first option whose condition is `true`, or `otherwise`.
+The condition reads a Boolean that `CheckAmount` declares in its output
+schema. A `nil` condition fails the Flow, so test a declared Boolean rather
+than the model output itself. See the Jido Action
+[Choices](https://hexdocs.pm/jido_action/flow-choices.html) guide.
+
+## The Root Flow
+
+The root Flow owns the request schema and wires the parts together:
+
+```elixir
+defmodule MyApp.RefundFlow do
+  @moduledoc "The refund desk root reasoning Flow."
+
+  alias Jido.AI.Reasoning.Actions.{FinalizeTurn, GuardInput, StartRequest}
+  alias MyApp.Refund.{CheckPolicy, Expand, Route}
+
+  @instructions """
+  You decide refund requests for the support desk. Refund at most the order
+  total. Deny requests that give no reason. Return one decision.
+  """
+
+  use Jido.Flow,
+    id: "my_app/refund_flow",
+    vsn: 1,
+    name: "my_app_refund_flow",
+    description: "A policy-checked refund decision",
+    schema:
+      Zoi.object(
+        %{
+          input: Zoi.string(),
+          order_id: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),
+          instructions: Zoi.string() |> Zoi.default(@instructions),
+          model: Zoi.string() |> Zoi.default("openai:gpt-4o-mini"),
+          options:
+            Zoi.map()
+            |> Zoi.default(%{max_tokens: 256, receive_timeout: 30_000, temperature: 0.0}),
+          refund:
+            Zoi.object(
+              %{max_cents: Zoi.integer(gte: 0) |> Zoi.default(50_000)},
+              unrecognized_keys: :error
+            )
+            |> Zoi.default(%{max_cents: 50_000}),
+          context:
+            Zoi.object(
+              %{
+                max_messages: Zoi.integer(gte: 1, lte: 512) |> Zoi.default(32),
+                max_bytes: Zoi.integer(gte: 1_024, lte: 2_000_000) |> Zoi.default(100_000)
+              },
+              unrecognized_keys: :error
+            )
+            |> Zoi.default(%{max_messages: 32, max_bytes: 100_000}),
+          limits:
+            Zoi.object(
+              %{
+                elapsed_ms: Zoi.integer(gte: 1, lte: 600_000) |> Zoi.default(60_000),
+                total_tokens: Zoi.integer(gte: 1) |> Zoi.nullable() |> Zoi.default(nil),
+                total_cost: Zoi.number(gte: 0) |> Zoi.nullable() |> Zoi.default(nil)
+              },
+              unrecognized_keys: :error
+            )
+            |> Zoi.default(%{elapsed_ms: 60_000, total_tokens: nil, total_cost: nil})
+        },
+        unrecognized_keys: :error
+      ),
+    output_schema: Zoi.object(%{state: Zoi.map(), response: Zoi.map()})
+
+  flow do
+    step "decision_schema", [] do
+      {:ok, %{json: MyApp.RefundDecision.json_schema()}}
+    end
+
+    step "start_request",
+      action: StartRequest,
+      params: %{
+        flow: %{id: "my_app/refund_flow", vsn: 1},
+        input: input(:input),
+        instructions: input(:instructions),
+        model: input(:model),
+        options: input(:options),
+        output_schema: result("decision_schema", :json),
+        context_window: input(:context),
+        max_model_calls: 1,
+        max_elapsed_ms: input([:limits, :elapsed_ms]),
+        max_total_tokens: input([:limits, :total_tokens]),
+        max_total_cost: input([:limits, :total_cost])
+      }
+
+    step "input_guard",
+      action: GuardInput,
+      params: %{turn: result("start_request")}
+
+    step "policy",
+      action: CheckPolicy,
+      params: %{
+        guard: result("input_guard"),
+        order_id: input(:order_id),
+        max_cents: input([:refund, :max_cents])
+      }
+
+    invoke "refund",
+      decision: Route,
+      expander: Expand,
+      params: %{turn: result("start_request"), policy: result("policy")}
+
+    step "finalize",
+      action: FinalizeTurn,
+      params: %{outcome: result("refund")}
+
+    output result("finalize")
+  end
+end
+```
+
+| Choice in the schema | Effect |
+| --- | --- |
+| `order_id` is nullable with default `nil` | A missing order reaches `CheckPolicy` and gets a `:blocked` reply, not a schema error. |
+| `refund.max_cents` | A desk setting you can default per Agent. |
+| `limits` has no `model_calls` | The Flow fixes `max_model_calls: 1`; callers can't raise it. |
+| `output_schema` isn't an input field | Callers can't change the decision shape. |
+| `unrecognized_keys: :error` | A request with an unknown field fails validation. |
+
+## Select the Flow
+
+Reference the Flow from the Agent. The block sets defaults for fields of
+`MyApp.RefundFlow`'s input schema, including your own `refund` object:
+
+```elixir
+defmodule MyApp.SupportAgent do
+  use Jido.AI.Agent,
+    id: "my_app/support_agent",
+    vsn: 1,
+    name: "support_agent"
+
+  ai do
+    reasoning MyApp.RefundFlow do
+      model "openai:gpt-4o-mini"
+
+      refund do
+        max_cents 20_000
+      end
+
+      limits do
+        total_tokens 2_000
+      end
+    end
+  end
+end
+```
+
+A name the schema doesn't define fails the build. `refund do currency "usd" end`
+raises `reasoning configuration is invalid for MyApp.RefundFlow at refund.currency`.
+
+Inspect the result without calling a model:
+
+```elixir
+explained = MyApp.SupportAgent.explain()
+
+{explained.reasoning, explained.defaults, explained.tools}
+```
+
+The result is
+`{MyApp.RefundFlow, %{model: "openai:gpt-4o-mini", refund: %{max_cents: 20000}, limits: %{total_tokens: 2000}}, []}`.
+
+```elixir
+{:ok, preflight} = MyApp.SupportAgent.preflight(%{input: "Refund order A-1001"})
+
+Map.take(preflight.params, [:order_id, :refund, :limits])
+```
+
+The result is
+`%{order_id: nil, refund: %{max_cents: 20000}, limits: %{elapsed_ms: 60000, total_tokens: 2000, total_cost: nil}}`.
+Defaults merge into nested objects field by field; the Flow schema fills the rest.
+
+```elixir
+{:error, error} = MyApp.SupportAgent.preflight(%{input: "Refund it", channel: "email"})
+
+Exception.message(error)
+```
+
+The result is `"unrecognized key: channel"`.
+
+## Run a Refund
+
+Queue one decision and send the request:
+
+```elixir
+MyApp.OfflineModel.respond_with([
+  MyApp.OfflineModel.text(
+    ~s({"decision":"refund","amount_cents":4500,"message":"Refunded 45.00 USD for the broken blender."})
+  )
+])
+
+agent = MyApp.SupportAgent.instantiate!(id: "refund-desk-1")
+
+signal =
+  MyApp.SupportAgent.request_signal!(%{
+    input: "The blender in order A-1001 arrived broken. Please refund it.",
+    order_id: "A-1001",
+    options: MyApp.OfflineModel.options()
+  })
+
+{:ok, next_agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+  MyApp.SupportAgent.cmd(agent, signal)
+
+Map.take(reply.data, [:status, :output, :reason_code, :model_calls, :flow])
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  status: :completed,
+  output: %{
+    "amount_cents" => 4500,
+    "decision" => "refund",
+    "message" => "Refunded 45.00 USD for the broken blender."
+  },
+  reason_code: :none,
+  model_calls: 1,
+  flow: %{id: "my_app/refund_flow", vsn: 1}
+}
+```
+
+Parse the output with the same Zoi schema to get atoms and checked types:
+
+```elixir
+Zoi.parse(MyApp.RefundDecision.schema(), reply.data.output)
+```
+
+The result is
+`{:ok, %{decision: :refund, message: "Refunded 45.00 USD for the broken blender.", amount_cents: 4500}}`.
+
+## What the Model Saw
+
+```elixir
+[request] = MyApp.OfflineModel.requests()
+
+Enum.map(request["input"], fn message ->
+  {message["role"], get_in(message, ["content", Access.at(0), "text"])}
+end)
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+[
+  {"system",
+   "You decide refund requests for the support desk. Refund at most the order\ntotal. Deny requests that give no reason. Return one decision.\n"},
+  {"user", "The blender in order A-1001 arrived broken. Please refund it."},
+  {"system", "Order A-1001 is delivered. Its total is 4500 cents."}
+]
+```
+
+```elixir
+{request["model"], request["text"]["format"]["strict"], request["text"]["format"]["schema"]["required"]}
+```
+
+The result is `{"gpt-4o-mini", true, ["message", "decision", "amount_cents"]}`.
+No `tools` key is sent, because the round passes `tools: false`.
+
+The Session has the user message and the accepted decision:
+
+```elixir
+{:ok, messages} = Jido.AI.Thread.Projection.messages(next_agent.state.session)
+
+Enum.map(messages, & &1.role)
+```
+
+The result is `[:user, :assistant]`.
+
+## Blocked Before the Model
+
+A request with no `order_id` stops in `CheckPolicy`. No reply is queued,
+because no model call happens:
+
+```elixir
+no_order =
+  MyApp.SupportAgent.request_signal!(%{
+    input: "Please refund my blender.",
+    options: MyApp.OfflineModel.options()
+  })
+
+{:ok, blocked_agent, [%Jido.Agent.Directive.Reply{signal: blocked}]} =
+  MyApp.SupportAgent.cmd(agent, no_order)
+
+Map.take(blocked.data, [:status, :output, :reason_code, :reason, :model_calls])
+```
+
+The result is
+`%{status: :blocked, output: "", reason_code: :policy, reason: "a refund request needs an order_id", model_calls: 0}`.
+
+Order A-2002 totals 89,000 cents, above this Agent's 20,000-cent limit:
+
+```elixir
+large =
+  MyApp.SupportAgent.request_signal!(%{
+    input: "Refund the espresso machine in order A-2002.",
+    order_id: "A-2002",
+    options: MyApp.OfflineModel.options()
+  })
+
+{:ok, _agent, [%Jido.Agent.Directive.Reply{signal: blocked}]} =
+  MyApp.SupportAgent.cmd(agent, large)
+
+{blocked.data.reason_code, blocked.data.reason}
+```
+
+The result is
+`{:policy, "order total 89000 cents is above the desk limit of 20000 cents"}`.
+
+A blocked turn still commits: `StartRequest` appended the user message, and
+`FinalizeTurn` recorded the outcome.
+
+```elixir
+Enum.map(blocked_agent.state.session.thread.entries, & &1.kind)
+```
+
+The result is `[:ai_message, :ai_request_outcome]`.
+
+The built-in `GuardInput` still runs first. An empty `input` is blocked with
+`reason_code: :input` before your policy reads the order:
+
+```elixir
+{:ok, _agent, [%Jido.Agent.Directive.Reply{signal: empty}]} =
+  MyApp.SupportAgent.cmd(
+    agent,
+    MyApp.SupportAgent.request_signal!(%{input: " ", order_id: "A-1001"})
+  )
+
+{empty.data.reason_code, empty.data.reason}
+```
+
+The result is `{:input, "input is empty"}`.
+
+Schema validation runs before the Flow. A field of the wrong type returns an
+error, not a reply, and commits nothing:
+
+```elixir
+{:error, error} =
+  MyApp.SupportAgent.cmd(
+    agent,
+    MyApp.SupportAgent.request_signal!(%{input: "Refund it", order_id: 1001})
+  )
+
+Exception.message(error)
+```
+
+The result is `"invalid type: expected string, at order_id"`.
+
+## Blocked After the Model
+
+Here the model offers more than the order total:
+
+```elixir
+MyApp.OfflineModel.respond_with([
+  MyApp.OfflineModel.text(
+    ~s({"decision":"refund","amount_cents":9000,"message":"Refunded 90.00 USD."})
+  )
+])
+
+{:ok, over_agent, [%Jido.Agent.Directive.Reply{signal: over}]} =
+  MyApp.SupportAgent.cmd(agent, signal)
+
+Map.take(over.data, [:status, :output, :reason_code, :reason, :model_calls])
+```
+
+The result is
+`%{status: :blocked, output: "", reason_code: :policy, reason: "refund of 9000 cents exceeds the order total of 4500 cents", model_calls: 1}`.
+
+The model call is recorded, but the decision isn't in the conversation:
+
+```elixir
+{:ok, messages} = Jido.AI.Thread.Projection.messages(over_agent.state.session)
+[attempt] = over.data.model_attempts
+
+{Enum.map(messages, & &1.role), attempt.output_allowed, attempt.output_reason}
+```
+
+The result is
+`{[:user], false, "refund of 9000 cents exceeds the order total of 4500 cents"}`.
+
+Output that breaks the decision schema fails inside ReqLLM before your checks
+run. `Complete` maps it to `:failed` with `reason_code: :model`:
+
+```elixir
+MyApp.OfflineModel.respond_with([
+  MyApp.OfflineModel.text(~s({"decision":"maybe","amount_cents":4500,"message":"Hmm."}))
+])
+
+{:ok, _agent, [%Jido.Agent.Directive.Reply{signal: invalid}]} =
+  MyApp.SupportAgent.cmd(agent, signal)
+
+{invalid.data.status, invalid.data.reason_code,
+ String.starts_with?(invalid.data.reason, "Structured output failed final validation:")}
+```
+
+The result is `{:failed, :model, true}`.
+
+## Budgets
+
+`StartRequest` receives the budgets, and `FinalizeTurn` reports them:
+
+```elixir
+reply.data.budget.limits
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  elapsed_ms: 60000,
+  input_tokens: nil,
+  model_calls: 1,
+  output_tokens: nil,
+  tool_calls: 0,
+  tool_rounds: 0,
+  total_cost: nil,
+  total_tokens: 2000
+}
+```
+
+`CallModel` checks them with `Jido.AI.Budget.before_model/2` before it sends a
+request. A request override of a nested object replaces the Agent default
+for that object, so send every field you want to keep:
+
+```elixir
+tight =
+  MyApp.SupportAgent.request_signal!(%{
+    input: "Refund order A-1001, the blender is broken.",
+    order_id: "A-1001",
+    limits: %{elapsed_ms: 5_000},
+    options: MyApp.OfflineModel.options()
+  })
+
+{:ok, tight_preflight} = MyApp.SupportAgent.preflight(tight.data)
+tight_preflight.params.limits
+```
+
+The result is `%{elapsed_ms: 5000, total_tokens: nil, total_cost: nil}`:
+the Agent's `total_tokens 2_000` is gone for this request.
+
+A spent budget gives `CallModel` a `status: :budget` outcome without a model
+call, and `Complete` maps it to `:blocked` with `reason_code: :limits`. This
+Flow allows one model call, so only a time budget can run out before it. A
+multi-call Flow checks again before each call; see
+[Budgets, Retries, and Fallbacks](budgets-retries-and-fallbacks.md).
+
+## Reuse a Built-in Round
+
+The expander can continue into any Flow, including a built-in round. Swap
+`Route` and `Expand` for `Jido.AI.Reasoning.Actions.DecideInput` and
+`Jido.AI.Reasoning.ReAct.Actions.ExpandNext`, and the model work after your
+policy is the full ReAct loop: tool rounds, repair, retries, and fallback
+models, driven by the `max_*` params you give `StartRequest`.
+
+```elixir
+defmodule MyApp.RefundLoopFlow do
+  @moduledoc "Refund policy in front of the ReAct model loop."
+
+  alias Jido.AI.Reasoning.Actions.{DecideInput, FinalizeTurn, GuardInput, StartRequest}
+  alias Jido.AI.Reasoning.ReAct.Actions.ExpandNext
+
+  use Jido.Flow,
+    id: "my_app/refund_loop_flow",
+    vsn: 1,
+    name: "my_app_refund_loop_flow",
+    schema:
+      Zoi.object(
+        %{
+          input: Zoi.string(),
+          order_id: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil),
+          options: Zoi.map() |> Zoi.default(%{max_tokens: 256, temperature: 0.0})
+        },
+        unrecognized_keys: :error
+      ),
+    output_schema: Zoi.object(%{state: Zoi.map(), response: Zoi.map()})
+
+  flow do
+    step "start_request",
+      action: StartRequest,
+      params: %{
+        flow: %{id: "my_app/refund_loop_flow", vsn: 1},
+        input: input(:input),
+        instructions: "Decide the refund request.",
+        model: "openai:gpt-4o-mini",
+        options: input(:options),
+        context_window: %{max_messages: 32, max_bytes: 100_000},
+        max_model_calls: 2,
+        max_retries: 1,
+        max_tool_rounds: 0,
+        max_tool_calls: 1
+      }
+
+    step "input_guard",
+      action: GuardInput,
+      params: %{turn: result("start_request")}
+
+    step "policy",
+      action: MyApp.Refund.CheckPolicy,
+      params: %{guard: result("input_guard"), order_id: input(:order_id), max_cents: 20_000}
+
+    invoke "loop",
+      decision: DecideInput,
+      expander: ExpandNext,
+      params: %{turn: result("start_request"), guard: result("policy")}
+
+    step "finalize",
+      action: FinalizeTurn,
+      params: %{outcome: result("loop")}
+
+    output result("finalize")
+  end
+end
+```
+
+`DecideInput` reads only `allowed`, `reason_code`, and `reason` from the
+guard, so `CheckPolicy`'s extra `order` key does no harm. Run it with an empty
+first answer; the ReAct output guard rejects it and repairs within the budget:
+
+```elixir
+defmodule MyApp.LoopAgent do
+  use Jido.AI.Agent, id: "my_app/loop_agent", vsn: 1, name: "loop_agent"
+
+  ai do
+    reasoning MyApp.RefundLoopFlow
+  end
+end
+
+MyApp.OfflineModel.respond_with([
+  MyApp.OfflineModel.text(""),
+  MyApp.OfflineModel.text("Refund approved for order A-1001.")
+])
+
+{:ok, _agent, [%Jido.Agent.Directive.Reply{signal: looped}]} =
+  MyApp.LoopAgent.cmd(
+    MyApp.LoopAgent.instantiate!(id: "loop-1"),
+    MyApp.LoopAgent.request_signal!(%{
+      input: "Refund order A-1001.",
+      order_id: "A-1001",
+      options: MyApp.OfflineModel.options()
+    })
+  )
+
+_requests = MyApp.OfflineModel.requests()
+Map.take(looped.data, [:status, :output, :model_calls, :retries])
+```
+
+The result is
+`%{status: :completed, output: "Refund approved for order A-1001.", model_calls: 2, retries: 1}`.
+
+The trade-off: `ReAct.ModelRound` records each accepted answer before
+returning, so a check that runs after the loop can block the reply but can't
+keep the answer out of the Session. Put checks that must gate the
+conversation inside your own round, as `MyApp.RefundRound` does.
+
+## Human Approval
+
+A refund over the desk limit could wait for a supervisor instead of ending
+the turn. A Jido Flow wait (`await`, `timer`, or `selection`) does that, with
+two rules:
+
+1. `Jido.Exec.run/4` and `cmd/2` reject a Flow that contains a wait before any
+   Action runs. Put the wait in a separate Flow and reach it through an
+   `invoke`, the way `Jido.AI.Reasoning.ReAct.ToolReview` does.
+2. Only a durable `Jido.AgentServer` turn supports waits: start Jido with a
+   stable `namespace:` and the Agent with `persistence:`. Check
+   `Jido.Exec.supports?(context, :waits)` in your decision Action and block
+   with a clear reason when it returns `false`, the way `GuardInput` blocks
+   tool review.
+
+A sketch of the approval Flow:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+defmodule MyApp.RefundApproval do
+  use Jido.Flow,
+    id: "my_app/refund_approval",
+    vsn: 1,
+    name: "my_app_refund_approval",
+    schema: Zoi.object(%{turn: Zoi.any(), order: Zoi.map()}),
+    output_schema: Zoi.map()
+
+  flow do
+    step "request",
+      action: MyApp.Refund.RequestApproval,
+      params: %{turn: input(:turn), order: input(:order)}
+
+    selection "decision" do
+      await "approved",
+        event: "my_app.refund.approved",
+        match: %{review_id: result("request", :review_id)}
+
+      await "denied",
+        event: "my_app.refund.denied",
+        match: %{review_id: result("request", :review_id)}
+
+      timer "expired", after_ms: 900_000
+    end
+
+    invoke "next",
+      decision: MyApp.Refund.ResolveApproval,
+      expander: MyApp.Refund.Expand,
+      params: %{turn: result("request", :turn), decision: result("decision")}
+
+    output result("next")
+  end
+end
+```
+
+`MyApp.Refund.RequestApproval` publishes the request, and
+`MyApp.Refund.ResolveApproval` maps the selected option to a model round or a
+terminal result. Both are yours to write.
+[Tool Review and Cycle Limits](tool-review-and-cycle-limits.livemd) runs the
+built-in version of this pattern on a live AgentServer, and the Jido Action
+[Flow Waits](https://hexdocs.pm/jido_action/flow-waits.html) guide lists
+the wait result shapes.
+
+## Inline Flows
+
+For a small Agent, write the root Flow inside the `ai` block. It uses the
+same Flow language, and its output has the same `%{state, response}` shape:
+
+```elixir
+defmodule MyApp.RefundTriageAgent do
+  use Jido.AI.Agent, id: "my_app/refund_triage_agent", vsn: 1, name: "refund_triage_agent"
+
+  ai do
+    reasoning do
+      step "triage", order_id <- input(:order_id), inline: [context: context] do
+        response =
+          case MyApp.Orders.fetch(order_id) do
+            {:ok, %{total_cents: total}} when total <= 20_000 ->
+              %{status: :completed, output: "Order #{order_id} qualifies for desk refunds."}
+
+            _other ->
+              %{status: :blocked, output: "", reason: "send this request to a supervisor"}
+          end
+
+        {:ok, %{state: context.agent_state, response: response}}
+      end
+
+      output result("triage")
+    end
+  end
+end
+
+{:ok, _agent, [%Jido.Agent.Directive.Reply{signal: triage}]} =
+  MyApp.RefundTriageAgent.cmd(
+    MyApp.RefundTriageAgent.instantiate!(id: "triage-1"),
+    MyApp.RefundTriageAgent.request_signal!(%{order_id: "A-2002"})
+  )
+
+triage.data
+```
+
+The result is
+`%{status: :blocked, output: "", reason: "send this request to a supervisor"}`.
+
+| | Custom Flow module | Inline Flow |
+| --- | --- | --- |
+| Input schema and `reasoning` defaults | Yes | No; any map passes |
+| Stable `id` and `vsn` for stored Agents | Yes | No; the module name is a generated hash |
+| Reusable across Agents | Yes | No |
+| Use for | Production desks, shared policy | Prototypes, tests, fixed logic |
+
+[Agent Authoring](agent-authoring.md) covers inline Flows in full.
+
+## Test the Flow
+
+Test the guardrails and the exact request the way you ran them here. This
+ExUnit module runs in the notebook:
+
+```elixir
+ExUnit.start(autorun: false)
+
+defmodule MyApp.RefundFlowTest do
+  use ExUnit.Case, async: false
+
+  setup do
+    {:ok, agent: MyApp.SupportAgent.instantiate!(id: "refund-test")}
+  end
+
+  defp run(agent, data) do
+    signal =
+      MyApp.SupportAgent.request_signal!(Map.put(data, :options, MyApp.OfflineModel.options()))
+
+    {:ok, next, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+      MyApp.SupportAgent.cmd(agent, signal)
+
+    {next, reply.data}
+  end
+
+  test "blocks a missing order without a model call", %{agent: agent} do
+    {_next, data} = run(agent, %{input: "Refund my blender."})
+
+    assert %{status: :blocked, reason_code: :policy, model_calls: 0} = data
+    assert MyApp.OfflineModel.requests() == []
+  end
+
+  test "sends the order facts and the strict decision schema", %{agent: agent} do
+    MyApp.OfflineModel.respond_with([
+      MyApp.OfflineModel.text(~s({"decision":"deny","amount_cents":0,"message":"No reason given."}))
+    ])
+
+    {_next, data} = run(agent, %{input: "Refund A-1001.", order_id: "A-1001"})
+    [request] = MyApp.OfflineModel.requests()
+
+    assert data.status == :completed
+    assert request["model"] == "gpt-4o-mini"
+    assert request["text"]["format"]["strict"] == true
+
+    assert Enum.map(request["input"], & &1["role"]) == ["system", "user", "system"]
+
+    assert List.last(request["input"])["content"] == [
+             %{"type" => "input_text", "text" => "Order A-1001 is delivered. Its total is 4500 cents."}
+           ]
+  end
+
+  test "keeps an over-total refund out of the Session", %{agent: agent} do
+    MyApp.OfflineModel.respond_with([
+      MyApp.OfflineModel.text(~s({"decision":"refund","amount_cents":4501,"message":"Done."}))
+    ])
+
+    {next, data} = run(agent, %{input: "Refund A-1001.", order_id: "A-1001"})
+    _requests = MyApp.OfflineModel.requests()
+
+    assert %{status: :blocked, reason_code: :policy, model_calls: 1} = data
+    assert {:ok, [%{role: :user}]} = Jido.AI.Thread.Projection.messages(next.state.session)
+  end
+end
+
+ExUnit.run()
+```
+
+The result is `%{total: 3, failures: 0, excluded: 0, skipped: 0}`.
+
+In a project, put the Agent and Flow in `lib/`, the offline model in
+`test/support/`, and call `Req.Test.verify_on_exit!/0` in `setup` so an unused
+queued reply fails the test. To assert on the exact `ReqLLM.Context` and
+options instead of the HTTP body, see
+[Mock Model Calls with ReqLLM](mock-model-calls-with-reqllm.livemd).
+
+## Summary
+
+- A root reasoning Flow is any Flow whose input schema has `input` and whose
+  output is `%{state: map(), response: map()}`. Its schema owns request fields
+  and the fields a `reasoning MyFlow do ... end` block can default.
+- `StartRequest`, `GuardInput`, `ProjectConversation`, `CallModel`,
+  `GuardOutput`, `RecordModelAttempt`, and `FinalizeTurn` are public Actions;
+  wire them with `step`, `invoke`, and `choice`.
+- A pre-model check plus an `invoke` ends the turn as `:blocked` with
+  `model_calls: 0`.
+- A post-model check placed before `RecordModelAttempt` keeps a rejected
+  answer out of the Session; a `choice` on a declared Boolean picks the
+  terminal result.
+- Budgets are `StartRequest` params; `CallModel` enforces them before each
+  call.
+- An expander can continue into a built-in round, such as
+  `Jido.AI.Reasoning.ReAct.ModelRound`, through
+  `Jido.AI.Reasoning.ReAct.Actions.ExpandNext`.
+- Waits belong in an invoked Flow and need a durable AgentServer turn.
+
+## Next
+
+- [Test AI Agents](test-ai-agents.livemd) – test Flows, Context values, and
+  Agent state without a provider.
+- [Budgets, Retries, and Fallbacks](budgets-retries-and-fallbacks.md) – limits
+  for multi-call Flows.

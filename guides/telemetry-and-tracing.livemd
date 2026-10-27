@@ -1,0 +1,505 @@
+# Telemetry and Tracing
+
+## Overview
+
+A live AI request emits `:telemetry` events for the Agent request, each tool
+call, and each model call. Every event carries the same request, Session,
+and Thread IDs, so you can join them into one trace. This notebook runs one
+offline request on an Agent Server, prints the events it captured, and joins
+them by ID. By the end, this works:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+Enum.map(events, fn {name, _measurements, _metadata} -> name end)
+# => [
+#      [:jido, :ai, :agent, :start],
+#      [:req_llm, :request, :start],
+#      [:req_llm, :request, :stop],
+#      [:jido, :ai, :tool, :start],
+#      [:jido, :ai, :tool, :stop],
+#      [:req_llm, :request, :start],
+#      [:req_llm, :request, :stop],
+#      [:jido, :ai, :agent, :stop]
+#    ]
+```
+
+Jido AI owns the Agent, reasoning, and tool events. ReqLLM owns model
+request, token, and cost events. Neither records prompts, model output, or
+tool arguments.
+
+## Install
+
+```elixir
+Mix.install([{:jido_ai, "~> 3.0.0-beta.1"}, {:plug, "~> 1.0"}])
+```
+
+## Offline Model
+
+The fake provider queues OpenAI Responses API replies with `Req.Test`. The
+Agent Server makes the model calls from its own process, so shared mode lets
+that process use replies queued here:
+
+```elixir
+Req.Test.set_req_test_to_shared()
+
+defmodule MyApp.OfflineModel do
+  def options do
+    %{
+      api_key: "offline-test-key",
+      max_retries: 0,
+      max_tokens: 128,
+      temperature: 0.0,
+      req_http_options: [plug: {Req.Test, MyApp.LLM}]
+    }
+  end
+
+  def respond_with(bodies) do
+    Enum.each(bodies, fn body -> Req.Test.expect(MyApp.LLM, &Req.Test.json(&1, body)) end)
+  end
+
+  def text(text) do
+    response(%{
+      "type" => "message",
+      "id" => "msg_1",
+      "role" => "assistant",
+      "status" => "completed",
+      "content" => [%{"type" => "output_text", "text" => text, "annotations" => []}]
+    })
+  end
+
+  def tool_call(name, arguments) do
+    response(%{
+      "type" => "function_call",
+      "id" => "fc_1",
+      "call_id" => "call_1",
+      "name" => name,
+      "arguments" => Jason.encode!(arguments),
+      "status" => "completed"
+    })
+  end
+
+  defp response(item) do
+    %{
+      "id" => "resp_1",
+      "object" => "response",
+      "created_at" => 1,
+      "model" => "gpt-4o-mini-2024-07-18",
+      "status" => "completed",
+      "output" => [item],
+      "usage" => %{"input_tokens" => 20, "output_tokens" => 5, "total_tokens" => 25}
+    }
+  end
+end
+```
+
+Each reply reports 20 input and 5 output tokens.
+
+## The Agent
+
+```elixir
+defmodule MyApp.LookupOrder do
+  use Jido.Action,
+    id: "my_app/actions/lookup_order",
+    vsn: 1,
+    name: "lookup_order",
+    description: "Look up the shipping status of one order.",
+    schema: Zoi.object(%{order_id: Zoi.string()})
+
+  @impl Jido.Action
+  def run(%{order_id: order_id}, _context) do
+    {:ok, %{order_id: order_id, status: "shipped", eta: "2026-11-02"}}
+  end
+end
+
+defmodule MyApp.SupportAgent do
+  use Jido.AI.Agent,
+    id: "my_app/support_agent",
+    vsn: 1,
+    name: "support_agent",
+    description: "Answers order questions."
+
+  ai do
+    reasoning Jido.AI.Reasoning.ReAct do
+      model "openai:gpt-4o-mini"
+    end
+
+    tools do
+      action MyApp.LookupOrder
+    end
+  end
+end
+```
+
+## Attach a Handler
+
+`Jido.AI.Telemetry.events/0` returns the full inventory, including the core
+Jido, Runic, and ReqLLM events below it. This notebook attaches to the events
+one request produces at the AI level:
+
+| Event | Emitted |
+| --- | --- |
+| `[:jido, :ai, :agent, :start \| :stop \| :exception]` | Once per `jido.ai.request` Turn on an Agent Server. |
+| `[:jido, :ai, :tool, :start \| :stop \| :exception]` | Once per tool call. |
+| `[:jido, :ai, :reasoning, :start \| :stop \| :exception]` | Once per model round of a single-call or multi-stage Flow. |
+| `[:req_llm, :request, :start \| :stop \| :exception]` | Once per provider call. |
+
+ReAct model rounds don't emit reasoning events. The Agent and tool events
+come from the Agent Server Turn, so `cmd/3` doesn't emit them.
+
+```elixir
+defmodule MyApp.TelemetryForwarder do
+  def handle(event, measurements, metadata, pid) do
+    send(pid, {:telemetry, event, measurements, metadata})
+  end
+end
+
+ai_events =
+  for kind <- [:agent, :tool, :reasoning], phase <- [:start, :stop, :exception] do
+    [:jido, :ai, kind, phase]
+  end
+
+model_events = [[:req_llm, :request, :start], [:req_llm, :request, :stop]]
+
+:telemetry.attach_many(
+  "telemetry-guide",
+  ai_events ++ model_events,
+  &MyApp.TelemetryForwarder.handle/4,
+  self()
+)
+```
+
+The result is `:ok`. A handler that is a module function avoids the
+`:telemetry` warning about local functions. Handlers run in the process that
+emits the event, so keep them fast.
+
+`Jido.AI.Telemetry.attach/3` attaches one handler to the complete inventory
+when you want everything.
+
+## Run One Request
+
+```elixir
+{:ok, _jido} = Jido.start()
+{:ok, server} = Jido.start_agent(MyApp.SupportAgent, id: "support-live")
+
+MyApp.OfflineModel.respond_with([
+  MyApp.OfflineModel.tool_call("lookup_order", %{order_id: "A-1001"}),
+  MyApp.OfflineModel.text("Order A-1001 has shipped.")
+])
+
+signal =
+  MyApp.SupportAgent.request_signal!(%{
+    input: "Where is order A-1001?",
+    options: MyApp.OfflineModel.options()
+  })
+
+{:ok, _agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+  Jido.AgentServer.call(server, signal)
+
+reply.data.status
+```
+
+The result is `:completed`.
+
+## Read the Events
+
+Collect what arrived:
+
+```elixir
+collect = fn collect, acc ->
+  receive do
+    {:telemetry, event, measurements, metadata} ->
+      collect.(collect, [{event, measurements, metadata} | acc])
+  after
+    200 -> Enum.reverse(acc)
+  end
+end
+
+events = collect.(collect, [])
+
+Enum.map(events, fn {name, _measurements, _metadata} -> name end)
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+[
+  [:jido, :ai, :agent, :start],
+  [:req_llm, :request, :start],
+  [:req_llm, :request, :stop],
+  [:jido, :ai, :tool, :start],
+  [:jido, :ai, :tool, :stop],
+  [:req_llm, :request, :start],
+  [:req_llm, :request, :stop],
+  [:jido, :ai, :agent, :stop]
+]
+```
+
+Two model calls with one tool call between them, inside one Agent request.
+
+```elixir
+find = fn name ->
+  Enum.find(events, fn {event, _measurements, _metadata} -> event == name end)
+end
+
+{_, agent_measurements, agent_metadata} = find.([:jido, :ai, :agent, :stop])
+
+Map.take(agent_measurements, [:model_calls, :tool_rounds, :tool_calls, :input_tokens, :output_tokens])
+```
+
+The result is
+`%{model_calls: 2, tool_rounds: 1, tool_calls: 1, input_tokens: 40, output_tokens: 10}`.
+
+The Agent stop event carries the request summary as measurements:
+
+| Measurement | Meaning |
+| --- | --- |
+| `duration` | Turn duration in native time units. |
+| `model_calls`, `tool_rounds`, `tool_calls`, `tool_errors`, `retries` | Request counters from the reply. |
+| `reasoning_steps` | Steps for Flows that report them, otherwise `nil`. |
+| `input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_write_tokens`, `reasoning_tokens`, `total_cost` | Request usage totals. |
+
+```elixir
+Map.take(agent_metadata, [:status, :reason_code, :agent_name, :agent_definition_id, :reasoning])
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  status: :completed,
+  reason_code: :none,
+  agent_name: "support_agent",
+  agent_definition_id: "my_app/support_agent",
+  reasoning: Jido.AI.Reasoning.ReAct
+}
+```
+
+`status` is the reply status: `:completed`, `:blocked`, or `:failed`. A Turn
+that crashed emits `[:jido, :ai, :agent, :exception]` with `status: :error`
+and an `error_type`.
+
+The tool stop event names the tool and the call:
+
+```elixir
+{_, tool_measurements, tool_metadata} = find.([:jido, :ai, :tool, :stop])
+
+{Map.take(tool_metadata, [:tool_name, :tool_call_id, :action, :status]),
+ is_integer(tool_measurements.duration)}
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{%{tool_name: "lookup_order", tool_call_id: "call_1", action: MyApp.LookupOrder, status: :ok},
+ true}
+```
+
+## Correlation IDs
+
+Every Jido AI event carries the same IDs:
+
+| Metadata | Value |
+| --- | --- |
+| `request_id` | The request Signal ID, and `reply.data.request_id`. |
+| `run_id` | One run of the reasoning Flow. |
+| `session_id`, `thread_id` | The conversation. |
+| `turn_id` | The Agent Server Turn. |
+| `trace_id`, `span_id` | The Turn's trace context from core Jido. |
+| `agent_id`, `agent_module`, `agent_name`, `agent_definition_id`, `agent_version` | The Agent. |
+
+The Agent start event has the Agent, Turn, and request IDs. Tool events and
+the stop event add `run_id`, `session_id`, and `thread_id`:
+
+```elixir
+{agent_metadata.request_id == reply.data.request_id,
+ tool_metadata.run_id == reply.data.run_id,
+ agent_metadata.thread_id == reply.data.thread_id}
+```
+
+The result is `{true, true, true}`.
+
+ReqLLM events don't know about Agents. Jido AI passes the Thread ID to
+ReqLLM as `telemetry: %{conversation_id: thread_id}`, and each model attempt
+records ReqLLM's own request ID:
+
+```elixir
+model_stops =
+  for {[:req_llm, :request, :stop], _measurements, metadata} <- events, do: metadata
+
+{Enum.map(model_stops, & &1.request_options.conversation_id) |> Enum.uniq(),
+ Enum.map(model_stops, & &1.request_id) ==
+   Enum.map(reply.data.model_attempts, & &1.req_llm_request_id)}
+```
+
+The result is `{["session:support-live:thread"], true}`. Join Agent events
+to model events on `thread_id` and `conversation_id`, and model attempts to
+model events on `req_llm_request_id` and `request_id`.
+
+The ReqLLM stop event carries usage and cost for one call:
+
+```elixir
+model_stops |> hd() |> Map.fetch!(:usage) |> Map.take([:input_cost, :output_cost, :total_cost])
+```
+
+The result is `%{input_cost: 3.0e-6, output_cost: 3.0e-6, total_cost: 6.0e-6}`.
+
+Jido AI keeps a short-lived record of each active Turn to join these events.
+Entries expire after `correlation_ttl_ms`, checked every
+`correlation_sweep_interval_ms`:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+config :jido_ai, :telemetry,
+  correlation_ttl_ms: 3_600_000,
+  correlation_sweep_interval_ms: 60_000
+```
+
+Those are the defaults. Each sweep that expires entries emits
+`[:jido, :ai, :telemetry, :correlation, :cleanup]` with `expired` and `size`
+measurements. A growing `size` means Turns aren't finishing.
+
+## Metrics
+
+`Jido.AI.Telemetry.metrics/0` returns `Telemetry.Metrics` definitions with
+low-cardinality tags. Pass them to any reporter:
+
+```elixir
+Enum.map(Jido.AI.Telemetry.metrics(), &Enum.join(&1.name, "."))
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+["jido.ai.agent.stop.count", "jido.ai.agent.stop.duration",
+ "jido.ai.reasoning.stop.count", "jido.ai.reasoning.stop.duration",
+ "jido.ai.tool.stop.count", "jido.ai.tool.stop.duration",
+ "jido.ai.model.request.count", "jido.ai.model.request.exception.count",
+ "jido.ai.model.request.duration", "jido.ai.telemetry.correlation.expired",
+ "jido.ai.telemetry.correlation.size", "jido.ai.model.input_tokens",
+ "jido.ai.model.output_tokens", "jido.ai.model.cache_read_tokens",
+ "jido.ai.model.cache_write_tokens", "jido.ai.model.reasoning_tokens",
+ "jido.ai.model.total_cost"]
+```
+
+Agent metrics are tagged by `status` and `reasoning_name`, tool metrics by
+`status` and `tool_name`, and model metrics by `provider` and `model`.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+children = [
+  {Telemetry.Metrics.ConsoleReporter, metrics: Jido.AI.Telemetry.metrics()}
+]
+```
+
+## Semantic Logs
+
+Jido AI can log one line per event from the same telemetry, with IDs, status,
+counts, and usage, and never content:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+config :jido_ai, :telemetry,
+  semantic_log_mode: :interesting,
+  semantic_slow_threshold_ms: 1_000
+```
+
+| Mode | Logs |
+| --- | --- |
+| `:off` (default) | Nothing. |
+| `:errors` | Exceptions, `:failed` requests, and HTTP errors, as warnings. |
+| `:interesting` | Errors, requests that didn't complete, and events slower than the threshold. |
+| `:all` | Every Agent, reasoning, tool, and model request event. |
+
+Errors log as warnings and everything else at debug level. A line looks like
+`[jido.ai.semantic] event=ai.agent.stop agent_name=support_agent ... status=blocked`.
+
+## OpenTelemetry
+
+Add `opentelemetry_api` and an SDK, such as `opentelemetry` with an exporter,
+to your application. When the SDK runs a real tracer at boot, Jido AI maps
+each Agent request, tool call, and reasoning round to a span, and attaches
+ReqLLM's model span bridge:
+
+| Span | Parent | Key attributes |
+| --- | --- | --- |
+| `invoke_agent support_agent` | none | `gen_ai.operation.name`, `gen_ai.agent.name`, `gen_ai.agent.id`, `gen_ai.agent.version`, `gen_ai.conversation.id`, `session.id` |
+| `execute_tool lookup_order` | the Agent span | `gen_ai.tool.name`, `gen_ai.tool.call.id`, `gen_ai.tool.type` |
+| `reasoning chain_of_thought` | the Agent span | `jido.ai.reasoning.method`, `jido.ai.model.request.id` |
+| `chat gpt-4o-mini` | the Agent span | ReqLLM's GenAI client attributes |
+
+Runtime IDs go under `jido.ai.*`, such as `jido.ai.request.id`,
+`jido.ai.run.id`, and `jido.ai.turn.id`. A failed span gets `error.type`
+and an error status. Spans opened inside a tool become children of the tool
+span.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+# mix.exs
+{:opentelemetry_api, "~> 1.0"},
+{:opentelemetry, "~> 1.5"},
+{:opentelemetry_exporter, "~> 1.8"}
+
+# config/runtime.exs
+config :jido_ai, :opentelemetry, options: [req_llm: [content: :none]]
+```
+
+Model spans carry no prompt or output content by default. Set
+`config :jido_ai, :opentelemetry, enabled: false` to turn the mapping off.
+Jido AI doesn't start an SDK or configure sampling and export.
+
+If your SDK starts after `:jido_ai`, attach the bridges yourself:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+if Jido.AI.Telemetry.open_telemetry?(), do: Jido.AI.Telemetry.attach_open_telemetry()
+```
+
+This notebook has no SDK, so the mapping is off:
+
+```elixir
+Jido.AI.Telemetry.open_telemetry?()
+```
+
+The result is `false`.
+
+## Clean Up
+
+```elixir
+:telemetry.detach("telemetry-guide")
+:ok = Jido.stop_agent("support-live")
+:ok = Jido.stop()
+```
+
+## Summary
+
+- Jido AI emits Agent, tool, and reasoning events under `[:jido, :ai]`.
+  ReqLLM emits model events under `[:req_llm]`.
+- Agent and tool events come from Agent Server Turns. The Agent stop event
+  carries the request counters and usage.
+- `request_id`, `run_id`, `session_id`, and `thread_id` join Jido AI events.
+  `conversation_id` and `req_llm_request_id` join model events.
+- `Jido.AI.Telemetry.metrics/0` feeds any `Telemetry.Metrics` reporter.
+- Semantic logs and OpenTelemetry spans use the same events and carry no
+  content.
+
+## Next
+
+- [Usage, Cache, and Cost](usage-cache-and-cost.md) – the usage numbers in
+  these events.
+- [Errors and Recovery](errors-and-recovery.md) – the statuses and reason
+  codes the Agent stop event reports.
+- [Test AI Agents](test-ai-agents.livemd) – assert on events in tests.

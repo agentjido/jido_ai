@@ -1,0 +1,452 @@
+# Mock Model Calls with ReqLLM
+
+## Overview
+
+Every Jido AI model call goes through ReqLLM, so ReqLLM is where your tests
+replace the provider. You can mock it at two depths: the HTTP request ReqLLM
+sends, or the `ReqLLM.generate_text/3` call itself. Both run offline with no
+provider key.
+
+This Livebook runs the same Agents through both paths. The HTTP mock
+asserts the exact provider request body: roles, tool definitions, and the
+JSON schema for structured output. The Mimic mock asserts the exact model,
+`ReqLLM.Context`, and options that Jido AI hands to ReqLLM.
+
+## Install
+
+```elixir
+Mix.install([
+  {:jido_ai, "~> 3.0.0-beta.1"},
+  {:plug, "~> 1.0"},
+  {:mimic, "~> 2.0"}
+])
+```
+
+```elixir
+Mimic.copy(ReqLLM)
+ExUnit.start(autorun: false)
+```
+
+`Req.Test` ships with Req and needs Plug. Mimic is only for the second path.
+
+## Choose a Path
+
+| | HTTP mock with `Req.Test` | Mimic on `ReqLLM` |
+| --- | --- | --- |
+| Replaces | The provider HTTP endpoint | `ReqLLM.generate_text/3` and friends |
+| You assert | The JSON body ReqLLM sends | The model, `ReqLLM.Context`, and options |
+| You return | Provider JSON, such as OpenAI Responses API | A `ReqLLM.Response` struct |
+| Covers | Jido AI, ReqLLM encoding, and response decoding | Jido AI only |
+| Request setup | `options.req_http_options: [plug: ...]` per request | None; the Agent runs unchanged |
+| Async tests | Yes | No; `set_mimic_global` needs `async: false` |
+| Provider-specific | Yes; the body and responses follow one provider | No |
+
+Use the HTTP mock when the provider wire format matters: tool definitions,
+`json_schema` output, or a ReqLLM upgrade. Use Mimic for everything else. It
+asserts the boundary Jido AI owns, and the fake responses stay small.
+
+## The Agents
+
+A tool-using support Agent and a triage Agent with no tools:
+
+```elixir
+defmodule MyApp.LookupOrder do
+  use Jido.Action,
+    id: "my_app/actions/lookup_order",
+    vsn: 1,
+    name: "lookup_order",
+    description: "Look up one order by ID.",
+    schema: Zoi.object(%{order_id: Zoi.string()}),
+    output_schema: Zoi.object(%{order_id: Zoi.string(), status: Zoi.string(), eta: Zoi.string()})
+
+  @impl Jido.Action
+  def run(%{order_id: order_id}, _context) do
+    {:ok, %{order_id: order_id, status: "shipped", eta: "2026-11-02"}}
+  end
+end
+
+defmodule MyApp.SupportAgent do
+  use Jido.AI.Agent,
+    id: "my_app/support_agent",
+    vsn: 1,
+    name: "support_agent"
+
+  ai do
+    reasoning Jido.AI.Reasoning.ReAct do
+      model "openai:gpt-4o-mini"
+      instructions "Answer customer support questions. Use tools for order data."
+    end
+
+    tools do
+      action MyApp.LookupOrder
+    end
+  end
+end
+
+defmodule MyApp.TriageAgent do
+  use Jido.AI.Agent,
+    id: "my_app/triage_agent",
+    vsn: 1,
+    name: "triage_agent"
+
+  ai do
+    reasoning Jido.AI.Reasoning.ReAct do
+      model "openai:gpt-4o-mini"
+      instructions "Classify the support ticket."
+    end
+  end
+end
+```
+
+## HTTP Mock Responses
+
+`openai:` models use the OpenAI Responses API. The offline model is a small
+module that builds its JSON. `offline/1` adds the request options that route
+ReqLLM to the `Req.Test` plug named `MyApp.LLM`:
+
+```elixir
+defmodule MyApp.OpenAIResponses do
+  def offline(params) do
+    Map.put(params, :options, %{
+      api_key: "offline-test-key",
+      max_retries: 0,
+      max_tokens: 128,
+      temperature: 0.0,
+      req_http_options: [plug: {Req.Test, MyApp.LLM}]
+    })
+  end
+
+  def text(text, input_tokens \\ 20, output_tokens \\ 6) do
+    response(
+      [
+        %{
+          "type" => "message",
+          "id" => "msg-1",
+          "role" => "assistant",
+          "status" => "completed",
+          "content" => [
+            %{"type" => "output_text", "text" => text, "annotations" => [], "logprobs" => []}
+          ]
+        }
+      ],
+      input_tokens,
+      output_tokens
+    )
+  end
+
+  def tool_call(call_id, name, arguments) do
+    response(
+      [
+        %{
+          "type" => "function_call",
+          "id" => "fc-1",
+          "call_id" => call_id,
+          "name" => name,
+          "arguments" => Jason.encode!(arguments),
+          "status" => "completed"
+        }
+      ],
+      20,
+      4
+    )
+  end
+
+  def body(conn) do
+    {:ok, body, _conn} = Plug.Conn.read_body(conn)
+    Jason.decode!(body)
+  end
+
+  defp response(output, input_tokens, output_tokens) do
+    %{
+      "id" => "resp-1",
+      "object" => "response",
+      "created_at" => 1,
+      "model" => "gpt-4o-mini-2024-07-18",
+      "status" => "completed",
+      "error" => nil,
+      "incomplete_details" => nil,
+      "parallel_tool_calls" => true,
+      "output" => output,
+      "usage" => %{
+        "input_tokens" => input_tokens,
+        "input_tokens_details" => %{"cached_tokens" => 0},
+        "output_tokens" => output_tokens,
+        "output_tokens_details" => %{"reasoning_tokens" => 0},
+        "total_tokens" => input_tokens + output_tokens
+      }
+    }
+  end
+end
+```
+
+`options` replaces the Flow's default options map. Set `max_tokens` and
+`temperature` again, or ReqLLM applies its own defaults. `max_retries: 0`
+stops ReqLLM from retrying a failed mock response.
+
+## Assert the Body
+
+Each `Req.Test.expect/2` answers one HTTP request, in order. The plug sends
+the decoded body to the test process, so the test asserts on it after the
+request finishes:
+
+```elixir
+defmodule MyApp.HTTPMockTest do
+  use ExUnit.Case, async: true
+
+  alias Jido.Agent.Directive.Reply
+  alias MyApp.OpenAIResponses
+
+  setup {Req.Test, :set_req_test_from_context}
+  setup {Req.Test, :verify_on_exit!}
+
+  @triage %{
+    "type" => "object",
+    "properties" => %{
+      "category" => %{"type" => "string", "enum" => ["billing", "shipping", "account"]},
+      "priority" => %{"type" => "string", "enum" => ["low", "normal", "high"]},
+      "summary" => %{"type" => "string"}
+    },
+    "required" => ["category", "priority", "summary"],
+    "additionalProperties" => false
+  }
+
+  test "a tool round sends roles, tools, and the tool result" do
+    owner = self()
+
+    Req.Test.expect(MyApp.LLM, fn conn ->
+      send(owner, {:body, OpenAIResponses.body(conn)})
+
+      Req.Test.json(
+        conn,
+        OpenAIResponses.tool_call("call-1", "lookup_order", %{order_id: "A-1001"})
+      )
+    end)
+
+    Req.Test.expect(MyApp.LLM, fn conn ->
+      send(owner, {:body, OpenAIResponses.body(conn)})
+      Req.Test.json(conn, OpenAIResponses.text("Order A-1001 shipped.", 30, 6))
+    end)
+
+    agent = MyApp.SupportAgent.instantiate!(id: "support-1")
+
+    signal =
+      MyApp.SupportAgent.request_signal!(OpenAIResponses.offline(%{input: "Where is A-1001?"}))
+
+    assert {:ok, _agent, [%Reply{signal: reply}]} = MyApp.SupportAgent.cmd(agent, signal)
+    assert reply.data.status == :completed
+    assert reply.data.output == "Order A-1001 shipped."
+
+    assert_receive {:body, first}
+    assert_receive {:body, second}
+
+    assert first["model"] == "gpt-4o-mini"
+    assert first["max_output_tokens"] == 128
+    assert Enum.map(first["input"], & &1["role"]) == ["system", "user"]
+    assert [%{"name" => "lookup_order", "type" => "function", "strict" => true}] = first["tools"]
+    assert first["tools"] |> hd() |> get_in(["parameters", "required"]) == ["order_id"]
+
+    assert Enum.map(second["input"], &{&1["role"], &1["type"]}) == [
+             {"system", nil},
+             {"user", nil},
+             {nil, "function_call"},
+             {nil, "function_call_output"}
+           ]
+  end
+
+  test "structured output sends a strict json_schema" do
+    owner = self()
+    triage = %{category: "shipping", priority: "normal", summary: "Customer asks about A-1001."}
+
+    Req.Test.expect(MyApp.LLM, fn conn ->
+      send(owner, {:body, OpenAIResponses.body(conn)})
+      Req.Test.json(conn, OpenAIResponses.text(Jason.encode!(triage)))
+    end)
+
+    agent = MyApp.TriageAgent.instantiate!(id: "triage-1")
+
+    signal =
+      MyApp.TriageAgent.request_signal!(
+        OpenAIResponses.offline(%{input: "Where is order A-1001?", output_schema: @triage})
+      )
+
+    assert {:ok, _agent, [%Reply{signal: reply}]} = MyApp.TriageAgent.cmd(agent, signal)
+
+    assert reply.data.output == %{
+             "category" => "shipping",
+             "priority" => "normal",
+             "summary" => "Customer asks about A-1001."
+           }
+
+    assert_receive {:body, body}
+    refute Map.has_key?(body, "tools")
+
+    assert %{
+             "type" => "json_schema",
+             "name" => "output_schema",
+             "strict" => true,
+             "schema" => schema
+           } =
+             body["text"]["format"]
+
+    assert schema["required"] == ["category", "priority", "summary"]
+  end
+end
+```
+
+The second request carries the tool exchange as `function_call` and
+`function_call_output` items. That is ReqLLM's OpenAI encoding of the
+`:assistant` and `:tool` messages that Jido AI projected.
+
+An Agent with tools encodes structured output differently: ReqLLM adds a
+`structured_output` function tool and forces it with `tool_choice`. Assert
+the encoding your Agent sends.
+
+## Mock ReqLLM with Mimic
+
+`expect(ReqLLM, :generate_text, fn model, context, options -> ... end)`
+replaces one call. The function receives exactly what Jido AI passes to
+ReqLLM. The request needs no extra options:
+
+```elixir
+defmodule MyApp.MimicMockTest do
+  use ExUnit.Case, async: false
+
+  import Mimic
+
+  alias Jido.Agent.Directive.Reply
+
+  setup :set_mimic_global
+  setup :verify_on_exit!
+
+  test "Jido AI sends the exact model, Context, and options" do
+    expect(ReqLLM, :generate_text, fn model, context, options ->
+      assert model == "openai:gpt-4o-mini"
+
+      assert [system, user] = ReqLLM.Context.to_list(context)
+      assert system.role == :system
+
+      assert hd(system.content).text ==
+               "Answer customer support questions. Use tools for order data."
+
+      assert user.role == :user
+      assert hd(user.content).text == "Where is A-1001?"
+
+      assert options |> Keyword.keys() |> Enum.sort() ==
+               [:max_tokens, :receive_timeout, :telemetry, :temperature, :tools, :total_timeout]
+
+      assert options[:max_tokens] == 128
+      assert options[:temperature] == 0.0
+      assert options[:receive_timeout] == 30_000
+      assert [%ReqLLM.Tool{name: "lookup_order"}] = options[:tools]
+
+      {:ok,
+       %ReqLLM.Response{
+         id: "resp-1",
+         model: model,
+         context: context,
+         finish_reason: :stop,
+         message: ReqLLM.Context.assistant("Order A-1001 shipped."),
+         usage: %{input_tokens: 20, output_tokens: 6}
+       }}
+    end)
+
+    agent = MyApp.SupportAgent.instantiate!(id: "support-1")
+    signal = MyApp.SupportAgent.request_signal!(%{input: "Where is A-1001?"})
+
+    assert {:ok, _agent, [%Reply{signal: reply}]} = MyApp.SupportAgent.cmd(agent, signal)
+    assert reply.data.output == "Order A-1001 shipped."
+    assert reply.data.usage.total_tokens == 26
+  end
+
+  test "structured output arrives as a strict ReqLLM.Output" do
+    expect(ReqLLM, :generate_text, fn model, context, options ->
+      assert %ReqLLM.Output{type: :object} = options[:output]
+      assert options[:output_validation] == :strict
+
+      {:ok,
+       %ReqLLM.Response{
+         id: "resp-1",
+         model: model,
+         context: context,
+         finish_reason: :stop,
+         object: %{
+           "category" => "shipping",
+           "priority" => "normal",
+           "summary" => "Where is A-1001?"
+         },
+         usage: %{input_tokens: 20, output_tokens: 6}
+       }}
+    end)
+
+    agent = MyApp.TriageAgent.instantiate!(id: "triage-1")
+
+    signal =
+      MyApp.TriageAgent.request_signal!(%{
+        input: "Where is A-1001?",
+        output_schema: %{
+          "type" => "object",
+          "properties" => %{"category" => %{"type" => "string"}},
+          "required" => ["category"]
+        }
+      })
+
+    assert {:ok, _agent, [%Reply{signal: reply}]} = MyApp.TriageAgent.cmd(agent, signal)
+    assert reply.data.output["category"] == "shipping"
+  end
+
+  test "stream: true calls ReqLLM.stream_text/3 instead" do
+    expect(ReqLLM, :stream_text, fn model, context, _options ->
+      response = %ReqLLM.Response{
+        id: "resp-1",
+        model: model,
+        context: context,
+        finish_reason: :stop,
+        message: ReqLLM.Context.assistant("Order A-1001 shipped."),
+        usage: %{input_tokens: 20, output_tokens: 6}
+      }
+
+      {:ok, ReqLLM.Cache.stream_response(response, ReqLLM.model!(model), context)}
+    end)
+
+    agent = MyApp.SupportAgent.instantiate!(id: "support-1")
+    signal = MyApp.SupportAgent.request_signal!(%{input: "Where is A-1001?", stream: true})
+
+    assert {:ok, _agent, [%Reply{signal: reply}]} = MyApp.SupportAgent.cmd(agent, signal)
+    assert reply.data.output == "Order A-1001 shipped."
+  end
+end
+```
+
+`total_timeout` is the time left in the request's `limits.elapsed_ms` budget,
+so its value changes on every run. Assert that the key is present, not its
+value. `telemetry` carries the Thread ID as `conversation_id`.
+
+`ReqLLM.Cache.stream_response/3` turns a complete `ReqLLM.Response` into a
+`ReqLLM.StreamResponse`, so one builder serves both modes.
+[Stream Model Output](stream-model-output.livemd) covers the stream Signals.
+
+## Run the Tests
+
+```elixir
+ExUnit.run()
+```
+
+The result is `%{total: 5, failures: 0, excluded: 0, skipped: 0}`.
+
+## Summary
+
+- The HTTP mock routes ReqLLM to `Req.Test` with
+  `options.req_http_options: [plug: {Req.Test, MyApp.LLM}]` and asserts the
+  provider JSON body.
+- An Agent without tools sends structured output as a strict `json_schema`.
+  An Agent with tools sends a `structured_output` function tool.
+- Mimic replaces `ReqLLM.generate_text/3` and asserts the exact model,
+  `ReqLLM.Context`, and options, with no request changes.
+- `stream: true` calls `ReqLLM.stream_text/3`; mock that function instead.
+- Use `async: true` with the HTTP mock and `async: false` with Mimic global
+  mode.
+
+## Next
+
+[Public API Reference](public-api-reference.md) lists every request field,
+response field, and Signal name you can assert on.

@@ -43,8 +43,8 @@ defmodule Jido.AI.Agent.DSL do
   defmacro tools(do: block) do
     caller = __CALLER__
 
-    unless Enum.all?(expressions(block), &match?({:action, _, [_target]}, &1)) do
-      compile_error!(caller, caller.line, "tools accepts only action declarations")
+    unless Enum.all?(expressions(block), &tool_declaration?/1) do
+      compile_error!(caller, caller.line, "tools accepts only action or flow declarations")
     end
 
     quote do
@@ -58,6 +58,9 @@ defmodule Jido.AI.Agent.DSL do
   defmacro reasoning(target), do: referenced_reasoning(target, nil, __CALLER__)
 
   defmacro reasoning(target, do: body), do: referenced_reasoning(target, body, __CALLER__)
+
+  defp tool_declaration?({kind, _meta, [_target]}) when kind in [:action, :flow], do: true
+  defp tool_declaration?(_declaration), do: false
 
   defp referenced_reasoning(target_ast, body, caller) do
     target =

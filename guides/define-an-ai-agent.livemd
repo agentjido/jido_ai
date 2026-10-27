@@ -1,0 +1,468 @@
+# Define an AI Agent
+
+## Overview
+
+An AI Agent is a declaration: one root reasoning Flow, the request defaults
+for that Flow, and the tools the model may call. This Livebook builds a
+support Agent, covers each part of the `ai` block and the rules the compiler
+enforces, and reads what `explain/0` and `preflight/1` return. By the end,
+you can check a request against the declaration without calling a model:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+MyApp.SupportAgent.explain().tools
+# => [MyApp.LookupOrder, MyApp.IssueRefund]
+
+{:ok, checked} = MyApp.SupportAgent.preflight(%{input: "Where is order A-1001?"})
+checked.params.limits.model_calls
+# => 4
+```
+
+Run the cells from top to bottom. The model runs offline, so you need no API
+key. [Getting Started](getting-started.livemd) is the shorter tour; this page
+goes field by field.
+
+## Install
+
+```elixir
+Mix.install([{:jido_ai, "~> 3.0.0-beta.1"}, {:plug, "~> 1.0"}])
+```
+
+`plug` provides `Req.Test`, which the offline model uses.
+
+## Define The Tools
+
+Tools are Jido Actions. The model sees each Action's `name`, `description`,
+and parameter schema:
+
+```elixir
+defmodule MyApp.LookupOrder do
+  use Jido.Action,
+    id: "my_app/actions/lookup_order",
+    vsn: 1,
+    name: "lookup_order",
+    description: "Look up the shipping status of one order.",
+    schema: Zoi.object(%{order_id: Zoi.string()})
+
+  @impl Jido.Action
+  def run(%{order_id: order_id}, _context) do
+    {:ok, %{order_id: order_id, status: "shipped", eta: "2026-11-02"}}
+  end
+end
+
+defmodule MyApp.IssueRefund do
+  use Jido.Action,
+    id: "my_app/actions/issue_refund",
+    vsn: 1,
+    name: "issue_refund",
+    description: "Refund part of one order, in cents.",
+    schema: Zoi.object(%{order_id: Zoi.string(), amount_cents: Zoi.integer(gte: 1)})
+
+  @impl Jido.Action
+  def run(%{order_id: order_id, amount_cents: amount_cents}, _context) do
+    {:ok, %{order_id: order_id, refunded_cents: amount_cents}}
+  end
+end
+```
+
+## Declare The Agent
+
+```elixir
+defmodule MyApp.SupportAgent do
+  use Jido.AI.Agent,
+    id: "my_app/support_agent",
+    vsn: 1,
+    name: "support_agent"
+
+  ai do
+    reasoning Jido.AI.Reasoning.ReAct do
+      model "openai:gpt-4o-mini"
+      fallback_models ["anthropic:claude-haiku-4-5"]
+      instructions "You answer customer-support questions. Look up orders before you answer."
+
+      limits do
+        model_calls 4
+        tool_rounds 2
+      end
+
+      context do
+        max_messages 32
+      end
+    end
+
+    tools do
+      action MyApp.LookupOrder
+      action MyApp.IssueRefund
+    end
+  end
+end
+```
+
+| Declaration | Effect |
+| --- | --- |
+| `use Jido.AI.Agent` | Defines a Jido Agent with a `session` state field and one `jido.ai.request` route. The `id` sets the Signal source to `/my_app/support_agent`. |
+| `ai` | Holds one `reasoning` declaration and at most one `tools` block. Nothing else. |
+| `reasoning Flow do ... end` | Selects the root Flow and sets its request defaults. |
+| `tools` | The ordered tool allowlist. A request can narrow it but can't add to it. |
+
+`use Jido.AI.Agent` also generates these functions:
+
+| Function | Returns |
+| --- | --- |
+| `reasoning/0` | The root Flow module. |
+| `explain/0` | The Flow, its schemas, the defaults, and the tools. |
+| `preflight/1` | The validated request params and compiled workflow, without running them. |
+| `request_signal!/2`, `request_signal/2` | A `jido.ai.request` Signal with your data. |
+
+## Reasoning Defaults
+
+The `reasoning` block is not a fixed DSL. Its fields are the fields of the
+selected Flow's input schema, and nothing else. For
+`Jido.AI.Reasoning.ReAct` those are:
+
+| Field | Default |
+| --- | --- |
+| `instructions` | `"Answer concisely. Use the available tools when they help. ..."` |
+| `model` | `"openai:gpt-4o-mini"` |
+| `fallback_models` | `[]` |
+| `options` | `%{max_tokens: 128, receive_timeout: 30_000, temperature: 0.0}` |
+| `prompt_cache` | `enabled false`, optional `ttl` |
+| `stream` | `false` |
+| `output_schema` | `nil` |
+| `review_tools` | `false` |
+| `tool_policy` | `visible`, `hidden`, `review` (all `[]`), `requirement :optional`, `reason nil` |
+| `context` | `max_messages 64` (1 to 512), `max_bytes 200_000` |
+| `limits` | `model_calls 8`, `tool_rounds 4`, `tool_calls 8`, `retries 1`, `elapsed_ms 120_000`, `tool_output_bytes 16_384`, token and cost limits `nil` |
+
+`input` is also in the schema, but it is the per-request message, so it can't
+be a default. Other Flows define other fields; read them from
+`explain().input_schema`, or see
+[Choose a Reasoning Flow](choose-a-reasoning-flow.md).
+
+Nested objects such as `limits` and `context` use nested blocks. Jido
+validates the defaults against the schema at compile time and fills the
+fields you left out:
+
+```elixir
+MyApp.SupportAgent.explain().defaults.limits
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  model_calls: 4,
+  tool_rounds: 2,
+  tool_calls: 8,
+  retries: 1,
+  elapsed_ms: 120_000,
+  input_tokens: nil,
+  output_tokens: nil,
+  total_tokens: nil,
+  total_cost: nil,
+  tool_output_bytes: 16_384
+}
+```
+
+Every value must be a compile-time literal. `model System.get_env("MODEL")`
+fails with `model requires a compile-time literal value`. Pass runtime
+values in the request instead.
+
+## Request Overrides
+
+Each request's Signal data is the Flow input. A field in the request replaces
+the Agent default for that field:
+
+```elixir
+{:ok, checked} =
+  MyApp.SupportAgent.preflight(%{
+    input: "Where is order A-1001?",
+    model: "anthropic:claude-haiku-4-5"
+  })
+
+{checked.params.model, checked.params.limits.model_calls}
+```
+
+The result is `{"anthropic:claude-haiku-4-5", 4}`.
+
+The replacement is per top-level field. A request `limits` map replaces the
+whole `limits` default, and the schema fills the rest:
+
+```elixir
+{:ok, checked} =
+  MyApp.SupportAgent.preflight(%{input: "Where is order A-1001?", limits: %{retries: 0}})
+
+{checked.params.limits.retries, checked.params.limits.model_calls}
+```
+
+The result is `{0, 8}`. The Agent's `model_calls 4` is gone. Send the complete
+object when you override a nested field.
+
+## Tools
+
+The `tools` block accepts `action Module` and `flow Module` lines. Order is
+kept, and the model sees the tools in that order:
+
+```elixir
+MyApp.SupportAgent.explain().tools
+```
+
+The result is `[MyApp.LookupOrder, MyApp.IssueRefund]`.
+
+The block is an allowlist. A request can narrow it with `tool_policy`
+(`visible`, `hidden`, `review`, `requirement`), but it can't add a tool. A
+request field named `tools` fails validation with `unrecognized key: tools`.
+[Action Tools](action-tools.livemd) covers tool selection, and
+[Dynamic Tool Sources](dynamic-tool-sources.md) covers tools that a trusted
+host adds at run time.
+
+## Compile-Time Rules
+
+The compiler rejects a malformed `ai` block before the module exists:
+
+| Mistake | Error |
+| --- | --- |
+| No `ai` block | `AI Agent requires exactly one reasoning Flow` (a `Spark.Error.DslError`) |
+| Zero or two `reasoning` declarations | `ai requires exactly one reasoning declaration` |
+| Two `tools` blocks | `An Agent can define at most one tools block` |
+| Two `ai` blocks | `An Agent can define only one ai block` |
+| Anything but `reasoning` or `tools` in `ai` | `ai accepts only reasoning and tools declarations` |
+| Anything but `action` or `flow` in `tools` | `tools accepts only action or flow declarations` |
+| A field the Flow doesn't define | `reasoning configuration is invalid for Jido.AI.Reasoning.ReAct at temperature: Flow default field is unknown` |
+| A value the schema rejects | `... at limits.model_calls: Flow default does not match its input schema` |
+| `input` as a default | `reasoning input cannot be a default` |
+| A module that isn't a Flow | `reasoning must reference a compiled Jido Flow module` |
+
+Try one:
+
+```elixir
+source = """
+defmodule MyApp.TwoToolBlocks do
+  use Jido.AI.Agent, id: "my_app/two_tool_blocks", vsn: 1, name: "two_tool_blocks"
+
+  ai do
+    reasoning Jido.AI.Reasoning.ReAct
+
+    tools do
+      action MyApp.LookupOrder
+    end
+
+    tools do
+      action MyApp.IssueRefund
+    end
+  end
+end
+"""
+
+try do
+  Code.compile_string(source)
+rescue
+  error in CompileError -> Exception.message(error)
+end
+```
+
+The result is `"nofile:4: An Agent can define at most one tools block"`. The line is the `ai` block.
+
+`use Jido.AI.Agent` declares the Agent's `state` and `routes` sections
+itself. Adding your own `state do` or `routes do` block fails with
+`Agent section state can be declared only once`. Add state through a Plugin;
+[Agent Authoring](agent-authoring.md) shows how.
+
+## Explain
+
+`explain/0` describes the declaration:
+
+```elixir
+explained = MyApp.SupportAgent.explain()
+
+Map.keys(explained) |> Enum.sort()
+```
+
+The result is
+`[:agent, :defaults, :flow, :input_schema, :output_schema, :reasoning, :tools]`.
+
+| Key | Value |
+| --- | --- |
+| `agent` | `MyApp.SupportAgent` |
+| `reasoning` | `Jido.AI.Reasoning.ReAct` |
+| `defaults` | The validated `reasoning` block values |
+| `input_schema` | The Flow's Zoi input schema |
+| `output_schema` | The Flow's Zoi output schema, `%{state: map, response: map}` |
+| `tools` | The `tools` block, in order |
+| `flow` | The compiled `%Jido.Flow{}` graph |
+
+`explain/0` reads compiled data. It runs nothing and needs no instance.
+
+## Preflight
+
+`preflight/1` takes request data as a map or keyword list. It merges the
+defaults, validates the result against the Flow input schema, checks the
+tools, and compiles the Flow into a workflow. It calls no model and runs no
+tool:
+
+```elixir
+{:ok, checked} = MyApp.SupportAgent.preflight(input: "Where is order A-1001?")
+
+{Map.keys(checked) |> Enum.sort(), checked.workflow.__struct__}
+```
+
+The result is
+`{[:agent, :flow, :params, :reasoning, :tools, :workflow], Runic.Workflow}`.
+`params` is the exact input the Flow would receive: every schema field, with
+your defaults and the request merged in.
+
+A bad request returns the schema error:
+
+```elixir
+{:error, error} =
+  MyApp.SupportAgent.preflight(%{input: "Where is order A-1001?", limits: %{model_calls: 99}})
+
+{error.__struct__, Exception.message(error)}
+```
+
+The result is
+`{Jido.Action.Error.InvalidInputError, "too big: must be at most 16, at limits.model_calls"}`.
+A missing `input` gives `"is required, at input"`. Call `preflight/1` in a
+controller or test before you queue real model work.
+
+## Offline Model
+
+This cell is the fake provider. It answers ReqLLM's HTTP requests with
+OpenAI Responses API JSON, in the order you queue them:
+
+```elixir
+defmodule MyApp.OfflineModel do
+  @moduledoc "Queues fake OpenAI Responses API replies for ReqLLM."
+
+  @doc "Request options that send model calls to this module."
+  def options do
+    %{
+      api_key: "offline-test-key",
+      max_retries: 0,
+      max_tokens: 128,
+      temperature: 0.0,
+      req_http_options: [plug: {Req.Test, MyApp.LLM}]
+    }
+  end
+
+  @doc "Queues one reply per model call, in order."
+  def respond_with(bodies) do
+    Enum.each(bodies, fn body ->
+      Req.Test.expect(MyApp.LLM, &Req.Test.json(&1, body))
+    end)
+  end
+
+  @doc "A final text answer."
+  def text(text) do
+    response([
+      %{
+        "type" => "message",
+        "id" => "msg_1",
+        "role" => "assistant",
+        "status" => "completed",
+        "content" => [%{"type" => "output_text", "text" => text, "annotations" => []}]
+      }
+    ])
+  end
+
+  @doc "A request to call one tool."
+  def tool_call(name, arguments, call_id \\ "call_1") do
+    response([
+      %{
+        "type" => "function_call",
+        "id" => "fc_" <> call_id,
+        "call_id" => call_id,
+        "name" => name,
+        "arguments" => Jason.encode!(arguments),
+        "status" => "completed"
+      }
+    ])
+  end
+
+  defp response(output) do
+    %{
+      "id" => "resp_1",
+      "object" => "response",
+      "created_at" => 1,
+      "model" => "gpt-4o-mini-2024-07-18",
+      "status" => "completed",
+      "error" => nil,
+      "incomplete_details" => nil,
+      "parallel_tool_calls" => true,
+      "output" => output,
+      "usage" => %{
+        "input_tokens" => 20,
+        "input_tokens_details" => %{"cached_tokens" => 0},
+        "output_tokens" => 5,
+        "output_tokens_details" => %{"reasoning_tokens" => 0},
+        "total_tokens" => 25
+      }
+    }
+  end
+end
+```
+
+`MyApp.OfflineModel.options/0` replaces the whole `options` default for each
+request. With a real provider, leave `options` out and set the key ReqLLM
+reads, such as `OPENAI_API_KEY`.
+
+## Run A Request
+
+The model asks for `lookup_order`, then answers:
+
+```elixir
+MyApp.OfflineModel.respond_with([
+  MyApp.OfflineModel.tool_call("lookup_order", %{order_id: "A-1001"}),
+  MyApp.OfflineModel.text("Order A-1001 has shipped. It should arrive on 2026-11-02.")
+])
+
+agent = MyApp.SupportAgent.instantiate!(id: "support-1")
+
+signal =
+  MyApp.SupportAgent.request_signal!(%{
+    input: "Where is order A-1001?",
+    options: MyApp.OfflineModel.options()
+  })
+
+{:ok, next_agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+  MyApp.SupportAgent.cmd(agent, signal)
+
+{reply.type, reply.data.status, reply.data.output}
+```
+
+The result is
+`{"jido.ai.response", :completed, "Order A-1001 has shipped. It should arrive on 2026-11-02."}`.
+
+The Agent's limits applied to this request:
+
+```elixir
+Map.take(reply.data, [:model_calls, :tool_rounds, :tool_calls])
+```
+
+The result is `%{model_calls: 2, tool_rounds: 1, tool_calls: 1}`, inside the
+`model_calls 4` and `tool_rounds 2` defaults. `next_agent.state.session` holds
+the conversation; [Sessions and Threads](sessions-and-threads.md) covers it.
+
+## Summary
+
+- An AI Agent has one `ai` block with exactly one `reasoning` declaration and
+  at most one `tools` block.
+- The `reasoning` block's fields come from the Flow's input schema. Values are
+  compile-time literals, checked and completed at compile time.
+- A request field replaces the default for that whole top-level field.
+- The `tools` block is an ordered allowlist of Actions. Requests can narrow
+  it, never extend it.
+- `explain/0` returns the Flow, schemas, defaults, and tools.
+  `preflight/1` returns validated `params` and a compiled workflow, or the
+  schema error, without calling a model.
+
+## Next
+
+- [Agent Authoring](agent-authoring.md) – inline Flows, Plugins, and portable
+  JSON definitions.
+- [Structured Output](structured-output.livemd) – typed replies from a Zoi
+  schema.
+- [Action Tools](action-tools.livemd) – tool selection and the allowlist.

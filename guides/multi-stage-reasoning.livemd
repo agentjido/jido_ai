@@ -1,0 +1,466 @@
+# Multi-Stage Reasoning
+
+## Overview
+
+A customer's package is late and you want the model to weigh options, such as
+reship, refund, or wait, before it answers. Tree of Thoughts, Graph of
+Thoughts, and TRM split that work across two or three structured model calls.
+Each stage has its own instruction and JSON schema, and Jido AI moves data
+between stages in local code:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{reply.data.output, reply.data.model_calls}
+# => {"Reship order A-1001 today with express shipping at no charge.", 3}
+```
+
+You'll run all three Flows offline, see the instruction for each stage, and
+read the result data. Run the cells from top to bottom.
+
+## Install
+
+```elixir
+Mix.install([{:jido_ai, "~> 3.0.0-beta.1"}, {:plug, "~> 1.0"}])
+```
+
+## Three Agents
+
+```elixir
+defmodule MyApp.TreeAgent do
+  use Jido.AI.Agent, id: "my_app/tree_agent", vsn: 1, name: "tree_agent"
+
+  ai do
+    reasoning Jido.AI.Reasoning.TreeOfThoughts
+  end
+end
+
+defmodule MyApp.GraphAgent do
+  use Jido.AI.Agent, id: "my_app/graph_agent", vsn: 1, name: "graph_agent"
+
+  ai do
+    reasoning Jido.AI.Reasoning.GraphOfThoughts
+  end
+end
+
+defmodule MyApp.RevisionAgent do
+  use Jido.AI.Agent, id: "my_app/revision_agent", vsn: 1, name: "revision_agent"
+
+  ai do
+    reasoning Jido.AI.Reasoning.TRM
+  end
+end
+```
+
+None of these Flows calls tools.
+
+## The Stage Loop
+
+Each Flow has a `ModelRound` that runs one stage and invokes itself for the
+next one:
+
+```elixir
+alias Jido.AI.Reasoning.{GraphOfThoughts, TreeOfThoughts, TRM}
+
+for flow <- [TreeOfThoughts.ModelRound, GraphOfThoughts.ModelRound, TRM.ModelRound] do
+  IO.puts("Graph: #{inspect(flow)}")
+
+  flow.flow().components
+  |> Enum.sort_by(&elem(&1, 0))
+  |> Enum.each(fn {name, component} -> IO.puts("  #{name}: #{component.kind}") end)
+end
+```
+
+```text
+Graph: Jido.AI.Reasoning.TreeOfThoughts.ModelRound
+  accept: call
+  model: call
+  next: invoke
+  output_guard: call
+  prepare: call
+  project: call
+  record_attempt: call
+Graph: Jido.AI.Reasoning.GraphOfThoughts.ModelRound
+  advance: invoke
+  model: call
+  output_guard: call
+  prepare: call
+  project: call
+  record_attempt: call
+Graph: Jido.AI.Reasoning.TRM.ModelRound
+  advance: invoke
+  model: call
+  output_guard: call
+  prepare: call
+  project: call
+  record_attempt: call
+```
+
+`prepare` sets the stage instruction and output schema. The instruction goes
+after the conversation as a final system message, below the Agent
+instructions. The `invoke` step reads the object, stores it in the stage
+state, and starts the next `ModelRound` or completes. Only the last stage's
+answer is added to the conversation; earlier stages appear in
+`model_attempts` only.
+
+## Offline Model
+
+The fake provider answers by stage. It reads the last message of each request
+(the stage instruction) and passes it to a function you supply:
+
+```elixir
+defmodule MyApp.LLM do
+  def options do
+    %{
+      api_key: "offline-test-key",
+      max_retries: 0,
+      max_tokens: 1536,
+      temperature: 0.0,
+      req_http_options: [plug: {Req.Test, __MODULE__}]
+    }
+  end
+
+  def stub(notebook, answer) do
+    Req.Test.stub(__MODULE__, fn conn ->
+      {:ok, body, conn} = Plug.Conn.read_body(conn)
+      [%{"text" => instruction} | _parts] = List.last(Jason.decode!(body)["input"])["content"]
+      send(notebook, {:stage, instruction})
+      object(conn, answer.(instruction))
+    end)
+  end
+
+  defp object(conn, object) do
+    Req.Test.json(conn, %{
+      "id" => "resp_#{System.unique_integer([:positive])}",
+      "object" => "response",
+      "created_at" => 1,
+      "model" => "gpt-4o-mini-2024-07-18",
+      "status" => "completed",
+      "output" => [
+        %{
+          "type" => "message",
+          "id" => "msg_1",
+          "role" => "assistant",
+          "status" => "completed",
+          "content" => [
+            %{"type" => "output_text", "text" => Jason.encode!(object), "annotations" => []}
+          ]
+        }
+      ],
+      "usage" => %{
+        "input_tokens" => 80,
+        "input_tokens_details" => %{"cached_tokens" => 0},
+        "output_tokens" => 40,
+        "output_tokens_details" => %{"reasoning_tokens" => 0},
+        "total_tokens" => 120
+      }
+    })
+  end
+end
+```
+
+`ask` runs one request on a fresh Agent and returns the reply with the stage
+instructions in order:
+
+```elixir
+notebook = self()
+question = "Order A-1001 is five days late. What should we offer the customer?"
+
+ask = fn agent_module, answer ->
+  MyApp.LLM.stub(notebook, answer)
+  agent = agent_module.instantiate!(id: "agent-#{System.unique_integer([:positive])}")
+  signal = agent_module.request_signal!(%{input: question, options: MyApp.LLM.options()})
+  {:ok, _agent, [%Jido.Agent.Directive.Reply{signal: reply}]} = agent_module.cmd(agent, signal)
+
+  stages =
+    Stream.repeatedly(fn ->
+      receive do
+        {:stage, instruction} -> String.slice(instruction, 0, 48)
+      after
+        0 -> nil
+      end
+    end)
+    |> Enum.take_while(& &1)
+
+  {reply, stages}
+end
+```
+
+## Tree of Thoughts
+
+Tree of Thoughts generates candidates, scores them, keeps the top two, and
+synthesizes an answer. Selection is local code, so that's three model calls:
+
+| Stage | Instruction starts with | Required JSON |
+| --- | --- | --- |
+| Generate | `Generate four distinct candidate approaches` | `thoughts`: at least 2 `%{"content"}` |
+| Evaluate | `Evaluate each candidate from this JSON list:` + candidates | `thoughts`: at least 2 `%{"content", "score"}`, score 0–1 |
+| Select | No model call | Sort by score, keep 2 |
+| Synthesize | `Synthesize the best final answer from this JSON list:` + the 2 kept | `answer` |
+
+```elixir
+candidates = [
+  "Reship with express shipping",
+  "Refund the shipping fee",
+  "Wait two more days",
+  "Offer a 10% coupon"
+]
+
+tree_answer = fn
+  "Generate" <> _rest ->
+    %{thoughts: Enum.map(candidates, &%{content: &1})}
+
+  "Evaluate" <> _rest ->
+    %{thoughts: Enum.zip_with(candidates, [0.9, 0.7, 0.2, 0.4], &%{content: &1, score: &2})}
+
+  "Synthesize" <> _rest ->
+    %{answer: "Reship order A-1001 today with express shipping at no charge."}
+end
+
+{reply, stages} = ask.(MyApp.TreeAgent, tree_answer)
+
+{reply.data.status, reply.data.output, reply.data.model_calls}
+```
+
+The result is
+`{:completed, "Reship order A-1001 today with express shipping at no charge.", 3}`.
+
+```elixir
+stages
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+[
+  "Generate four distinct candidate approaches to t",
+  "Evaluate each candidate from this JSON list: [{\"",
+  "Synthesize the best final answer from this JSON "
+]
+```
+
+```elixir
+reply.data.reasoning
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  method: :tree_of_thoughts,
+  thoughts: [
+    %{content: "Reship with express shipping", score: 0.9},
+    %{content: "Refund the shipping fee", score: 0.7},
+    %{content: "Wait two more days", score: 0.2},
+    %{content: "Offer a 10% coupon", score: 0.4}
+  ],
+  steps_count: 4,
+  conclusion: "Reship order A-1001 today with express shipping at no charge."
+}
+```
+
+`thoughts` holds every scored candidate in the model's order, not only the two
+kept for synthesis. `steps_count` is the number of scored candidates.
+
+## Graph of Thoughts
+
+Graph of Thoughts asks for thought nodes and the edges between them, then
+synthesizes from the graph. That's two model calls:
+
+| Stage | Instruction starts with | Required JSON |
+| --- | --- | --- |
+| Construct | `Build a small graph of useful thoughts` | `nodes`: at least 1 `%{"id", "content"}`; `edges`: at least 1 `%{"from", "to", "relationship"}` |
+| Synthesize | `Synthesize one final answer from this thought graph:` + the graph | `answer` |
+
+Between the stages, Jido AI checks that every edge's `from` and `to` name an
+existing node ID.
+
+```elixir
+graph_answer = fn
+  "Build" <> _rest ->
+    %{
+      nodes: [
+        %{id: "late", content: "Order is five days late"},
+        %{id: "policy", content: "Late orders get free reshipping"},
+        %{id: "offer", content: "Reship with express shipping"}
+      ],
+      edges: [
+        %{from: "late", to: "policy", relationship: "triggers"},
+        %{from: "policy", to: "offer", relationship: "supports"}
+      ]
+    }
+
+  "Synthesize" <> _rest ->
+    %{answer: "Our late-order policy covers this, so we'll reship express for free."}
+end
+
+{reply, stages} = ask.(MyApp.GraphAgent, graph_answer)
+
+{reply.data.output, reply.data.model_calls, length(stages)}
+```
+
+The result is
+`{"Our late-order policy covers this, so we'll reship express for free.", 2, 2}`.
+
+```elixir
+Map.take(reply.data.reasoning, [:method, :edges, :steps_count])
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  method: :graph_of_thoughts,
+  edges: [
+    %{from: "late", to: "policy", relationship: "triggers"},
+    %{from: "policy", to: "offer", relationship: "supports"}
+  ],
+  steps_count: 3
+}
+```
+
+`reasoning.nodes` holds the three nodes, and `steps_count` counts them.
+
+An edge to a missing node stops the request after the first call:
+
+```elixir
+broken_graph = fn "Build" <> _rest ->
+  %{
+    nodes: [%{id: "late", content: "Order is five days late"}],
+    edges: [%{from: "late", to: "refund", relationship: "suggests"}]
+  }
+end
+
+{reply, _stages} = ask.(MyApp.GraphAgent, broken_graph)
+
+Map.take(reply.data, [:status, :reason_code, :reason, :model_calls])
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  status: :blocked,
+  reason_code: :output,
+  reason: "graph edges must reference existing node IDs",
+  model_calls: 1
+}
+```
+
+## TRM
+
+TRM drafts an answer, critiques it, and revises it once. That's three model
+calls:
+
+| Stage | Instruction starts with | Required JSON |
+| --- | --- | --- |
+| Draft | `Create a strong initial draft answer` | `draft` |
+| Critique | `Find the important errors or omissions in this draft:` + draft | `critique` |
+| Revise | `Revise the draft with this critique and return the final answer:` + draft and critique | `answer` |
+
+```elixir
+revision_answer = fn
+  "Create" <> _rest ->
+    %{draft: "Sorry for the delay. Your order will arrive soon."}
+
+  "Find" <> _rest ->
+    %{critique: "The draft gives no date and no remedy for the delay."}
+
+  "Revise" <> _rest ->
+    %{answer: "Sorry for the delay. We reshipped A-1001 express; it arrives 2026-11-02."}
+end
+
+{reply, stages} = ask.(MyApp.RevisionAgent, revision_answer)
+
+{reply.data.output, reply.data.model_calls}
+```
+
+The result is
+`{"Sorry for the delay. We reshipped A-1001 express; it arrives 2026-11-02.", 3}`.
+
+```elixir
+reply.data.reasoning
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  method: :trm,
+  draft: "Sorry for the delay. Your order will arrive soon.",
+  critique: "The draft gives no date and no remedy for the delay.",
+  iterations: 1,
+  steps_count: 3,
+  conclusion: "Sorry for the delay. We reshipped A-1001 express; it arrives 2026-11-02."
+}
+```
+
+`iterations` is always 1. There's no setting for more revision cycles.
+
+## Limits and Parameters
+
+None of these Flows has a breadth, depth, or iteration input. The stage count
+is fixed in each Flow:
+
+| Flow | Model calls | Retries | Default `options` | `reasoning` fields |
+| --- | --- | --- | --- | --- |
+| `Jido.AI.Reasoning.TreeOfThoughts` | 3 | 0 | `max_tokens: 1536, temperature: 0.4` | `thoughts`, `steps_count`, `conclusion` |
+| `Jido.AI.Reasoning.GraphOfThoughts` | 2 | 0 | `max_tokens: 1536, temperature: 0.3` | `nodes`, `edges`, `steps_count`, `conclusion` |
+| `Jido.AI.Reasoning.TRM` | 3 | 0 | `max_tokens: 1536, temperature: 0.2` | `draft`, `critique`, `iterations`, `steps_count`, `conclusion` |
+
+Every `reasoning` map also has `method`. The input schema is the same for all
+three: `input`, `instructions`, `model`, `options`, `prompt_cache`, `context`
+(`max_messages` default 64, `max_bytes` default 200,000), and `limits`.
+`limits` takes `elapsed_ms` (default 120,000) and the optional
+`input_tokens`, `output_tokens`, `total_tokens`, and `total_cost` budgets.
+They apply across all stages: a stage that would exceed one ends the request
+as `:blocked` with `reason_code: :limits`. Unknown keys fail validation.
+
+`instructions` replaces the Flow's default system message (read it with
+`default_instructions/0`). The stage instructions and schemas are fixed.
+
+## Stage Failures
+
+Any stage can end the request:
+
+| Cause | `status` | `reason_code` |
+| --- | --- | --- |
+| Provider error, or text that isn't the stage's object | `:failed` | `:model` |
+| Output guard rejected the stage | `:blocked` | `:output` |
+| Graph edge names a missing node | `:blocked` | `:output` |
+| A budget refused the next call | `:blocked` | `:limits` |
+
+A failed request keeps what the finished stages produced: Tree of Thoughts
+keeps scored `thoughts`, Graph of Thoughts keeps `nodes` and `edges`, and TRM
+keeps `draft` and `critique`, with `steps_count` counting what's present and
+`conclusion: nil`.
+
+## Summary
+
+- Tree of Thoughts makes 3 calls: generate, evaluate, synthesize. The top two
+  scores are selected locally.
+- Graph of Thoughts makes 2 calls: construct, synthesize. Edges are checked
+  against node IDs before synthesis.
+- TRM makes 3 calls: draft, critique, revise, with `iterations: 1`.
+- Each stage sends its instruction as a final system message and a strict
+  JSON schema. Only the final answer enters the conversation.
+- Stage counts are fixed; `limits` budgets apply across all stages.
+
+## Next
+
+- [Adaptive Reasoning](adaptive-reasoning.livemd) – choose a Flow per
+  request.
+- [Single-Call Reasoning](single-call-reasoning.livemd) – the one-call
+  Flows.
+- [Inspect Model Context](inspect-model-context.livemd) – read each stage's
+  Context snapshots in `model_attempts`.

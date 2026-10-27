@@ -1,0 +1,502 @@
+# ReAct
+
+## Overview
+
+Your support Agent has to look up an order before it can answer
+"Where is order A-1001?". `Jido.AI.Reasoning.ReAct` runs that loop: a model
+round asks for a tool, a tool round runs it, and the next model round writes
+the answer. By the end of this Livebook, this request runs offline:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+reply = ask.("Where is order A-1001?", %{})
+
+{reply.data.status, reply.data.output, reply.data.model_calls, reply.data.tool_rounds}
+# => {:completed, "Order A-1001 has shipped. It should arrive on 2026-11-02.", 2, 1}
+```
+
+You'll read the ReAct graph, run model and tool rounds against a fake
+provider, repair an empty answer, fall back to a second model, and stop the
+loop with a limit. Run the cells from top to bottom.
+
+## Install
+
+```elixir
+Mix.install([{:jido_ai, "~> 3.0.0-beta.1"}, {:plug, "~> 1.0"}])
+```
+
+`plug` is required by `Req.Test`, which stands in for the provider.
+
+## Define the Agent
+
+The tool is a normal Jido Action. Its name and Zoi schema become the model
+tool definition:
+
+```elixir
+defmodule MyApp.LookupOrder do
+  use Jido.Action,
+    name: "lookup_order",
+    description: "Look up the status and delivery estimate for one order.",
+    schema: Zoi.object(%{order_id: Zoi.string()}),
+    output_schema: Zoi.object(%{order_id: Zoi.string(), status: Zoi.string(), eta: Zoi.string()})
+
+  @impl true
+  def run(%{order_id: order_id}, _context) do
+    {:ok, %{order_id: order_id, status: "shipped", eta: "2026-11-02"}}
+  end
+end
+```
+
+```elixir
+defmodule MyApp.SupportAgent do
+  use Jido.AI.Agent, id: "my_app/support_agent", vsn: 1, name: "support_agent"
+
+  ai do
+    reasoning Jido.AI.Reasoning.ReAct do
+      instructions "You are a support agent. Look up orders before you answer."
+      model "openai:gpt-4o-mini"
+    end
+
+    tools do
+      action MyApp.LookupOrder
+    end
+  end
+end
+```
+
+The `reasoning` block sets defaults for the ReAct input schema. Each request
+can override any of them except `input`.
+
+## Read the Graph
+
+ReAct is three Flow modules. Print their components:
+
+```elixir
+alias Jido.AI.Reasoning.ReAct
+
+for flow <- [MyApp.SupportAgent.reasoning(), ReAct.ModelRound, ReAct.ToolReview] do
+  IO.puts("Graph: #{inspect(flow)}")
+
+  flow.flow().components
+  |> Enum.sort_by(&elem(&1, 0))
+  |> Enum.each(fn {name, component} -> IO.puts("  #{name}: #{component.kind}") end)
+end
+```
+
+```text
+Graph: Jido.AI.Reasoning.ReAct
+  finalize: call
+  input_guard: call
+  loop: invoke
+  start_request: call
+Graph: Jido.AI.Reasoning.ReAct.ModelRound
+  detect_cycle: call
+  model: call
+  next: invoke
+  output_guard: call
+  project: call
+  record_attempt: call
+Graph: Jido.AI.Reasoning.ReAct.ToolReview
+  decision: wait
+  next: invoke
+  request: call
+```
+
+| Flow | Component | Action | Job |
+| --- | --- | --- | --- |
+| `ReAct` | `start_request` | `Jido.AI.Reasoning.Actions.StartRequest` | Builds the turn: tools, limits, model list, and the user message in the Session |
+| | `input_guard` | `Jido.AI.Reasoning.Actions.GuardInput` | Rejects empty, oversized, or blocked input |
+| | `loop` | `Jido.AI.Reasoning.Actions.DecideInput` | Starts the first model round, or completes as `:blocked` |
+| | `finalize` | `Jido.AI.Reasoning.Actions.FinalizeTurn` | Records the outcome and returns `%{state:, response:}` |
+| `ModelRound` | `project` | `Jido.AI.Reasoning.Actions.ProjectConversation` | Builds a `Jido.AI.Context` from the Thread |
+| | `model` | `Jido.AI.Reasoning.Actions.CallModel` | Makes one ReqLLM call |
+| | `output_guard` | `Jido.AI.Reasoning.Actions.GuardOutput` | Checks the answer or the tool calls |
+| | `record_attempt` | `Jido.AI.Reasoning.Actions.RecordModelAttempt` | Saves the attempt and the accepted assistant message |
+| | `detect_cycle` | `Jido.AI.Reasoning.ReAct.Actions.DetectToolCycle` | Flags a batch identical to the previous one |
+| | `next` | `Jido.AI.Reasoning.ReAct.Actions.DecideNext` | Picks complete, model, tools, or review |
+
+Each `invoke` component runs a decision Action, then
+`Jido.AI.Reasoning.ReAct.Actions.ExpandNext` turns that decision into the next
+Flow: another `ModelRound`, a tool round, or `ToolReview`. The graph grows one
+round at a time.
+
+## Offline Model
+
+This module plays the provider. It returns OpenAI Responses API JSON through
+`Req.Test`, so ReqLLM runs its normal decoding path:
+
+```elixir
+defmodule MyApp.LLM do
+  def options do
+    %{
+      api_key: "offline-test-key",
+      max_retries: 0,
+      max_tokens: 256,
+      temperature: 0.0,
+      req_http_options: [plug: {Req.Test, __MODULE__}]
+    }
+  end
+
+  def text(conn, text) do
+    respond(conn, [
+      %{
+        "type" => "message",
+        "id" => "msg_1",
+        "role" => "assistant",
+        "status" => "completed",
+        "content" => [%{"type" => "output_text", "text" => text, "annotations" => []}]
+      }
+    ])
+  end
+
+  def tool_call(conn, id, name, arguments) do
+    respond(conn, [
+      %{
+        "type" => "function_call",
+        "id" => "fc_" <> id,
+        "call_id" => id,
+        "name" => name,
+        "arguments" => Jason.encode!(arguments),
+        "status" => "completed"
+      }
+    ])
+  end
+
+  def rate_limited(conn) do
+    conn
+    |> Plug.Conn.put_status(429)
+    |> Req.Test.json(%{"error" => %{"message" => "Rate limit reached", "type" => "rate_limit_error"}})
+  end
+
+  def body(conn) do
+    {:ok, body, _conn} = Plug.Conn.read_body(conn)
+    Jason.decode!(body)
+  end
+
+  defp respond(conn, output) do
+    Req.Test.json(conn, %{
+      "id" => "resp_#{System.unique_integer([:positive])}",
+      "object" => "response",
+      "created_at" => 1,
+      "model" => "gpt-4o-mini-2024-07-18",
+      "status" => "completed",
+      "output" => output,
+      "usage" => %{
+        "input_tokens" => 40,
+        "input_tokens_details" => %{"cached_tokens" => 0},
+        "output_tokens" => 10,
+        "output_tokens_details" => %{"reasoning_tokens" => 0},
+        "total_tokens" => 50
+      }
+    })
+  end
+end
+```
+
+`options` replaces the whole ReAct `options` default
+(`%{max_tokens: 128, receive_timeout: 30_000, temperature: 0.0}`), so it sets
+`max_tokens` and `temperature` again.
+
+`ask` runs one request on a fresh Agent and returns the reply Signal:
+
+```elixir
+ask = fn input, extra ->
+  agent = MyApp.SupportAgent.instantiate!(id: "support-#{System.unique_integer([:positive])}")
+  params = Map.merge(%{input: input, options: MyApp.LLM.options()}, extra)
+  signal = MyApp.SupportAgent.request_signal!(params)
+
+  {:ok, _agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+    MyApp.SupportAgent.cmd(agent, signal)
+
+  reply
+end
+```
+
+## Run a Request
+
+Queue two provider responses. `Req.Test.expect/2` serves them in order:
+
+```elixir
+Req.Test.expect(MyApp.LLM, fn conn ->
+  MyApp.LLM.tool_call(conn, "call_1", "lookup_order", %{order_id: "A-1001"})
+end)
+
+Req.Test.expect(MyApp.LLM, fn conn ->
+  MyApp.LLM.text(conn, "Order A-1001 has shipped. It should arrive on 2026-11-02.")
+end)
+
+reply = ask.("Where is order A-1001?", %{})
+
+{reply.type, reply.data.status, reply.data.output}
+```
+
+The result is
+`{"jido.ai.response", :completed, "Order A-1001 has shipped. It should arrive on 2026-11-02."}`.
+
+```elixir
+Map.take(reply.data, [:model_calls, :tool_rounds, :tool_calls, :tool_errors, :retries, :reason_code])
+```
+
+The result is
+`%{model_calls: 2, tool_rounds: 1, tool_calls: 1, tool_errors: 0, retries: 0, reason_code: :none}`.
+
+## Model Rounds
+
+Each model round leaves one entry in `reply.data.model_attempts`:
+
+```elixir
+Enum.map(reply.data.model_attempts, fn attempt ->
+  {attempt.model_call, attempt.outcome.kind, attempt.outcome.finish_reason, attempt.output_allowed}
+end)
+```
+
+The result is
+`[{1, :tool_calls, :tool_calls, true}, {2, :final_answer, :stop, true}]`.
+
+After the output guard, `DecideNext` routes the round. The first matching row
+wins:
+
+| Model outcome | Next |
+| --- | --- |
+| Budget refused the call | Complete `:blocked`, `reason_code: :limits` |
+| Provider error | Retry, then fall back, else complete `:failed`, `reason_code: :model` |
+| Output guard rejected it | Repair round, then fall back, else complete `:blocked`, `reason_code: :output` |
+| Tool calls, `tool_rounds` reached | Complete `:blocked`, `"maximum tool rounds reached"` |
+| Tool calls, `tool_calls` would be exceeded | Complete `:blocked`, `"maximum tool calls reached"` |
+| Tool calls that need review | `ToolReview` |
+| Tool calls | Tool round |
+| Final answer | Complete `:completed` |
+
+The output guard rejects a tool-call response with more than 4 calls,
+duplicate call IDs, a tool outside the request's tool selection, or arguments
+that fail the Action schema. It rejects a final answer that is empty, longer
+than 4,000 characters, missing required structured data, stopped by
+`:length` or `:content_filter`, or sent before a required tool round.
+
+## Tool Rounds
+
+A tool round is a Flow built at runtime from the model's calls. Build one for
+two lookups to see its shape:
+
+```elixir
+alias Jido.AI.Reasoning.ReAct.Actions.ExpandNext
+
+{:ok, selection} = Jido.AI.Toolset.select([MyApp.LookupOrder])
+
+calls = [
+  %{id: "call_1", name: "lookup_order", arguments: %{"order_id" => "A-1001"}},
+  %{id: "call_2", name: "lookup_order", arguments: %{"order_id" => "A-1002"}}
+]
+
+input = %{turn: %{tools: selection.tools, model_outcome: %{tool_calls: calls}}}
+{:continue, ^input, tool_flow} = ExpandNext.run(%{kind: :tools, input: input}, %{})
+
+IO.puts("Graph: runtime Parallel tool calls")
+
+tool_flow.components
+|> Enum.sort_by(&elem(&1, 0))
+|> Enum.each(fn
+  {name, %{kind: :parallel, actions: actions}} ->
+    IO.puts("  #{name}: parallel")
+    Enum.each(actions, &IO.puts("    #{&1.name}: #{inspect(&1.call.target)}"))
+
+  {name, component} ->
+    IO.puts("  #{name}: #{component.kind}")
+end)
+```
+
+```text
+Graph: runtime Parallel tool calls
+  model: call
+  record: call
+  tools: parallel
+    tool_0: Jido.AI.Reasoning.ReAct.Actions.ExecuteTool
+    tool_1: Jido.AI.Reasoning.ReAct.Actions.ExecuteTool
+```
+
+`tools` runs every call at once and collects errors instead of stopping.
+`record` (`Jido.AI.Reasoning.ReAct.Actions.RecordToolResults`) appends the
+results to the Session in call order and adds one to `tool_rounds`. `model`
+starts the next `ModelRound`. A failed tool becomes an error result for the
+model; it doesn't fail the request.
+
+The first request's tool round left one attempt:
+
+```elixir
+[attempt] = reply.data.tool_attempts
+Map.take(attempt, [:tool_call_id, :tool_name, :status, :input, :output, :tool_round])
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  tool_call_id: "call_1",
+  tool_name: "lookup_order",
+  status: :ok,
+  input: %{"order_id" => "A-1001"},
+  output: %{"eta" => "2026-11-02", "order_id" => "A-1001", "status" => "shipped"},
+  tool_round: 1
+}
+```
+
+The model saw `output`, cut to `limits.tool_output_bytes` (default 16,384).
+[Tool Execution and Results](tool-execution-and-results.md) covers that
+contract.
+
+## Repair Bad Output
+
+An empty answer fails the output guard. With the default `limits.retries` of
+1, ReAct adds a repair instruction and calls the model again:
+
+```elixir
+notebook = self()
+
+Req.Test.expect(MyApp.LLM, fn conn -> MyApp.LLM.text(conn, "   ") end)
+
+Req.Test.expect(MyApp.LLM, fn conn ->
+  send(notebook, {:last_message, List.last(MyApp.LLM.body(conn)["input"])})
+  MyApp.LLM.text(conn, "Refunds post within 5 business days.")
+end)
+
+reply = ask.("How long do refunds take?", %{})
+
+{reply.data.status, reply.data.output, reply.data.model_calls, reply.data.retries}
+```
+
+The result is `{:completed, "Refunds post within 5 business days.", 2, 1}`.
+The fake provider doesn't run in the notebook process, so it reports to the
+pid captured as `notebook`. The repair request ends with a system message:
+
+```elixir
+receive do
+  {:last_message, %{"role" => role, "content" => [%{"text" => text}]}} -> {role, text}
+after
+  1_000 -> :no_request
+end
+```
+
+The result is
+`{"system", "Repair the previous response. model output is empty. Return a valid final answer."}`.
+The rejected answer is in `model_attempts` with `output_allowed: false` but
+never enters the conversation.
+
+## Fallback Models
+
+A retryable provider error (timeout, 429, 5xx, or a closed connection) first
+retries the same model while `limits.retries` allows it, then moves to the
+next entry in `fallback_models`. Set `retries: 0` to fall back on the first
+error:
+
+```elixir
+Req.Test.expect(MyApp.LLM, &MyApp.LLM.rate_limited/1)
+
+Req.Test.expect(MyApp.LLM, fn conn ->
+  MyApp.LLM.text(conn, "Refunds post within 5 business days.")
+end)
+
+reply =
+  ask.("How long do refunds take?", %{
+    fallback_models: ["openai:gpt-4.1-mini"],
+    limits: %{retries: 0}
+  })
+
+{reply.data.status, reply.data.model_calls, reply.data.retries,
+ Enum.map(reply.data.model_attempts, &{&1.model, &1.status, &1.outcome[:category]})}
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{:completed, 2, 1,
+ [{"openai:gpt-4o-mini", :error, :rate_limit}, {"openai:gpt-4.1-mini", :ok, nil}]}
+```
+
+A fallback costs a model call and a retry, and each switch resets the attempt
+count. A non-retryable error, such as a 401, completes as `:failed` with
+`reason_code: :model` without trying the fallbacks. The `max_retries: 0` in
+`MyApp.LLM.options/0` turns off ReqLLM's own HTTP retries so that ReAct owns
+the retry decision.
+
+## Limits Stop the Loop
+
+`limits.tool_rounds: 0` lets the model ask for a tool but never run one:
+
+```elixir
+Req.Test.expect(MyApp.LLM, fn conn ->
+  MyApp.LLM.tool_call(conn, "call_2", "lookup_order", %{order_id: "A-1002"})
+end)
+
+reply = ask.("Where is order A-1002?", %{limits: %{tool_rounds: 0}})
+
+Map.take(reply.data, [:status, :reason_code, :reason, :output, :model_calls, :tool_rounds])
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  status: :blocked,
+  reason_code: :limits,
+  reason: "maximum tool rounds reached",
+  output: "",
+  model_calls: 1,
+  tool_rounds: 0
+}
+```
+
+| Limit | Default | Range |
+| --- | --- | --- |
+| `model_calls` | 8 | 1–16 |
+| `tool_rounds` | 4 | 0–8 |
+| `tool_calls` | 8 | 1–16 |
+| `retries` | 1 | 0–4 |
+| `elapsed_ms` | 120,000 | 1–3,600,000 |
+| `tool_output_bytes` | 16,384 | 256–1,000,000 |
+| `input_tokens`, `output_tokens`, `total_tokens`, `total_cost` | `nil` (off) | ≥ 1, cost ≥ 0 |
+
+[Budgets, Retries, and Fallbacks](budgets-retries-and-fallbacks.md) explains
+how each budget is counted.
+
+## Final Result
+
+Every path ends in `FinalizeTurn` with one terminal result:
+
+| `status` | `reason_code` | `output` |
+| --- | --- | --- |
+| `:completed` | `:none` | The structured object when `output_schema` is set, else the answer text |
+| `:blocked` | `:input`, `:review`, `:output`, or `:limits` | `""` |
+| `:failed` | `:model` | `""` |
+
+`reason` carries the guard or limit message. `reasoning` and
+`reasoning_steps` are `nil` for ReAct; the single-call and multi-stage Flows
+fill them. The same summary is recorded in the Session Thread as an
+`:ai_request_outcome` entry.
+
+## Summary
+
+- `ReAct` starts a request, guards input, invokes a loop of `ModelRound`
+  Flows, and finalizes one result.
+- `DecideNext` routes each model outcome to completion, a repair or retry
+  round, a fallback model, a tool round, or tool review.
+- A tool round runs all calls in parallel, records results in call order, and
+  starts the next model round.
+- Rejected output gets a repair instruction while `limits.retries` allows it.
+- Retryable provider errors retry, then move through `fallback_models`.
+- Limits end the loop as `:blocked` with `reason_code: :limits`.
+
+## Next
+
+- [Single-Call Reasoning](single-call-reasoning.livemd) – answer with one
+  structured model call and no tools.
+- [Tool Review and Cycle Limits](tool-review-and-cycle-limits.livemd) –
+  approve tool calls and stop repeated batches.
+- [Budgets, Retries, and Fallbacks](budgets-retries-and-fallbacks.md) – every
+  limit in detail.

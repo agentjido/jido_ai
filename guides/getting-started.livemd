@@ -1,0 +1,380 @@
+# Getting Started
+
+## Overview
+
+You'll build a support Agent that looks up an order and answers the customer.
+The model runs offline, so the notebook needs no API key. By the end, this
+works:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+agent = MyApp.SupportAgent.instantiate!(id: "support-1")
+
+signal =
+  MyApp.SupportAgent.request_signal!(%{
+    input: "Where is order A-1001?",
+    options: MyApp.OfflineModel.options()
+  })
+
+{:ok, next_agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+  MyApp.SupportAgent.cmd(agent, signal)
+
+reply.data.output
+# => "Order A-1001 has shipped. It should arrive on 2026-11-02."
+```
+
+The parts:
+
+| Part | What it is |
+| --- | --- |
+| AI Agent | A Jido Agent with one root reasoning Flow and a list of tool Actions or Flows. |
+| Reasoning Flow | The graph that calls the model and runs tools. This guide uses ReAct. |
+| Tool | A Jido Action or Flow the model can call by name. |
+| Session | The conversation, stored in Agent state at `state.session`. |
+
+ReqLLM sends the model calls. Here it sends them to a local test plug instead
+of a provider.
+
+## Install
+
+```elixir
+Mix.install([{:jido_ai, "~> 3.0.0-beta.1"}, {:plug, "~> 1.0"}])
+```
+
+`plug` provides `Req.Test`, which the offline model uses.
+
+## Define A Tool
+
+A tool can be a Jido Action or Flow. The model sees its `name`, `description`, and
+parameter schema:
+
+```elixir
+defmodule MyApp.LookupOrder do
+  use Jido.Action,
+    id: "my_app/actions/lookup_order",
+    vsn: 1,
+    name: "lookup_order",
+    description: "Look up the shipping status of one order.",
+    schema: Zoi.object(%{order_id: Zoi.string()}),
+    output_schema:
+      Zoi.object(%{order_id: Zoi.string(), status: Zoi.string(), eta: Zoi.string()})
+
+  @impl Jido.Action
+  def run(%{order_id: order_id}, _context) do
+    {:ok, %{order_id: order_id, status: "shipped", eta: "2026-11-02"}}
+  end
+end
+```
+
+## Declare The Agent
+
+```elixir
+defmodule MyApp.SupportAgent do
+  use Jido.AI.Agent,
+    id: "my_app/support_agent",
+    vsn: 1,
+    name: "support_agent"
+
+  ai do
+    reasoning Jido.AI.Reasoning.ReAct do
+      model "openai:gpt-4o-mini"
+      instructions "You answer customer-support questions. Look up orders before you answer."
+
+      limits do
+        model_calls 4
+        tool_rounds 2
+      end
+    end
+
+    tools do
+      action MyApp.LookupOrder
+    end
+  end
+end
+```
+
+| Line | Effect |
+| --- | --- |
+| `use Jido.AI.Agent` | Defines a Jido Agent with a `session` state field and a `jido.ai.request` route. |
+| `reasoning` | Selects the root Flow. An Agent has exactly one. |
+| `model`, `instructions`, `limits` | Request defaults, checked against the ReAct input schema at compile time. |
+| `tools` | The Agent's tool allowlist. A request can narrow it but can't add to it. |
+
+A default that the Flow schema rejects fails the build. `model_calls 40`
+(the ReAct maximum is 16) raises `reasoning configuration is invalid for
+Jido.AI.Reasoning.ReAct at limits.model_calls`.
+
+## Inspect The Agent
+
+Three generated functions read the declaration without calling a model:
+
+```elixir
+MyApp.SupportAgent.reasoning()
+```
+
+The result is `Jido.AI.Reasoning.ReAct`.
+
+```elixir
+explained = MyApp.SupportAgent.explain()
+
+{explained.tools, explained.defaults.model, explained.defaults.limits.model_calls}
+```
+
+The result is `{[MyApp.LookupOrder], "openai:gpt-4o-mini", 4}`. `explain/0` also
+returns the Flow's `input_schema`, `output_schema`, and compiled `flow`.
+
+`preflight/1` validates one request and compiles the root Flow. It doesn't run
+it:
+
+```elixir
+{:ok, preflight} = MyApp.SupportAgent.preflight(%{input: "Where is order A-1001?"})
+
+{preflight.params.limits.tool_rounds, preflight.params.options}
+```
+
+The result is
+`{2, %{receive_timeout: 30000, max_tokens: 128, temperature: 0.0}}`. Fields you
+didn't declare take the ReAct schema defaults.
+
+An invalid request returns the schema error:
+
+```elixir
+{:error, error} = MyApp.SupportAgent.preflight(%{})
+
+Exception.message(error)
+```
+
+The result is `"is required, at input"`.
+
+## Offline Model
+
+This cell is the fake provider. It answers ReqLLM's HTTP requests with
+OpenAI Responses API JSON, in the order you queue them:
+
+```elixir
+defmodule MyApp.OfflineModel do
+  @moduledoc "Queues fake OpenAI Responses API replies for ReqLLM."
+
+  @doc "Request options that send model calls to this module."
+  def options do
+    %{
+      api_key: "offline-test-key",
+      max_retries: 0,
+      max_tokens: 128,
+      temperature: 0.0,
+      req_http_options: [plug: {Req.Test, MyApp.LLM}]
+    }
+  end
+
+  @doc "Queues one reply per model call, in order."
+  def respond_with(bodies) do
+    Enum.each(bodies, fn body ->
+      Req.Test.expect(MyApp.LLM, &Req.Test.json(&1, body))
+    end)
+  end
+
+  @doc "A final text answer."
+  def text(text) do
+    response([
+      %{
+        "type" => "message",
+        "id" => "msg_1",
+        "role" => "assistant",
+        "status" => "completed",
+        "content" => [%{"type" => "output_text", "text" => text, "annotations" => []}]
+      }
+    ])
+  end
+
+  @doc "A request to call one tool. Use a new `call_id` for each call in a request."
+  def tool_call(name, arguments, call_id \\ "call_1") do
+    response([
+      %{
+        "type" => "function_call",
+        "id" => "fc_" <> call_id,
+        "call_id" => call_id,
+        "name" => name,
+        "arguments" => Jason.encode!(arguments),
+        "status" => "completed"
+      }
+    ])
+  end
+
+  defp response(output) do
+    %{
+      "id" => "resp_1",
+      "object" => "response",
+      "created_at" => 1,
+      "model" => "gpt-4o-mini-2024-07-18",
+      "status" => "completed",
+      "error" => nil,
+      "incomplete_details" => nil,
+      "parallel_tool_calls" => true,
+      "output" => output,
+      "usage" => %{
+        "input_tokens" => 20,
+        "input_tokens_details" => %{"cached_tokens" => 0},
+        "output_tokens" => 5,
+        "output_tokens_details" => %{"reasoning_tokens" => 0},
+        "total_tokens" => 25
+      }
+    }
+  end
+end
+```
+
+`req_http_options: [plug: {Req.Test, MyApp.LLM}]` routes the HTTP request to
+the queued replies. `api_key` is a placeholder; nothing leaves the machine.
+Each reply reports 20 input and 5 output tokens. Queued replies are used once,
+in order; a request that stops early leaves the rest for the next request.
+
+## Run One Request
+
+Queue two replies: the model first asks for `lookup_order`, then answers with
+the tool result. Then build the request Signal and run it:
+
+```elixir
+MyApp.OfflineModel.respond_with([
+  MyApp.OfflineModel.tool_call("lookup_order", %{order_id: "A-1001"}),
+  MyApp.OfflineModel.text("Order A-1001 has shipped. It should arrive on 2026-11-02.")
+])
+
+agent = MyApp.SupportAgent.instantiate!(id: "support-1")
+
+signal =
+  MyApp.SupportAgent.request_signal!(%{
+    input: "Where is order A-1001?",
+    options: MyApp.OfflineModel.options()
+  })
+
+{:ok, next_agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+  MyApp.SupportAgent.cmd(agent, signal)
+
+reply.type
+```
+
+The result is `"jido.ai.response"`.
+
+`request_signal!/1` builds a `jido.ai.request` Signal. Its data is the Flow
+input: `input` is required, and any other ReAct field, such as `options`,
+replaces the Agent default for this request. The replacement is whole:
+`MyApp.OfflineModel.options/0` sets every option the request uses. With a real provider, leave out
+`options` and set the provider key that ReqLLM reads, such as
+`OPENAI_API_KEY`.
+
+`cmd/3` runs the whole ReAct graph in this process: model call, tool call,
+model call. It returns the next Agent and one `Reply` Directive. It starts no
+process and commits nothing.
+
+## Read The Reply
+
+```elixir
+{reply.data.status, reply.data.output}
+```
+
+The result is
+`{:completed, "Order A-1001 has shipped. It should arrive on 2026-11-02."}`.
+
+```elixir
+Map.take(reply.data, [:model_calls, :tool_rounds, :tool_calls, :reason_code])
+```
+
+The result is `%{model_calls: 2, tool_rounds: 1, tool_calls: 1, reason_code: :none}`.
+
+| `status` | Meaning | `output` |
+| --- | --- | --- |
+| `:completed` | The Flow produced an answer. | The answer |
+| `:blocked` | A guard or limit stopped the request. | `""` |
+| `:failed` | The model call failed after retries and fallbacks. | `""` |
+
+A blocked or failed reply still returns `{:ok, next_agent, [reply]}`. Read
+`reason_code` and `reason` for the cause.
+
+Usage adds up across both model calls:
+
+```elixir
+Map.take(reply.data.usage, [:input_tokens, :output_tokens, :total_tokens])
+```
+
+The result is `%{input_tokens: 40, output_tokens: 10, total_tokens: 50}`.
+
+`reply.data.model_attempts` has one entry per model call, with content-free
+Context snapshots from before and after the call.
+[Inspect Model Context](inspect-model-context.livemd) reads them.
+
+## Read The Session
+
+The original Agent is unchanged. The next Agent holds the conversation:
+
+```elixir
+{agent.state.session, next_agent.state.session.thread.rev}
+```
+
+The result is `{nil, 8}`. The first request created a `Jido.Session` with one
+`Jido.Thread`, and each Thread entry adds one revision.
+
+```elixir
+Enum.map(next_agent.state.session.thread.entries, & &1.kind)
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+[:ai_message, :ai_model_attempt, :ai_message, :ai_tool_attempt, :ai_message,
+ :ai_model_attempt, :ai_message, :ai_request_outcome]
+```
+
+The four `:ai_message` entries are the user message, the tool call, the tool
+result, and the answer. Only those can enter the next model call. The model
+attempts, the tool attempt, and the request outcome are records for you, not
+prompt content.
+
+Run a second request against `next_agent` and the model sees the first
+exchange. [Sessions and Threads](sessions-and-threads.md) covers the entries.
+
+## Run It Live
+
+`cmd/3` returns a candidate Agent. To keep the Session across requests, give
+the Agent to a `Jido.AgentServer`, which commits each request's state:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{:ok, _jido} = Jido.start()
+{:ok, server} = Jido.start_agent(MyApp.SupportAgent, id: "support-live")
+
+signal = MyApp.SupportAgent.request_signal!(%{input: "Where is order A-1001?"})
+
+{:ok, committed, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+  Jido.AgentServer.call(server, signal)
+
+committed.state.session.thread.rev
+```
+
+This block calls the real provider, so it needs a provider key. It isn't part
+of the offline notebook.
+[Pure or Live Execution](pure-or-live-execution.md) compares the two paths.
+
+## Summary
+
+- `use Jido.AI.Agent` defines a Jido Agent with one reasoning Flow, a tool
+  allowlist, and a `session` state field.
+- Reasoning defaults are validated against the Flow's input schema at compile
+  time.
+- `reasoning/0`, `explain/0`, and `preflight/1` inspect the Agent without
+  calling a model.
+- `request_signal!/1` builds a `jido.ai.request`; `cmd/3` returns the next
+  Agent and one `jido.ai.response` reply.
+- The reply reports `status`, `output`, `usage`, and `model_calls`.
+- The Session's Thread records every message and model attempt.
+
+## Next
+
+- [Core Concepts](core-concepts.md) – the parts of a request and who owns each.
+- [Choose a Reasoning Flow](choose-a-reasoning-flow.md) – ReAct and the other
+  built-in Flows.
+- [Define an AI Agent](define-an-ai-agent.livemd) – schemas, defaults, and
+  tools in depth.

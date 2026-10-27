@@ -277,9 +277,9 @@ defmodule Jido.AI.Telemetry do
         calls =
           calls
           |> Enum.flat_map(fn
-            {execution_name, %{id: id, name: name}}
+            {execution_name, %{id: id, name: name} = call}
             when is_binary(execution_name) and is_binary(id) and id != "" and is_binary(name) ->
-              [{execution_name, %{id: id, name: name}}]
+              [{execution_name, Map.take(call, [:id, :name, :description, :action])}]
 
             _invalid ->
               []
@@ -405,6 +405,7 @@ defmodule Jido.AI.Telemetry do
   defp bridge_tool_event(ending, measurements, metadata) do
     agent = CorrelationStore.get({:agent, metadata.turn_id}) || %{}
     tool_call = registered_tool_call(metadata)
+    action = tool_call[:action] || metadata[:action]
 
     ai_metadata =
       agent
@@ -427,15 +428,15 @@ defmodule Jido.AI.Telemetry do
         :parent_span_id
       ])
       |> Map.merge(%{
-        action: metadata[:action],
-        tool_name: metadata[:action_name],
+        action: action,
+        tool_name: tool_call[:name] || metadata[:action_name],
         node_name: metadata[:node_name],
         activation_id: metadata[:activation_id],
         attempt_id: metadata[:attempt_id],
         attempt: metadata[:attempt],
         status: tool_status(ending, metadata),
         tool_call_id: tool_call[:id],
-        tool_description: action_description(metadata[:action]),
+        tool_description: tool_call[:description] || action_description(action),
         error_type: metadata[:error_type],
         retryable?: metadata[:retryable?]
       })

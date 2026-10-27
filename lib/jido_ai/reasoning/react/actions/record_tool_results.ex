@@ -51,8 +51,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.RecordToolResults do
           tool_call_count: turn.tool_call_count + length(results),
           tool_error_count: turn.tool_error_count + errors,
           tool_attempts: turn.tool_attempts ++ attempts,
-          model_outcome: nil,
-          repair_instruction: nil
+          model_outcome: nil
       }
 
       {:ok, %{turn: next_turn}}
@@ -93,6 +92,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.RecordToolResults do
       content: normalized.content_parts,
       error: normalized.error,
       metadata: normalized.metadata,
+      result_metadata: normalized.result_metadata,
       started_at_ms: execution.started_at_ms,
       completed_at_ms: execution.completed_at_ms,
       duration_ms: execution.duration_ms,

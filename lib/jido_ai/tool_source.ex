@@ -1,15 +1,3 @@
-defmodule Jido.AI.ToolSource.Tool do
-  @moduledoc "A tool definition loaded from one trusted runtime source."
-
-  @enforce_keys [:definition, :source]
-  defstruct [:definition, :source]
-
-  @type t :: %__MODULE__{
-          definition: ReqLLM.Tool.t(),
-          source: Jido.AI.ToolSource.spec()
-        }
-end
-
 defmodule Jido.AI.ToolSource do
   @moduledoc """
   Defines the runtime extension point for dynamic AI tools.
@@ -30,8 +18,6 @@ defmodule Jido.AI.ToolSource do
   The normal request tool policy can only reduce the combined tool set.
   """
 
-  alias __MODULE__.Tool
-
   @typedoc "A portable source module with optional portable configuration."
   @type spec :: module() | {module(), term()}
 
@@ -45,6 +31,17 @@ defmodule Jido.AI.ToolSource do
               optional(:strict) => boolean(),
               optional(:provider_options) => keyword() | map()
             }
+
+  @typedoc "A portable dynamic tool loaded from a source."
+  @type tool :: %{
+          required(:kind) => :source,
+          required(:name) => String.t(),
+          required(:description) => String.t(),
+          required(:parameter_schema) => keyword() | map(),
+          required(:strict) => boolean(),
+          required(:provider_options) => keyword() | map(),
+          required(:source) => %{module: module(), config: term()}
+        }
 
   @typedoc "The portable tool call passed to a source."
   @type call :: %{
@@ -72,44 +69,43 @@ defmodule Jido.AI.ToolSource do
   end
 
   @doc "Loads and validates all tools from the trusted execution context."
-  @spec load(map()) :: {:ok, [Tool.t()]} | {:error, term()}
+  @spec load(map()) :: {:ok, [tool()]} | {:error, term()}
   def load(context) when is_map(context) do
-    context
-    |> from_context()
-    |> Enum.reduce_while({:ok, []}, fn source, {:ok, tools} ->
-      case load_source(source, context) do
-        {:ok, loaded} -> {:cont, {:ok, tools ++ loaded}}
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
-    end)
+    case Map.get(context, :jido_ai_tool_sources, []) do
+      sources when is_list(sources) -> load_sources(sources, context)
+      _other -> {:error, :invalid_tool_sources}
+    end
   end
 
   @doc "Executes one resolved dynamic tool call through its source."
-  @spec run(Tool.t(), call(), map()) ::
+  @spec run(map(), call(), map()) ::
           {:ok, term()} | {:ok, term(), [term()]} | {:error, term()}
-  def run(%Tool{source: source}, call, context) when is_map(call) and is_map(context) do
-    with {:ok, module, config} <- normalize_source(source) do
-      invoke_source(module, call, config, context)
+  def run(%{kind: :source, module: module, config: config}, call, context)
+      when is_atom(module) and is_map(call) and is_map(context) do
+    invoke_source(module, call, config, context)
+  end
+
+  @doc false
+  @spec validate_input(tool(), map()) :: {:ok, map()} | {:error, term()}
+  def validate_input(%{kind: :source} = tool, arguments) when is_map(arguments) do
+    with {:ok, definition} <- definition(tool) do
+      ReqLLM.Tool.validate_input(definition, arguments)
     end
   end
 
   @doc false
-  @spec validate_input(Tool.t(), map()) :: {:ok, map()} | {:error, term()}
-  def validate_input(%Tool{definition: definition}, arguments) when is_map(arguments) do
-    ReqLLM.Tool.validate_input(definition, arguments)
+  @spec identity(tool()) :: map()
+  def identity(%{kind: :source, name: name, source: %{module: module}}) do
+    %{kind: :source, name: name, source: Atom.to_string(module)}
   end
 
   @doc false
-  @spec identity(Tool.t()) :: map()
-  def identity(%Tool{definition: definition, source: source}) do
-    {:ok, module, _config} = normalize_source(source)
+  @spec executor(tool()) :: map()
+  def executor(%{kind: :source, source: source}), do: Map.put(source, :kind, :source)
 
-    %{
-      kind: :source,
-      name: definition.name,
-      source: Atom.to_string(module)
-    }
-  end
+  @doc false
+  @spec definition(tool()) :: {:ok, ReqLLM.Tool.t()} | {:error, term()}
+  def definition(%{kind: :source} = tool), do: build_definition(tool)
 
   @doc false
   @spec execution_boundary(map()) :: {:error, atom()}
@@ -120,8 +116,11 @@ defmodule Jido.AI.ToolSource do
          {:ok, module, config} <- normalize_source(source),
          :ok <- source_module(module),
          {:ok, definitions} <- module.list_tools(config, context),
-         {:ok, tools} <- normalize_definitions(definitions, source) do
+         {:ok, tools} <- normalize_definitions(definitions, module, config) do
       {:ok, tools}
+    else
+      {:error, _reason} = error -> error
+      other -> {:error, {:invalid_tool_source_result, source_module_name(source), other}}
     end
   rescue
     error -> {:error, {:tool_source_failed, source_module_name(source), Exception.message(error)}}
@@ -129,18 +128,24 @@ defmodule Jido.AI.ToolSource do
     kind, reason -> {:error, {:tool_source_failed, source_module_name(source), {kind, reason}}}
   end
 
-  defp normalize_definitions(definitions, source) when is_list(definitions) do
+  defp load_sources(sources, context) do
+    Enum.reduce_while(sources, {:ok, []}, fn source, {:ok, tools} ->
+      case load_source(source, context) do
+        {:ok, loaded} -> {:cont, {:ok, tools ++ loaded}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  defp normalize_definitions(definitions, module, config) when is_list(definitions) do
     if List.improper?(definitions) do
       {:error, :invalid_tool_source_definitions}
     else
       definitions
       |> Enum.reduce_while({:ok, []}, fn definition, {:ok, tools} ->
-        case normalize_definition(definition) do
-          {:ok, normalized} ->
-            {:cont, {:ok, [%Tool{definition: normalized, source: source} | tools]}}
-
-          {:error, reason} ->
-            {:halt, {:error, reason}}
+        case normalize_definition(definition, module, config) do
+          {:ok, normalized} -> {:cont, {:ok, [normalized | tools]}}
+          {:error, reason} -> {:halt, {:error, reason}}
         end
       end)
       |> case do
@@ -150,20 +155,37 @@ defmodule Jido.AI.ToolSource do
     end
   end
 
-  defp normalize_definitions(_definitions, _source), do: {:error, :invalid_tool_source_definitions}
+  defp normalize_definitions(_definitions, _module, _config),
+    do: {:error, :invalid_tool_source_definitions}
 
-  defp normalize_definition(%ReqLLM.Tool{} = definition) do
-    build_definition(%{
+  defp normalize_definition(%ReqLLM.Tool{} = definition, module, config) do
+    definition
+    |> portable_tool(module, config)
+    |> validate_runtime_tool()
+  end
+
+  defp normalize_definition(definition, module, config) when is_map(definition) do
+    with {:ok, normalized} <- build_definition(definition) do
+      normalized
+      |> portable_tool(module, config)
+      |> validate_runtime_tool()
+    end
+  end
+
+  defp normalize_definition(_definition, _module, _config),
+    do: {:error, :invalid_tool_source_definition}
+
+  defp portable_tool(definition, module, config) do
+    %{
+      kind: :source,
       name: definition.name,
       description: definition.description,
       parameter_schema: definition.parameter_schema,
       strict: definition.strict,
-      provider_options: definition.provider_options
-    })
+      provider_options: definition.provider_options,
+      source: %{module: module, config: config}
+    }
   end
-
-  defp normalize_definition(definition) when is_map(definition), do: build_definition(definition)
-  defp normalize_definition(_definition), do: {:error, :invalid_tool_source_definition}
 
   defp build_definition(definition) do
     ReqLLM.Tool.new(
@@ -178,14 +200,22 @@ defmodule Jido.AI.ToolSource do
 
   defp invoke_source(module, call, config, context) do
     case module.run_tool(call, config, context) do
-      {:ok, value} -> {:ok, value}
+      {:ok, value} ->
+        {:ok, value}
+
       {:ok, value, effects} when is_list(effects) ->
         if List.improper?(effects),
           do: {:error, :invalid_tool_source_effects},
           else: {:ok, value, effects}
-      {:error, reason} -> {:error, reason}
-      {:error, reason, _effects} -> {:error, reason}
-      other -> {:error, {:invalid_tool_source_result, other}}
+
+      {:error, reason} ->
+        {:error, reason}
+
+      {:error, reason, _effects} ->
+        {:error, reason}
+
+      other ->
+        {:error, {:invalid_tool_source_result, other}}
     end
   rescue
     error -> {:error, error}
@@ -203,16 +233,38 @@ defmodule Jido.AI.ToolSource do
   defp normalize_source(_source), do: {:error, :invalid_tool_source}
 
   defp source_module(module) do
-    if function_exported?(module, :list_tools, 2) and function_exported?(module, :run_tool, 3),
-      do: :ok,
-      else: {:error, {:invalid_tool_source, module}}
+    with {:module, ^module} <- Code.ensure_loaded(module),
+         true <- function_exported?(module, :list_tools, 2),
+         true <- function_exported?(module, :run_tool, 3) do
+      :ok
+    else
+      _other -> {:error, {:invalid_tool_source, module}}
+    end
   end
 
   defp portable_source(source) do
+    with :ok <- portable_term(source), do: canonical_term(source, :invalid_tool_source_config)
+  end
+
+  defp portable_term(source) do
     case Jido.PortableTerm.validate(source, :tool_source) do
       :ok -> :ok
       {:error, path} -> {:error, {:nonportable_tool_source, path}}
     end
+  end
+
+  defp validate_runtime_tool(tool) do
+    with :ok <- portable_term(tool),
+         :ok <- canonical_term(tool, :invalid_tool_source_definition) do
+      {:ok, tool}
+    end
+  end
+
+  defp canonical_term(term, reason) do
+    Runic.Identity.Canonical.encode!(term)
+    :ok
+  rescue
+    _error -> {:error, reason}
   end
 
   defp source_module_name(module) when is_atom(module), do: module

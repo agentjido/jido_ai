@@ -1,0 +1,400 @@
+# Single-Call Reasoning
+
+## Overview
+
+A customer asks whether an order delivered 40 days ago can still be refunded.
+The answer needs a few reasoning steps but no tools. Chain of Thought, Chain of
+Draft, and Algorithm of Thoughts each answer it with one structured model call
+and return the parsed reasoning next to the answer:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{reply.data.output, reply.data.reasoning.steps_count}
+# => {"No. The 30-day refund window closed 10 days ago.", 3}
+```
+
+You'll run all three Flows offline, read the prompt and output format each one
+sends, and compare their result data. Run the cells from top to bottom.
+
+## Install
+
+```elixir
+Mix.install([{:jido_ai, "~> 3.0.0-beta.1"}, {:plug, "~> 1.0"}])
+```
+
+## Three Agents
+
+Each Agent selects one Flow. None declares tools; these Flows never send tool
+definitions to the model.
+
+```elixir
+defmodule MyApp.ChainAgent do
+  use Jido.AI.Agent, id: "my_app/chain_agent", vsn: 1, name: "chain_agent"
+
+  ai do
+    reasoning Jido.AI.Reasoning.ChainOfThought
+  end
+end
+
+defmodule MyApp.DraftAgent do
+  use Jido.AI.Agent, id: "my_app/draft_agent", vsn: 1, name: "draft_agent"
+
+  ai do
+    reasoning Jido.AI.Reasoning.ChainOfDraft
+  end
+end
+
+defmodule MyApp.AlgorithmAgent do
+  use Jido.AI.Agent, id: "my_app/algorithm_agent", vsn: 1, name: "algorithm_agent"
+
+  ai do
+    reasoning Jido.AI.Reasoning.AlgorithmOfThoughts
+  end
+end
+```
+
+## The Shared Graph
+
+The three Flows have the same shape. Print one root Flow and its model round:
+
+```elixir
+alias Jido.AI.Reasoning.ChainOfThought
+
+for flow <- [ChainOfThought, ChainOfThought.ModelRound] do
+  IO.puts("Graph: #{inspect(flow)}")
+
+  flow.flow().components
+  |> Enum.sort_by(&elem(&1, 0))
+  |> Enum.each(fn {name, component} -> IO.puts("  #{name}: #{component.kind}") end)
+end
+```
+
+```text
+Graph: Jido.AI.Reasoning.ChainOfThought
+  finalize: call
+  input_guard: call
+  reason: invoke
+  start_request: call
+Graph: Jido.AI.Reasoning.ChainOfThought.ModelRound
+  complete: call
+  model: call
+  output_guard: call
+  project: call
+  record_attempt: call
+```
+
+The root Flow is the ReAct root with a fixed `output_schema`, one model call,
+and no retries. `ModelRound` has no loop: it projects the conversation, calls
+the model once with tools off, guards the output, records the attempt, and
+`complete` parses the structured object into the result.
+
+## Offline Model
+
+The fake provider returns a JSON object as the model's text. ReqLLM decodes it
+into the response object and validates it against the Flow's schema:
+
+```elixir
+defmodule MyApp.LLM do
+  def options do
+    %{
+      api_key: "offline-test-key",
+      max_retries: 0,
+      max_tokens: 512,
+      temperature: 0.0,
+      req_http_options: [plug: {Req.Test, __MODULE__}]
+    }
+  end
+
+  def object(conn, object), do: text(conn, Jason.encode!(object))
+
+  def text(conn, text) do
+    Req.Test.json(conn, %{
+      "id" => "resp_#{System.unique_integer([:positive])}",
+      "object" => "response",
+      "created_at" => 1,
+      "model" => "gpt-4o-mini-2024-07-18",
+      "status" => "completed",
+      "output" => [
+        %{
+          "type" => "message",
+          "id" => "msg_1",
+          "role" => "assistant",
+          "status" => "completed",
+          "content" => [%{"type" => "output_text", "text" => text, "annotations" => []}]
+        }
+      ],
+      "usage" => %{
+        "input_tokens" => 60,
+        "input_tokens_details" => %{"cached_tokens" => 0},
+        "output_tokens" => 40,
+        "output_tokens_details" => %{"reasoning_tokens" => 0},
+        "total_tokens" => 100
+      }
+    })
+  end
+
+  def body(conn) do
+    {:ok, body, _conn} = Plug.Conn.read_body(conn)
+    Jason.decode!(body)
+  end
+end
+```
+
+`ask` runs one request on a fresh Agent. It reports each provider request body
+to the notebook process:
+
+```elixir
+notebook = self()
+question = "Order A-1001 was delivered 40 days ago. Can the customer still get a refund?"
+
+ask = fn agent_module, object ->
+  Req.Test.expect(MyApp.LLM, fn conn ->
+    send(notebook, {:request, MyApp.LLM.body(conn)})
+    MyApp.LLM.object(conn, object)
+  end)
+
+  agent = agent_module.instantiate!(id: "agent-#{System.unique_integer([:positive])}")
+  signal = agent_module.request_signal!(%{input: question, options: MyApp.LLM.options()})
+
+  {:ok, _agent, [%Jido.Agent.Directive.Reply{signal: reply}]} = agent_module.cmd(agent, signal)
+
+  request =
+    receive do
+      {:request, body} -> body
+    after
+      1_000 -> nil
+    end
+
+  {reply, request}
+end
+```
+
+## Chain of Thought
+
+Chain of Thought asks for numbered steps and a conclusion:
+
+```elixir
+{reply, request} =
+  ask.(MyApp.ChainAgent, %{
+    steps: [
+      %{number: 1, content: "The refund window is 30 days from delivery."},
+      %{number: 2, content: "The order was delivered 40 days ago."},
+      %{number: 3, content: "40 is greater than 30, so the window has closed."}
+    ],
+    conclusion: "No. The 30-day refund window closed 10 days ago."
+  })
+
+{reply.data.status, reply.data.output, reply.data.model_calls}
+```
+
+The result is
+`{:completed, "No. The 30-day refund window closed 10 days ago.", 1}`.
+`output` is the conclusion. The parsed chain is in `reasoning`:
+
+```elixir
+reply.data.reasoning
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  method: :chain_of_thought,
+  steps: [
+    %{number: 1, content: "The refund window is 30 days from delivery."},
+    %{number: 2, content: "The order was delivered 40 days ago."},
+    %{number: 3, content: "40 is greater than 30, so the window has closed."}
+  ],
+  steps_count: 3,
+  conclusion: "No. The 30-day refund window closed 10 days ago."
+}
+```
+
+`reply.data.reasoning_steps` copies `steps_count`, so it's `3`.
+
+The request carried the default instructions as a system message and the
+output schema as a strict JSON schema:
+
+```elixir
+[system | _messages] = request["input"]
+
+{hd(system["content"])["text"], request["text"]["format"]["type"],
+ request["text"]["format"]["schema"]["required"], Map.has_key?(request, "tools")}
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{"You are a helpful AI assistant that thinks through problems step by step.\nReturn an ordered list of clear reasoning steps and one concise conclusion.\n",
+ "json_schema", ["conclusion", "steps"], false}
+```
+
+## Chain of Draft
+
+Chain of Draft asks for drafts of at most five words each and a final answer:
+
+```elixir
+{reply, request} =
+  ask.(MyApp.DraftAgent, %{
+    drafts: ["window: 30 days", "delivered: 40 days", "40 > 30: closed"],
+    answer: "No. The refund window has closed."
+  })
+
+{reply.data.output, reply.data.reasoning}
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{"No. The refund window has closed.",
+ %{
+   method: :chain_of_draft,
+   drafts: ["window: 30 days", "delivered: 40 days", "40 > 30: closed"],
+   steps_count: 3,
+   conclusion: "No. The refund window has closed."
+ }}
+```
+
+```elixir
+request["text"]["format"]["schema"]["required"]
+```
+
+The result is `["answer", "drafts"]`. The five-word limit lives in the
+instructions only; the schema accepts any non-empty string.
+
+## Algorithm of Thoughts
+
+Algorithm of Thoughts asks for the operation sequence of an explicit search,
+including backtracking, and a final answer:
+
+```elixir
+{reply, request} =
+  ask.(MyApp.AlgorithmAgent, %{
+    operations: [
+      "Check the standard 30-day window: 40 days fails",
+      "Check the damaged-item exception: no damage reported, backtrack",
+      "Check store credit within 60 days: 40 days passes"
+    ],
+    answer: "No cash refund. Offer store credit, which is allowed up to 60 days."
+  })
+
+{reply.data.output, reply.data.reasoning.method, reply.data.reasoning.steps_count}
+```
+
+The result is
+`{"No cash refund. Offer store credit, which is allowed up to 60 days.", :algorithm_of_thoughts, 3}`.
+The operations are in `reply.data.reasoning.operations`.
+
+```elixir
+request["text"]["format"]["schema"]["required"]
+```
+
+The result is `["answer", "operations"]`.
+
+## Compare the Flows
+
+| Flow | Default instructions ask for | Required JSON | `reasoning` fields | Default `options` |
+| --- | --- | --- | --- | --- |
+| `Jido.AI.Reasoning.ChainOfThought` | Ordered steps and one concise conclusion | `steps` (`number`, `content`), `conclusion` | `steps`, `steps_count`, `conclusion` | `max_tokens: 512, receive_timeout: 30_000, temperature: 0.0` |
+| `Jido.AI.Reasoning.ChainOfDraft` | Steps of at most five words and one final answer | `drafts` (strings), `answer` | `drafts`, `steps_count`, `conclusion` | `max_tokens: 256, temperature: 0.0` |
+| `Jido.AI.Reasoning.AlgorithmOfThoughts` | An algorithmic search with backtracking, the operation sequence, and the answer | `operations` (strings), `answer` | `operations`, `steps_count`, `conclusion` | `max_tokens: 1024, temperature: 0.0` |
+
+Every `reasoning` map also has `method`. Each list needs at least one item.
+Read the instructions with `default_instructions/0` on each module, and
+replace them with the `instructions` input. Your instructions replace the
+format request too, so keep asking for the same fields.
+
+Choose by the answer you need:
+
+- **Chain of Thought** when a reviewer or the customer needs to read each
+  step, such as explaining a refund decision.
+- **Chain of Draft** when the reasoning is short and you want fewer output
+  tokens, such as checking a date against one policy window.
+- **Algorithm of Thoughts** when the model must try options in order and
+  discard dead ends, such as walking through refund, exception, and store
+  credit rules.
+- **ReAct** when the answer needs live data. These Flows can't call
+  `MyApp.LookupOrder`.
+
+## When the Format Fails
+
+There is one model call and no repair round. ReqLLM validates the response
+against the schema, so plain text fails the call and ends the request:
+
+```elixir
+Req.Test.expect(MyApp.LLM, fn conn ->
+  MyApp.LLM.text(conn, "No, the refund window has closed.")
+end)
+
+agent = MyApp.ChainAgent.instantiate!(id: "chain-plain-text")
+signal = MyApp.ChainAgent.request_signal!(%{input: question, options: MyApp.LLM.options()})
+{:ok, _agent, [%Jido.Agent.Directive.Reply{signal: reply}]} = MyApp.ChainAgent.cmd(agent, signal)
+
+Map.take(reply.data, [:status, :reason_code, :reason, :output, :reasoning])
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  status: :failed,
+  reason_code: :model,
+  reason:
+    "Structured output failed final validation: No complete structured output value was materialized.",
+  output: "",
+  reasoning: %{method: :chain_of_thought, steps: [], steps_count: 0, conclusion: nil}
+}
+```
+
+| Cause | `status` | `reason_code` |
+| --- | --- | --- |
+| Provider error, or text that isn't the required object | `:failed` | `:model` |
+| Output guard rejected the answer | `:blocked` | `:output` |
+| A budget refused the call | `:blocked` | `:limits` |
+
+Failed and blocked results keep the `reasoning` keys with empty values.
+
+## Inputs
+
+All three Flows accept the same request fields: `input`, `instructions`,
+`model`, `options`, `prompt_cache`, `context` (`max_messages`, `max_bytes`),
+and `limits` (`elapsed_ms`, `input_tokens`, `output_tokens`, `total_tokens`,
+`total_cost`). Unknown keys fail validation, including the ReAct-only
+`fallback_models`, `tool_policy`, and `limits.model_calls`:
+
+```elixir
+{:error, error} =
+  Jido.AI.Reasoning.ChainOfDraft.validate_params(%{input: question, fallback_models: []})
+
+error.__struct__
+```
+
+The result is `Jido.Action.Error.InvalidInputError`.
+
+## Summary
+
+- Chain of Thought, Chain of Draft, and Algorithm of Thoughts make exactly
+  one model call with no tools, retries, or fallbacks.
+- Each sends a strict JSON schema and parses the object into
+  `reply.data.reasoning`.
+- `output` is the conclusion or answer; `reasoning.steps_count` counts steps,
+  drafts, or operations, and `reasoning_steps` copies it.
+- A response without the object ends the request as `:failed` or
+  `:blocked`, with empty `reasoning` values.
+
+## Next
+
+- [Multi-Stage Reasoning](multi-stage-reasoning.livemd) – split reasoning
+  across two or three model calls.
+- [Adaptive Reasoning](adaptive-reasoning.livemd) – pick one of these Flows
+  per request.
+- [Structured Output](structured-output.livemd) – your own Zoi output schemas.

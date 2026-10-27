@@ -1,0 +1,407 @@
+# Stream Model Output
+
+## Overview
+
+Your support UI should show the answer while the model writes it, not after the
+request finishes. Set `stream: true` on a ReAct request and pass a dispatch
+target in the command context. Jido AI publishes each model chunk as a Signal:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+request = MyApp.SupportAgent.request_signal!(%{input: "Where is order A-1001?", stream: true})
+
+{:ok, _agent, [reply]} =
+  MyApp.SupportAgent.cmd(agent, request, context: %{jido_ai_dispatch: {:pid, target: self()}})
+
+# Your mailbox now holds:
+# jido.ai.model.stream.started    sequence 0
+# jido.ai.model.stream.chunk      sequence 1..4
+# jido.ai.model.stream.completed  sequence 5
+```
+
+This notebook runs one streamed request, reads the Signals, matches them to the
+reply, runs the same request on a live Agent Server, and handles a failed
+stream. It runs offline.
+
+## Install
+
+```elixir
+Mix.install([{:jido_ai, "~> 3.0.0-beta.1"}, {:plug, "~> 1.0"}])
+```
+
+## Offline Model
+
+With `stream: true`, Jido AI calls `ReqLLM.stream_text/3`. ReqLLM streams over
+Finch, not Req, so a `Req.Test` plug can't answer it. This cell starts a small
+HTTP server on `127.0.0.1` that replies with OpenAI Responses API server-sent
+events. ReqLLM parses them exactly as it parses OpenAI's.
+
+```elixir
+defmodule MyApp.OfflineOpenAI do
+  @moduledoc "Serves one canned HTTP response to every connection."
+
+  def start(response) do
+    {:ok, listen} = :gen_tcp.listen(0, [:binary, active: false, reuseaddr: true])
+    {:ok, port} = :inet.port(listen)
+    spawn(fn -> serve(listen, response) end)
+    "http://127.0.0.1:#{port}/v1"
+  end
+
+  def sse(deltas) do
+    completed = %{
+      "type" => "response.completed",
+      "response" => %{
+        "id" => "resp_offline",
+        "status" => "completed",
+        "output" => [
+          %{
+            "type" => "message",
+            "role" => "assistant",
+            "content" => [%{"type" => "output_text", "text" => Enum.join(deltas)}]
+          }
+        ],
+        "usage" => %{"input_tokens" => 12, "output_tokens" => 6, "total_tokens" => 18}
+      }
+    }
+
+    events = Enum.map(deltas, &%{"type" => "response.output_text.delta", "delta" => &1})
+
+    body =
+      Enum.map_join(events ++ [completed], fn event ->
+        "event: #{event["type"]}\ndata: #{Jason.encode!(event)}\n\n"
+      end)
+
+    http(200, "text/event-stream", body)
+  end
+
+  def error(status, message) do
+    http(status, "application/json", Jason.encode!(%{"error" => %{"message" => message}}))
+  end
+
+  defp http(status, type, body) do
+    "HTTP/1.1 #{status} X\r\ncontent-type: #{type}\r\ncontent-length: #{byte_size(body)}\r\n" <>
+      "connection: close\r\n\r\n" <> body
+  end
+
+  defp serve(listen, response) do
+    {:ok, socket} = :gen_tcp.accept(listen)
+    :ok = read_request(socket, "")
+    :ok = :gen_tcp.send(socket, response)
+    :gen_tcp.close(socket)
+    serve(listen, response)
+  end
+
+  defp read_request(socket, buffer) do
+    with [head, body] <- String.split(buffer, "\r\n\r\n", parts: 2),
+         [_, length] <- Regex.run(~r/content-length: (\d+)/i, head),
+         true <- byte_size(body) >= String.to_integer(length) do
+      :ok
+    else
+      _incomplete ->
+        {:ok, data} = :gen_tcp.recv(socket, 0, 5_000)
+        read_request(socket, buffer <> data)
+    end
+  end
+end
+
+base_url = MyApp.OfflineOpenAI.start(MyApp.OfflineOpenAI.sse(["Order A-1001 ", "shipped on ", "October 30."]))
+
+offline = %{api_key: "offline-test-key", base_url: base_url, max_retries: 0}
+```
+
+The model streams three text deltas. `offline` is the request `options` map.
+`base_url` points ReqLLM at the local server. Remove `api_key` and `base_url`
+to stream from OpenAI.
+
+## Define The Agent
+
+```elixir
+defmodule MyApp.SupportAgent do
+  use Jido.AI.Agent,
+    id: "my_app/support_agent",
+    vsn: 1,
+    name: "support_agent"
+
+  ai do
+    reasoning Jido.AI.Reasoning.ReAct do
+      model "openai:gpt-4o-mini"
+      instructions "Answer order questions in one sentence."
+    end
+  end
+end
+```
+
+`stream` is a field of the `Jido.AI.Reasoning.ReAct` input schema, with a
+default of `false`. The other built-in reasoning Flows don't define it and
+reject it as an unrecognized key.
+
+## Stream A Request
+
+`jido_ai_dispatch` is a `Jido.Signal.Dispatch` config. Jido AI dispatches
+every stream Signal to it. `{:pid, target: self()}` sends each one to this
+notebook as `{:signal, signal}`:
+
+```elixir
+agent = MyApp.SupportAgent.instantiate!(id: "support-1")
+
+request =
+  MyApp.SupportAgent.request_signal!(%{
+    input: "Where is order A-1001?",
+    stream: true,
+    options: offline
+  })
+
+{:ok, agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+  MyApp.SupportAgent.cmd(agent, request, context: %{jido_ai_dispatch: {:pid, target: self()}})
+
+{reply.data.status, reply.data.output}
+```
+
+The result is `{:completed, "Order A-1001 shipped on October 30."}`.
+
+The stream Signals are already in the mailbox. Jido AI dispatches them while
+the model call runs, so all of them arrive before `cmd/3` returns.
+
+## Read The Signals
+
+```elixir
+drain = fn drain, signals ->
+  receive do
+    {:signal, signal} -> drain.(drain, [signal | signals])
+  after
+    0 -> Enum.reverse(signals)
+  end
+end
+
+signals = drain.(drain, [])
+
+Enum.map(signals, &{&1.type, &1.data.sequence})
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+[
+  {"jido.ai.model.stream.started", 0},
+  {"jido.ai.model.stream.chunk", 1},
+  {"jido.ai.model.stream.chunk", 2},
+  {"jido.ai.model.stream.chunk", 3},
+  {"jido.ai.model.stream.chunk", 4},
+  {"jido.ai.model.stream.completed", 5}
+]
+```
+
+| Type | When | Extra data |
+| --- | --- | --- |
+| `jido.ai.model.stream.started` | Before ReqLLM opens the stream | none |
+| `jido.ai.model.stream.chunk` | Once per ReqLLM chunk | `chunk` |
+| `jido.ai.model.stream.completed` | After the last chunk | `response_id`, `outcome`, `finish_reason` |
+| `jido.ai.model.stream.failed` | When the stream can't open or breaks | `reason` |
+
+`sequence` starts at `0` and increases by one per Signal within one model call.
+Use it to order or deduplicate Signals at the receiver.
+
+## Read The Chunks
+
+Each `chunk` is a portable map with `type`, `text`, `name`, `arguments`, and
+`metadata`:
+
+```elixir
+signals
+|> Enum.filter(&(&1.type == "jido.ai.model.stream.chunk"))
+|> Enum.map(&{&1.data.chunk.type, &1.data.chunk.text})
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+[
+  {:content, "Order A-1001 "},
+  {:content, "shipped on "},
+  {:content, "October 30."},
+  {:meta, nil}
+]
+```
+
+`:content` chunks carry text. The final `:meta` chunk carries ReqLLM's usage,
+`finish_reason`, and `response_id` in `metadata`. ReqLLM also emits
+`:thinking` chunks for reasoning text and `:tool_call` chunks with `name` and
+`arguments`.
+
+## Match The Reply
+
+Every stream Signal carries the same correlation fields as the reply:
+
+```elixir
+completed = List.last(signals)
+
+Map.take(completed.data, [:request_id, :session_id, :thread_id, :model, :model_call, :outcome])
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  request_id: "01a17d76-1bd9-7921-a3b0-2ced49779eba",
+  session_id: "session:support-1",
+  thread_id: "session:support-1:thread",
+  model: "openai:gpt-4o-mini",
+  model_call: 1,
+  outcome: :final_answer
+}
+```
+
+Your `request_id` is a different generated ID. It is the request Signal's `id`:
+
+```elixir
+{completed.data.request_id == request.id, completed.data.request_id == reply.data.request_id,
+ completed.data.run_id == reply.data.run_id}
+```
+
+The result is `{true, true, true}`.
+
+| Field | Meaning |
+| --- | --- |
+| `request_id` | The request Signal ID. Same on the reply. |
+| `run_id` | One run of the reasoning Flow. Same on the reply. |
+| `session_id`, `thread_id` | The conversation that receives the answer. |
+| `stream_id` | One model call's stream. New for every model call. |
+| `model`, `model_index` | The model used and its position in `[model \| fallback_models]`. |
+| `model_call` | The request's model call count, starting at `1`. |
+| `model_attempt` | The attempt number on this model, starting at `1`. |
+| `tool_rounds` | Tool rounds finished before this model call. |
+| `sequence`, `timestamp_ms` | Order and wall-clock time. |
+
+Each stream Signal also has the Agent's `signal_source` as `source` and the
+request ID in its `jidocausationid` extension:
+
+```elixir
+{completed.source, Jido.Signal.get_context(completed, "jidocausationid") == request.id}
+```
+
+The result is `{"/my_app/support_agent", true}`.
+
+## Stream And Reply
+
+The stream is a preview. The reply and the Session are the record:
+
+```elixir
+streamed =
+  signals
+  |> Enum.filter(&(&1.type == "jido.ai.model.stream.chunk" and &1.data.chunk.type == :content))
+  |> Enum.map_join(& &1.data.chunk.text)
+
+assistant_messages =
+  Enum.filter(agent.state.session.thread.entries, &(&1.payload["role"] == "assistant"))
+
+{streamed == reply.data.output, length(assistant_messages)}
+```
+
+The result is `{true, 1}`. ReqLLM collects the chunks into one response. Jido
+AI then runs the output guard and appends one assistant message to the Thread.
+The reply has the same fields as a non-streamed reply.
+
+A request with tool rounds streams once per model call. Each call gets a new
+`stream_id` and `model_call`, and `tool_rounds` tells you how many tool rounds
+came before it. Only the last call's `completed` Signal has
+`outcome: :final_answer`; earlier ones have `outcome: :tool_calls`. A retry or
+fallback also starts a new stream, so a UI should reset its text buffer on
+every `started` Signal.
+
+## Stream On A Server
+
+`Jido.AgentServer.call/3` passes `context:` to the Turn. Use it the same way:
+
+```elixir
+{:ok, _jido} = Jido.start()
+{:ok, server} = Jido.start_agent(MyApp.SupportAgent, id: "live-support")
+
+live_request =
+  MyApp.SupportAgent.request_signal!(%{
+    input: "Where is order A-1001?",
+    stream: true,
+    options: offline
+  })
+
+{:ok, _committed, [%Jido.Agent.Directive.Reply{signal: live_reply}]} =
+  Jido.AgentServer.call(server, live_request,
+    context: %{jido_ai_dispatch: {:pid, target: self()}}
+  )
+
+live_signals = drain.(drain, [])
+
+{live_reply.data.output, Enum.map(live_signals, & &1.data.sequence)}
+```
+
+The result is `{"Order A-1001 shipped on October 30.", [0, 1, 2, 3, 4, 5]}`.
+The context isn't stored in Agent state or Signal data. Pass it on each call
+that should stream to a receiver.
+
+Without `jido_ai_dispatch`, the model call still streams and the reply is the
+same, but Jido AI publishes no stream Signals.
+
+## A Failed Stream
+
+Point a second server at a `401` response:
+
+```elixir
+failing_url = MyApp.OfflineOpenAI.start(MyApp.OfflineOpenAI.error(401, "Incorrect API key provided"))
+
+failing =
+  MyApp.SupportAgent.request_signal!(%{
+    input: "Where is order A-1001?",
+    stream: true,
+    options: %{offline | base_url: failing_url}
+  })
+
+{:ok, _agent, [%Jido.Agent.Directive.Reply{signal: failed}]} =
+  MyApp.SupportAgent.cmd(MyApp.SupportAgent.instantiate!(id: "support-2"), failing,
+    context: %{jido_ai_dispatch: {:pid, target: self()}}
+  )
+
+{failed.data.status, failed.data.reason_code, Enum.map(drain.(drain, []), & &1.type)}
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{:failed, :model, ["jido.ai.model.stream.started", "jido.ai.model.stream.failed"]}
+```
+
+The `failed` Signal has `sequence: 1` and the error text in `reason`. A `401`
+isn't retryable, so the request fails without a retry. ReqLLM also logs a
+warning. For a retryable error such as a `503`, ReAct retries or moves to a
+fallback model, and each attempt sends its own `started` Signal.
+
+## Clean Up
+
+```elixir
+:ok = Jido.stop_agent("live-support")
+:ok = Jido.stop()
+```
+
+## Summary
+
+- Set `stream: true` on a ReAct request and pass `jido_ai_dispatch` in the
+  command or Agent Server context.
+- Each model call publishes `started`, one `chunk` per ReqLLM chunk, then
+  `completed` or `failed`.
+- `sequence` orders Signals within one `stream_id`.
+- `request_id`, `run_id`, `session_id`, and `thread_id` match the reply.
+- The reply and the single committed assistant message are the final record.
+
+## Next
+
+- [Telemetry and Tracing](telemetry-and-tracing.livemd) – events, spans, and
+  correlation identifiers.
+- [Budgets, Retries, and Fallbacks](budgets-retries-and-fallbacks.md) – what
+  starts another model call.

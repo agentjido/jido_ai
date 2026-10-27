@@ -1,0 +1,455 @@
+# Structured Output
+
+## Overview
+
+Your support desk wants every incoming ticket sorted into a category and a
+priority, with a one-line summary, as data your code can match on. This
+Livebook defines that shape once as a Zoi schema, asks the model for it, and
+reads the reply as typed data. By the end, this works:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{:ok, ticket} = Zoi.parse(MyApp.Triage.schema(), reply.data.output)
+
+ticket
+# => %{category: :shipping, priority: :normal, summary: "Customer asks where order A-1001 is."}
+```
+
+You'll also see what happens when the model returns data that breaks the
+schema, and when Jido AI starts a repair round. The model runs offline.
+
+## Install
+
+```elixir
+Mix.install([{:jido_ai, "~> 3.0.0-beta.1"}, {:plug, "~> 1.0"}])
+```
+
+`plug` provides `Req.Test`, which the offline model uses.
+
+## The Triage Schema
+
+```elixir
+defmodule MyApp.Triage do
+  @moduledoc "The ticket triage shape shared by the model request and your code."
+
+  @schema Zoi.object(
+            %{
+              category: Zoi.enum(billing: "billing", shipping: "shipping", account: "account"),
+              priority: Zoi.enum(low: "low", normal: "normal", high: "high"),
+              summary: Zoi.string() |> Zoi.min(1)
+            },
+            coerce: true,
+            unrecognized_keys: :error
+          )
+
+  def schema, do: @schema
+  def json_schema, do: Zoi.to_json_schema(@schema)
+end
+```
+
+Each option matters at one boundary:
+
+| Option | Effect |
+| --- | --- |
+| `Zoi.enum(shipping: "shipping", ...)` | The model sees the string `"shipping"`; your code gets the atom `:shipping`. |
+| `coerce: true` | Accepts the string keys that come back from JSON. |
+| `unrecognized_keys: :error` | Emits `additionalProperties: false`, which OpenAI strict schemas require. |
+
+## The Request Schema
+
+The ReAct `output_schema` field takes a JSON Schema map, not a Zoi struct.
+Convert once with `Zoi.to_json_schema/1`:
+
+```elixir
+MyApp.Triage.json_schema()
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  type: :object,
+  required: [:priority, :category, :summary],
+  properties: %{
+    priority: %{type: :string, enum: ["low", "normal", "high"]},
+    category: %{type: :string, enum: ["billing", "shipping", "account"]},
+    summary: %{type: :string, minLength: 1}
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  additionalProperties: false
+}
+```
+
+The same schema now drives the provider request, ReqLLM's validation of the
+reply, and your own parse of the result.
+
+## Declare The Agent
+
+```elixir
+defmodule MyApp.TriageAgent do
+  use Jido.AI.Agent,
+    id: "my_app/triage_agent",
+    vsn: 1,
+    name: "triage_agent"
+
+  ai do
+    reasoning Jido.AI.Reasoning.ReAct do
+      model "openai:gpt-4o-mini"
+      instructions "Triage the support ticket. Pick one category and one priority, and summarize it in one sentence."
+    end
+  end
+end
+```
+
+This Agent has no tools. With an OpenAI model, ReqLLM sends a request that
+has both `output_schema` and tool definitions as a forced
+`structured_output` tool call, and the ReAct output guard rejects that call
+as a tool outside the allowlist. To get structured output from an Agent that
+has tools, send `tool_policy: %{requirement: :disabled}` in that request so
+no tool definitions are sent.
+
+## Offline Model
+
+This cell is the fake provider. It answers ReqLLM's HTTP requests with
+OpenAI Responses API JSON, in the order you queue them, and sends each
+request body to this notebook:
+
+```elixir
+defmodule MyApp.OfflineModel do
+  @moduledoc "Queues fake OpenAI Responses API replies for ReqLLM."
+
+  @doc "Request options that send model calls to this module."
+  def options do
+    %{
+      api_key: "offline-test-key",
+      max_retries: 0,
+      max_tokens: 256,
+      temperature: 0.0,
+      req_http_options: [plug: {Req.Test, MyApp.LLM}]
+    }
+  end
+
+  @doc "Queues one reply per model call and reports each request body."
+  def respond_with(bodies) do
+    owner = self()
+
+    Enum.each(bodies, fn body ->
+      Req.Test.expect(MyApp.LLM, fn conn ->
+        {:ok, request, conn} = Plug.Conn.read_body(conn)
+        send(owner, {:model_request, Jason.decode!(request)})
+        Req.Test.json(conn, body)
+      end)
+    end)
+  end
+
+  @doc "A final text answer. Structured output arrives as JSON text."
+  def text(text) do
+    %{
+      "id" => "resp_1",
+      "object" => "response",
+      "created_at" => 1,
+      "model" => "gpt-4o-mini-2024-07-18",
+      "status" => "completed",
+      "error" => nil,
+      "incomplete_details" => nil,
+      "parallel_tool_calls" => true,
+      "output" => [
+        %{
+          "type" => "message",
+          "id" => "msg_1",
+          "role" => "assistant",
+          "status" => "completed",
+          "content" => [%{"type" => "output_text", "text" => text, "annotations" => []}]
+        }
+      ],
+      "usage" => %{
+        "input_tokens" => 20,
+        "input_tokens_details" => %{"cached_tokens" => 0},
+        "output_tokens" => 5,
+        "output_tokens_details" => %{"reasoning_tokens" => 0},
+        "total_tokens" => 25
+      }
+    }
+  end
+
+  @doc "Returns the request bodies received so far."
+  def requests(acc \\ []) do
+    receive do
+      {:model_request, body} -> requests([body | acc])
+    after
+      0 -> Enum.reverse(acc)
+    end
+  end
+end
+```
+
+## Request An Object
+
+Put the JSON Schema in the request's `output_schema` field:
+
+```elixir
+MyApp.OfflineModel.respond_with([
+  MyApp.OfflineModel.text(
+    ~s({"category":"shipping","priority":"normal","summary":"Customer asks where order A-1001 is."})
+  )
+])
+
+agent = MyApp.TriageAgent.instantiate!(id: "triage-1")
+
+signal =
+  MyApp.TriageAgent.request_signal!(%{
+    input: "Hi, where is my order A-1001? It was due yesterday.",
+    output_schema: MyApp.Triage.json_schema(),
+    options: MyApp.OfflineModel.options()
+  })
+
+{:ok, next_agent, [%Jido.Agent.Directive.Reply{signal: reply}]} =
+  MyApp.TriageAgent.cmd(agent, signal)
+
+{reply.data.status, reply.data.output}
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+{:completed,
+ %{
+   "category" => "shipping",
+   "priority" => "normal",
+   "summary" => "Customer asks where order A-1001 is."
+ }}
+```
+
+With `output_schema` set, `reply.data.output` is the decoded object, with
+string keys. Without it, `output` is the answer text.
+
+A Zoi struct in the field fails request validation before any model call:
+
+```elixir
+bad_signal =
+  MyApp.TriageAgent.request_signal!(%{
+    input: "Where is my order?",
+    output_schema: MyApp.Triage.schema()
+  })
+
+{:error, error} = MyApp.TriageAgent.cmd(agent, bad_signal)
+Exception.message(error)
+```
+
+The result is `"invalid type: expected map, at output_schema"`.
+
+## Read Typed Data
+
+Parse the reply with the same Zoi schema:
+
+```elixir
+{:ok, ticket} = Zoi.parse(MyApp.Triage.schema(), reply.data.output)
+
+ticket
+```
+
+The result is
+`%{category: :shipping, priority: :normal, summary: "Customer asks where order A-1001 is."}`.
+Match on it like any map:
+
+```elixir
+case ticket do
+  %{priority: :high} -> :page_on_call
+  %{category: :billing} -> :billing_queue
+  %{category: :shipping} -> :shipping_queue
+  _ticket -> :general_queue
+end
+```
+
+The result is `:shipping_queue`.
+
+The Session records the object as the assistant message, JSON-encoded, so the
+next request in the conversation sees it:
+
+```elixir
+{:ok, messages} = Jido.AI.Thread.Projection.messages(next_agent.state.session)
+
+Enum.map(messages, &{&1.role, &1.content})
+```
+
+The result is:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+[
+  user: "Hi, where is my order A-1001? It was due yesterday.",
+  assistant: "{\"category\":\"shipping\",\"priority\":\"normal\",\"summary\":\"Customer asks where order A-1001 is.\"}"
+]
+```
+
+## What The Model Saw
+
+Jido AI passes the schema to ReqLLM as an object output with strict
+validation. For this OpenAI request, ReqLLM sent it as a strict JSON Schema
+response format:
+
+```elixir
+[request] = MyApp.OfflineModel.requests()
+
+format = request["text"]["format"]
+{format["type"], format["name"], format["strict"], format["schema"]["required"]}
+```
+
+The result is
+`{"json_schema", "output_schema", true, ["priority", "category", "summary"]}`.
+Other providers receive the schema in their own structured-output form;
+ReqLLM owns that mapping.
+
+## Invalid Output
+
+ReqLLM validates the decoded object against the schema before Jido AI sees
+it. Here the model invents a category:
+
+```elixir
+MyApp.OfflineModel.respond_with([
+  MyApp.OfflineModel.text(
+    ~s({"category":"returns","priority":"normal","summary":"Customer wants to return A-1001."})
+  )
+])
+
+{:ok, failed_agent, [%Jido.Agent.Directive.Reply{signal: failed}]} =
+  MyApp.TriageAgent.cmd(agent, signal)
+
+Map.take(failed.data, [:status, :output, :reason_code, :model_calls, :retries])
+```
+
+The result is
+`%{status: :failed, output: "", reason_code: :model, model_calls: 1, retries: 0}`.
+
+```elixir
+String.starts_with?(failed.data.reason, "Structured output failed final validation:")
+```
+
+The result is `true`. The rest of `reason` names the failing path,
+`#/properties/category`.
+
+A schema violation is a failed model call, not a repair candidate. It isn't
+retryable, so ReAct doesn't spend `limits.retries` or try `fallback_models`.
+Text with no JSON object fails the same way, with
+`"Structured output failed final validation: No complete structured output value was materialized."`.
+No assistant message is committed:
+
+```elixir
+Jido.AI.Thread.Projection.messages(failed_agent.state.session)
+```
+
+The result is `{:ok, []}`. To try again, send a new request.
+
+## Repair
+
+A repair round starts when the output passes the schema but fails the ReAct
+output guard. The guard rejects a final answer that is empty, longer than
+4,000 characters (an object is measured as encoded JSON), cut off by a
+`length`, `content_filter`, or other non-`stop` finish reason, or given
+before a required tool round.
+
+Here the first reply is valid but its summary runs to 4,100 characters:
+
+```elixir
+too_long =
+  Jason.encode!(%{
+    category: "shipping",
+    priority: "normal",
+    summary: String.duplicate("x", 4_100)
+  })
+
+MyApp.OfflineModel.respond_with([
+  MyApp.OfflineModel.text(too_long),
+  MyApp.OfflineModel.text(
+    ~s({"category":"shipping","priority":"normal","summary":"Customer asks where order A-1001 is."})
+  )
+])
+
+{:ok, _agent, [%Jido.Agent.Directive.Reply{signal: repaired}]} =
+  MyApp.TriageAgent.cmd(agent, signal)
+
+Map.take(repaired.data, [:status, :model_calls, :retries])
+```
+
+The result is `%{status: :completed, model_calls: 2, retries: 1}`.
+
+The second model call carried one extra system message:
+
+```elixir
+second = MyApp.OfflineModel.requests() |> List.last()
+
+second["input"]
+|> List.last()
+|> get_in(["content", Access.at(0), "text"])
+```
+
+The result is
+`"Repair the previous response. model output is too long. Return a valid final answer."`.
+
+Repair rounds come from the same budget as retries:
+
+| Remaining budget | Next step |
+| --- | --- |
+| Model attempts ≤ `limits.retries` (default `1`) | Repair with the same model. |
+| Another entry in `fallback_models` | Repair with the next model. |
+| Neither | `status: :blocked`, `reason_code: :output`, `reason` from the guard. |
+
+`limits.model_calls` and the other budgets still apply; a repair that would
+exceed them ends with `reason_code: :limits`.
+
+## A Default Schema
+
+To give every request the same schema, set `output_schema` in the
+`reasoning` block. Defaults must be compile-time literals, so write the JSON
+Schema map out; a `Zoi.to_json_schema/1` call there fails with
+`output_schema requires a compile-time literal value`:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+ai do
+  reasoning Jido.AI.Reasoning.ReAct do
+    output_schema %{
+      "type" => "object",
+      "properties" => %{
+        "category" => %{"type" => "string", "enum" => ["billing", "shipping", "account"]},
+        "priority" => %{"type" => "string", "enum" => ["low", "normal", "high"]},
+        "summary" => %{"type" => "string", "minLength" => 1}
+      },
+      "required" => ["category", "priority", "summary"],
+      "additionalProperties" => false
+    }
+  end
+end
+```
+
+Keep the Zoi schema next to it for parsing the reply. A request can still
+send its own `output_schema`, or `nil` for plain text.
+
+## Summary
+
+- `output_schema` is a ReAct request field that takes a JSON Schema map.
+  Build it with `Zoi.to_json_schema/1`.
+- `reply.data.output` is the decoded object with string keys. Parse it with
+  the same Zoi schema for atoms and validated types.
+- ReqLLM validates the object strictly. A violation ends the request with
+  `status: :failed` and `reason_code: :model`, without a repair round.
+- The output guard starts a repair round for empty, oversized, or truncated
+  answers. Repairs share the `limits.retries` and `fallback_models` budget.
+- Request structured output with no tool definitions in the call: an Agent
+  without tools, or `tool_policy: %{requirement: :disabled}`.
+
+## Next
+
+- [Errors and Recovery](errors-and-recovery.md) – every `status` and
+  `reason_code`, and how to respond.
+- [Budgets, Retries, and Fallbacks](budgets-retries-and-fallbacks.md) – the
+  limits that bound repair rounds.
+- [Pure or Live Execution](pure-or-live-execution.md) – run the triage
+  Agent under an Agent Server.
