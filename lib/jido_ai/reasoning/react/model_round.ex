@@ -26,7 +26,7 @@ defmodule Jido.AI.Reasoning.ReAct.ModelRound do
       action: CallModel,
       params: %{
         turn: result("project", :turn),
-        messages: result("project", :messages)
+        context: result("project", :context)
       }
 
     step "output_guard",
@@ -41,6 +41,7 @@ defmodule Jido.AI.Reasoning.ReAct.ModelRound do
       params: %{
         turn: result("model", :turn),
         outcome: result("model", :outcome),
+        context: result("model", :context),
         output_allowed: result("output_guard", :allowed),
         output_reason: result("output_guard", :reason)
       }

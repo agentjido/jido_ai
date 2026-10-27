@@ -67,6 +67,15 @@ defmodule Jido.AI.ChainOfThoughtLiveTest do
     assert reply.data.reasoning.steps_count >= 3
     assert reply.data.reasoning.conclusion =~ "79"
 
+    assert [attempt] = reply.data.model_attempts
+    before_context = Jido.AI.Context.Snapshot.decode!(attempt.context.before)
+    after_context = Jido.AI.Context.Snapshot.decode!(attempt.context.after)
+    assert before_context["stage"] == "prepared"
+    assert before_context["shape"]["message_count"] == 2
+    assert after_context["stage"] == "completed"
+    assert after_context["usage"]["input_tokens"] > 0
+    assert after_context["usage"]["output_tokens"] > 0
+
     reasoning_stops = events_named(trace, [:jido, :ai, :reasoning, :stop])
     request_stops = events_named(trace, [:req_llm, :request, :stop])
     agent_stops = events_named(trace, [:jido, :ai, :agent, :stop])
@@ -77,7 +86,7 @@ defmodule Jido.AI.ChainOfThoughtLiveTest do
 
     assert reasoning_stop.reasoning_method == :chain_of_thought
     assert reasoning_stop.status == :ok
-    assert reasoning_stop.req_llm_request_id == request_stop.request_id
+    assert after_context["response"]["req_llm_request_id"] == request_stop.request_id
     assert reasoning_measurements.duration > 0
     assert agent_stop.status == :completed
     assert agent_measurements.model_calls == 1

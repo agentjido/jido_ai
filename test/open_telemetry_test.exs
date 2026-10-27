@@ -4,6 +4,7 @@ defmodule Jido.AI.OpenTelemetryTest do
   import Mimic
 
   alias Jido.AI.Telemetry
+  alias Jido.AI.Telemetry.CorrelationStore
   alias Jido.AITest.OpenTelemetryTracer, as: TestTracer
 
   defmodule TracedTool do
@@ -188,6 +189,31 @@ defmodule Jido.AI.OpenTelemetryTest do
     assert final["error.type"] == "tool_execution_failed"
     assert final["jido.ai.tool.retryable"] == false
     assert {:otel_status, ids, :error, "tool_execution_failed"} in events
+  end
+
+  test "expired span correlations close the span and restore a local context" do
+    before = :otel_tracer.current_span_ctx()
+    attempt_id = "expired-tool-#{System.unique_integer([:positive])}"
+
+    :telemetry.execute(
+      [:jido, :ai, :tool, :start],
+      %{monotonic_time: System.monotonic_time()},
+      %{attempt_id: attempt_id, tool_name: "expired_tool", turn_id: "turn-expired"}
+    )
+
+    refute :otel_tracer.current_span_ctx() == before
+    assert CorrelationStore.prune_stale(0) >= 1
+    assert :otel_tracer.current_span_ctx() == before
+
+    events = receive_otel([])
+    {span, _parent, _opts} = find_start(events, "execute_tool expired_tool")
+    ids = TestTracer.ids(span)
+    final = merged_attributes(events, ids)
+
+    assert final["error.type"] == "jido.ai.telemetry.correlation_expired"
+
+    assert {:otel_status, ids, :error, "jido.ai.telemetry.correlation_expired"} in events
+    assert Enum.any?(events, &match?({:otel_end, ^ids, _timestamp}, &1))
   end
 
   defp receive_otel(events) do

@@ -183,7 +183,18 @@ defmodule Jido.AI.ChainOfThoughtTest do
       |> Enum.map(& &1.payload["role"])
 
     assert messages == ["user", "assistant"]
-    assert length(Jido.Thread.filter_by_kind(agent.state.session.thread, :ai_model_attempt)) == 1
+    [attempt] = Jido.Thread.filter_by_kind(agent.state.session.thread, :ai_model_attempt)
+
+    before_context =
+      attempt.payload |> get_in(["context", "before"]) |> Jido.AI.Context.Snapshot.decode!()
+
+    after_context =
+      attempt.payload |> get_in(["context", "after"]) |> Jido.AI.Context.Snapshot.decode!()
+
+    assert before_context["stage"] == "prepared"
+    assert after_context["stage"] == "completed"
+    assert after_context["shape"]["message_count"] == 2
+    assert before_context["request"]["tools"] == []
 
     events = receive_events([])
     {_, _, agent_start} = find_event(events, [:jido, :ai, :agent, :start])

@@ -45,10 +45,31 @@ defmodule Jido.AI.Thread.Projection do
 
   @doc "Projects a bounded set of complete conversation turns from a Session."
   @spec project(Session.t(), map()) :: {:ok, map()} | {:error, :invalid_context}
-  def project(%Session{thread: thread}, config) when is_map(config) do
+  def project(%Session{} = session, config) when is_map(config) do
+    with {:ok, explanation} <- explain(session, config) do
+      {:ok,
+       Map.take(explanation, [
+         :messages,
+         :available_messages,
+         :included_messages,
+         :dropped_messages,
+         :first_seq,
+         :last_seq
+       ])}
+    end
+  end
+
+  def project(_session, _config), do: {:error, :invalid_context}
+
+  @doc "Projects a Thread and reports why each model message was included or excluded."
+  @spec explain(Session.t(), map()) :: {:ok, map()} | {:error, :invalid_context}
+  def explain(%Session{thread: thread}, config) when is_map(config) do
     with {:ok, _thread} <- Thread.validate(thread) do
-      thread.entries
-      |> context_entries()
+      outcomes = request_outcomes(thread.entries)
+      message_entries = Enum.filter(thread.entries, &message_entry?/1)
+      eligible_entries = Enum.filter(message_entries, &context_entry?(&1, outcomes))
+
+      eligible_entries
       |> Enum.reduce_while({:ok, []}, fn entry, {:ok, messages} ->
         case decode_message(entry.payload) do
           {:ok, message} -> {:cont, {:ok, [{entry, message} | messages]}}
@@ -59,10 +80,21 @@ defmodule Jido.AI.Thread.Projection do
         {:ok, pairs} ->
           completed = pairs |> Enum.reverse() |> complete_exchanges()
           selected = select_turns(completed, config)
+          completed_ids = entry_ids(completed)
+          selected_ids = entry_ids(selected)
 
           {:ok,
            %{
              messages: Enum.map(selected, &elem(&1, 1)),
+             entries: Enum.map(selected, &portable_pair/1),
+             decisions:
+               projection_decisions(
+                 message_entries,
+                 eligible_entries,
+                 completed_ids,
+                 selected_ids,
+                 outcomes
+               ),
              available_messages: length(completed),
              included_messages: length(selected),
              dropped_messages: length(completed) - length(selected),
@@ -78,7 +110,7 @@ defmodule Jido.AI.Thread.Projection do
     end
   end
 
-  def project(_session, _config), do: {:error, :invalid_context}
+  def explain(_session, _config), do: {:error, :invalid_context}
 
   @doc "Returns the final included Thread sequence for one projection."
   @spec breakpoint(Session.t()) :: non_neg_integer() | nil
@@ -111,8 +143,56 @@ defmodule Jido.AI.Thread.Projection do
     outcomes = request_outcomes(entries)
 
     Enum.filter(entries, fn entry ->
-      entry.kind in [:ai_message, "ai_message"] and context_entry?(entry, outcomes)
+      message_entry?(entry) and context_entry?(entry, outcomes)
     end)
+  end
+
+  defp message_entry?(entry), do: entry.kind in [:ai_message, "ai_message"]
+
+  defp entry_ids(pairs), do: MapSet.new(pairs, fn {entry, _message} -> entry.id end)
+
+  defp portable_pair({entry, message}) do
+    %{
+      id: entry.id,
+      seq: entry.seq,
+      at: entry.at,
+      refs: entry.refs,
+      message: message
+    }
+  end
+
+  defp projection_decisions(entries, eligible, completed_ids, selected_ids, outcomes) do
+    eligible_ids = MapSet.new(eligible, & &1.id)
+
+    Enum.map(entries, fn entry ->
+      cond do
+        not MapSet.member?(eligible_ids, entry.id) ->
+          decision(entry, :excluded, request_outcome_reason(entry, outcomes))
+
+        not MapSet.member?(completed_ids, entry.id) ->
+          decision(entry, :excluded, :incomplete_tool_exchange)
+
+        not MapSet.member?(selected_ids, entry.id) ->
+          decision(entry, :excluded, :outside_context_window)
+
+        true ->
+          decision(entry, :included, :projected)
+      end
+    end)
+  end
+
+  defp decision(entry, state, reason) do
+    %{entry_id: entry.id, seq: entry.seq, state: state, reason: reason, refs: entry.refs}
+  end
+
+  defp request_outcome_reason(entry, outcomes) do
+    case field(entry.refs, :run_id) do
+      run_id when is_binary(run_id) and run_id != "" ->
+        if Map.get(outcomes, run_id) == false, do: :request_not_completed, else: :not_eligible
+
+      _other ->
+        :not_eligible
+    end
   end
 
   defp request_outcomes(entries) do
@@ -225,7 +305,7 @@ defmodule Jido.AI.Thread.Projection do
 
   defp encode_message(message) when is_map(message) do
     with role when role in @roles <- role(field(message, :role)),
-         content when is_binary(content) <- field(message, :content) || "",
+         content when is_binary(content) or is_list(content) <- field(message, :content) || "",
          {:ok, tool_calls} <- encode_tool_calls(field(message, :tool_calls) || []) do
       {:ok,
        json(%{
@@ -247,7 +327,7 @@ defmodule Jido.AI.Thread.Projection do
 
   defp decode_message(%{"version" => 1} = payload) do
     with role when role in @roles <- role(payload["role"]),
-         content when is_binary(content) <- payload["content"] || "",
+         content when is_binary(content) or is_list(content) <- payload["content"] || "",
          {:ok, tool_calls} <- decode_tool_calls(payload["tool_calls"] || []) do
       {:ok,
        %{

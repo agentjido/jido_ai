@@ -7,7 +7,7 @@ defmodule Jido.AI.Application do
   def start(_type, _args) do
     with {:ok, supervisor} <-
            Supervisor.start_link(
-             [Jido.AI.Telemetry.Storage],
+             [Jido.AI.Telemetry.CorrelationStore],
              strategy: :one_for_one,
              name: Jido.AI.Supervisor
            ) do

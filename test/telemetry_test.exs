@@ -17,6 +17,7 @@ defmodule Jido.AI.TelemetryTest do
     assert [:jido, :ai, :agent, :start] in events
     assert [:jido, :ai, :reasoning, :stop] in events
     assert [:jido, :ai, :tool, :stop] in events
+    assert [:jido, :ai, :telemetry, :correlation, :cleanup] in events
     assert [:jido, :agent_server, :turn, :stop] in events
     assert [:jido, :action, :stop] in events
     assert [:runic, :runner, :runnable, :stop] in events
@@ -28,6 +29,8 @@ defmodule Jido.AI.TelemetryTest do
     assert [:jido, :ai, :reasoning, :stop, :duration] in names
     assert [:jido, :ai, :model, :input_tokens] in names
     assert [:jido, :ai, :model, :cache_read_tokens] in names
+    assert [:jido, :ai, :telemetry, :correlation, :expired] in names
+    assert [:jido, :ai, :telemetry, :correlation, :size] in names
   end
 
   test "one AgentServer request correlates Agent, model, and tool telemetry" do

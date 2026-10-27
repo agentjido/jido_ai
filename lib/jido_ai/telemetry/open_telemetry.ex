@@ -1,7 +1,7 @@
 defmodule Jido.AI.Telemetry.OpenTelemetry do
   @moduledoc false
 
-  alias Jido.AI.Telemetry.Storage
+  alias Jido.AI.Telemetry.CorrelationStore
 
   @handler_id "jido-ai-open-telemetry"
   @req_llm_handler_id "jido-ai-req-llm-open-telemetry"
@@ -66,7 +66,7 @@ defmodule Jido.AI.Telemetry.OpenTelemetry do
       when kind in [:agent, :tool] and ending in [:stop, :exception] do
     case span_key(kind, metadata) do
       nil -> :ok
-      key -> finish_span(Storage.take(key), kind, ending, metadata, measurements)
+      key -> finish_span(CorrelationStore.take(key), kind, ending, metadata, measurements)
     end
   catch
     _, _ -> :ok
@@ -87,7 +87,7 @@ defmodule Jido.AI.Telemetry.OpenTelemetry do
       when ending in [:stop, :exception] do
     case span_key(:reasoning, metadata) do
       nil -> :ok
-      key -> finish_span(Storage.take(key), :reasoning, ending, metadata, measurements)
+      key -> finish_span(CorrelationStore.take(key), :reasoning, ending, metadata, measurements)
     end
   catch
     _, _ -> :ok
@@ -119,7 +119,7 @@ defmodule Jido.AI.Telemetry.OpenTelemetry do
   end
 
   defp agent_span(%{turn_id: turn_id}) when is_binary(turn_id),
-    do: Storage.get({:otel, :agent, turn_id})
+    do: CorrelationStore.get({:otel, :agent, turn_id})
 
   defp agent_span(_context), do: nil
 
@@ -154,7 +154,7 @@ defmodule Jido.AI.Telemetry.OpenTelemetry do
   end
 
   defp attach_stored_span(key) do
-    case Storage.get(key) do
+    case CorrelationStore.get(key) do
       %{span: span} ->
         attach_span(span)
 
@@ -185,7 +185,7 @@ defmodule Jido.AI.Telemetry.OpenTelemetry do
   defp parent_span(:agent, _metadata), do: nil
 
   defp parent_span(:tool, %{turn_id: turn_id}) when is_binary(turn_id) do
-    case Storage.get({:otel, :agent, turn_id}) do
+    case CorrelationStore.get({:otel, :agent, turn_id}) do
       %{span: span} -> span
       _other -> nil
     end
@@ -260,23 +260,46 @@ defmodule Jido.AI.Telemetry.OpenTelemetry do
         :tool ->
           case attach_span(span) do
             {:ok, restore_context} ->
-              %{span: span, metadata: metadata, restore_context: restore_context}
+              %{
+                span: span,
+                metadata: metadata,
+                owner: self(),
+                restore_context: restore_context
+              }
 
             :error ->
-              %{span: span, metadata: metadata}
+              %{span: span, metadata: metadata, owner: self()}
           end
 
         _other ->
-          %{span: span, metadata: metadata}
+          %{span: span, metadata: metadata, owner: self()}
       end
 
-    unless Storage.put_new(key, stored) do
+    unless CorrelationStore.put_new(key, stored, on_expire: {__MODULE__, :expire_span}) do
       detach(Map.get(stored, :restore_context))
       safely(fn -> call(:otel_span, :end_span, [span]) end)
     end
 
     :ok
   end
+
+  @doc false
+  @spec expire_span(term(), map()) :: :ok
+  def expire_span(_key, %{span: span} = stored) do
+    error_type = "jido.ai.telemetry.correlation_expired"
+
+    safely(fn -> call(:otel_span, :set_attributes, [span, %{"error.type" => error_type}]) end)
+    safely(fn -> call(:otel_span, :set_status, [span, :error, error_type]) end)
+    safely(fn -> call(:otel_span, :end_span, [span]) end)
+
+    if Map.get(stored, :owner) == self() do
+      detach(Map.get(stored, :restore_context))
+    end
+
+    :ok
+  end
+
+  def expire_span(_key, _stored), do: :ok
 
   defp attach_span(span) do
     current = call(:otel_ctx, :get_current, [])

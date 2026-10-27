@@ -1,6 +1,8 @@
 defmodule Jido.AI.Reasoning.Actions.CallModel do
   @moduledoc "Calls one model and returns success or failure as graph data."
 
+  alias Jido.AI.Context, as: AIContext
+  alias Jido.AI.Context.ReqLLM, as: ContextRequest
   alias Jido.AI.{Budget, Telemetry, Toolset, Usage}
 
   use Jido.Action,
@@ -12,40 +14,31 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
     output_schema: Zoi.map()
 
   @impl Jido.Action
-  def run(%{turn: turn, messages: messages} = params, context) do
+  def run(%{turn: turn, context: model_context} = params, context) do
     case Budget.before_model(turn) do
-      :ok -> call_model(turn, messages, params, context)
-      {:error, budget, reason} -> budget_outcome(turn, budget, reason)
+      :ok -> call_model(turn, model_context, params, context)
+      {:error, budget, reason} -> budget_outcome(turn, model_context, budget, reason)
     end
   end
 
-  defp call_model(turn, messages, params, context) do
+  defp call_model(turn, model_context, params, context) do
     model = Enum.at(turn.models, turn.model_index)
     started_at = System.system_time(:millisecond)
     stream_id = "stream_#{Jido.generate_id()}"
     :ok = Telemetry.record_agent_context(context, agent_context(turn))
 
-    result =
-      with {:ok, tools} <- model_tools(turn, Map.get(params, :tools, true)) do
-        options =
-          turn.options
-          |> Map.delete(:tool_choice)
-          |> Map.delete("tool_choice")
-          |> apply_prompt_cache_options(model, turn)
-          |> put_conversation_telemetry(turn)
-          |> put_budget_timeout(turn, started_at)
-          |> Map.to_list()
-          |> put_tools(tools)
-          |> put_tool_choice(tool_choice(turn))
-
-        model_call = fn ->
-          if turn.stream do
-            stream(model, messages, options, turn, stream_id, context)
-          else
-            generate(model, messages, options)
-          end
+    with {:ok, tools} <- model_tools(turn, Map.get(params, :tools, true)),
+         {:ok, prepared_context, request} <-
+           prepare_context(model_context, turn, model, tools, started_at) do
+      model_call = fn ->
+        if turn.stream do
+          stream(request, turn, stream_id, context)
+        else
+          generate(request)
         end
+      end
 
+      result =
         case Map.get(params, :reasoning) do
           reasoning when is_map(reasoning) ->
             Telemetry.with_reasoning(context, reasoning, model_call)
@@ -53,15 +46,46 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
           _other ->
             Telemetry.with_agent_span(context, model_call)
         end
-      end
 
-    completed_at = System.system_time(:millisecond)
-    normalize(result, turn, model, started_at, completed_at)
+      completed_at = System.system_time(:millisecond)
+      req_llm_request_id = Telemetry.take_model_request_id(thread_id(turn))
+
+      normalize(
+        result,
+        turn,
+        model,
+        started_at,
+        completed_at,
+        prepared_context,
+        req_llm_request_id
+      )
+    end
   end
 
-  defp generate(model, messages, options) do
-    context = ReqLLM.Context.new(Enum.map(messages, &to_req_llm_message/1))
-    ReqLLM.generate_text(model, context, options)
+  defp prepare_context(context, turn, model, tools, started_at) do
+    options =
+      turn.options
+      |> Map.delete(:tool_choice)
+      |> Map.delete("tool_choice")
+      |> apply_prompt_cache_options(model, turn)
+      |> put_conversation_telemetry(turn)
+      |> put_budget_timeout(turn, started_at)
+
+    patch = %{
+      model: model,
+      tools: tools || [],
+      options: options,
+      tool_choice: tool_choice(turn),
+      prompt_cache: turn.prompt_cache
+    }
+
+    operation_id = "model-request:#{turn.model_calls + 1}"
+
+    with {:ok, configured} <- AIContext.configure(context, patch, op_id: operation_id),
+         {:ok, prepared} <- AIContext.prepare(configured),
+         {:ok, request} <- ContextRequest.render(prepared) do
+      {:ok, prepared, request}
+    end
   end
 
   defp model_tools(turn, true) do
@@ -73,11 +97,9 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
 
   defp model_tools(_turn, false), do: {:ok, nil}
 
-  defp put_tools(options, nil), do: options
-  defp put_tools(options, tools), do: Keyword.put(options, :tools, tools)
-
-  defp put_tool_choice(options, nil), do: options
-  defp put_tool_choice(options, choice), do: Keyword.put(options, :tool_choice, choice)
+  defp generate(request) do
+    ReqLLM.generate_text(request.model, request.context, request.options)
+  end
 
   defp tool_choice(turn) do
     Toolset.provider_tool_choice(turn.tool_requirement, turn.tool_rounds, turn.tools)
@@ -102,10 +124,11 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
     end
   end
 
-  defp budget_outcome(turn, budget, reason) do
+  defp budget_outcome(turn, context, budget, reason) do
     {:ok,
      %{
        turn: turn,
+       context: context,
        outcome: %{
          status: :budget,
          category: :limits,
@@ -129,12 +152,13 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
     }
   end
 
-  defp stream(model, messages, options, turn, stream_id, context) do
+  defp thread_id(turn), do: turn.session |> Jido.Session.decode!() |> then(& &1.thread.id)
+
+  defp stream(request_data, turn, stream_id, context) do
     request = correlation(turn, stream_id, 0, System.system_time(:millisecond))
     _result = dispatch_stream_signal(context, "jido.ai.model.stream.started", request)
-    req_context = ReqLLM.Context.new(Enum.map(messages, &to_req_llm_message/1))
 
-    case ReqLLM.stream_text(model, req_context, options) do
+    case ReqLLM.stream_text(request_data.model, request_data.context, request_data.options) do
       {:ok, response} ->
         sequence_counter = :atomics.new(1, [])
 
@@ -231,51 +255,68 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
     }
   end
 
-  defp normalize({:ok, response}, turn, model, started_at, completed_at) do
+  defp normalize(
+         {:ok, response},
+         turn,
+         model,
+         started_at,
+         completed_at,
+         context,
+         observed_request_id
+       ) do
     classified = ReqLLM.Response.classify(response)
     call_metadata = ReqLLM.Response.call_metadata(response)
     usage = Usage.normalize(ReqLLM.Response.usage(response))
     next_turn = record_call(turn, usage)
 
-    {:ok,
-     %{
-       turn: next_turn,
-       outcome: %{
-         status: :ok,
-         kind: classified.type,
-         finish_reason: classified.finish_reason,
-         text: classified.text,
-         tool_calls: Enum.map(classified.tool_calls, &Map.take(&1, [:id, :name, :arguments])),
-         req_llm_request_id: call_metadata[:request_id],
-         response_id: response.id,
-         model: model,
-         usage: usage,
-         prompt_cache: Usage.cache_observation(turn.prompt_cache, usage, completed_at),
-         started_at_ms: started_at,
-         completed_at_ms: completed_at
-       }
-     }}
+    outcome = %{
+      status: :ok,
+      kind: classified.type,
+      finish_reason: classified.finish_reason,
+      text: classified.text,
+      tool_calls: Enum.map(classified.tool_calls, &Map.take(&1, [:id, :name, :arguments])),
+      req_llm_request_id: call_metadata[:request_id] || observed_request_id,
+      response_id: response.id,
+      model: model,
+      usage: usage,
+      prompt_cache: Usage.cache_observation(turn.prompt_cache, usage, completed_at),
+      started_at_ms: started_at,
+      completed_at_ms: completed_at
+    }
+
+    with {:ok, completed_context} <- AIContext.complete(context, outcome) do
+      {:ok, %{turn: next_turn, outcome: outcome, context: completed_context}}
+    end
   end
 
-  defp normalize({:error, reason}, turn, model, started_at, completed_at) do
+  defp normalize(
+         {:error, reason},
+         turn,
+         model,
+         started_at,
+         completed_at,
+         context,
+         observed_request_id
+       ) do
     usage = ReqLLM.Usage.normalize(nil)
     next_turn = record_call(turn, usage)
 
-    {:ok,
-     %{
-       turn: next_turn,
-       outcome: %{
-         status: :error,
-         category: category(reason),
-         retryable: retryable?(reason),
-         reason: error_message(reason),
-         model: model,
-         usage: usage,
-         prompt_cache: Usage.cache_observation(turn.prompt_cache, usage, completed_at),
-         started_at_ms: started_at,
-         completed_at_ms: completed_at
-       }
-     }}
+    outcome = %{
+      status: :error,
+      category: category(reason),
+      retryable: retryable?(reason),
+      reason: error_message(reason),
+      req_llm_request_id: observed_request_id,
+      model: model,
+      usage: usage,
+      prompt_cache: Usage.cache_observation(turn.prompt_cache, usage, completed_at),
+      started_at_ms: started_at,
+      completed_at_ms: completed_at
+    }
+
+    with {:ok, completed_context} <- AIContext.complete(context, outcome) do
+      {:ok, %{turn: next_turn, outcome: outcome, context: completed_context}}
+    end
   end
 
   defp record_call(turn, usage) do
@@ -348,26 +389,6 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
   defp field(nil, _key), do: nil
   defp field(map, key) when is_map(map), do: Map.get(map, key, Map.get(map, Atom.to_string(key)))
   defp field(_value, _key), do: nil
-
-  defp to_req_llm_message(%{role: :system, content: content}), do: ReqLLM.Context.system(content)
-  defp to_req_llm_message(%{role: :user, content: content}), do: ReqLLM.Context.user(content)
-
-  defp to_req_llm_message(%{role: :assistant, content: content, tool_calls: calls})
-       when is_list(calls) and calls != [] do
-    tool_calls =
-      Enum.map(calls, fn call ->
-        ReqLLM.ToolCall.new(call.id, call.name, Jason.encode!(call.arguments))
-      end)
-
-    ReqLLM.Context.assistant(content, tool_calls: tool_calls)
-  end
-
-  defp to_req_llm_message(%{role: :assistant, content: content}),
-    do: ReqLLM.Context.assistant(content)
-
-  defp to_req_llm_message(%{role: :tool} = message) do
-    ReqLLM.Context.tool_result_message(message.name, message.tool_call_id, message.output)
-  end
 
   @retryable_statuses [408, 409, 425, 429, 500, 502, 503, 504]
   @retryable_transport_reasons [

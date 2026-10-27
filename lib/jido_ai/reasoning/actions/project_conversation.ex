@@ -1,7 +1,7 @@
 defmodule Jido.AI.Reasoning.Actions.ProjectConversation do
   @moduledoc "Projects the canonical Thread into one model request."
 
-  alias Jido.AI.Thread.Projection
+  alias Jido.AI.Context
 
   use Jido.Action,
     id: "jido.ai/reasoning/actions/project-conversation",
@@ -13,18 +13,17 @@ defmodule Jido.AI.Reasoning.Actions.ProjectConversation do
 
   @impl Jido.Action
   def run(%{turn: turn}, _context) do
-    with {:ok, projection} <-
-           turn.session
-           |> Jido.Session.decode!()
-           |> Projection.project(turn.context_window) do
-      messages = [%{role: :system, content: turn.instructions}] ++ projection.messages
-      messages = maybe_add_repair(messages, turn.repair_instruction)
-      {:ok, %{turn: turn, messages: messages, projection: Map.delete(projection, :messages)}}
+    with {:ok, context} <-
+           Context.new(turn.session,
+             instructions: turn.instructions,
+             repair_instruction: turn.repair_instruction,
+             context_window: turn.context_window,
+             request_id: turn.request_id,
+             run_id: turn.run_id,
+             model_call: turn.model_calls + 1,
+             prompt_cache: turn.prompt_cache
+           ) do
+      {:ok, %{turn: turn, context: context}}
     end
   end
-
-  defp maybe_add_repair(messages, nil), do: messages
-
-  defp maybe_add_repair(messages, instruction),
-    do: messages ++ [%{role: :system, content: instruction}]
 end

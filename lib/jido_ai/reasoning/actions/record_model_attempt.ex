@@ -1,7 +1,7 @@
 defmodule Jido.AI.Reasoning.Actions.RecordModelAttempt do
   @moduledoc "Records one model attempt and any accepted assistant message."
 
-  alias Jido.AI.Thread.Projection
+  alias Jido.AI.{Context, Thread.Projection}
 
   use Jido.Action,
     id: "jido.ai/reasoning/actions/record-model-attempt",
@@ -29,6 +29,16 @@ defmodule Jido.AI.Reasoning.Actions.RecordModelAttempt do
     at = System.system_time(:millisecond)
     refs = %{request_id: turn.request_id, run_id: turn.run_id}
 
+    before_snapshot =
+      params.context
+      |> Context.snapshot(stage: :prepared, content: :none)
+      |> Context.Snapshot.encode()
+
+    after_snapshot =
+      params.context
+      |> Context.snapshot(content: :none)
+      |> Context.Snapshot.encode()
+
     attempt = %{
       status: outcome.status,
       reasoning: Map.get(params, :reasoning),
@@ -41,7 +51,12 @@ defmodule Jido.AI.Reasoning.Actions.RecordModelAttempt do
       output_allowed: params.output_allowed,
       output_reason: params.output_reason,
       outcome: portable_outcome(outcome),
-      prompt_cache: outcome.prompt_cache
+      prompt_cache: outcome.prompt_cache,
+      context: %{
+        format: "jido.ai.context.snapshot+json",
+        before: before_snapshot,
+        after: after_snapshot
+      }
     }
 
     session =

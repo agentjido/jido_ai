@@ -88,7 +88,8 @@ defmodule JidoAi.MixProject do
       {:excoveralls, "~> 0.18", only: [:dev, :test]},
       {:git_hooks, "~> 0.8", only: [:dev, :test], runtime: false},
       {:git_ops, "~> 2.9", only: :dev, runtime: false},
-      {:mimic, "~> 2.0", only: :test}
+      {:mimic, "~> 2.0", only: :test},
+      {:plug, "~> 1.0", only: :test}
     ]
   end
 

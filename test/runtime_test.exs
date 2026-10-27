@@ -97,6 +97,15 @@ defmodule Jido.AI.RuntimeTest do
     assert write.ttl_ms == 300_000
     assert write.token_count == 80
     assert write.estimated_expires_at_ms == write.observed_at_ms + write.ttl_ms
+    assert attempt.context.format == "jido.ai.context.snapshot+json"
+    before_context = Jido.AI.Context.Snapshot.decode!(attempt.context.before)
+    after_context = Jido.AI.Context.Snapshot.decode!(attempt.context.after)
+    assert before_context["stage"] == "prepared"
+    assert before_context["usage"] == nil
+    assert after_context["stage"] == "completed"
+    assert after_context["usage"]["input_tokens"] == 100
+    assert after_context["request"]["prompt_cache"]["enabled"]
+    assert after_context["shape"]["message_count"] == 2
 
     outcome = List.last(agent.state.session.thread.entries)
     assert outcome.kind == :ai_request_outcome

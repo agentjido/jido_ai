@@ -11,7 +11,9 @@ defmodule Jido.AI.Telemetry do
 
       config :jido_ai, :telemetry,
         semantic_log_mode: :interesting,
-        semantic_slow_threshold_ms: 1_000
+        semantic_slow_threshold_ms: 1_000,
+        correlation_ttl_ms: 3_600_000,
+        correlation_sweep_interval_ms: 60_000
 
   Supported log modes are `:off`, `:errors`, `:interesting`, and `:all`.
   Prompts, model output, reasoning text, tool arguments, tool results, Agent
@@ -27,7 +29,7 @@ defmodule Jido.AI.Telemetry do
 
   require Logger
 
-  alias Jido.AI.Telemetry.{OpenTelemetry, Storage}
+  alias Jido.AI.Telemetry.{CorrelationStore, OpenTelemetry}
 
   @request_type "jido.ai.request"
   @runtime_handler_id "jido-ai-runtime-telemetry"
@@ -51,6 +53,10 @@ defmodule Jido.AI.Telemetry do
     [:jido, :ai, :reasoning, :start],
     [:jido, :ai, :reasoning, :stop],
     [:jido, :ai, :reasoning, :exception]
+  ]
+
+  @correlation_events [
+    [:jido, :ai, :telemetry, :correlation, :cleanup]
   ]
 
   @owned_events @agent_events ++ @reasoning_events ++ @tool_events
@@ -79,6 +85,7 @@ defmodule Jido.AI.Telemetry do
   @spec events() :: [event_name()]
   def events do
     (@owned_events ++
+       @correlation_events ++
        @runtime_events ++
        Jido.Exec.Telemetry.event_names() ++
        Runic.Runner.Telemetry.event_names() ++ ReqLLM.Telemetry.events())
@@ -128,6 +135,14 @@ defmodule Jido.AI.Telemetry do
         tags: [:provider, :model, :operation],
         tag_values: &model_tag_values/1,
         unit: {:native, :millisecond}
+      ),
+      Telemetry.Metrics.sum("jido.ai.telemetry.correlation.expired",
+        event_name: [:jido, :ai, :telemetry, :correlation, :cleanup],
+        measurement: :expired
+      ),
+      Telemetry.Metrics.last_value("jido.ai.telemetry.correlation.size",
+        event_name: [:jido, :ai, :telemetry, :correlation, :cleanup],
+        measurement: :size
       )
     ] ++ usage_metrics()
   end
@@ -174,9 +189,14 @@ defmodule Jido.AI.Telemetry do
       when is_map(context) and is_map(reasoning) and is_function(fun, 0) do
     operation_id = "reasoning_#{Jido.generate_id()}"
     metadata = reasoning_metadata(context, reasoning, operation_id)
+    conversation_id = metadata[:thread_id]
     started_at = System.monotonic_time()
     previous_operation = Process.get(@reasoning_scope_key)
     Process.put(@reasoning_scope_key, operation_id)
+
+    if is_binary(conversation_id) do
+      CorrelationStore.put({:reasoning_conversation, conversation_id}, operation_id)
+    end
 
     :telemetry.execute(
       [:jido, :ai, :reasoning, :start],
@@ -209,9 +229,11 @@ defmodule Jido.AI.Telemetry do
           |> Map.put(:error_type, reasoning_error_type(kind, reason))
         )
 
-        Storage.take({:reasoning_request, operation_id})
+        CorrelationStore.take({:reasoning_request, operation_id})
         :erlang.raise(kind, reason, __STACKTRACE__)
     after
+      clear_reasoning_conversation(conversation_id, operation_id)
+
       if previous_operation,
         do: Process.put(@reasoning_scope_key, previous_operation),
         else: Process.delete(@reasoning_scope_key)
@@ -223,7 +245,7 @@ defmodule Jido.AI.Telemetry do
   def record_agent_summary(context, summary) when is_map(context) and is_map(summary) do
     case Map.get(context, :turn_id) do
       turn_id when is_binary(turn_id) ->
-        Storage.put({:summary, turn_id}, normalize_summary(summary))
+        CorrelationStore.put({:summary, turn_id}, normalize_summary(summary))
 
       _other ->
         :ok
@@ -240,7 +262,7 @@ defmodule Jido.AI.Telemetry do
           |> Map.take([:request_id, :run_id, :session_id, :thread_id])
           |> compact()
 
-        Storage.put({:agent, turn_id}, Map.merge(current, updates))
+        CorrelationStore.put({:agent, turn_id}, Map.merge(current, updates))
 
       _other ->
         :ok
@@ -264,7 +286,7 @@ defmodule Jido.AI.Telemetry do
           end)
           |> Map.new()
 
-        Storage.put({:tool_calls, turn_id}, calls)
+        CorrelationStore.put({:tool_calls, turn_id}, calls)
 
       _other ->
         :ok
@@ -299,9 +321,23 @@ defmodule Jido.AI.Telemetry do
   end
 
   def handle_runtime_event([:req_llm, :request, :start], _measurements, metadata, _config) do
+    conversation_id = req_llm_conversation_id(metadata)
+
+    if is_binary(conversation_id) and is_binary(metadata[:request_id]) do
+      CorrelationStore.put({:model_request, conversation_id}, metadata[:request_id])
+
+      case CorrelationStore.get({:reasoning_conversation, conversation_id}) do
+        operation_id when is_binary(operation_id) ->
+          CorrelationStore.put({:reasoning_request, operation_id}, metadata[:request_id])
+
+        _other ->
+          :ok
+      end
+    end
+
     case {Process.get(@reasoning_scope_key), metadata[:request_id]} do
       {operation_id, request_id} when is_binary(operation_id) and is_binary(request_id) ->
-        Storage.put({:reasoning_request, operation_id}, request_id)
+        CorrelationStore.put({:reasoning_request, operation_id}, request_id)
 
       _other ->
         :ok
@@ -309,6 +345,14 @@ defmodule Jido.AI.Telemetry do
   end
 
   def handle_runtime_event(_event, _measurements, _metadata, _config), do: :ok
+
+  @doc false
+  @spec take_model_request_id(String.t()) :: String.t() | nil
+  def take_model_request_id(conversation_id) when is_binary(conversation_id) do
+    CorrelationStore.take({:model_request, conversation_id})
+  end
+
+  def take_model_request_id(_conversation_id), do: nil
 
   @doc false
   def handle_semantic_event(event, measurements, metadata, _config) do
@@ -335,13 +379,16 @@ defmodule Jido.AI.Telemetry do
 
   defp bridge_agent_event(:start, measurements, metadata) do
     ai_metadata = agent_metadata(metadata)
-    Storage.put({:agent, metadata.turn_id}, ai_metadata)
+    CorrelationStore.put({:agent, metadata.turn_id}, ai_metadata)
     :telemetry.execute([:jido, :ai, :agent, :start], measurements, ai_metadata)
   end
 
   defp bridge_agent_event(ending, measurements, metadata) do
-    summary = Storage.take({:summary, metadata.turn_id}) || %{measurements: %{}, metadata: %{}}
-    started = Storage.get({:agent, metadata.turn_id}) || agent_metadata(metadata)
+    summary =
+      CorrelationStore.take({:summary, metadata.turn_id}) ||
+        %{measurements: %{}, metadata: %{}}
+
+    started = CorrelationStore.get({:agent, metadata.turn_id}) || agent_metadata(metadata)
 
     ai_metadata =
       started
@@ -350,13 +397,13 @@ defmodule Jido.AI.Telemetry do
 
     measurements = Map.merge(measurements, summary.measurements)
     :telemetry.execute([:jido, :ai, :agent, ending], measurements, ai_metadata)
-    Storage.take({:agent, metadata.turn_id})
-    Storage.take({:tool_calls, metadata.turn_id})
+    CorrelationStore.take({:agent, metadata.turn_id})
+    CorrelationStore.take({:tool_calls, metadata.turn_id})
     :ok
   end
 
   defp bridge_tool_event(ending, measurements, metadata) do
-    agent = Storage.get({:agent, metadata.turn_id}) || %{}
+    agent = CorrelationStore.get({:agent, metadata.turn_id}) || %{}
     tool_call = registered_tool_call(metadata)
 
     ai_metadata =
@@ -398,7 +445,7 @@ defmodule Jido.AI.Telemetry do
   end
 
   defp reasoning_metadata(context, reasoning, operation_id) do
-    agent = Storage.get({:agent, context[:turn_id]}) || %{}
+    agent = CorrelationStore.get({:agent, context[:turn_id]}) || %{}
 
     agent
     |> Map.take([
@@ -432,7 +479,7 @@ defmodule Jido.AI.Telemetry do
 
   defp reasoning_result_metadata(result, operation_id) do
     request_id =
-      Storage.take({:reasoning_request, operation_id}) || response_request_id(result)
+      CorrelationStore.take({:reasoning_request, operation_id}) || response_request_id(result)
 
     %{
       req_llm_request_id: request_id,
@@ -445,6 +492,19 @@ defmodule Jido.AI.Telemetry do
     do: ReqLLM.Response.call_metadata(response)[:request_id]
 
   defp response_request_id(_result), do: nil
+
+  defp clear_reasoning_conversation(conversation_id, operation_id)
+       when is_binary(conversation_id) do
+    key = {:reasoning_conversation, conversation_id}
+
+    case CorrelationStore.take(key) do
+      ^operation_id -> :ok
+      nil -> :ok
+      current -> CorrelationStore.put(key, current)
+    end
+  end
+
+  defp clear_reasoning_conversation(_conversation_id, _operation_id), do: :ok
 
   defp reasoning_result_error_type({:error, %{type: type}}) when is_atom(type) or is_binary(type),
     do: type
@@ -538,14 +598,16 @@ defmodule Jido.AI.Telemetry do
 
   defp ai_turn?(_metadata), do: false
 
-  defp agent_context(turn_id) when is_binary(turn_id), do: Storage.get({:agent, turn_id})
+  defp agent_context(turn_id) when is_binary(turn_id),
+    do: CorrelationStore.get({:agent, turn_id})
+
   defp agent_context(_turn_id), do: nil
 
   defp registered_tool_call(%{turn_id: turn_id, node_path: node_path})
        when is_binary(turn_id) and is_list(node_path) do
     execution_name = List.last(node_path)
 
-    case Storage.get({:tool_calls, turn_id}) do
+    case CorrelationStore.get({:tool_calls, turn_id}) do
       calls when is_map(calls) -> Map.get(calls, execution_name, %{})
       _other -> %{}
     end
@@ -555,7 +617,7 @@ defmodule Jido.AI.Telemetry do
 
   defp ai_tool_action?(%{turn_id: turn_id, component: "tools", component_kind: :parallel})
        when is_binary(turn_id) do
-    not is_nil(Storage.get({:agent, turn_id}))
+    not is_nil(CorrelationStore.get({:agent, turn_id}))
   end
 
   defp ai_tool_action?(_metadata), do: false

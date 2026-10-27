@@ -100,6 +100,26 @@ Pending records are kept; older terminal records are removed first. This limit
 does not control concurrency or retained Session/Thread Context. Each Agent
 accepts one active AI request and rejects a second request with `:busy`.
 
+## Telemetry Correlation Lifetime
+
+Jido AI keeps small, in-flight correlation records in ETS. These records join
+Agent, reasoning, tool, model, and OpenTelemetry lifecycle events. They do not
+contain prompts, model output, tool arguments, or tool results.
+
+The runtime removes a record when its terminal event arrives. It also removes
+stale records after one hour by default. A cleanup pass runs once per minute.
+Hosts with longer operations can increase these values:
+
+```elixir
+config :jido_ai, :telemetry,
+  correlation_ttl_ms: 3_600_000,
+  correlation_sweep_interval_ms: 60_000
+```
+
+Both values must be positive integers. Invalid values use the defaults. A
+cleanup emits `[:jido, :ai, :telemetry, :correlation, :cleanup]` with the
+expired record count and the remaining table size.
+
 ## Portable Models and Dynamic Tool Sources
 
 Public `Jido.AI.export/3` supports model IDs and aliases. For a rich model record,
