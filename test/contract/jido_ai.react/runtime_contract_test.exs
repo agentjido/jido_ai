@@ -1022,7 +1022,6 @@ defmodule Jido.AI.RuntimeTest do
       Jido.Signal.new!("jido.ai.review.approved", review_match(restored_wait, "approved"), source: "/tests")
 
     assert :ok = Server.deliver_wait(restored, restored_wait.id, approval)
-    assert :ok = idle(restored)
     assert :ok = Server.quiesce(restored, timeout: 10_000)
 
     session = Server.agent(restored).state.session
@@ -1140,21 +1139,6 @@ defmodule Jido.AI.RuntimeTest do
       _status ->
         Process.sleep(10)
         waiting(server, attempts - 1)
-    end
-  end
-
-  defp idle(server, attempts \\ 500)
-
-  defp idle(_server, 0), do: flunk("Agent did not finish the restored turn")
-
-  defp idle(server, attempts) do
-    case Server.status(server) do
-      %{phase: :idle, active: nil} ->
-        :ok
-
-      _status ->
-        Process.sleep(10)
-        idle(server, attempts - 1)
     end
   end
 
