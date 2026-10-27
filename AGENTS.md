@@ -69,8 +69,8 @@ into this file.
 
 - Current runtime code and tests are the primary contract.
 - `examples/00_graph_first/` is the current graph-first example baseline.
-- `lib_old/`, `test_old/`, and `examples_v1/` are historical material. Do not
-  use them as current API evidence.
+- Removed V1 code, tests, and examples remain available in Git history. Do not
+  restore them as current API evidence.
 - Documents under `docs/design/` and `docs/v3-spike/` can contain plans or
   historical findings. Verify each claim against current code before use.
 - Do not restore removed helper modules or APIs only because an old guide or

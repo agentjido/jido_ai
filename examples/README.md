@@ -1,11 +1,7 @@
 # Jido AI examples
 
-This catalog starts with the smallest public Jido AI contract and grows one
-working example at a time.
-
-The previous example catalog is retained in
-[`examples_v1/`](../examples_v1/README.md). It uses the previous Jido AI API and
-does not compile as part of this catalog.
+The graph-first examples are the current Jido AI contract. Removed V1 examples
+remain available in Git history.
 
 ## Run
 
