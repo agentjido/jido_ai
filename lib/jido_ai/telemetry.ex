@@ -18,9 +18,11 @@ defmodule Jido.AI.Telemetry do
   state, and raw errors are not logged.
 
   If the optional `opentelemetry_api` dependency and a host-managed SDK are
-  active, Jido AI maps Agent and tool operations to OpenTelemetry spans and
-  enables ReqLLM's GenAI model span bridge. Jido AI does not start an SDK or
-  configure sampling and export.
+  active, Jido AI maps Agent, reasoning, and tool operations to portable
+  OpenTelemetry GenAI spans and enables ReqLLM's model span bridge. Standard
+  `gen_ai.*`, `session.id`, and `error.type` attributes carry portable meaning.
+  Runtime-specific correlation stays under `jido.ai.*`. Jido AI does not add
+  backend-specific attributes, start an SDK, or configure sampling and export.
   """
 
   require Logger
@@ -140,7 +142,7 @@ defmodule Jido.AI.Telemetry do
   @spec open_telemetry?() :: boolean()
   def open_telemetry?, do: OpenTelemetry.enabled?()
 
-  @doc "Attaches optional Agent, tool, and ReqLLM OpenTelemetry bridges."
+  @doc "Attaches the vendor-neutral Agent, reasoning, tool, and ReqLLM OpenTelemetry bridges."
   @spec attach_open_telemetry(keyword()) :: :ok
   def attach_open_telemetry(opts \\ []), do: OpenTelemetry.attach(opts)
 
@@ -229,6 +231,47 @@ defmodule Jido.AI.Telemetry do
   end
 
   @doc false
+  @spec record_agent_context(map(), map()) :: :ok
+  def record_agent_context(context, values) when is_map(context) and is_map(values) do
+    case {Map.get(context, :turn_id), Map.get(context, :turn_id) |> agent_context()} do
+      {turn_id, current} when is_binary(turn_id) and is_map(current) ->
+        updates =
+          values
+          |> Map.take([:request_id, :run_id, :session_id, :thread_id])
+          |> compact()
+
+        Storage.put({:agent, turn_id}, Map.merge(current, updates))
+
+      _other ->
+        :ok
+    end
+  end
+
+  @doc false
+  @spec record_tool_calls(map(), map()) :: :ok
+  def record_tool_calls(context, calls) when is_map(context) and is_map(calls) do
+    case Map.get(context, :turn_id) do
+      turn_id when is_binary(turn_id) ->
+        calls =
+          calls
+          |> Enum.flat_map(fn
+            {execution_name, %{id: id, name: name}}
+            when is_binary(execution_name) and is_binary(id) and id != "" and is_binary(name) ->
+              [{execution_name, %{id: id, name: name}}]
+
+            _invalid ->
+              []
+          end)
+          |> Map.new()
+
+        Storage.put({:tool_calls, turn_id}, calls)
+
+      _other ->
+        :ok
+    end
+  end
+
+  @doc false
   def handle_runtime_event([:jido, :agent_server, :turn, ending], measurements, metadata, _config)
       when ending in [:start, :stop, :exception] do
     if ai_turn?(metadata) do
@@ -308,21 +351,29 @@ defmodule Jido.AI.Telemetry do
     measurements = Map.merge(measurements, summary.measurements)
     :telemetry.execute([:jido, :ai, :agent, ending], measurements, ai_metadata)
     Storage.take({:agent, metadata.turn_id})
+    Storage.take({:tool_calls, metadata.turn_id})
     :ok
   end
 
   defp bridge_tool_event(ending, measurements, metadata) do
     agent = Storage.get({:agent, metadata.turn_id}) || %{}
+    tool_call = registered_tool_call(metadata)
 
     ai_metadata =
       agent
       |> Map.take([
         :agent_id,
+        :agent_definition_id,
+        :agent_description,
         :agent_module,
         :agent_name,
+        :agent_version,
         :reasoning,
         :reasoning_name,
         :request_id,
+        :run_id,
+        :session_id,
+        :thread_id,
         :turn_id,
         :trace_id,
         :span_id,
@@ -335,7 +386,11 @@ defmodule Jido.AI.Telemetry do
         activation_id: metadata[:activation_id],
         attempt_id: metadata[:attempt_id],
         attempt: metadata[:attempt],
-        status: tool_status(ending, metadata)
+        status: tool_status(ending, metadata),
+        tool_call_id: tool_call[:id],
+        tool_description: action_description(metadata[:action]),
+        error_type: metadata[:error_type],
+        retryable?: metadata[:retryable?]
       })
       |> compact()
 
@@ -348,11 +403,17 @@ defmodule Jido.AI.Telemetry do
     agent
     |> Map.take([
       :agent_id,
+      :agent_definition_id,
+      :agent_description,
       :agent_module,
       :agent_name,
+      :agent_version,
       :reasoning,
       :reasoning_name,
       :request_id,
+      :run_id,
+      :session_id,
+      :thread_id,
       :turn_id,
       :trace_id,
       :span_id,
@@ -373,7 +434,11 @@ defmodule Jido.AI.Telemetry do
     request_id =
       Storage.take({:reasoning_request, operation_id}) || response_request_id(result)
 
-    if is_binary(request_id), do: %{req_llm_request_id: request_id}, else: %{}
+    %{
+      req_llm_request_id: request_id,
+      error_type: reasoning_result_error_type(result)
+    }
+    |> compact()
   end
 
   defp response_request_id({:ok, %ReqLLM.Response{} = response}),
@@ -381,17 +446,33 @@ defmodule Jido.AI.Telemetry do
 
   defp response_request_id(_result), do: nil
 
+  defp reasoning_result_error_type({:error, %{type: type}}) when is_atom(type) or is_binary(type),
+    do: type
+
+  defp reasoning_result_error_type({:error, %{__struct__: module}}) when is_atom(module),
+    do: module
+
+  defp reasoning_result_error_type({:error, type}) when is_atom(type), do: type
+
+  defp reasoning_result_error_type({:error, {type, _details}}) when is_atom(type), do: type
+  defp reasoning_result_error_type({:error, _reason}), do: :reasoning_error
+  defp reasoning_result_error_type(_result), do: nil
+
   defp reasoning_error_type(:error, %{__struct__: module}) when is_atom(module), do: module
   defp reasoning_error_type(kind, _reason) when kind in [:error, :exit, :throw], do: kind
 
   defp agent_metadata(metadata) do
     agent_module = metadata[:agent_module]
+    definition = agent_definition(agent_module)
     reasoning = reasoning(agent_module)
 
     %{
       agent_id: metadata[:agent_id],
+      agent_definition_id: definition[:id],
+      agent_description: definition[:description],
       agent_module: agent_module,
       agent_name: metadata[:agent_name] || agent_name(agent_module),
+      agent_version: definition[:vsn] |> version(),
       reasoning: reasoning,
       reasoning_name: reasoning_name(reasoning),
       request_id: metadata[:signal_id],
@@ -457,6 +538,21 @@ defmodule Jido.AI.Telemetry do
 
   defp ai_turn?(_metadata), do: false
 
+  defp agent_context(turn_id) when is_binary(turn_id), do: Storage.get({:agent, turn_id})
+  defp agent_context(_turn_id), do: nil
+
+  defp registered_tool_call(%{turn_id: turn_id, node_path: node_path})
+       when is_binary(turn_id) and is_list(node_path) do
+    execution_name = List.last(node_path)
+
+    case Storage.get({:tool_calls, turn_id}) do
+      calls when is_map(calls) -> Map.get(calls, execution_name, %{})
+      _other -> %{}
+    end
+  end
+
+  defp registered_tool_call(_metadata), do: %{}
+
   defp ai_tool_action?(%{turn_id: turn_id, component: "tools", component_kind: :parallel})
        when is_binary(turn_id) do
     not is_nil(Storage.get({:agent, turn_id}))
@@ -478,6 +574,27 @@ defmodule Jido.AI.Telemetry do
 
   defp reasoning(_module), do: nil
 
+  defp agent_definition(module) when is_atom(module) and not is_nil(module) do
+    authoring =
+      if function_exported?(module, :__jido_authoring__, 0), do: module.__jido_authoring__(), else: %{}
+
+    case module.definition() do
+      %{id: id, description: description, vsn: vsn} ->
+        %{
+          id: authoring[:id] || id,
+          description: authoring[:description] || description,
+          vsn: authoring[:vsn] || vsn
+        }
+
+      _other ->
+        %{}
+    end
+  rescue
+    _error -> %{}
+  end
+
+  defp agent_definition(_module), do: %{}
+
   defp agent_name(module) when is_atom(module) and not is_nil(module) do
     module.definition().name
   rescue
@@ -485,6 +602,18 @@ defmodule Jido.AI.Telemetry do
   end
 
   defp agent_name(_module), do: nil
+
+  defp action_description(module) when is_atom(module) and not is_nil(module) do
+    if function_exported?(module, :description, 0), do: module.description()
+  rescue
+    _error -> nil
+  end
+
+  defp action_description(_module), do: nil
+
+  defp version(value) when is_binary(value), do: value
+  defp version(value) when is_integer(value) and value > 0, do: Integer.to_string(value)
+  defp version(_value), do: nil
 
   defp reasoning_name(module) when is_atom(module) and not is_nil(module) do
     if function_exported?(module, :name, 0), do: module.name(), else: Atom.to_string(module)
@@ -616,6 +745,8 @@ defmodule Jido.AI.Telemetry do
     metadata
     |> Map.take([
       :agent_id,
+      :agent_definition_id,
+      :agent_version,
       :agent_module,
       :agent_name,
       :reasoning,
@@ -626,6 +757,7 @@ defmodule Jido.AI.Telemetry do
       :session_id,
       :thread_id,
       :turn_id,
+      :tool_call_id,
       :tool_name,
       :status,
       :guardrail,

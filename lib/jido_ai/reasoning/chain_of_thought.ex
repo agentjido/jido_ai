@@ -59,7 +59,25 @@ defmodule Jido.AI.Reasoning.ChainOfThought do
               },
               unrecognized_keys: :error
             )
-            |> Zoi.default(%{max_messages: 64, max_bytes: 200_000})
+            |> Zoi.default(%{max_messages: 64, max_bytes: 200_000}),
+          limits:
+            Zoi.object(
+              %{
+                elapsed_ms: Zoi.integer(gte: 1, lte: 3_600_000) |> Zoi.default(120_000),
+                input_tokens: Zoi.integer(gte: 1) |> Zoi.nullable() |> Zoi.default(nil),
+                output_tokens: Zoi.integer(gte: 1) |> Zoi.nullable() |> Zoi.default(nil),
+                total_tokens: Zoi.integer(gte: 1) |> Zoi.nullable() |> Zoi.default(nil),
+                total_cost: Zoi.number(gte: 0) |> Zoi.nullable() |> Zoi.default(nil)
+              },
+              unrecognized_keys: :error
+            )
+            |> Zoi.default(%{
+              elapsed_ms: 120_000,
+              input_tokens: nil,
+              output_tokens: nil,
+              total_tokens: nil,
+              total_cost: nil
+            })
         },
         unrecognized_keys: :error
       ),
@@ -81,7 +99,12 @@ defmodule Jido.AI.Reasoning.ChainOfThought do
         prompt_cache: input(:prompt_cache),
         context_window: input(:context),
         max_model_calls: 1,
-        max_retries: 0
+        max_retries: 0,
+        max_elapsed_ms: input([:limits, :elapsed_ms]),
+        max_input_tokens: input([:limits, :input_tokens]),
+        max_output_tokens: input([:limits, :output_tokens]),
+        max_total_tokens: input([:limits, :total_tokens]),
+        max_total_cost: input([:limits, :total_cost])
       }
 
     step "input_guard",

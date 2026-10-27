@@ -17,7 +17,7 @@ defmodule Jido.AI.Reasoning.Actions.GuardInput do
       reason = rejection_reason(turn.input) ->
         {:ok, blocked(:input, reason)}
 
-      Map.get(turn, :review_tools, false) and not Jido.Exec.supports?(context, :waits) ->
+      Map.get(turn, :review_required, false) and not Jido.Exec.supports?(context, :waits) ->
         {:ok, blocked(:review, "execution host does not support waits")}
 
       true ->

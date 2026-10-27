@@ -1,6 +1,8 @@
 defmodule Jido.AI.Reasoning.ReAct.Actions.DecideNext do
   @moduledoc "Routes a model outcome to completion, repair, fallback, or tools."
 
+  alias Jido.AI.Budget
+
   use Jido.Action,
     id: "jido.ai/reasoning/react/actions/decide-next",
     vsn: 1,
@@ -34,8 +36,14 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.DecideNext do
   end
 
   def run(%{turn: %{model_outcome: %{kind: :tool_calls}} = turn}, _context) do
-    kind = if turn.review_tools, do: :review, else: :tools
-    {:ok, %{kind: kind, input: %{turn: %{turn | repair_instruction: nil}}}}
+    case Budget.resources(turn) do
+      :ok ->
+        kind = if review_required?(turn), do: :review, else: :tools
+        {:ok, %{kind: kind, input: %{turn: %{turn | repair_instruction: nil}}}}
+
+      {:error, _budget, reason} ->
+        {:ok, complete(turn, blocked(turn, :limits, reason))}
+    end
   end
 
   def run(%{turn: %{model_outcome: %{kind: :final_answer}} = turn}, _context) do
@@ -55,51 +63,62 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.DecideNext do
   end
 
   defp recover_or_fail(turn, guardrail, reason) do
-    cond do
-      turn.model_calls >= turn.max_model_calls ->
-        complete(turn, failed(turn, guardrail, reason))
+    case Budget.before_model(turn) do
+      {:error, _budget, budget_reason} ->
+        complete(turn, blocked(turn, :limits, budget_reason))
 
-      turn.model_outcome.retryable and turn.model_attempt <= turn.max_retries ->
-        %{kind: :model, input: %{turn: Map.update!(turn, :retries, &(&1 + 1))}}
+      :ok ->
+        cond do
+          turn.model_outcome.retryable and turn.model_attempt <= turn.max_retries ->
+            %{kind: :model, input: %{turn: Map.update!(turn, :retries, &(&1 + 1))}}
 
-      turn.model_outcome.retryable and turn.model_index + 1 < length(turn.models) ->
-        next = %{
-          turn
-          | model_index: turn.model_index + 1,
-            model_attempt: 0,
-            retries: turn.retries + 1
-        }
+          turn.model_outcome.retryable and turn.model_index + 1 < length(turn.models) ->
+            next = %{
+              turn
+              | model_index: turn.model_index + 1,
+                model_attempt: 0,
+                retries: turn.retries + 1
+            }
 
-        %{kind: :model, input: %{turn: next}}
+            %{kind: :model, input: %{turn: next}}
 
-      true ->
-        complete(turn, failed(turn, guardrail, reason))
+          true ->
+            complete(turn, failed(turn, guardrail, reason))
+        end
     end
   end
 
   defp recover_or_block(turn, instruction) do
-    cond do
-      turn.model_calls >= turn.max_model_calls ->
-        complete(turn, blocked(turn, :output, turn.output_reason))
+    case Budget.before_model(turn) do
+      {:error, _budget, budget_reason} ->
+        complete(turn, blocked(turn, :limits, budget_reason))
 
-      turn.model_attempt <= turn.max_retries ->
-        next = %{turn | repair_instruction: instruction, retries: turn.retries + 1}
-        %{kind: :model, input: %{turn: next}}
+      :ok ->
+        cond do
+          turn.model_attempt <= turn.max_retries ->
+            next = %{turn | repair_instruction: instruction, retries: turn.retries + 1}
+            %{kind: :model, input: %{turn: next}}
 
-      turn.model_index + 1 < length(turn.models) ->
-        next = %{
-          turn
-          | model_index: turn.model_index + 1,
-            model_attempt: 0,
-            repair_instruction: instruction,
-            retries: turn.retries + 1
-        }
+          turn.model_index + 1 < length(turn.models) ->
+            next = %{
+              turn
+              | model_index: turn.model_index + 1,
+                model_attempt: 0,
+                repair_instruction: instruction,
+                retries: turn.retries + 1
+            }
 
-        %{kind: :model, input: %{turn: next}}
+            %{kind: :model, input: %{turn: next}}
 
-      true ->
-        complete(turn, blocked(turn, :output, turn.output_reason))
+          true ->
+            complete(turn, blocked(turn, :output, turn.output_reason))
+        end
     end
+  end
+
+  defp review_required?(turn) do
+    review = Map.get(turn, :review_tools, [])
+    Enum.any?(turn.model_outcome.tool_calls, &(&1.name in review))
   end
 
   defp blocked(turn, guardrail, reason) do

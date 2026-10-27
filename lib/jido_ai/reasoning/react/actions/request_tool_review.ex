@@ -15,13 +15,19 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.RequestToolReview do
   def run(%{turn: turn}, context) do
     at = System.system_time(:millisecond)
     session = Jido.Session.decode!(turn.session)
+    review_id = "review:#{turn.run_id}:#{turn.tool_rounds + 1}"
+    expires_at_ms = at + 300_000
 
     data = %{
+      review_id: review_id,
       session_id: session.id,
       thread_id: session.thread.id,
       request_id: turn.request_id,
       run_id: turn.run_id,
       timestamp_ms: at,
+      expires_at_ms: expires_at_ms,
+      options: [:approved, :denied],
+      policy_reason: Map.get(turn.tool_selection, :reason) || "tool review required",
       tool_calls: turn.model_outcome.tool_calls
     }
 
@@ -31,12 +37,19 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.RequestToolReview do
       Projection.observe(
         session,
         :ai_review,
-        %{status: :requested, tool_calls: turn.model_outcome.tool_calls},
-        %{request_id: turn.request_id, run_id: turn.run_id},
+        %{
+          status: :requested,
+          review_id: review_id,
+          expires_at_ms: expires_at_ms,
+          options: [:approved, :denied],
+          policy_reason: data.policy_reason,
+          tool_calls: turn.model_outcome.tool_calls
+        },
+        %{review_id: review_id, request_id: turn.request_id, run_id: turn.run_id},
         at
       )
 
-    {:ok, %{turn: %{turn | session: Jido.Session.encode(next_session)}}}
+    {:ok, %{turn: %{turn | review_id: review_id, session: Jido.Session.encode(next_session)}}}
   end
 
   defp dispatch_review_signal(context, data) do

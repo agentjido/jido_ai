@@ -78,6 +78,9 @@ defmodule Jido.AI.TelemetryTest do
 
     assert {_, _, agent_start} = find_event(events, [:jido, :ai, :agent, :start])
     assert agent_start.agent_module == SimpleAgent
+    assert agent_start.agent_definition_id == "jido.ai/agents/simple"
+    assert agent_start.agent_description == "Answer one request with guardrails and multiple tools"
+    assert agent_start.agent_version == "3"
     assert agent_start.reasoning == Jido.AI.Reasoning.ReAct
     assert agent_start.request_id
     assert agent_start.turn_id
@@ -86,6 +89,11 @@ defmodule Jido.AI.TelemetryTest do
              find_event(events, [:jido, :ai, :tool, :stop])
 
     assert tool_stop.tool_name == "add"
+    assert tool_stop.tool_call_id == "sum-1"
+    assert tool_stop.tool_description == "Add two numbers."
+    assert tool_stop.run_id
+    assert tool_stop.session_id == "session:telemetry-agent"
+    assert tool_stop.thread_id == "session:telemetry-agent:thread"
     assert tool_stop.turn_id == agent_start.turn_id
     assert tool_stop.status == :ok
     assert is_integer(tool_measurements.duration)
@@ -123,6 +131,32 @@ defmodule Jido.AI.TelemetryTest do
     assert log =~ "status=failed"
     assert log =~ "error_type=provider_error"
     refute log =~ "must-not-be-logged"
+  end
+
+  test "reasoning errors carry a low-cardinality error type" do
+    owner = self()
+    handler_id = "jido-ai-reasoning-error-#{System.unique_integer([:positive])}"
+
+    assert :ok =
+             :telemetry.attach(
+               handler_id,
+               [:jido, :ai, :reasoning, :stop],
+               fn event, measurements, metadata, _config ->
+                 send(owner, {:telemetry, event, measurements, metadata})
+               end,
+               nil
+             )
+
+    on_exit(fn -> :telemetry.detach(handler_id) end)
+
+    assert {:error, :invalid_reasoning} =
+             Telemetry.with_reasoning(%{}, %{method: :test}, fn ->
+               {:error, :invalid_reasoning}
+             end)
+
+    assert_receive {:telemetry, [:jido, :ai, :reasoning, :stop], _measurements, metadata}
+    assert metadata.status == :error
+    assert metadata.error_type == :invalid_reasoning
   end
 
   test "semantic log modes follow the core Jido policy" do

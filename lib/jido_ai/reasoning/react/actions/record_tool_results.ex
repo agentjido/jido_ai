@@ -1,7 +1,7 @@
 defmodule Jido.AI.Reasoning.ReAct.Actions.RecordToolResults do
   @moduledoc "Appends ordered Parallel tool results to the Session."
 
-  alias Jido.AI.Thread.Projection
+  alias Jido.AI.{Thread.Projection, ToolResult}
 
   use Jido.Action,
     id: "jido.ai/reasoning/react/actions/record-tool-results",
@@ -18,15 +18,15 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.RecordToolResults do
 
     session_result =
       Enum.reduce_while(results, {:ok, Jido.Session.decode!(turn.session)}, fn result, {:ok, session} ->
-        {status, output} = tool_output(result.outcome)
+        normalized = ToolResult.normalize(result.outcome, turn.max_tool_output_bytes)
 
         message = %{
           role: :tool,
           content: "",
           name: result.name,
           tool_call_id: result.id,
-          output: output,
-          metadata: %{status: status}
+          output: normalized.model_content,
+          metadata: Map.put(normalized.metadata, :status, normalized.status)
         }
 
         case Projection.append(session, message, refs, at) do
@@ -53,21 +53,6 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.RecordToolResults do
     end
   end
 
-  defp tool_output(%{status: :ok, value: value}), do: {:ok, value}
-
-  defp tool_output(%{status: :error, error: error}) do
-    {:error,
-     %{
-       status: "error",
-       error: %{
-         type: field(error, :type) || "tool_error",
-         message: field(error, :message) || "tool action failed",
-         retryable: field(error, :retryable?) == true
-       }
-     }}
-  end
-
   defp tool_status(%{status: status}) when status in [:ok, :error], do: status
-  defp field(map, key) when is_map(map), do: Map.get(map, key, Map.get(map, Atom.to_string(key)))
-  defp field(_value, _key), do: nil
+  defp tool_status(_outcome), do: :error
 end

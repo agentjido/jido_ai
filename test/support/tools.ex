@@ -22,6 +22,18 @@ defmodule Jido.AITest.Tools.Multiply do
   def run(%{left: left, right: right}, _context), do: {:ok, %{value: left * right}}
 end
 
+defmodule Jido.AITest.Tools.LargeOutput do
+  use Jido.Action,
+    id: "jido.ai/examples/tools/large-output",
+    name: "large_output",
+    description: "Return a large local value.",
+    schema: Zoi.object(%{}),
+    output_schema: Zoi.map()
+
+  @impl Jido.Action
+  def run(_params, _context), do: {:ok, %{content: String.duplicate("local-only-", 1_000)}}
+end
+
 defmodule Jido.AITest.SimpleAgent do
   use Jido.AI.Agent,
     id: "jido.ai/agents/simple",
@@ -86,5 +98,21 @@ defmodule Jido.AITest.ChainOfThoughtAgent do
 
   ai do
     reasoning Jido.AI.Reasoning.ChainOfThought
+  end
+end
+
+defmodule Jido.AITest.LargeOutputAgent do
+  use Jido.AI.Agent,
+    id: "jido.ai/agents/large-output",
+    vsn: 1,
+    name: "jido_ai_large_output_agent",
+    description: "Test bounded tool result projection"
+
+  ai do
+    reasoning Jido.AI.Reasoning.ReAct
+
+    tools do
+      action Jido.AITest.Tools.LargeOutput
+    end
   end
 end

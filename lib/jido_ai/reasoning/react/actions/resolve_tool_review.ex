@@ -20,12 +20,17 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ResolveToolReview do
       Projection.observe(
         Jido.Session.decode!(turn.session),
         :ai_review,
-        %{status: status, selected: decision.selected},
-        %{request_id: turn.request_id, run_id: turn.run_id},
+        %{
+          status: status,
+          selected: decision.selected,
+          review_id: turn.review_id,
+          decision: decision_payload(decision)
+        },
+        %{review_id: turn.review_id, request_id: turn.request_id, run_id: turn.run_id},
         at
       )
 
-    turn = %{turn | session: Jido.Session.encode(session)}
+    turn = %{turn | review_id: nil, session: Jido.Session.encode(session)}
 
     case status do
       :approved -> {:ok, %{kind: :tools, input: %{turn: turn}}}
@@ -37,6 +42,12 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ResolveToolReview do
   defp review_status("approved"), do: :approved
   defp review_status("denied"), do: :denied
   defp review_status("expired"), do: :expired
+
+  defp decision_payload(%{value: value}) when is_map(value) do
+    Map.take(value, [:review_id, :request_id, :run_id, :actor_id, :reason])
+  end
+
+  defp decision_payload(_decision), do: %{}
 
   defp complete(turn, reason) do
     %{

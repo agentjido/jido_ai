@@ -21,13 +21,25 @@ defmodule Jido.AI.Reasoning.Actions.GuardOutput do
     {:ok, decision(reason)}
   end
 
-  def run(%{outcome: %{kind: :final_answer, text: text} = outcome}, _context) do
+  def run(%{turn: turn, outcome: %{kind: :final_answer, text: text} = outcome}, _context) do
     reason =
       finish_reason(outcome.finish_reason) ||
         cond do
-          String.trim(text) == "" -> "model output is empty"
-          String.length(text) > 4_000 -> "model output is too long"
-          true -> nil
+          not Jido.AI.Toolset.requirement_satisfied?(
+            turn.tool_requirement,
+            turn.tool_rounds,
+            turn.tools
+          ) ->
+            "tool use is required before a final answer"
+
+          String.trim(text) == "" ->
+            "model output is empty"
+
+          String.length(text) > 4_000 ->
+            "model output is too long"
+
+          true ->
+            nil
         end
 
     {:ok, decision(reason)}

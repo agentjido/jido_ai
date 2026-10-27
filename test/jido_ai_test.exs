@@ -272,7 +272,18 @@ defmodule Jido.AITest do
              instructions: "Answer as a careful support specialist.",
              model: "anthropic:claude-sonnet-4-5",
              fallback_models: ["openai:gpt-5-mini"],
-             limits: %{model_calls: 6, tool_rounds: 3, tool_calls: 6, retries: 1},
+             limits: %{
+               model_calls: 6,
+               tool_rounds: 3,
+               tool_calls: 6,
+               retries: 1,
+               elapsed_ms: 120_000,
+               input_tokens: nil,
+               output_tokens: nil,
+               total_tokens: nil,
+               total_cost: nil,
+               tool_output_bytes: 16_384
+             },
              context: %{max_messages: 32, max_bytes: 100_000},
              prompt_cache: %{enabled: true, ttl: "5m"}
            }

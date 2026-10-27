@@ -55,6 +55,64 @@ defmodule Jido.AI.Toolset do
   @spec names([module()]) :: [String.t()]
   def names(actions) when is_list(actions), do: Enum.map(actions, & &1.name())
 
+  @doc "Selects a request tool subset below the protected Agent allowlist."
+  @spec select([module()], map()) :: {:ok, map()} | {:error, term()}
+  def select(actions, policy \\ %{})
+
+  def select(actions, policy) when is_list(actions) and is_map(policy) do
+    visible = field(policy, :visible) || []
+    hidden = field(policy, :hidden) || []
+    review = field(policy, :review) || []
+    requirement = field(policy, :requirement) || :optional
+    reason = field(policy, :reason)
+    allowed = names(actions)
+
+    with :ok <- validate_name_list(:visible, visible),
+         :ok <- validate_name_list(:hidden, hidden),
+         :ok <- validate_name_list(:review, review),
+         :ok <- known_names(visible ++ hidden ++ review, allowed),
+         :ok <- validate_requirement(requirement) do
+      selected = select_actions(actions, visible, hidden, requirement)
+      selected_names = names(selected)
+
+      cond do
+        requirement in [:required, :per_turn] and selected == [] ->
+          {:error, {:tool_requirement_without_visible_tools, requirement}}
+
+        Enum.any?(review, &(&1 not in selected_names)) ->
+          {:error, {:review_tool_not_visible, Enum.find(review, &(&1 not in selected_names))}}
+
+        true ->
+          {:ok,
+           %{
+             actions: selected,
+             visible: selected_names,
+             hidden: allowed -- selected_names,
+             review: review,
+             requirement: requirement,
+             reason: reason
+           }}
+      end
+    end
+  end
+
+  def select(_actions, _policy), do: {:error, :invalid_tool_policy}
+
+  @doc "Lowers semantic tool-use policy to one provider tool-choice value."
+  @spec provider_tool_choice(atom(), non_neg_integer(), [module()]) :: atom() | nil
+  def provider_tool_choice(:disabled, _tool_rounds, _actions), do: :none
+  def provider_tool_choice(_requirement, _tool_rounds, []), do: nil
+  def provider_tool_choice(:optional, _tool_rounds, _actions), do: nil
+  def provider_tool_choice(:required, 0, _actions), do: :required
+  def provider_tool_choice(:required, _tool_rounds, _actions), do: :auto
+  def provider_tool_choice(:per_turn, _tool_rounds, _actions), do: :required
+
+  @doc "Checks whether one final answer satisfies semantic tool-use policy."
+  @spec requirement_satisfied?(atom(), non_neg_integer(), [module()]) :: boolean()
+  def requirement_satisfied?(:required, 0, [_ | _]), do: false
+  def requirement_satisfied?(:per_turn, _tool_rounds, [_ | _]), do: false
+  def requirement_satisfied?(_requirement, _tool_rounds, _actions), do: true
+
   @doc "Builds ReqLLM definitions for an Agent Toolset."
   @spec definitions([module()]) :: {:ok, [ReqLLM.Tool.t()]} | {:error, term()}
   def definitions(actions) when is_list(actions) do
@@ -146,4 +204,41 @@ defmodule Jido.AI.Toolset do
       {:error, _reason} -> {:error, {:invalid_tool_arguments, action.name()}}
     end
   end
+
+  defp select_actions(_actions, _visible, _hidden, :disabled), do: []
+
+  defp select_actions(actions, visible, hidden, _requirement) do
+    actions
+    |> Enum.filter(fn action -> visible == [] or action.name() in visible end)
+    |> Enum.reject(&(&1.name() in hidden))
+  end
+
+  defp validate_name_list(_field, values) when is_list(values) do
+    if List.improper?(values) do
+      {:error, :invalid_tool_policy}
+    else
+      cond do
+        Enum.any?(values, &(not is_binary(&1) or &1 == "")) -> {:error, :invalid_tool_policy}
+        values != Enum.uniq(values) -> {:error, :duplicate_tool_policy_names}
+        true -> :ok
+      end
+    end
+  end
+
+  defp validate_name_list(_field, _values), do: {:error, :invalid_tool_policy}
+
+  defp known_names(requested, allowed) do
+    case Enum.find(requested, &(&1 not in allowed)) do
+      nil -> :ok
+      name -> {:error, {:unknown_tool, name}}
+    end
+  end
+
+  defp validate_requirement(requirement)
+       when requirement in [:optional, :required, :per_turn, :disabled],
+       do: :ok
+
+  defp validate_requirement(requirement), do: {:error, {:invalid_tool_requirement, requirement}}
+
+  defp field(map, key), do: Map.get(map, key, Map.get(map, Atom.to_string(key)))
 end

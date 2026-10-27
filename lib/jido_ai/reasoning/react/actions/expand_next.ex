@@ -1,7 +1,7 @@
 defmodule Jido.AI.Reasoning.ReAct.Actions.ExpandNext do
   @moduledoc "Expands each trusted AI routing decision into its next executable."
 
-  alias Jido.AI.Toolset
+  alias Jido.AI.{Telemetry, Toolset}
   alias Jido.AI.Reasoning.ReAct
   alias Jido.AI.Reasoning.ReAct.Actions.RecordToolResults
   alias Jido.Flow.Ref
@@ -23,9 +23,10 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExpandNext do
   def run(%{kind: :review, input: input}, _context),
     do: {:continue, input, ReAct.ToolReview}
 
-  def run(%{kind: :tools, input: %{turn: turn} = input}, _context) do
+  def run(%{kind: :tools, input: %{turn: turn} = input}, context) do
     with {:ok, calls} <- resolve_calls(turn.tools, turn.model_outcome.tool_calls),
          {:ok, flow} <- build_flow(calls) do
+      :ok = Telemetry.record_tool_calls(context, tool_call_index(calls))
       {:continue, input, flow}
     end
   end
@@ -100,6 +101,12 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.ExpandNext do
     |> Enum.map(fn {call, index} ->
       %{id: call.id, name: call.name, outcome: Ref.result("tools", [index])}
     end)
+  end
+
+  defp tool_call_index(calls) do
+    calls
+    |> Enum.with_index()
+    |> Map.new(fn {call, index} -> {action_name(index), Map.take(call, [:id, :name])} end)
   end
 
   defp action_name(index), do: "tool_#{index}"

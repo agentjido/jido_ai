@@ -1,7 +1,7 @@
 defmodule Jido.AI.Reasoning.Actions.CallModel do
   @moduledoc "Calls one model and returns success or failure as graph data."
 
-  alias Jido.AI.{Telemetry, Toolset, Usage}
+  alias Jido.AI.{Budget, Telemetry, Toolset, Usage}
 
   use Jido.Action,
     id: "jido.ai/reasoning/actions/call-model",
@@ -12,34 +12,31 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
     output_schema: Zoi.map()
 
   @impl Jido.Action
-  def run(%{turn: turn}, _context) when turn.model_calls >= turn.max_model_calls do
-    {:ok,
-     %{
-       turn: turn,
-       outcome: %{
-         status: :budget,
-         category: :limits,
-         retryable: false,
-         reason: "maximum model calls reached",
-         model: Enum.at(turn.models, turn.model_index),
-         usage: ReqLLM.Usage.normalize(nil)
-       }
-     }}
+  def run(%{turn: turn, messages: messages} = params, context) do
+    case Budget.before_model(turn) do
+      :ok -> call_model(turn, messages, params, context)
+      {:error, budget, reason} -> budget_outcome(turn, budget, reason)
+    end
   end
 
-  def run(%{turn: turn, messages: messages} = params, context) do
+  defp call_model(turn, messages, params, context) do
     model = Enum.at(turn.models, turn.model_index)
     started_at = System.system_time(:millisecond)
     stream_id = "stream_#{Jido.generate_id()}"
+    :ok = Telemetry.record_agent_context(context, agent_context(turn))
 
     result =
       with {:ok, tools} <- model_tools(turn, Map.get(params, :tools, true)) do
         options =
           turn.options
+          |> Map.delete(:tool_choice)
+          |> Map.delete("tool_choice")
           |> apply_prompt_cache_options(model, turn)
           |> put_conversation_telemetry(turn)
+          |> put_budget_timeout(turn, started_at)
           |> Map.to_list()
           |> put_tools(tools)
+          |> put_tool_choice(tool_choice(turn))
 
         model_call = fn ->
           if turn.stream do
@@ -67,11 +64,70 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
     ReqLLM.generate_text(model, context, options)
   end
 
-  defp model_tools(turn, true), do: Toolset.definitions(turn.tools)
+  defp model_tools(turn, true) do
+    case Toolset.definitions(turn.tools) do
+      {:ok, []} -> {:ok, nil}
+      result -> result
+    end
+  end
+
   defp model_tools(_turn, false), do: {:ok, nil}
 
   defp put_tools(options, nil), do: options
   defp put_tools(options, tools), do: Keyword.put(options, :tools, tools)
+
+  defp put_tool_choice(options, nil), do: options
+  defp put_tool_choice(options, choice), do: Keyword.put(options, :tool_choice, choice)
+
+  defp tool_choice(turn) do
+    Toolset.provider_tool_choice(turn.tool_requirement, turn.tool_rounds, turn.tools)
+  end
+
+  defp put_budget_timeout(options, turn, now) do
+    case Budget.remaining_elapsed_ms(turn, now) do
+      nil ->
+        options
+
+      remaining ->
+        configured = field(options, :total_timeout)
+
+        timeout =
+          if is_integer(configured) and configured > 0,
+            do: min(configured, remaining),
+            else: remaining
+
+        options
+        |> Map.delete("total_timeout")
+        |> Map.put(:total_timeout, timeout)
+    end
+  end
+
+  defp budget_outcome(turn, budget, reason) do
+    {:ok,
+     %{
+       turn: turn,
+       outcome: %{
+         status: :budget,
+         category: :limits,
+         budget: budget,
+         retryable: false,
+         reason: reason,
+         model: Enum.at(turn.models, turn.model_index),
+         usage: ReqLLM.Usage.normalize(nil)
+       }
+     }}
+  end
+
+  defp agent_context(turn) do
+    session = Jido.Session.decode!(turn.session)
+
+    %{
+      request_id: turn.request_id,
+      run_id: turn.run_id,
+      session_id: session.id,
+      thread_id: session.thread.id
+    }
+  end
 
   defp stream(model, messages, options, turn, stream_id, context) do
     request = correlation(turn, stream_id, 0, System.system_time(:millisecond))
@@ -178,7 +234,7 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
   defp normalize({:ok, response}, turn, model, started_at, completed_at) do
     classified = ReqLLM.Response.classify(response)
     call_metadata = ReqLLM.Response.call_metadata(response)
-    usage = ReqLLM.Usage.normalize(ReqLLM.Response.usage(response))
+    usage = Usage.normalize(ReqLLM.Response.usage(response))
     next_turn = record_call(turn, usage)
 
     {:ok,

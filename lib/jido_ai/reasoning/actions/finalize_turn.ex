@@ -1,7 +1,7 @@
 defmodule Jido.AI.Reasoning.Actions.FinalizeTurn do
   @moduledoc "Finalizes one graph request and returns the Agent commit envelope."
 
-  alias Jido.AI.{Telemetry, Thread.Projection}
+  alias Jido.AI.{Budget, Telemetry, Thread.Projection}
 
   use Jido.Action,
     id: "jido.ai/reasoning/actions/finalize-turn",
@@ -15,6 +15,7 @@ defmodule Jido.AI.Reasoning.Actions.FinalizeTurn do
   def run(%{outcome: %{turn: turn, result: result}}, context) do
     completed_at = System.system_time(:millisecond)
     refs = %{request_id: turn.request_id, run_id: turn.run_id}
+    budget = Budget.summary(turn, completed_at)
 
     payload = %{
       status: result.status,
@@ -25,6 +26,7 @@ defmodule Jido.AI.Reasoning.Actions.FinalizeTurn do
       tool_calls: turn.tool_call_count,
       tool_errors: turn.tool_error_count,
       retries: turn.retries,
+      budget: budget,
       reasoning_steps: get_in(result, [:reasoning, :steps_count]),
       usage: turn.usage
     }
@@ -44,6 +46,7 @@ defmodule Jido.AI.Reasoning.Actions.FinalizeTurn do
         thread_id: session.thread.id,
         thread_rev: session.thread.rev,
         usage: turn.usage,
+        budget: budget,
         model_attempts: turn.model_attempts
       })
 

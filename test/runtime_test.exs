@@ -4,6 +4,7 @@ defmodule Jido.AI.RuntimeTest do
   import Mimic
 
   alias Jido.AI.Thread.Projection
+  alias Jido.AITest.LargeOutputAgent
   alias Jido.AITest.SimpleAgent
   alias Jido.AITest.Tools
   alias Jido.AgentServer, as: Server
@@ -298,6 +299,151 @@ defmodule Jido.AI.RuntimeTest do
     assert {:ok, []} = Projection.messages(agent.state.session)
   end
 
+  test "request tool selection stays below the Agent allowlist" do
+    expect(ReqLLM, :generate_text, fn model, context, options ->
+      assert Enum.map(options[:tools], & &1.name) == ["add"]
+      refute Keyword.has_key?(options, :tool_choice)
+      {:ok, response(model, context, "No tool needed.", "selected-tools")}
+    end)
+
+    agent = SimpleAgent.instantiate!(id: "selected-tools-agent")
+
+    assert {:ok, result, _agent} =
+             run(agent, %{
+               input: "Answer without a tool",
+               tool_policy: %{visible: ["add"], reason: "only arithmetic addition is relevant"}
+             })
+
+    assert result.status == :completed
+  end
+
+  test "semantic required tool policy relaxes after one tool batch" do
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    expect(ReqLLM, :generate_text, 2, fn model, context, options ->
+      case Agent.get_and_update(calls, fn count -> {count + 1, count + 1} end) do
+        1 ->
+          assert options[:tool_choice] == :required
+          assert Enum.map(options[:tools], & &1.name) == ["add"]
+          tool_calls = [ReqLLM.ToolCall.new("required-add", "add", ~s({"left":2,"right":3}))]
+          {:ok, tool_response(model, context, tool_calls, "required-tool")}
+
+        2 ->
+          assert options[:tool_choice] == :auto
+          {:ok, response(model, context, "The result is 5.", "required-final")}
+      end
+    end)
+
+    agent = SimpleAgent.instantiate!(id: "required-tool-agent")
+
+    assert {:ok, result, _agent} =
+             run(agent, %{
+               input: "Add 2 and 3",
+               options: %{tool_choice: :none},
+               tool_policy: %{visible: ["add"], requirement: :required}
+             })
+
+    assert result.status == :completed
+    assert result.tool_calls == 1
+  end
+
+  test "disabled tool policy sends no definitions and forbids provider tool use" do
+    expect(ReqLLM, :generate_text, fn model, context, options ->
+      refute Keyword.has_key?(options, :tools)
+      assert options[:tool_choice] == :none
+      {:ok, response(model, context, "Tools are disabled.", "disabled-tools")}
+    end)
+
+    agent = SimpleAgent.instantiate!(id: "disabled-tools-agent")
+
+    assert {:ok, result, _agent} =
+             run(agent, %{
+               input: "Answer without tools",
+               tool_policy: %{requirement: :disabled}
+             })
+
+    assert result.status == :completed
+  end
+
+  test "token budget stops tool work after the model call that consumes it" do
+    reject(&Tools.Add.run/2)
+
+    expect(ReqLLM, :generate_text, fn model, context, _options ->
+      tool_calls = [ReqLLM.ToolCall.new("token-add", "add", ~s({"left":2,"right":3}))]
+      {:ok, tool_response(model, context, tool_calls, "token-budget", usage(12, 3, 0, 0))}
+    end)
+
+    agent = SimpleAgent.instantiate!(id: "token-budget-agent")
+
+    assert {:ok, result, _agent} =
+             run(agent, %{input: "Add 2 and 3", limits: %{total_tokens: 10}})
+
+    assert result.status == :blocked
+    assert result.guardrail == :limits
+    assert result.reason == "maximum total tokens reached"
+    assert result.tool_calls == 0
+    assert result.usage.total_tokens == 15
+    assert result.budget.limits.total_tokens == 10
+  end
+
+  test "elapsed budget becomes the provider whole-call timeout" do
+    expect(ReqLLM, :generate_text, fn model, context, options ->
+      assert options[:total_timeout] > 0
+      assert options[:total_timeout] <= 1_000
+      {:ok, response(model, context, "Within time.", "elapsed-budget")}
+    end)
+
+    agent = SimpleAgent.instantiate!(id: "elapsed-budget-agent")
+
+    assert {:ok, result, _agent} =
+             run(agent, %{input: "Answer quickly", limits: %{elapsed_ms: 1_000}})
+
+    assert result.status == :completed
+    assert result.budget.limits.elapsed_ms == 1_000
+  end
+
+  test "large local Action values become bounded model content" do
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    expect(ReqLLM, :generate_text, 2, fn model, context, _options ->
+      case Agent.get_and_update(calls, fn count -> {count + 1, count + 1} end) do
+        1 ->
+          tool_calls = [ReqLLM.ToolCall.new("large-1", "large_output", ~s({}))]
+          {:ok, tool_response(model, context, tool_calls, "large-tool")}
+
+        2 ->
+          tool_result = context |> ReqLLM.Context.to_list() |> List.last()
+
+          assert tool_result.metadata.tool_output == %{
+                   "status" => "truncated",
+                   "message" => "tool result exceeded the model-content limit",
+                   "original_bytes" => 11_014,
+                   "max_bytes" => 256
+                 }
+
+          {:ok, response(model, context, "The local result was too large.", "large-final")}
+      end
+    end)
+
+    agent = LargeOutputAgent.instantiate!(id: "large-output-agent")
+
+    assert {:ok, result, agent} =
+             run_as(
+               LargeOutputAgent,
+               agent,
+               %{input: "Return the value", limits: %{tool_output_bytes: 256}}
+             )
+
+    assert result.status == :completed
+
+    tool_entry =
+      Enum.find(agent.state.session.thread.entries, fn entry ->
+        entry.kind == :ai_message and entry.payload["role"] == "tool"
+      end)
+
+    refute Jason.encode!(tool_entry.payload) =~ "local-only-local-only"
+  end
+
   test "a tool Action failure becomes a tool result that the model can repair" do
     expect(Tools.Add, :run, fn _params, _context ->
       {:error, Jido.Action.Error.execution_error("calculator unavailable", retry: true)}
@@ -556,7 +702,7 @@ defmodule Jido.AI.RuntimeTest do
     wait = waiting(server)
 
     denial =
-      Jido.Signal.new!("jido.ai.review.denied", %{request_id: request.id}, source: "/tests")
+      Jido.Signal.new!("jido.ai.review.denied", review_match(wait, "denied"), source: "/tests")
 
     assert :ok = Server.deliver_wait(server, wait.id, denial)
 
@@ -630,7 +776,12 @@ defmodule Jido.AI.RuntimeTest do
       end
     end)
 
-    request = SimpleAgent.request_signal!(%{input: "Add 2 and 3", review_tools: true})
+    request =
+      SimpleAgent.request_signal!(%{
+        input: "Add 2 and 3",
+        tool_policy: %{review: ["add"], reason: "addition requires approval"}
+      })
+
     pending = Server.submit(server, request)
     wait = waiting(server)
 
@@ -643,7 +794,7 @@ defmodule Jido.AI.RuntimeTest do
     assert restored_wait.id == wait.id
 
     approval =
-      Jido.Signal.new!("jido.ai.review.approved", %{request_id: request.id}, source: "/tests")
+      Jido.Signal.new!("jido.ai.review.approved", review_match(restored_wait, "approved"), source: "/tests")
 
     assert :ok = Server.deliver_wait(restored, restored_wait.id, approval)
     assert :ok = Server.quiesce(restored)
@@ -661,9 +812,13 @@ defmodule Jido.AI.RuntimeTest do
   end
 
   defp run(agent, params, opts \\ []) do
-    signal = SimpleAgent.request_signal!(params)
+    run_as(SimpleAgent, agent, params, opts)
+  end
 
-    case SimpleAgent.cmd(agent, signal, opts) do
+  defp run_as(module, agent, params, opts \\ []) do
+    signal = module.request_signal!(params)
+
+    case module.cmd(agent, signal, opts) do
       {:ok, next_agent, [%Jido.Agent.Directive.Reply{signal: reply}]} ->
         {:ok, reply.data, next_agent}
 
@@ -760,5 +915,14 @@ defmodule Jido.AI.RuntimeTest do
         Process.sleep(10)
         waiting(server, attempts - 1)
     end
+  end
+
+  defp review_match(wait, name) do
+    option = Enum.find(wait.options, &(&1.name == name))
+    assert option
+    assert is_binary(option.match.review_id)
+    assert is_binary(option.match.request_id)
+    assert is_binary(option.match.run_id)
+    option.match
   end
 end

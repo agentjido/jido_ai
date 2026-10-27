@@ -14,14 +14,29 @@ defmodule Jido.AI.Usage do
     :total_cost
   ]
 
+  @cost_keys [:input_cost, :output_cost, :reasoning_cost, :total_cost]
+
   @doc "Returns a normalized zero usage value."
   @spec zero() :: map()
-  def zero, do: ReqLLM.Usage.normalize(nil) |> Map.put(:input_includes_cached, nil)
+  def zero, do: normalize(nil) |> Map.put(:input_includes_cached, nil)
+
+  @doc "Normalizes provider usage and preserves reported numeric cost facts."
+  @spec normalize(map() | term()) :: map()
+  def normalize(usage) do
+    normalized = ReqLLM.Usage.normalize(usage)
+
+    Enum.reduce(@cost_keys, normalized, fn key, acc ->
+      case field(usage, key) do
+        value when is_number(value) -> Map.put(acc, key, value)
+        _other -> acc
+      end
+    end)
+  end
 
   @doc "Adds one provider usage value to request totals."
   @spec add(map(), map()) :: map()
   def add(total, usage) when is_map(total) and is_map(usage) do
-    normalized = ReqLLM.Usage.normalize(usage)
+    normalized = normalize(usage)
 
     totals =
       Enum.reduce(@counter_keys, total, fn key, acc ->
@@ -47,7 +62,7 @@ defmodule Jido.AI.Usage do
   @spec cache_observation(map(), map(), integer()) :: map()
   def cache_observation(config, usage, observed_at_ms)
       when is_map(config) and is_map(usage) and is_integer(observed_at_ms) do
-    normalized = ReqLLM.Usage.normalize(usage)
+    normalized = normalize(usage)
     requested_ttl = field(config, :ttl)
 
     %{
@@ -116,6 +131,7 @@ defmodule Jido.AI.Usage do
   defp unit_ms("h"), do: 3_600_000
 
   defp field(map, key) when is_map(map), do: Map.get(map, key, Map.get(map, Atom.to_string(key)))
+  defp field(_value, _key), do: nil
 
   defp cache_semantics(usage) do
     if Enum.any?(@counter_keys, &(number(usage[&1]) > 0)),
