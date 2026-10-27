@@ -1,12 +1,12 @@
-defmodule Jido.AI.Reasoning.ReAct.Actions.ProjectConversation do
+defmodule Jido.AI.Reasoning.Actions.ProjectConversation do
   @moduledoc "Projects the canonical Thread into one model request."
 
   alias Jido.AI.Thread.Projection
 
   use Jido.Action,
-    id: "jido.ai/reasoning/react/actions/project-conversation",
+    id: "jido.ai/reasoning/actions/project-conversation",
     vsn: 1,
-    name: "jido_ai_react_project_conversation",
+    name: "jido_ai_project_conversation",
     description: "Project Session history into model messages",
     schema: Zoi.map(),
     output_schema: Zoi.map()

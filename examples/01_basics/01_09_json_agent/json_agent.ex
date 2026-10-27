@@ -25,8 +25,8 @@ defmodule JidoAI.Examples.JSONAgent do
   @moduledoc """
   Stores and loads the graph-first SimpleAgent with `Jido.Authoring`.
 
-  The AI DSL lowers to a normal Agent route before execution. Its codec stores
-  the core Agent fields and one trusted reference to the root reasoning Flow.
+  The AI DSL lowers through the AI Agent extension. The normal Agent codec
+  stores the extension data and trusted executable references.
   """
 
   alias Jido.AI.Reasoning.ReAct
@@ -43,6 +43,7 @@ defmodule JidoAI.Examples.JSONAgent do
   def registry do
     Registry.new!(%{
       {"jido.ai/agents/simple", 3} => {:agent, SimpleAgent},
+      {"jido.ai/agent", 1} => {:extension, Jido.AI.Agent.Extension},
       {"jido.ai/reasoning/react", 1} => {:flow, ReAct},
       {"jido.ai/examples/tools/add", 1} => {:action, JidoAI.Examples.Tools.Add},
       {"jido.ai/examples/tools/multiply", 1} => {:action, JidoAI.Examples.Tools.Multiply},
@@ -50,11 +51,11 @@ defmodule JidoAI.Examples.JSONAgent do
     })
   end
 
-  @doc "Encodes the SimpleAgent definition with the AI Agent codec."
+  @doc "Encodes the SimpleAgent definition with the normal Agent codec."
   def encode_json do
     Jido.Authoring.encode_json(definition(),
       registry: registry(),
-      codec: Jido.AI.Agent.Codec
+      codec: Jido.Agent.Codec
     )
   end
 
@@ -65,7 +66,7 @@ defmodule JidoAI.Examples.JSONAgent do
   def import do
     Jido.Authoring.decode_json(fixture_json(),
       registry: registry(),
-      codec: Jido.AI.Agent.Codec
+      codec: Jido.Agent.Codec
     )
   end
 

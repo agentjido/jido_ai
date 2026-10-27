@@ -76,3 +76,15 @@ defmodule Jido.AITest.ConfiguredAgent do
     end
   end
 end
+
+defmodule Jido.AITest.ChainOfThoughtAgent do
+  use Jido.AI.Agent,
+    id: "jido.ai/agents/chain-of-thought",
+    vsn: 1,
+    name: "jido_ai_chain_of_thought_agent",
+    description: "Solve one request with a variable-length numbered reasoning chain"
+
+  ai do
+    reasoning Jido.AI.Reasoning.ChainOfThought
+  end
+end

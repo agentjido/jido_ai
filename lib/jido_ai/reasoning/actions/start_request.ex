@@ -1,12 +1,12 @@
-defmodule Jido.AI.Reasoning.ReAct.Actions.StartRequest do
+defmodule Jido.AI.Reasoning.Actions.StartRequest do
   @moduledoc "Initializes one request and appends its user message to the Session."
 
   alias Jido.AI.Thread.Projection
 
   use Jido.Action,
-    id: "jido.ai/reasoning/react/actions/start-request",
+    id: "jido.ai/reasoning/actions/start-request",
     vsn: 1,
-    name: "jido_ai_react_start_request",
+    name: "jido_ai_start_request",
     description: "Load conversation state and start one graph request",
     schema: Zoi.map(),
     output_schema: Zoi.map()
@@ -32,24 +32,24 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.StartRequest do
          started_at_ms: now,
          input: params.input,
          instructions: params.instructions,
-         models: [params.model | params.fallback_models],
+         models: [params.model | Map.get(params, :fallback_models, [])],
          model_index: 0,
          model_attempt: 0,
          model_calls: 0,
          max_model_calls: params.max_model_calls,
-         max_retries: params.max_retries,
+         max_retries: Map.get(params, :max_retries, 0),
          retries: 0,
          options: params.options,
-         prompt_cache: params.prompt_cache,
-         stream: params.stream,
-         review_tools: params.review_tools,
+         prompt_cache: Map.get(params, :prompt_cache, %{enabled: false}),
+         stream: Map.get(params, :stream, false),
+         review_tools: Map.get(params, :review_tools, false),
          repair_instruction: nil,
          context_window: params.context_window,
          tool_rounds: 0,
-         max_tool_rounds: params.max_tool_rounds,
+         max_tool_rounds: Map.get(params, :max_tool_rounds, 0),
          tool_call_count: 0,
          tool_error_count: 0,
-         max_tool_calls: params.max_tool_calls,
+         max_tool_calls: Map.get(params, :max_tool_calls, 0),
          tools: tools,
          model_outcome: nil,
          usage: Jido.AI.Usage.zero(),

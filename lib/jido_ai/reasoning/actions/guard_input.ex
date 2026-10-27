@@ -1,12 +1,12 @@
-defmodule Jido.AI.Reasoning.ReAct.Actions.GuardInput do
-  @moduledoc "Checks one request before the ReAct loop starts."
+defmodule Jido.AI.Reasoning.Actions.GuardInput do
+  @moduledoc "Checks one request before its reasoning graph starts."
 
   @blocked_fragments ["ignore previous instructions", "reveal your system prompt"]
 
   use Jido.Action,
-    id: "jido.ai/reasoning/react/actions/guard-input",
+    id: "jido.ai/reasoning/actions/guard-input",
     vsn: 1,
-    name: "jido_ai_react_guard_input",
+    name: "jido_ai_guard_input",
     description: "Check one request before model work starts",
     schema: Zoi.map(),
     output_schema: Zoi.map()

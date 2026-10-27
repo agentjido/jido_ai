@@ -2,10 +2,10 @@ defmodule Jido.AI.Telemetry do
   @moduledoc """
   The public observability API for AI Agent execution.
 
-  Jido AI emits semantic Agent and tool events under `[:jido, :ai]`. Model
-  request, streaming, token, cache, and cost data remain owned by ReqLLM. Use
-  `events/0` to get the complete event inventory and `metrics/0` to configure a
-  `Telemetry.Metrics` reporter.
+  Jido AI emits semantic Agent, reasoning, and tool events under
+  `[:jido, :ai]`. Model request, streaming, token, cache, and cost data remain
+  owned by ReqLLM. Use `events/0` to get the complete event inventory and
+  `metrics/0` to configure a `Telemetry.Metrics` reporter.
 
   Semantic logging consumes the same events. Configure it with:
 
@@ -30,6 +30,7 @@ defmodule Jido.AI.Telemetry do
   @request_type "jido.ai.request"
   @runtime_handler_id "jido-ai-runtime-telemetry"
   @semantic_handler_id "jido-ai-semantic-logger"
+  @reasoning_scope_key {__MODULE__, :reasoning_operation_id}
   @log_modes [:off, :errors, :interesting, :all]
 
   @agent_events [
@@ -44,7 +45,13 @@ defmodule Jido.AI.Telemetry do
     [:jido, :ai, :tool, :exception]
   ]
 
-  @owned_events @agent_events ++ @tool_events
+  @reasoning_events [
+    [:jido, :ai, :reasoning, :start],
+    [:jido, :ai, :reasoning, :stop],
+    [:jido, :ai, :reasoning, :exception]
+  ]
+
+  @owned_events @agent_events ++ @reasoning_events ++ @tool_events
 
   @model_log_events [
     [:req_llm, :request, :start],
@@ -60,6 +67,8 @@ defmodule Jido.AI.Telemetry do
     [:jido, :action, :stop],
     [:jido, :action, :exception]
   ]
+
+  @model_correlation_events [[:req_llm, :request, :start]]
 
   @typedoc "A telemetry event name."
   @type event_name :: [atom(), ...]
@@ -89,6 +98,13 @@ defmodule Jido.AI.Telemetry do
         tags: [:status, :reasoning_name],
         unit: {:native, :millisecond}
       ),
+      Telemetry.Metrics.counter("jido.ai.reasoning.stop.count",
+        tags: [:reasoning_name, :reasoning_method, :status]
+      ),
+      Telemetry.Metrics.summary("jido.ai.reasoning.stop.duration",
+        tags: [:reasoning_name, :reasoning_method, :status],
+        unit: {:native, :millisecond}
+      ),
       Telemetry.Metrics.counter("jido.ai.tool.stop.count", tags: [:status, :tool_name]),
       Telemetry.Metrics.summary("jido.ai.tool.stop.duration",
         tags: [:status, :tool_name],
@@ -96,16 +112,19 @@ defmodule Jido.AI.Telemetry do
       ),
       Telemetry.Metrics.counter("jido.ai.model.request.count",
         event_name: [:req_llm, :request, :stop],
-        tags: [:provider, :model, :operation]
+        tags: [:provider, :model, :operation],
+        tag_values: &model_tag_values/1
       ),
       Telemetry.Metrics.counter("jido.ai.model.request.exception.count",
         event_name: [:req_llm, :request, :exception],
-        tags: [:provider, :model, :operation]
+        tags: [:provider, :model, :operation],
+        tag_values: &model_tag_values/1
       ),
       Telemetry.Metrics.summary("jido.ai.model.request.duration",
         event_name: [:req_llm, :request, :stop],
         measurement: :duration,
         tags: [:provider, :model, :operation],
+        tag_values: &model_tag_values/1,
         unit: {:native, :millisecond}
       )
     ] ++ usage_metrics()
@@ -128,7 +147,11 @@ defmodule Jido.AI.Telemetry do
   @doc false
   @spec attach_default_handlers() :: :ok
   def attach_default_handlers do
-    attach_once(@runtime_handler_id, @runtime_events, &__MODULE__.handle_runtime_event/4)
+    attach_once(
+      @runtime_handler_id,
+      @runtime_events ++ @model_correlation_events,
+      &__MODULE__.handle_runtime_event/4
+    )
 
     attach_once(
       @semantic_handler_id,
@@ -142,6 +165,56 @@ defmodule Jido.AI.Telemetry do
   @doc false
   @spec with_agent_span(map(), (-> result)) :: result when result: term()
   def with_agent_span(context, fun), do: OpenTelemetry.with_agent_span(context, fun)
+
+  @doc false
+  @spec with_reasoning(map(), map(), (-> result)) :: result when result: term()
+  def with_reasoning(context, reasoning, fun)
+      when is_map(context) and is_map(reasoning) and is_function(fun, 0) do
+    operation_id = "reasoning_#{Jido.generate_id()}"
+    metadata = reasoning_metadata(context, reasoning, operation_id)
+    started_at = System.monotonic_time()
+    previous_operation = Process.get(@reasoning_scope_key)
+    Process.put(@reasoning_scope_key, operation_id)
+
+    :telemetry.execute(
+      [:jido, :ai, :reasoning, :start],
+      %{monotonic_time: started_at, system_time: System.system_time()},
+      metadata
+    )
+
+    try do
+      result = OpenTelemetry.with_reasoning_span(operation_id, fun)
+      duration = max(System.monotonic_time() - started_at, 0)
+
+      :telemetry.execute(
+        [:jido, :ai, :reasoning, :stop],
+        %{duration: duration},
+        metadata
+        |> Map.put(:status, reasoning_status(result))
+        |> Map.merge(reasoning_result_metadata(result, operation_id))
+      )
+
+      result
+    catch
+      kind, reason ->
+        duration = max(System.monotonic_time() - started_at, 0)
+
+        :telemetry.execute(
+          [:jido, :ai, :reasoning, :exception],
+          %{duration: duration},
+          metadata
+          |> Map.put(:status, :error)
+          |> Map.put(:error_type, reasoning_error_type(kind, reason))
+        )
+
+        Storage.take({:reasoning_request, operation_id})
+        :erlang.raise(kind, reason, __STACKTRACE__)
+    after
+      if previous_operation,
+        do: Process.put(@reasoning_scope_key, previous_operation),
+        else: Process.delete(@reasoning_scope_key)
+    end
+  end
 
   @doc false
   @spec record_agent_summary(map(), map()) :: :ok
@@ -180,6 +253,16 @@ defmodule Jido.AI.Telemetry do
     _error -> :ok
   catch
     _kind, _reason -> :ok
+  end
+
+  def handle_runtime_event([:req_llm, :request, :start], _measurements, metadata, _config) do
+    case {Process.get(@reasoning_scope_key), metadata[:request_id]} do
+      {operation_id, request_id} when is_binary(operation_id) and is_binary(request_id) ->
+        Storage.put({:reasoning_request, operation_id}, request_id)
+
+      _other ->
+        :ok
+    end
   end
 
   def handle_runtime_event(_event, _measurements, _metadata, _config), do: :ok
@@ -259,6 +342,48 @@ defmodule Jido.AI.Telemetry do
     :telemetry.execute([:jido, :ai, :tool, ending], measurements, ai_metadata)
   end
 
+  defp reasoning_metadata(context, reasoning, operation_id) do
+    agent = Storage.get({:agent, context[:turn_id]}) || %{}
+
+    agent
+    |> Map.take([
+      :agent_id,
+      :agent_module,
+      :agent_name,
+      :reasoning,
+      :reasoning_name,
+      :request_id,
+      :turn_id,
+      :trace_id,
+      :span_id,
+      :parent_span_id
+    ])
+    |> Map.merge(%{
+      reasoning_operation_id: operation_id,
+      reasoning_method: reasoning[:method]
+    })
+    |> compact()
+  end
+
+  defp reasoning_status({:ok, _value}), do: :ok
+  defp reasoning_status({:error, _reason}), do: :error
+  defp reasoning_status(_result), do: :unknown
+
+  defp reasoning_result_metadata(result, operation_id) do
+    request_id =
+      Storage.take({:reasoning_request, operation_id}) || response_request_id(result)
+
+    if is_binary(request_id), do: %{req_llm_request_id: request_id}, else: %{}
+  end
+
+  defp response_request_id({:ok, %ReqLLM.Response{} = response}),
+    do: ReqLLM.Response.call_metadata(response)[:request_id]
+
+  defp response_request_id(_result), do: nil
+
+  defp reasoning_error_type(:error, %{__struct__: module}) when is_atom(module), do: module
+  defp reasoning_error_type(kind, _reason) when kind in [:error, :exit, :throw], do: kind
+
   defp agent_metadata(metadata) do
     agent_module = metadata[:agent_module]
     reasoning = reasoning(agent_module)
@@ -302,7 +427,14 @@ defmodule Jido.AI.Telemetry do
 
     measurements =
       summary
-      |> Map.take([:model_calls, :tool_rounds, :tool_calls, :tool_errors, :retries])
+      |> Map.take([
+        :model_calls,
+        :tool_rounds,
+        :tool_calls,
+        :tool_errors,
+        :retries,
+        :reasoning_steps
+      ])
       |> Map.merge(%{
         input_tokens: usage_value(usage, :input_tokens),
         output_tokens: usage_value(usage, :output_tokens),
@@ -374,7 +506,8 @@ defmodule Jido.AI.Telemetry do
       Telemetry.Metrics.sum("jido.ai.model.#{key}",
         event_name: [:req_llm, :request, :stop],
         measurement: fn _measurements, metadata -> usage_value(metadata[:usage], key) end,
-        tags: [:provider, :model]
+        tags: [:provider, :model],
+        tag_values: &model_tag_values/1
       )
     end
   end
@@ -390,6 +523,14 @@ defmodule Jido.AI.Telemetry do
   end
 
   defp usage_value(_usage, _key), do: 0
+
+  defp model_tag_values(metadata) do
+    Map.update(metadata, :model, nil, &model_name/1)
+  end
+
+  defp model_name(%{id: id}) when is_binary(id), do: id
+  defp model_name(model) when is_binary(model), do: model
+  defp model_name(_model), do: "unknown"
 
   defp semantic_log_mode do
     case config_value(telemetry_config(), :semantic_log_mode) do
@@ -457,6 +598,8 @@ defmodule Jido.AI.Telemetry do
       :finish_reason,
       :error_type
     ])
+    |> Map.put(:conversation_id, req_llm_conversation_id(metadata))
+    |> Map.update(:model, nil, &model_name/1)
     |> Map.merge(Map.take(measurements, [:duration, :system_time]))
     |> Map.merge(%{
       input_tokens: usage_value(usage, :input_tokens),
@@ -476,7 +619,9 @@ defmodule Jido.AI.Telemetry do
       :agent_module,
       :agent_name,
       :reasoning,
+      :reasoning_method,
       :request_id,
+      :req_llm_request_id,
       :run_id,
       :session_id,
       :thread_id,
@@ -496,6 +641,7 @@ defmodule Jido.AI.Telemetry do
         :tool_calls,
         :tool_errors,
         :retries,
+        :reasoning_steps,
         :input_tokens,
         :output_tokens,
         :cache_read_tokens,
@@ -506,6 +652,16 @@ defmodule Jido.AI.Telemetry do
     )
     |> compact()
   end
+
+  defp req_llm_conversation_id(metadata) do
+    metadata[:conversation_id] ||
+      metadata
+      |> Map.get(:request_options, %{})
+      |> map_value(:conversation_id)
+  end
+
+  defp map_value(map, key) when is_map(map), do: Map.get(map, key, Map.get(map, to_string(key)))
+  defp map_value(_map, _key), do: nil
 
   defp format_fields(fields) do
     fields

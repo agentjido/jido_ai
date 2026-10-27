@@ -1,23 +1,33 @@
 {
-  "ai": {
-    "reasoning": {
-      "id": "jido.ai/reasoning/react",
-      "vsn": 1
-    },
-    "tools": [
-      {
-        "id": "jido.ai/examples/tools/add",
-        "vsn": 1
-      },
-      {
-        "id": "jido.ai/examples/tools/multiply",
-        "vsn": 1
-      }
-    ]
-  },
   "definition": {
     "description": "Answer one request with guardrails and multiple tools",
-    "extensions": [],
+    "extensions": [
+      {
+        "data": {
+          "config": {},
+          "reasoning": {
+            "id": "jido.ai/reasoning/react",
+            "vsn": 1
+          },
+          "tools": [
+            {
+              "id": "jido.ai/examples/tools/add",
+              "vsn": 1
+            },
+            {
+              "id": "jido.ai/examples/tools/multiply",
+              "vsn": 1
+            }
+          ]
+        },
+        "id": "jido.ai/agent",
+        "provider": {
+          "id": "jido.ai/agent",
+          "vsn": 1
+        },
+        "vsn": 1
+      }
+    ],
     "initial_state": {
       "$type": "map",
       "entries": []
@@ -43,6 +53,6 @@
     },
     "vsn": 3
   },
-  "type": "jido.ai.agent",
+  "type": "jido.agent.definition",
   "vsn": 1
 }

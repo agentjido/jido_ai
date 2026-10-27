@@ -1,12 +1,12 @@
-defmodule Jido.AI.Reasoning.ReAct.Actions.RecordModelAttempt do
+defmodule Jido.AI.Reasoning.Actions.RecordModelAttempt do
   @moduledoc "Records one model attempt and any accepted assistant message."
 
   alias Jido.AI.Thread.Projection
 
   use Jido.Action,
-    id: "jido.ai/reasoning/react/actions/record-model-attempt",
+    id: "jido.ai/reasoning/actions/record-model-attempt",
     vsn: 1,
-    name: "jido_ai_react_record_model_attempt",
+    name: "jido_ai_record_model_attempt",
     description: "Record a model attempt in the canonical Session",
     schema: Zoi.map(),
     output_schema: Zoi.map()
@@ -31,6 +31,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.RecordModelAttempt do
 
     attempt = %{
       status: outcome.status,
+      reasoning: Map.get(params, :reasoning),
       model: outcome.model,
       req_llm_request_id: outcome[:req_llm_request_id],
       model_index: turn.model_index,
@@ -48,7 +49,16 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.RecordModelAttempt do
       |> Jido.Session.decode!()
       |> Projection.observe(:ai_model_attempt, attempt, refs, at)
 
-    with {:ok, session} <- maybe_append_assistant(session, outcome, params.output_allowed, refs, at) do
+    persist_message = Map.get(params, :persist_message, true)
+
+    with {:ok, session} <-
+           maybe_append_assistant(
+             session,
+             outcome,
+             params.output_allowed and persist_message,
+             refs,
+             at
+           ) do
       {:ok,
        %{
          turn:

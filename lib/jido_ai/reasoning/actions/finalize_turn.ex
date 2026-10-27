@@ -1,12 +1,12 @@
-defmodule Jido.AI.Reasoning.ReAct.Actions.FinalizeTurn do
+defmodule Jido.AI.Reasoning.Actions.FinalizeTurn do
   @moduledoc "Finalizes one graph request and returns the Agent commit envelope."
 
   alias Jido.AI.{Telemetry, Thread.Projection}
 
   use Jido.Action,
-    id: "jido.ai/reasoning/react/actions/finalize-turn",
+    id: "jido.ai/reasoning/actions/finalize-turn",
     vsn: 1,
-    name: "jido_ai_react_finalize_turn",
+    name: "jido_ai_finalize_turn",
     description: "Commit the terminal request Session",
     schema: Zoi.object(%{outcome: Zoi.object(%{turn: Zoi.any(), result: Zoi.map()})}),
     output_schema: Zoi.object(%{state: Zoi.map(), response: Zoi.map()})
@@ -25,6 +25,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.FinalizeTurn do
       tool_calls: turn.tool_call_count,
       tool_errors: turn.tool_error_count,
       retries: turn.retries,
+      reasoning_steps: get_in(result, [:reasoning, :steps_count]),
       usage: turn.usage
     }
 
@@ -57,6 +58,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.FinalizeTurn do
       tool_calls: turn.tool_call_count,
       tool_errors: turn.tool_error_count,
       retries: turn.retries,
+      reasoning_steps: get_in(result, [:reasoning, :steps_count]),
       usage: turn.usage
     })
 

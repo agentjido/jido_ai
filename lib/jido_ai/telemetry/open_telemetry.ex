@@ -38,6 +38,12 @@ defmodule Jido.AI.Telemetry.OpenTelemetry do
     end
   end
 
+  @spec with_reasoning_span(String.t(), (-> result)) :: result when result: term()
+  def with_reasoning_span(operation_id, fun)
+      when is_binary(operation_id) and is_function(fun, 0) do
+    with_stored_span({:otel, :reasoning, operation_id}, fun)
+  end
+
   def handle_event([:jido, :ai, kind, :start], measurements, metadata, _config)
       when kind in [:agent, :tool] do
     key = span_key(kind, metadata)
@@ -63,6 +69,27 @@ defmodule Jido.AI.Telemetry.OpenTelemetry do
     case span_key(kind, metadata) do
       nil -> :ok
       key -> finish_span(Storage.take(key), kind, ending, metadata, measurements)
+    end
+  catch
+    _, _ -> :ok
+  end
+
+  def handle_event([:jido, :ai, :reasoning, :start], measurements, metadata, _config) do
+    start_owned_span(:reasoning, measurements, metadata)
+  catch
+    _, _ -> :ok
+  end
+
+  def handle_event(
+        [:jido, :ai, :reasoning, ending],
+        measurements,
+        metadata,
+        _config
+      )
+      when ending in [:stop, :exception] do
+    case span_key(:reasoning, metadata) do
+      nil -> :ok
+      key -> finish_span(Storage.take(key), :reasoning, ending, metadata, measurements)
     end
   catch
     _, _ -> :ok
@@ -114,6 +141,53 @@ defmodule Jido.AI.Telemetry.OpenTelemetry do
     _kind, _reason -> :error
   end
 
+  defp with_stored_span(key, fun) do
+    case attach_stored_span(key) do
+      {:ok, token} ->
+        try do
+          fun.()
+        after
+          detach(token)
+        end
+
+      :error ->
+        fun.()
+    end
+  end
+
+  defp attach_stored_span(key) do
+    case Storage.get(key) do
+      %{span: span} ->
+        current = call(:otel_ctx, :get_current, [])
+        next = call(:otel_tracer, :set_current_span, [current, span])
+        {:ok, call(:otel_ctx, :attach, [next])}
+
+      _other ->
+        :error
+    end
+  rescue
+    _error -> :error
+  catch
+    _kind, _reason -> :error
+  end
+
+  defp start_owned_span(kind, measurements, metadata) do
+    key = span_key(kind, metadata)
+
+    if key do
+      parent = parent_span(kind, metadata)
+      span = start_span(span_name(kind, metadata), attributes(kind, metadata, measurements), parent)
+
+      if span do
+        unless Storage.put_new(key, %{span: span, metadata: metadata}) do
+          call(:otel_span, :end_span, [span])
+        end
+      end
+    end
+
+    :ok
+  end
+
   defp parent_span(:agent, _metadata), do: nil
 
   defp parent_span(:tool, %{turn_id: turn_id}) when is_binary(turn_id) do
@@ -124,6 +198,7 @@ defmodule Jido.AI.Telemetry.OpenTelemetry do
   end
 
   defp parent_span(:tool, _metadata), do: nil
+  defp parent_span(:reasoning, metadata), do: parent_span(:tool, metadata)
 
   defp span_key(:agent, %{turn_id: turn_id}) when is_binary(turn_id),
     do: {:otel, :agent, turn_id}
@@ -131,10 +206,17 @@ defmodule Jido.AI.Telemetry.OpenTelemetry do
   defp span_key(:tool, %{attempt_id: attempt_id}) when not is_nil(attempt_id),
     do: {:otel, :tool, attempt_id}
 
+  defp span_key(:reasoning, %{reasoning_operation_id: operation_id})
+       when is_binary(operation_id),
+       do: {:otel, :reasoning, operation_id}
+
   defp span_key(_kind, _metadata), do: nil
 
   defp span_name(:agent, metadata), do: "invoke_agent #{metadata[:agent_name] || "agent"}"
   defp span_name(:tool, metadata), do: "execute_tool #{metadata[:tool_name] || "tool"}"
+
+  defp span_name(:reasoning, metadata),
+    do: "reasoning #{metadata[:reasoning_method] || "operation"}"
 
   defp start_span(name, attributes, nil) do
     call(:otel_tracer, :start_span, [
@@ -193,7 +275,8 @@ defmodule Jido.AI.Telemetry.OpenTelemetry do
       "jido.ai.turn.id" => metadata[:turn_id],
       "jido.ai.status" => value(metadata[:status]),
       "jido.ai.model.calls" => measurements[:model_calls],
-      "jido.ai.tool.calls" => measurements[:tool_calls]
+      "jido.ai.tool.calls" => measurements[:tool_calls],
+      "jido.ai.reasoning.steps" => measurements[:reasoning_steps]
     }
     |> compact()
   end
@@ -211,9 +294,22 @@ defmodule Jido.AI.Telemetry.OpenTelemetry do
     |> compact()
   end
 
+  defp attributes(:reasoning, metadata, _measurements) do
+    %{
+      "gen_ai.agent.name" => metadata[:agent_name],
+      "jido.ai.turn.id" => metadata[:turn_id],
+      "jido.ai.reasoning.module" => module_name(metadata[:reasoning]),
+      "jido.ai.reasoning.method" => value(metadata[:reasoning_method]),
+      "jido.ai.reasoning.status" => value(metadata[:status]),
+      "jido.ai.model.request.id" => metadata[:req_llm_request_id]
+    }
+    |> compact()
+  end
+
   defp error?(_kind, :exception, _metadata), do: true
   defp error?(:agent, _ending, %{status: status}), do: status in [:error, :failed]
   defp error?(:tool, _ending, %{status: status}), do: status == :error
+  defp error?(:reasoning, _ending, %{status: status}), do: status == :error
   defp error?(_kind, _ending, _metadata), do: false
 
   defp compact(values) do

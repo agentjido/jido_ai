@@ -1,14 +1,14 @@
 defmodule Jido.AI.Reasoning.ReAct.ModelRound do
   @moduledoc "Projects context and runs one guarded provider attempt."
 
-  alias Jido.AI.Reasoning.ReAct.Actions.{
+  alias Jido.AI.Reasoning.Actions.{
     CallModel,
-    DecideNext,
-    ExpandNext,
     GuardOutput,
     ProjectConversation,
     RecordModelAttempt
   }
+
+  alias Jido.AI.Reasoning.ReAct.Actions.{DecideNext, ExpandNext}
 
   use Jido.Flow,
     id: "jido.ai/reasoning/react/model-round",

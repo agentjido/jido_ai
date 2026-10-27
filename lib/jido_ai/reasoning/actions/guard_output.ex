@@ -1,10 +1,10 @@
-defmodule Jido.AI.Reasoning.ReAct.Actions.GuardOutput do
+defmodule Jido.AI.Reasoning.Actions.GuardOutput do
   @moduledoc "Applies final-answer guards to one model outcome."
 
   use Jido.Action,
-    id: "jido.ai/reasoning/react/actions/guard-output",
+    id: "jido.ai/reasoning/actions/guard-output",
     vsn: 1,
-    name: "jido_ai_react_guard_output",
+    name: "jido_ai_guard_output",
     description: "Apply the Agent output guard",
     schema: Zoi.map(),
     output_schema: Zoi.map()

@@ -15,6 +15,7 @@ defmodule Jido.AI.TelemetryTest do
     events = Telemetry.events()
 
     assert [:jido, :ai, :agent, :start] in events
+    assert [:jido, :ai, :reasoning, :stop] in events
     assert [:jido, :ai, :tool, :stop] in events
     assert [:jido, :agent_server, :turn, :stop] in events
     assert [:jido, :action, :stop] in events
@@ -24,6 +25,7 @@ defmodule Jido.AI.TelemetryTest do
 
     names = Enum.map(Telemetry.metrics(), & &1.name)
     assert [:jido, :ai, :agent, :stop, :duration] in names
+    assert [:jido, :ai, :reasoning, :stop, :duration] in names
     assert [:jido, :ai, :model, :input_tokens] in names
     assert [:jido, :ai, :model, :cache_read_tokens] in names
   end

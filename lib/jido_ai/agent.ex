@@ -1,64 +1,40 @@
 defmodule Jido.AI.Agent do
   @moduledoc """
-  Defines a graph-first AI Agent.
+  Defines a graph-first AI Agent with a Spark-backed Agent extension.
 
-  `use Jido.AI.Agent` builds a normal `Jido.Agent`. The required `ai` block
-  selects one root reasoning Flow and an optional Agent-local Toolset:
+  An AI Agent selects one root reasoning Flow and an optional ordered set of
+  tool Actions:
 
       defmodule MyApp.SupportAgent do
-        use Jido.AI.Agent,
-          id: "my_app/agents/support",
-          name: "support_agent"
+        use Jido.AI.Agent, name: "support_agent"
 
         ai do
           reasoning MyApp.SupportReasoning
 
           tools do
-            action MyApp.Actions.Search
-            action MyApp.Actions.Fetch
+            action MyApp.SearchDocs
+            action MyApp.CreateTicket
           end
         end
       end
 
-  The reasoning Flow is the direct executable target of the Agent request
-  route. Jido AI does not insert a hidden pipeline around it.
+  The reasoning Flow is the direct target of the `jido.ai.request` route.
+  Jido AI does not add a hidden pipeline around it.
 
-  A reasoning block sets compile-time defaults for the root Flow input. Signal
-  data can override these defaults for one request:
+  A reasoning block sets partial input defaults. The selected Flow input
+  schema defines all fields, types, defaults, and validation:
 
       ai do
         reasoning Jido.AI.Reasoning.ReAct do
           instructions "Answer as a support specialist."
           model "anthropic:claude-sonnet-4-5"
-          fallback_models ["openai:gpt-5-mini"]
 
           limits do
             model_calls 8
             tool_rounds 4
-            tool_calls 8
-            retries 1
-          end
-
-          context do
-            max_messages 64
-            max_bytes 200_000
-          end
-
-          prompt_cache do
-            enabled true
-            ttl "5m"
           end
         end
       end
-
-  The reasoning block is generic nested data. The selected Flow input schema
-  defines its fields, types, defaults, and validation. Configuration changes
-  Flow input only. To change graph structure, define a different root Flow and
-  select that module with `reasoning`.
-
-  `tools` is plural because the block declares the Agent's complete tool set.
-  Each `action` entry names one executable `Jido.Action`. The block does not
-  accept Flows or other executable kinds.
 
   Small Agents can define the root Flow inline:
 
@@ -72,47 +48,33 @@ defmodule Jido.AI.Agent do
         end
       end
 
-  The generated Agent accepts `jido.ai.request` Signals and replies with a
-  `jido.ai.response` Signal. The root Flow returns an explicit `%{state: ...,
-  response: ...}` envelope. The route commits the state and replies with the
-  response.
-
-  The `ai` block lowers to the normal Jido Agent route model at compile time.
-  `Jido.AI.Agent.Codec` gives this authoring boundary a versioned
-  `jido.ai.agent` document. It stores the core Agent fields and trusted
-  references to the root reasoning Flow, its configured defaults, and declared
-  tool Actions.
+  The `ai`, `reasoning`, and `tools` declarations lower through
+  `Jido.AI.Agent.Extension`. The extension contributes the normal Agent route
+  and stores its authoring data in the normal `Jido.Agent.Codec` document.
+  Registered Flow and Action references are required when the Agent is stored
+  as JSON.
   """
 
-  @request_type "jido.ai.request"
-  @response_type "jido.ai.response"
+  alias Jido.AI.Agent.Extension
 
-  @doc "Uses the Jido Agent runtime with the graph-first AI authoring layer."
+  @doc "Uses the Jido Agent runtime with the graph-first AI extension."
   defmacro __using__(options) do
     options = Jido.Agent.options!(options, __CALLER__)
+    providers = Enum.uniq([Extension | Keyword.get(options, :extensions, [])])
+    options = Keyword.put(options, :extensions, providers)
     signal_source = "/" <> options[:id]
-    Module.put_attribute(__CALLER__.module, :jido_ai_signal_source, signal_source)
 
     quote do
       use Jido.Agent, unquote(Macro.escape(options))
-
-      import Jido.AI.Agent, only: [ai: 1]
 
       state do
         schema Zoi.object(%{session: Jido.AI.Thread.Projection.schema()})
       end
 
-      @before_compile Jido.AI.Agent
-    end
-  end
+      routes do
+        signal_source unquote(signal_source)
+      end
 
-  @doc false
-  defmacro __before_compile__(caller) do
-    unless Module.get_attribute(caller.module, :jido_ai_block_declared) do
-      compile_error!(caller, caller.line, "Jido.AI.Agent requires one ai block")
-    end
-
-    quote do
       @doc "Returns this Agent's root reasoning Flow module."
       @spec reasoning() :: module()
       def reasoning, do: Jido.AI.Reasoning.root(__MODULE__)
@@ -125,208 +87,5 @@ defmodule Jido.AI.Agent do
       @spec preflight(map() | keyword()) :: {:ok, map()} | {:error, term()}
       def preflight(input), do: Jido.AI.Reasoning.preflight(__MODULE__, input)
     end
-  end
-
-  @doc "Defines the one root reasoning Flow for an AI Agent."
-  defmacro ai(do: block) do
-    caller = __CALLER__
-    ensure_single_ai_block!(caller)
-
-    {reasoning, actions, tools_line} = declarations!(block, caller)
-    tools = toolset_declaration(actions, tools_line || caller.line)
-
-    route =
-      case reasoning do
-        {:module, target, defaults, line} -> module_reasoning(target, defaults, line, caller)
-        {:inline, body, line} -> inline_reasoning(body, line, caller)
-      end
-
-    quote do
-      unquote(tools)
-      unquote(route)
-    end
-  end
-
-  defp ensure_single_ai_block!(caller) do
-    if Module.get_attribute(caller.module, :jido_ai_block_declared) do
-      compile_error!(caller, caller.line, "An Agent can define only one ai block")
-    end
-
-    Module.put_attribute(caller.module, :jido_ai_block_declared, true)
-  end
-
-  defp declarations!(block, caller) do
-    declarations = expressions(block)
-    reasoning = Enum.filter(declarations, &match?({:reasoning, _, _}, &1))
-    tools = Enum.filter(declarations, &match?({:tools, _, _}, &1))
-    known = reasoning ++ tools
-
-    if length(known) != length(declarations) do
-      compile_error!(caller, caller.line, "ai accepts only reasoning and tools declarations")
-    end
-
-    reasoning = reasoning_declaration!(reasoning, caller)
-    {actions, tools_line} = tools_declaration!(tools, caller)
-
-    case Jido.AI.Toolset.validate(actions) do
-      :ok ->
-        {reasoning, actions, tools_line}
-
-      {:error, reason} ->
-        compile_error!(caller, tools_line, "invalid Agent Toolset: #{inspect(reason)}")
-    end
-  end
-
-  defp reasoning_declaration!(declarations, caller) do
-    case declarations do
-      [{:reasoning, metadata, [[do: body]]}] ->
-        {:inline, body, metadata[:line]}
-
-      [{:reasoning, metadata, [target, [do: body]]}] ->
-        target = reasoning_module!(target, metadata[:line], caller)
-        defaults = Jido.AI.Agent.DSL.parse!(body, target, caller)
-        {:module, target, defaults, metadata[:line]}
-
-      [{:reasoning, metadata, [target]}] ->
-        {:module, reasoning_module!(target, metadata[:line], caller), %{}, metadata[:line]}
-
-      [{:reasoning, metadata, arguments}] when is_list(arguments) ->
-        compile_error!(
-          caller,
-          metadata[:line],
-          "reasoning requires one Flow module, an optional configuration block, or one inline Flow block"
-        )
-
-      declarations ->
-        lines = Enum.map(declarations, &expression_line(&1, caller.line))
-        line = List.first(lines) || caller.line
-
-        compile_error!(
-          caller,
-          line,
-          "ai requires exactly one reasoning declaration"
-        )
-    end
-  end
-
-  defp tools_declaration!([], _caller), do: {[], nil}
-
-  defp tools_declaration!([{:tools, metadata, [[do: body]]}], caller) do
-    actions =
-      body
-      |> expressions()
-      |> Enum.map(fn
-        {:action, action_metadata, [target]} ->
-          action_module!(target, action_metadata[:line], caller)
-
-        _declaration ->
-          compile_error!(caller, metadata[:line], "tools accepts only action declarations")
-      end)
-
-    {actions, metadata[:line]}
-  end
-
-  defp tools_declaration!([{:tools, metadata, _arguments}], caller),
-    do: compile_error!(caller, metadata[:line], "tools requires a do block")
-
-  defp tools_declaration!(_declarations, caller),
-    do: compile_error!(caller, caller.line, "An Agent can define at most one tools block")
-
-  defp reasoning_module!(target_ast, line, caller) do
-    target = Macro.expand(target_ast, caller)
-
-    with true <- is_atom(target) and target not in [nil, true, false],
-         {:module, ^target} <- Code.ensure_compiled(target),
-         {:ok, %{kind: :flow}} <- Jido.Instruction.resolve(target) do
-      target
-    else
-      _reason ->
-        compile_error!(caller, line, "reasoning must reference a compiled Jido Flow module")
-    end
-  end
-
-  defp action_module!(target_ast, line, caller) do
-    target = Macro.expand(target_ast, caller)
-
-    with true <- is_atom(target) and target not in [nil, true, false],
-         {:module, ^target} <- Code.ensure_compiled(target),
-         {:ok, %{kind: :action}} <- Jido.Instruction.resolve(target) do
-      target
-    else
-      _reason ->
-        compile_error!(
-          caller,
-          line,
-          "tool action must reference a compiled Jido Action module"
-        )
-    end
-  end
-
-  defp toolset_declaration(actions, line) do
-    quote line: line do
-      plugins do
-        plugin Jido.AI.Toolset, config: %{actions: unquote(Macro.escape(actions))}
-      end
-    end
-  end
-
-  defp module_reasoning(target, defaults, line, caller) do
-    signal_source = signal_source!(caller)
-
-    quote line: line do
-      routes do
-        signal_source unquote(signal_source)
-
-        route unquote(@request_type), unquote(target),
-          as: :request,
-          defaults: unquote(Macro.escape(defaults)) do
-          state(from: output(:state))
-          reply(unquote(@response_type), from: output(:response))
-        end
-      end
-    end
-  end
-
-  defp inline_reasoning(body, line, caller) do
-    signal_source = signal_source!(caller)
-
-    quote line: line do
-      routes do
-        signal_source unquote(signal_source)
-
-        route unquote(@request_type), as: :request do
-          flow name: "reasoning",
-               output_schema: Zoi.object(%{state: Zoi.map(), response: Zoi.map()}) do
-            unquote(body)
-          end
-
-          state(from: output(:state))
-          reply(unquote(@response_type), from: output(:response))
-        end
-      end
-    end
-  end
-
-  defp signal_source!(caller) do
-    case Module.get_attribute(caller.module, :jido_ai_signal_source) do
-      source when is_binary(source) -> source
-      _other -> compile_error!(caller, caller.line, "ai must be used with Jido.AI.Agent")
-    end
-  end
-
-  defp expressions({:__block__, _metadata, expressions}), do: expressions
-  defp expressions(nil), do: []
-  defp expressions(expression), do: [expression]
-
-  defp expression_line({_name, metadata, _arguments}, fallback) when is_list(metadata),
-    do: Keyword.get(metadata, :line, fallback)
-
-  defp expression_line(_expression, fallback), do: fallback
-
-  defp compile_error!(caller, line, description) do
-    raise CompileError,
-      file: caller.file,
-      line: line || caller.line,
-      description: description
   end
 end

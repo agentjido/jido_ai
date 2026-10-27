@@ -1,19 +1,123 @@
 defmodule Jido.AI.Agent.DSL do
   @moduledoc false
 
-  @spec parse!(Macro.t(), module(), Macro.Env.t()) :: map()
-  def parse!(body, target, %Macro.Env{} = caller) do
-    config = block!(body, "reasoning", caller)
+  @entity Module.concat([
+            Jido.AI.Agent.Extension,
+            Macro.camelize("__ai__"),
+            Macro.camelize("__reasoning__")
+          ])
+  @tools_section Module.concat([
+                   Jido.AI.Agent.Extension,
+                   Macro.camelize("__tools__")
+                 ])
 
-    case Jido.AI.Agent.Config.normalize(config, target) do
-      {:ok, normalized} ->
-        normalized
+  defmacro ai(do: block) do
+    caller = __CALLER__
+    declarations = expressions(block)
+    reasoning = Enum.filter(declarations, &match?({:reasoning, _, _}, &1))
+    tools = Enum.filter(declarations, &match?({:tools, _, _}, &1))
 
-      {:error, reason} ->
+    if Module.get_attribute(caller.module, :jido_ai_block_declared) do
+      compile_error!(caller, caller.line, "An Agent can define only one ai block")
+    end
+
+    if length(reasoning) != 1 do
+      compile_error!(caller, caller.line, "ai requires exactly one reasoning declaration")
+    end
+
+    if length(tools) > 1 do
+      compile_error!(caller, caller.line, "An Agent can define at most one tools block")
+    end
+
+    if length(reasoning) + length(tools) != length(declarations) do
+      compile_error!(caller, caller.line, "ai accepts only reasoning and tools declarations")
+    end
+
+    Module.put_attribute(caller.module, :jido_ai_block_declared, true)
+
+    quote do
+      __ai__(do: unquote(block))
+    end
+  end
+
+  defmacro tools(do: block) do
+    caller = __CALLER__
+
+    unless Enum.all?(expressions(block), &match?({:action, _, [_target]}, &1)) do
+      compile_error!(caller, caller.line, "tools accepts only action declarations")
+    end
+
+    quote do
+      require unquote(@tools_section)
+      unquote(@tools_section).__tools__(do: unquote(block))
+    end
+  end
+
+  defmacro reasoning(do: body), do: inline_reasoning(body, __CALLER__)
+
+  defmacro reasoning(target), do: referenced_reasoning(target, nil, __CALLER__)
+
+  defmacro reasoning(target, do: body), do: referenced_reasoning(target, body, __CALLER__)
+
+  defp referenced_reasoning(target_ast, body, caller) do
+    target =
+      executable!(
+        target_ast,
+        :flow,
+        "reasoning must reference a compiled Jido Flow module",
+        caller
+      )
+
+    defaults = if is_nil(body), do: %{}, else: parse_defaults!(body, target, caller)
+
+    quote line: caller.line do
+      require unquote(@entity)
+      unquote(@entity).__reasoning__(unquote(target), defaults: unquote(Macro.escape(defaults)))
+    end
+  end
+
+  defp inline_reasoning(body, caller) do
+    identity = quote do: [host: Jido.Agent, route: "jido.ai.request", role: :flow]
+
+    compiled =
+      Jido.Flow.Inline.compile!(
+        identity,
+        quote do
+          [
+            name: "reasoning",
+            output_schema: Zoi.object(%{state: Zoi.map(), response: Zoi.map()})
+          ]
+        end,
+        body,
+        caller
+      )
+
+    quote line: caller.line do
+      unquote(compiled.declaration_ast)
+      require unquote(@entity)
+      unquote(@entity).__reasoning__(unquote(compiled.target_ast), defaults: %{})
+    end
+  end
+
+  defp parse_defaults!(body, target, caller) do
+    defaults = block!(body, "reasoning", caller)
+
+    case Jido.Flow.normalize_defaults(defaults, target) do
+      {:ok, defaults} ->
+        if Map.has_key?(defaults, :input) do
+          compile_error!(caller, caller.line, "reasoning input cannot be a default")
+        else
+          defaults
+        end
+
+      {:error, error} ->
+        path = error.details |> Map.get(:path, []) |> Enum.map_join(".", &to_string/1)
+        suffix = if path == "", do: "", else: " at #{path}"
+
         compile_error!(
           caller,
           caller.line,
-          "reasoning configuration is invalid for #{inspect(target)}: #{format_reason(reason)}"
+          "reasoning configuration is invalid for #{inspect(target)}#{suffix}: #{Exception.message(error)}"
         )
     end
   end
@@ -52,51 +156,23 @@ defmodule Jido.AI.Agent.DSL do
   defp literal!(name, value_ast, line, caller) do
     if Macro.quoted_literal?(value_ast) do
       {value, []} = Code.eval_quoted(value_ast, [], caller)
-      portable!(value, name, line, caller)
+      value
     else
       compile_error!(caller, line, "#{name} requires a compile-time literal value")
     end
   end
 
-  defp portable!(value, _name, _line, _caller)
-       when is_nil(value) or is_boolean(value) or is_number(value) or is_binary(value),
-       do: value
+  defp executable!(target_ast, kind, message, caller) do
+    target = Macro.expand(target_ast, caller)
 
-  defp portable!([], _name, _line, _caller), do: []
-
-  defp portable!(value, name, line, caller) when is_list(value) do
-    if List.improper?(value) do
-      compile_error!(caller, line, "#{name} requires portable data")
-    end
-
-    if Keyword.keyword?(value) do
-      keys = Keyword.keys(value)
-
-      if Enum.uniq(keys) != keys do
-        compile_error!(caller, line, "#{name} contains duplicate keys")
-      end
-
-      Map.new(value, fn {key, item} -> {key, portable!(item, name, line, caller)} end)
+    with true <- is_atom(target) and target not in [nil, true, false],
+         {:module, ^target} <- Code.ensure_compiled(target),
+         {:ok, %{kind: ^kind}} <- Jido.Instruction.resolve(target) do
+      target
     else
-      Enum.map(value, &portable!(&1, name, line, caller))
+      _reason -> compile_error!(caller, caller.line, message)
     end
   end
-
-  defp portable!(value, name, line, caller) when is_map(value) and not is_struct(value) do
-    Map.new(value, fn
-      {key, item} when is_atom(key) or is_binary(key) ->
-        {key, portable!(item, name, line, caller)}
-
-      {_key, _item} ->
-        compile_error!(caller, line, "#{name} map keys must be atoms or strings")
-    end)
-  end
-
-  defp portable!(_value, name, line, caller),
-    do: compile_error!(caller, line, "#{name} requires portable data")
-
-  defp format_reason(reason) when is_exception(reason), do: Exception.message(reason)
-  defp format_reason(reason), do: inspect(reason, limit: 20, printable_limit: 500)
 
   defp expressions({:__block__, _metadata, expressions}), do: expressions
   defp expressions(nil), do: []

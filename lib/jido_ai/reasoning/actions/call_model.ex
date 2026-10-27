@@ -1,12 +1,12 @@
-defmodule Jido.AI.Reasoning.ReAct.Actions.CallModel do
+defmodule Jido.AI.Reasoning.Actions.CallModel do
   @moduledoc "Calls one model and returns success or failure as graph data."
 
   alias Jido.AI.{Telemetry, Toolset, Usage}
 
   use Jido.Action,
-    id: "jido.ai/reasoning/react/actions/call-model",
+    id: "jido.ai/reasoning/actions/call-model",
     vsn: 1,
-    name: "jido_ai_react_call_model",
+    name: "jido_ai_call_model",
     description: "Call or stream one text model",
     schema: Zoi.map(),
     output_schema: Zoi.map()
@@ -27,27 +27,35 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.CallModel do
      }}
   end
 
-  def run(%{turn: turn, messages: messages}, context) do
+  def run(%{turn: turn, messages: messages} = params, context) do
     model = Enum.at(turn.models, turn.model_index)
     started_at = System.system_time(:millisecond)
     stream_id = "stream_#{Jido.generate_id()}"
 
     result =
-      with {:ok, tools} <- Toolset.definitions(turn.tools) do
+      with {:ok, tools} <- model_tools(turn, Map.get(params, :tools, true)) do
         options =
           turn.options
           |> apply_prompt_cache_options(model, turn)
           |> put_conversation_telemetry(turn)
           |> Map.to_list()
-          |> Keyword.put(:tools, tools)
+          |> put_tools(tools)
 
-        Telemetry.with_agent_span(context, fn ->
+        model_call = fn ->
           if turn.stream do
             stream(model, messages, options, turn, stream_id, context)
           else
             generate(model, messages, options)
           end
-        end)
+        end
+
+        case Map.get(params, :reasoning) do
+          reasoning when is_map(reasoning) ->
+            Telemetry.with_reasoning(context, reasoning, model_call)
+
+          _other ->
+            Telemetry.with_agent_span(context, model_call)
+        end
       end
 
     completed_at = System.system_time(:millisecond)
@@ -58,6 +66,12 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.CallModel do
     context = ReqLLM.Context.new(Enum.map(messages, &to_req_llm_message/1))
     ReqLLM.generate_text(model, context, options)
   end
+
+  defp model_tools(turn, true), do: Toolset.definitions(turn.tools)
+  defp model_tools(_turn, false), do: {:ok, nil}
+
+  defp put_tools(options, nil), do: options
+  defp put_tools(options, tools), do: Keyword.put(options, :tools, tools)
 
   defp stream(model, messages, options, turn, stream_id, context) do
     request = correlation(turn, stream_id, 0, System.system_time(:millisecond))

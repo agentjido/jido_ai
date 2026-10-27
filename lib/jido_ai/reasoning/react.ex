@@ -7,13 +7,8 @@ defmodule Jido.AI.Reasoning.ReAct do
   review, and all recipe Actions are public modules under this namespace.
   """
 
-  alias Jido.AI.Reasoning.ReAct.Actions.{
-    DecideInput,
-    ExpandNext,
-    FinalizeTurn,
-    GuardInput,
-    StartRequest
-  }
+  alias Jido.AI.Reasoning.Actions.{FinalizeTurn, GuardInput, StartRequest}
+  alias Jido.AI.Reasoning.ReAct.Actions.{DecideInput, ExpandNext}
 
   @default_instructions "Answer concisely. Use the available tools when they help. You can request multiple tools in one response."
 

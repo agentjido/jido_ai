@@ -9,7 +9,7 @@ defmodule Jido.AI.Toolset do
   use Jido.Plugin,
     id: "jido.ai/toolset",
     vsn: 1,
-    option_keys: [agent: [:actions]]
+    option_keys: [agent: [:reasoning, :defaults, :tools]]
 
   @doc false
   @impl Jido.Agent.Extension
@@ -27,7 +27,7 @@ defmodule Jido.AI.Toolset do
   @doc false
   @impl Jido.Plugin
   def prepare(_preparation, options) do
-    actions = Keyword.get(options, :actions, [])
+    actions = Keyword.get(options, :tools, [])
     with :ok <- validate(actions), do: {:ok, actions}
   end
 
