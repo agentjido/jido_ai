@@ -126,9 +126,9 @@ defmodule JidoAi.MixProject do
   defp deps do
     [
       # Jido ecosystem
-      {:jido, path: "../jido", override: true},
-      {:jido_action, path: "../jido_action", override: true},
-      {:jido_signal, path: "../jido_signal", override: true},
+      {:jido, github: "agentjido/jido", branch: "release/v3", override: true},
+      {:jido_action, github: "agentjido/jido_action", branch: "release/v3", override: true},
+      {:jido_signal, github: "agentjido/jido_signal", branch: "release/v3", override: true},
       {:req_llm, "~> 1.29"},
 
       # Runtime
