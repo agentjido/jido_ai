@@ -230,6 +230,20 @@ agent.state.session.rev
 # => 8
 ```
 
+An execution host can own the Session instead. Pass a valid open Session in
+trusted caller context:
+
+```elixir
+Jido.AgentServer.call(server, signal,
+  context: %{jido_ai_session: selected_session}
+)
+```
+
+The reply includes the portable entries added by the request in
+`session_entries`. In this mode, Jido AI does not replace the Agent state
+Session. The execution host must serialize requests for the selected Session
+and persist the returned entries.
+
 The AI Agent declares `state.session` with
 `Jido.AI.Thread.Projection.schema/0`: a nullable Session, default `nil`,
 validated strictly with no coercion. Because `Jido.AgentServer` serializes

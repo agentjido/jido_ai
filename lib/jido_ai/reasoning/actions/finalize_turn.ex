@@ -43,7 +43,15 @@ defmodule Jido.AI.Reasoning.Actions.FinalizeTurn do
       |> Jido.Session.decode!()
       |> Projection.observe(:ai_request_outcome, summary, refs, completed_at)
 
-    state = Map.put(turn.agent_state, :session, session)
+    state =
+      if Map.get(turn, :session_owner, :agent) == :caller,
+        do: turn.agent_state,
+        else: Map.put(turn.agent_state, :session, session)
+
+    session_entries =
+      session.thread.entries
+      |> Enum.drop(Map.get(turn, :session_entry_count, 0))
+      |> Enum.map(&Jido.Thread.Entry.encode/1)
 
     response =
       Map.merge(summary, %{
@@ -52,6 +60,7 @@ defmodule Jido.AI.Reasoning.Actions.FinalizeTurn do
         session_id: session.id,
         thread_id: session.thread.id,
         thread_rev: session.thread.rev,
+        session_entries: session_entries,
         usage: turn.usage,
         budget: budget,
         model_attempts: turn.model_attempts,

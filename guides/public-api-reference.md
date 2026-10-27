@@ -189,6 +189,7 @@ which returns this map as the `jido.ai.response` data:
 | `flow` | `%{id: flow_id, vsn: integer}` |
 | `request_id`, `run_id` | Correlation IDs for this request |
 | `session_id`, `thread_id`, `thread_rev` | The committed Session and Thread revision |
+| `session_entries` | Portable Thread entries added by this request, including its terminal outcome |
 | `started_at_ms`, `completed_at_ms` | System time in milliseconds |
 | `model_calls`, `retries` | Model calls made and retries used |
 | `tool_rounds`, `tool_calls`, `tool_errors`, `tool_cycles` | Tool counters |
@@ -207,6 +208,12 @@ Each `tool_attempts` entry has `tool_call_id`, `tool_name`, `tool`, `input`,
 `output`, `content`, `error`, `status`, `metadata`, `result_metadata`,
 `review`, `tool_round`, `started_at_ms`, `completed_at_ms`, `duration_ms`,
 and `effects_count`. `input` and `output` use string keys.
+
+An execution host can supply a selected `Jido.Session` in trusted caller
+context under `:jido_ai_session`. The request uses that Session and returns its
+new entries in `session_entries`. It does not replace the Session in Agent
+state. This mode lets the execution host own several durable sessions without
+putting all of them in one Agent checkpoint.
 
 An inline `reasoning do ... end` Flow replies with whatever its `response`
 map holds.

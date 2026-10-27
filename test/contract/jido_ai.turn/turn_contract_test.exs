@@ -142,6 +142,8 @@ defmodule Jido.AI.Contract.TurnTest do
 
     assert Map.keys(turn) |> Enum.sort() == request_turn_keys()
     assert turn.agent_state == %{kept: :value}
+    assert turn.session_owner == :agent
+    assert turn.session_entry_count == 0
     assert turn.request_id == "request-contract"
     assert is_binary(turn.run_id)
     assert String.starts_with?(turn.run_id, "run_")
@@ -276,6 +278,10 @@ defmodule Jido.AI.Contract.TurnTest do
     assert response.session_id == state.session.id
     assert response.thread_id == state.session.thread.id
     assert response.thread_rev == state.session.thread.rev
+
+    assert Enum.map(response.session_entries, &Jido.Thread.Entry.decode/1)
+           |> Enum.all?(&match?({:ok, _entry}, &1))
+
     assert response.started_at_ms == started_at_ms
     assert response.completed_at_ms >= started_at_ms
     assert response.status == :completed
@@ -335,6 +341,58 @@ defmodule Jido.AI.Contract.TurnTest do
                cache_write_tokens: 0
              }
            }
+  end
+
+  @tag obligation: ["jido_ai.turn.I1", "jido_ai.turn.I2"]
+  test "a caller-selected session returns an entry delta without changing Agent state" do
+    agent_session = Session.new(id: "agent-session", now: 1)
+
+    selected_session =
+      Session.new(id: "selected-session", now: 2)
+      |> Session.append(Thread.Entry.new(kind: :note, payload: %{"kept" => true}, at: 3))
+
+    params = request_params()
+
+    assert {:ok, turn} =
+             StartRequest.run(params, %{
+               agent_state: %{session: agent_session, kept: :value},
+               jido_ai_session: Jido.Session.encode(selected_session),
+               signal: %{id: "selected-request"}
+             })
+
+    assert turn.session_owner == :caller
+    assert turn.session_entry_count == 1
+    assert turn.agent_state == %{session: agent_session, kept: :value}
+
+    started_session = Jido.Session.decode!(turn.session)
+    assert started_session.id == "selected-session"
+    assert Enum.map(started_session.thread.entries, & &1.kind) == [:note, :ai_message]
+
+    result = Result.completed("answer")
+
+    assert {:ok, %{state: state, response: response}} =
+             FinalizeTurn.run(%{outcome: %{turn: turn, result: result}}, %{})
+
+    assert state == %{session: agent_session, kept: :value}
+    assert response.session_id == "selected-session"
+
+    assert {:ok, user_entry} = response.session_entries |> Enum.at(0) |> Thread.Entry.decode()
+    assert {:ok, outcome_entry} = response.session_entries |> Enum.at(1) |> Thread.Entry.decode()
+    assert user_entry.kind == :ai_message
+    assert user_entry.payload["role"] == "user"
+    assert outcome_entry.kind == :ai_request_outcome
+    assert outcome_entry.payload["status"] == "completed"
+  end
+
+  @tag obligation: "jido_ai.turn.I1"
+  test "a caller-selected session must be valid and open" do
+    assert {:error, :invalid_session} =
+             StartRequest.run(request_params(), %{jido_ai_session: %{id: "invalid"}})
+
+    closed = Session.new(id: "closed", now: 1) |> Session.close()
+
+    assert {:error, :closed_session} =
+             StartRequest.run(request_params(), %{jido_ai_session: closed})
   end
 
   @tag obligation: "jido_ai.turn.I2"
@@ -973,6 +1031,8 @@ defmodule Jido.AI.Contract.TurnTest do
     [
       :agent_state,
       :session,
+      :session_owner,
+      :session_entry_count,
       :request_id,
       :run_id,
       :flow,
@@ -1027,6 +1087,7 @@ defmodule Jido.AI.Contract.TurnTest do
          :session_id,
          :thread_id,
          :thread_rev,
+         :session_entries,
          :model_attempts,
          :tool_attempts
        ])

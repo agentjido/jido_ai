@@ -2,8 +2,8 @@ defmodule Jido.Session do
   @moduledoc """
   A portable conversation session that owns one `Jido.Thread`.
 
-  A Session is an immutable value. The containing Jido Agent owns it, and
-  `Jido.AgentServer` owns its persistence and commit boundary.
+  A Session is an immutable value. An Agent can own it in state, or a trusted
+  caller can supply it for one AI request and own its persistence boundary.
   """
 
   alias Jido.Thread

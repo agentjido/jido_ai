@@ -16,12 +16,12 @@ defmodule Jido.AI.Reasoning.Actions.StartRequest do
     now = System.system_time(:millisecond)
     static_tools = Toolset.from_context(context)
     agent_state = Map.get(context, :agent_state, %{session: nil})
-    session = session(agent_state, context, now)
     request_id = request_id(context)
     run_id = "run_#{Jido.generate_id()}"
     refs = %{request_id: request_id, run_id: run_id}
 
-    with {:ok, dynamic_tools} <- ToolSource.load(context),
+    with {:ok, session, session_owner} <- session(agent_state, context, now),
+         {:ok, dynamic_tools} <- ToolSource.load(context),
          {:ok, selection} <-
            Toolset.select(static_tools ++ dynamic_tools, Map.get(params, :tool_policy, %{})),
          {:ok, session} <-
@@ -33,8 +33,10 @@ defmodule Jido.AI.Reasoning.Actions.StartRequest do
 
       {:ok,
        %{
-         agent_state: Map.delete(agent_state, :session),
+         agent_state: turn_agent_state(agent_state, session_owner),
          session: Jido.Session.encode(session),
+         session_owner: session_owner,
+         session_entry_count: session.thread.rev - 1,
          request_id: request_id,
          run_id: run_id,
          flow: Map.get(params, :flow),
@@ -84,12 +86,26 @@ defmodule Jido.AI.Reasoning.Actions.StartRequest do
     end
   end
 
-  defp session(%{session: %Jido.Session{} = session}, _context, _now), do: session
+  defp session(_agent_state, %{jido_ai_session: value}, _now) do
+    with {:ok, session} <- Jido.Session.decode(value),
+         true <- Jido.Session.open?(session) do
+      {:ok, session, :caller}
+    else
+      false -> {:error, :closed_session}
+      {:error, _reason} -> {:error, :invalid_session}
+    end
+  end
+
+  defp session(%{session: %Jido.Session{} = session}, _context, _now),
+    do: {:ok, session, :agent}
 
   defp session(_state, context, now) do
     agent_id = Map.get(context, :agent_id, Jido.generate_id())
-    Jido.Session.new(id: "session:#{agent_id}", now: now)
+    {:ok, Jido.Session.new(id: "session:#{agent_id}", now: now), :agent}
   end
+
+  defp turn_agent_state(agent_state, :agent), do: Map.delete(agent_state, :session)
+  defp turn_agent_state(agent_state, :caller), do: agent_state
 
   defp request_id(%{signal: %{id: id}}) when is_binary(id), do: id
   defp request_id(_context), do: "request_#{Jido.generate_id()}"
