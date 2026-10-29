@@ -23,7 +23,7 @@
   "hpax": {:hex, :hpax, "1.1.0", "782931867cc23217c68fb5f68fe1a11f5e7544c7fda82c8a7019a5df5a4a1cdf", [:mix], [], "hexpm", "0b8d0f05832f55571d65ac720f79bf8994138ffbb133209dc4685eae0ad456a8"},
   "idna": {:hex, :idna, "7.1.0", "1067a13043538129602d2f2ce6899d8713125c7d19734aa557ce2e3ea55bd4f1", [:rebar3], [], "hexpm", "6ae959a025bf36df61a8cab8508d9654891b5426a84c44d82deaffd6ddf8c71f"},
   "jason": {:hex, :jason, "1.4.5", "2e3a008590b0b8d7388c20293e9dcc9cf3e5d642fd2a114e4cbbb52e595d940a", [:mix], [{:decimal, "~> 1.0 or ~> 2.0 or ~> 3.0", [hex: :decimal, repo: "hexpm", optional: true]}], "hexpm", "b0c823996102bcd0239b3c2444eb00409b72f6a140c1950bc8b457d836b30684"},
-  "jido": {:git, "https://github.com/agentjido/jido.git", "dd6cc9475da554d3b2f14b9ce7fe847de0142dd3", [branch: "release/v3"]},
+  "jido": {:git, "https://github.com/agentjido/jido.git", "e783fe1b4d19e797819e9a0569b16866f83825a6", [branch: "release/v3"]},
   "jido_action": {:git, "https://github.com/agentjido/jido_action.git", "d2a981895fb986e9a2fe88f8c523326572643117", [branch: "release/v3"]},
   "jido_signal": {:git, "https://github.com/agentjido/jido_signal.git", "7b825f1d050a0e0159bb2a72ba79c100b5d362d3", [branch: "release/v3"]},
   "jsv": {:hex, :jsv, "0.26.1", "e82f85ae6b88207b3f9c7a717c5f72808d2e86214973e8f7759ba015e22b532a", [:mix], [{:abnf_parsec, "~> 2.0", [hex: :abnf_parsec, repo: "hexpm", optional: false]}, {:decimal, "~> 2.0 or ~> 3.0", [hex: :decimal, repo: "hexpm", optional: true]}, {:idna, "~> 6.0 or ~> 7.0", [hex: :idna, repo: "hexpm", optional: false]}, {:jason, "~> 1.0", [hex: :jason, repo: "hexpm", optional: true]}, {:texture, ">= 1.2.1", [hex: :texture, repo: "hexpm", optional: false]}], "hexpm", "039971fbdddc3d49e88fc8a2bb7ad51ac409f97ca1db4c95a56cc1afa3c1c3d4"},

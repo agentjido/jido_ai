@@ -58,20 +58,13 @@ defmodule Jido.AI.Agent do
   alias Jido.AI.Agent.Plugin
 
   @doc "Uses the Jido Agent runtime with the graph-first AI Plugin."
-  defmacro __using__(options) do
-    {options, _binding} = Code.eval_quoted(options, [], __CALLER__)
+  defmacro __using__(quoted_options) do
+    options =
+      quoted_options
+      |> Jido.Agent.Options.prepare!(__CALLER__)
+      |> Jido.Agent.Options.prepend_plugin(Plugin)
 
-    unless Keyword.keyword?(options) do
-      raise ArgumentError, "Jido.AI.Agent requires keyword options"
-    end
-
-    unless is_list(Keyword.get(options, :plugins, [])) do
-      raise ArgumentError, "Jido.AI.Agent plugins must be a list"
-    end
-
-    plugins = Enum.uniq([Plugin | Keyword.get(options, :plugins, [])])
-    options = Keyword.delete(options, :plugins) ++ [plugins: plugins]
-    signal_source = "/" <> Keyword.get(options, :id, Atom.to_string(__CALLER__.module))
+    signal_source = "/" <> Keyword.fetch!(options, :id)
 
     quote do
       use Jido.Agent, unquote(Macro.escape(options))

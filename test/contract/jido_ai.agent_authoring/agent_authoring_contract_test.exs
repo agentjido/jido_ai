@@ -4,6 +4,14 @@ defmodule Jido.AI.Contract.AgentAuthoringTest do
   alias Jido.AI.Reasoning.ReAct
   alias Jido.AITest.Tools.Add
 
+  defmodule DefaultIdentityAgent do
+    use Jido.AI.Agent, name: "jido_ai_default_identity"
+
+    ai do
+      reasoning Jido.AI.Reasoning.ReAct
+    end
+  end
+
   defmodule ContractAgent do
     use Jido.AI.Agent,
       name: "jido_ai_contract_authoring",
@@ -16,6 +24,14 @@ defmodule Jido.AI.Contract.AgentAuthoringTest do
         action Jido.AITest.Tools.Add
       end
     end
+  end
+
+  @tag obligation: "jido_ai.agent_authoring.I1"
+  test "the core Agent default ID also defines the AI signal source" do
+    id = Atom.to_string(DefaultIdentityAgent)
+
+    assert DefaultIdentityAgent.__jido_authoring__().id == id
+    assert DefaultIdentityAgent.definition().signal_source == "/" <> id
   end
 
   @tag obligation: ["jido_ai.agent_authoring.I1", "jido_ai.agent_authoring.I3"]
