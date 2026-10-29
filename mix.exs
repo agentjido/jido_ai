@@ -70,6 +70,7 @@ defmodule JidoAi.MixProject do
       version: @version,
       elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
+      test_ignore_filters: [&String.starts_with?(&1, "test/bench/")],
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases(),
@@ -103,6 +104,8 @@ defmodule JidoAi.MixProject do
         "test.authoring": :test,
         "test.contract": :test,
         "test.ci": :test,
+        "bench.react": :test,
+        "bench.react.memory": :test,
         examples: :test,
         coveralls: :test,
         "coveralls.detail": :test,
@@ -164,6 +167,8 @@ defmodule JidoAi.MixProject do
       "test.contract": "covenant.check",
       "test.ci": ["test --seed 0", "covenant.check"],
       "test.fast": "cmd env MIX_ENV=test mix test --exclude flaky --only stable_smoke",
+      "bench.react": &run_react_benchmark/1,
+      "bench.react.memory": &run_react_memory_benchmark/1,
       precommit: [
         "format --check-formatted",
         "compile --warnings-as-errors",
@@ -181,6 +186,12 @@ defmodule JidoAi.MixProject do
       docs: "docs --open"
     ]
   end
+
+  defp run_react_benchmark(args),
+    do: Mix.Task.run("run", ["test/bench/react_state_growth.exs" | args])
+
+  defp run_react_memory_benchmark(args),
+    do: Mix.Task.run("run", ["test/bench/react_memory.exs" | args])
 
   defp package do
     [
