@@ -30,7 +30,7 @@ definitions to the model.
 
 ```elixir
 defmodule MyApp.ChainAgent do
-  use Jido.AI.Agent, id: "my_app/chain_agent", vsn: 1, name: "chain_agent"
+  use Jido.AI.Agent, name: "chain_agent", id: "my_app/chain_agent", vsn: 1
 
   ai do
     reasoning Jido.AI.Reasoning.ChainOfThought
@@ -38,7 +38,7 @@ defmodule MyApp.ChainAgent do
 end
 
 defmodule MyApp.DraftAgent do
-  use Jido.AI.Agent, id: "my_app/draft_agent", vsn: 1, name: "draft_agent"
+  use Jido.AI.Agent, name: "draft_agent", id: "my_app/draft_agent", vsn: 1
 
   ai do
     reasoning Jido.AI.Reasoning.ChainOfDraft
@@ -46,7 +46,7 @@ defmodule MyApp.DraftAgent do
 end
 
 defmodule MyApp.AlgorithmAgent do
-  use Jido.AI.Agent, id: "my_app/algorithm_agent", vsn: 1, name: "algorithm_agent"
+  use Jido.AI.Agent, name: "algorithm_agent", id: "my_app/algorithm_agent", vsn: 1
 
   ai do
     reasoning Jido.AI.Reasoning.AlgorithmOfThoughts

@@ -1,6 +1,10 @@
 defmodule JidoAI.Examples.CoreComposition.Audit do
-  @moduledoc "A second stateless Agent extension."
-  use Jido.Agent.Extension, id: "examples.audit"
+  @moduledoc "A second stateless Agent Plugin."
+
+  use Jido.Plugin, id: "examples.audit"
+
+  @impl Jido.Plugin
+  def prepare(_preparation, _options), do: {:ok, :audited}
 end
 
 defmodule JidoAI.Examples.CoreComposition.Agent do
@@ -8,7 +12,7 @@ defmodule JidoAI.Examples.CoreComposition.Agent do
 
   use Jido.AI.Agent,
     name: "core_composition_example",
-    extensions: [JidoAI.Examples.CoreComposition.Audit]
+    plugins: [JidoAI.Examples.CoreComposition.Audit]
 
   state do
     schema Zoi.object(%{

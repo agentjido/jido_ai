@@ -30,17 +30,17 @@ resource-owner module placement and restart activation policy remain open.
 
 ## Scope and owner
 
-- Owner: Jido AI Agent extension, runtime Plugin, session Plugin integration, route targets, AI Directives, and typed AI Signal definitions.
+- Owner: Jido AI Agent Plugin, session Plugin integration, route targets, AI Directives, and typed AI Signal definitions.
 - In scope: Static lowering to core Agents and Flows, command preparation, trusted runtime binding, Plugin state ownership, candidate and Directive formation, internal routes, typed AI event data, and public Signal dispatch.
 - Out of scope: AgentServer internals, Agent commit, Flow execution internals, Signal envelopes, routing engines, buses, private server messages, and durable transport.
 
 ## V2 capability anchor
 
-V2 connected AI Strategies to Agents with generated routes, Strategy state, AI Directives, typed Signals, and worker processes. V3 keeps the Agent-facing AI experience and replaces those mechanics with `Jido.Agent.Extension`, core Turns, `Jido.Plugin`, core Directives, direct Flow route targets, and `Jido.Signal`.
+V2 connected AI Strategies to Agents with generated routes, Strategy state, AI Directives, typed Signals, and worker processes. V3 keeps the Agent-facing AI experience and replaces those mechanics with core Turns, `Jido.Plugin`, core Directives, direct Flow route targets, and `Jido.Signal`.
 
 | V2 capability | V3 target |
 | --- | --- |
-| `use Jido.AI.Agent` | Core `use Jido.Agent` plus `Jido.AI.DSL` extension or a compatibility wrapper |
+| `use Jido.AI.Agent` | Core `use Jido.Agent` plus `Jido.AI.Agent.Plugin` or a compatibility wrapper |
 | Strategy route | Route to a canonical AI Flow or session-admission Action |
 | Strategy state callback | Complete candidate Agent returned by a core Turn |
 | AI runtime worker | Optional session Plugin runtime root only for live session state |
@@ -49,11 +49,11 @@ V2 connected AI Strategies to Agents with generated routes, Strategy state, AI D
 
 ## Model
 
-Jido AI integrates at four core extension points.
+Jido AI integrates at four core Plugin points.
 
 ### Static authoring
 
-`Jido.AI.DSL` is a `Jido.Agent.Extension`. It accepts portable AI profile declarations and AI route targets. It lowers them before runtime to:
+`Jido.AI.Agent.Plugin` is a `Jido.Plugin`. It accepts portable AI profile declarations and AI route targets. It lowers them before runtime to:
 
 - Validated core Agent schema fields.
 - Canonical core routes.
@@ -91,9 +91,9 @@ Jido AI owns each type string and data schema. `jido_signal` owns the envelope, 
 
 ## Requirements
 
-### Agent extension and routes
+### Agent Plugin and routes
 
-`INT-REQ-001`: The AI Agent DSL shall implement the public `Jido.Agent.Extension` contract and shall lower static AI declarations to an ordinary neutral Agent definition.
+`INT-REQ-001`: The AI Agent DSL shall implement the public `Jido.Plugin` contract and shall lower static AI declarations to an ordinary neutral Agent definition.
 
 `INT-REQ-002`: Lowering shall perform no model call, tool call, process start, store access, or other runtime side effect.
 
@@ -105,7 +105,7 @@ Jido AI owns each type string and data schema. `jido_signal` owns the envelope, 
 
 `INT-REQ-006`: AI-generated routes shall use core route conflict validation and shall not override an explicit host route silently.
 
-`INT-REQ-007`: Route-target options shall be owned and validated by the AI extension and shall reject unknown options.
+`INT-REQ-007`: Route-target options shall be owned and validated by the AI Plugin and shall reject unknown options.
 
 ### Plugin contracts
 
@@ -162,7 +162,8 @@ Recommended authoring surface:
 ```elixir
 defmodule MyAgent do
   use Jido.Agent,
-    extensions: [Jido.AI.DSL]
+    name: "my_agent",
+    plugins: [Jido.AI.Agent.Plugin]
 
   agent do
     schema do
@@ -182,7 +183,7 @@ defmodule MyAgent do
 end
 ```
 
-This is a design-shape example. The final DSL syntax must follow the approved core Agent extension grammar.
+This is a design-shape example. The final DSL syntax must follow the approved core Agent Plugin grammar.
 
 Recommended Plugin ownership:
 

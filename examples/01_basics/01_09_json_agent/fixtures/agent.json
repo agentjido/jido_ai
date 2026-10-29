@@ -1,7 +1,7 @@
 {
   "definition": {
     "description": "Answer one request with guardrails and multiple tools",
-    "extensions": [
+    "plugins": [
       {
         "data": {
           "config": {},

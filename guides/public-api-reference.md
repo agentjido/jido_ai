@@ -11,9 +11,9 @@ Module documentation holds the full detail for each function.
 ```elixir
 defmodule MyApp.SupportAgent do
   use Jido.AI.Agent,
+    name: "support_agent",
     id: "my_app/support_agent",
-    vsn: 1,
-    name: "support_agent"
+    vsn: 1
 
   ai do
     reasoning Jido.AI.Reasoning.ReAct do
@@ -43,7 +43,7 @@ end
 | `reasoning do ... end` | Defines the root Flow inline with Flow `step` and `output` declarations. Its output must match `%{state: map(), response: map()}`. |
 | `tools do action Module; flow Module end` | The ordered static tool allowlist. Each target must be a Jido Action or Flow with a unique name. |
 
-`Jido.AI.Agent` also accepts the extension data directly when you build an
+`Jido.AI.Agent` also accepts the Plugin data directly when you build an
 Agent from a JSON document. The document stores `reasoning`, `config`, and
 `tools`, and its Flow and Action references must be registered. See
 [Agent Authoring](agent-authoring.md).

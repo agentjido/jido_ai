@@ -39,9 +39,9 @@ defmodule JidoAI.Examples.SchemaOverrides.Agent do
   @moduledoc "An Agent with schema-validated reasoning defaults."
 
   use Jido.AI.Agent,
+    name: "schema_overrides_agent",
     id: "jido.ai/examples/agents/schema-overrides",
-    vsn: 1,
-    name: "schema_overrides_agent"
+    vsn: 1
 
   ai do
     reasoning JidoAI.Examples.SchemaOverrides.Reasoning do

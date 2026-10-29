@@ -261,7 +261,7 @@ defmodule MyApp.IssueRefund do
 end
 
 defmodule MyApp.SupportAgent do
-  use Jido.AI.Agent, id: "my_app/support_agent", vsn: 1, name: "support_agent"
+  use Jido.AI.Agent, name: "support_agent", id: "my_app/support_agent", vsn: 1
 
   ai do
     reasoning Jido.AI.Reasoning.ReAct do

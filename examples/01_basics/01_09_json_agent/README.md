@@ -4,8 +4,8 @@ This example defines and loads its own SimpleAgent through `Jido.Authoring`.
 It then runs the imported Agent definition with a live model.
 
 The `ai do` block lowers `reasoning Jido.AI.Reasoning.ReAct` to a normal Jido
-Agent extension. `Jido.Agent.Codec` stores it as a versioned
-`jido.agent.definition` document. The AI extension stores the reasoning Flow,
+Agent Plugin. `Jido.Agent.Codec` stores it as a versioned
+`jido.agent.definition` document. The AI Plugin stores the reasoning Flow,
 its input defaults, and the ordered Action references from the `tools do`
 block. On import, the extension restores the direct request route.
 

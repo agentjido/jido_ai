@@ -23,10 +23,10 @@ defmodule JidoAI.Bench.ReAct.Agent do
   @moduledoc false
 
   use Jido.AI.Agent,
-    id: "jido.ai/bench/agents/react-state-growth",
-    vsn: 1,
     name: "jido_ai_react_state_growth_bench",
-    description: "Measure ReAct fact growth over many small tool rounds"
+    description: "Measure ReAct fact growth over many small tool rounds",
+    id: "jido.ai/bench/agents/react-state-growth",
+    vsn: 1
 
   ai do
     reasoning(JidoAI.Bench.ReAct.ExtendedReAct)

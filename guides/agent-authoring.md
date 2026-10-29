@@ -10,12 +10,12 @@ the examples reuse its `MyApp.SupportAgent`, `MyApp.LookupOrder`, and
 ## What A Definition Holds
 
 `use Jido.AI.Agent` produces a normal `Jido.Agent` definition. The `ai` block
-lowers to one extension entry, and that entry derives one route:
+lowers to one Plugin entry, and that entry derives one route:
 
 | Part | Value |
 | --- | --- |
 | State schema | `session` (a `Jido.Session` or `nil`), plus Plugin-owned fields |
-| Extension `jido.ai/agent` | `%{reasoning: flow_module, defaults: map, tools: [action_module]}` |
+| Plugin `jido.ai/agent` | `%{reasoning: flow_module, defaults: map, tools: [action_module]}` |
 | Derived route | `jido.ai.request` → the reasoning Flow → reply `jido.ai.response` |
 
 The route runs the Flow directly. The Flow's output must be
@@ -61,7 +61,7 @@ defmodule MyApp.Reasoning.AfterHours do
 end
 
 defmodule MyApp.AfterHoursAgent do
-  use Jido.AI.Agent, id: "my_app/after_hours_agent", vsn: 1, name: "after_hours_agent"
+  use Jido.AI.Agent, name: "after_hours_agent", id: "my_app/after_hours_agent", vsn: 1
 
   ai do
     reasoning MyApp.Reasoning.AfterHours do
@@ -88,7 +88,7 @@ An inline Flow lives in the Agent module:
 
 ```elixir
 defmodule MyApp.EchoAgent do
-  use Jido.AI.Agent, id: "my_app/echo_agent", vsn: 1, name: "echo_agent"
+  use Jido.AI.Agent, name: "echo_agent", id: "my_app/echo_agent", vsn: 1
 
   ai do
     reasoning do
@@ -175,7 +175,7 @@ An AI Agent's Registry needs one entry per module the definition references:
 entries = %{
   {"my_app/support_agent", 1} => {:agent, MyApp.SupportAgent},
   {"my_app/support_agent_state", 1} => {:schema, MyApp.SupportAgent.definition().schema},
-  {"jido.ai/agent", 1} => {:extension, Jido.AI.Agent.Extension},
+  {"jido.ai/agent", 1} => {:plugin, Jido.AI.Agent.Plugin},
   {"jido.ai/reasoning/react", 1} => {:flow, Jido.AI.Reasoning.ReAct},
   {"my_app/actions/lookup_order", 1} => {:action, MyApp.LookupOrder},
   {"my_app/actions/issue_refund", 1} => {:action, MyApp.IssueRefund}
@@ -190,11 +190,11 @@ opts = [registry: registry, codec: Jido.Agent.Codec]
 | --- | --- |
 | `:agent` | The Agent module. |
 | `:schema` | The composed state schema, read from `definition().schema`. |
-| `:extension` `"jido.ai/agent"` v1 | The AI extension that stores the `ai` block. |
+| `:plugin` `"jido.ai/agent"` v1 | The AI Plugin that stores the `ai` block. |
 | `:flow` | The reasoning Flow. Built-in Flows have stable ids such as `"jido.ai/reasoning/react"`. |
 | `:action` | Every tool. |
 
-The AI data sits in the definition's `extensions` list:
+The AI data sits in the definition's `plugins` list:
 
 ```json
 {
@@ -223,7 +223,7 @@ The AI data sits in the definition's `extensions` list:
 ```
 
 `config` holds the `reasoning` defaults, encoded through the Flow's input
-schema. The definition's `routes` list is empty: the extension derives the
+schema. The definition's `routes` list is empty: the Plugin derives the
 `jido.ai.request` route again on import.
 
 Decode with the same Registry, then instantiate the definition through
@@ -251,14 +251,14 @@ smaller = Jido.Authoring.Registry.new!(Map.delete(entries, {"my_app/actions/issu
 {:error, [issue]} = Jido.Authoring.decode_json(json, registry: smaller, codec: Jido.Agent.Codec)
 
 {issue.code, issue.path}
-# => {:reference, ["definition", "extensions", 0, "data", "tools", 1, "id"]}
+# => {:reference, ["definition", "plugins", 0, "data", "tools", 1, "id"]}
 ```
 
 Encoding with a missing entry fails too, with
 `authoring Registry has no reference for the required value`. Import also
 re-validates `config` against the Flow schema: a stored `"model_calls": 99`
 returns an `:invalid_value` issue at
-`["definition", "extensions", 0, "data", "config", "limits", "model_calls"]`.
+`["definition", "plugins", 0, "data", "config", "limits", "model_calls"]`.
 
 Use referenced Flows for stored definitions. An inline Flow's module name is
 generated, so it has no stable Registry key to review.
@@ -272,7 +272,7 @@ Jido composes as usual:
 
 | You want | Use |
 | --- | --- |
-| Static data on the definition | An Extension, through `extensions:` |
+| Static data on the definition | A Plugin declaration through `plugins:` |
 | A state field next to `session` | A Plugin with `state_spec/1` |
 | Behavior around every Signal | A Plugin with `prepare/2`, `admit/3`, or `reduce/2` |
 | A live process per Agent | A Plugin runtime |
@@ -298,19 +298,18 @@ defmodule MyApp.RequestLedger do
 end
 
 defmodule MyApp.Audit do
-  use Jido.Agent.Extension, id: "my_app/audit"
+  use Jido.Plugin, id: "my_app/audit"
+
+  @impl Jido.Plugin
+  def prepare(_preparation, _options), do: {:ok, :audited}
 end
 
 defmodule MyApp.DeskAgent do
   use Jido.AI.Agent,
+    name: "desk_agent",
     id: "my_app/desk_agent",
     vsn: 1,
-    name: "desk_agent",
-    extensions: [MyApp.Audit]
-
-  plugins do
-    plugin MyApp.RequestLedger
-  end
+    plugins: [MyApp.Audit, MyApp.RequestLedger]
 
   ai do
     reasoning Jido.AI.Reasoning.ReAct
@@ -346,7 +345,7 @@ rest unchanged, so the Plugin's `reduce/2` owns `ledger`. A custom Flow must
 do the same: return every state field it received. The Agent validates the
 complete state after each request.
 
-For the Extension and Plugin contracts, see
-[Extensions or Plugins](https://hexdocs.pm/jido/extensions-and-plugins.html).
+For the Plugin contract, see
+[Agent Plugins](https://hexdocs.pm/jido/agent-plugins.html).
 To run the composed Agent as a process, see
 [Pure or Live Execution](pure-or-live-execution.md).

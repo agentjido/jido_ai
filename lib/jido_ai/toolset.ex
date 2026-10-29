@@ -7,39 +7,14 @@ defmodule Jido.AI.Toolset do
   tools before request policy narrows that allowlist.
   """
 
-  use Jido.Plugin,
-    id: "jido.ai/toolset",
-    vsn: 1,
-    option_keys: [agent: [:reasoning, :defaults, :tools]]
-
   alias Jido.AI.ToolSource
 
   @type runtime_tool :: module() | ToolSource.tool()
 
-  @doc false
-  @impl Jido.Agent.Extension
-  def normalize(%{actions: actions}) do
-    with :ok <- validate(actions), do: {:ok, %{actions: actions}}
-  end
-
-  def normalize(%{"actions" => actions}), do: normalize(%{actions: actions})
-  def normalize(_data), do: {:error, :invalid_toolset}
-
-  @doc false
-  @impl Jido.Agent.Extension
-  def verify(%{actions: actions}, _definition), do: validate(actions)
-
-  @doc false
-  @impl Jido.Plugin
-  def prepare(_preparation, options) do
-    actions = Keyword.get(options, :tools, [])
-    with :ok <- validate(actions), do: {:ok, actions}
-  end
-
   @doc "Returns the static tools from the protected Agent plugin input."
   @spec from_context(map()) :: [module()]
   def from_context(context) when is_map(context) do
-    case get_in(context, [:plugin_inputs, __MODULE__]) do
+    case get_in(context, [:plugin_inputs, Jido.AI.Agent.Plugin]) do
       %Jido.Plugin.Input{prepared: actions} when is_list(actions) -> actions
       _other -> []
     end

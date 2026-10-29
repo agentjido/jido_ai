@@ -71,9 +71,9 @@ end
 ```elixir
 defmodule MyApp.SupportAgent do
   use Jido.AI.Agent,
+    name: "support_agent",
     id: "my_app/support_agent",
-    vsn: 1,
-    name: "support_agent"
+    vsn: 1
 
   ai do
     reasoning Jido.AI.Reasoning.ReAct do
@@ -241,7 +241,7 @@ Try one:
 ```elixir
 source = """
 defmodule MyApp.TwoToolBlocks do
-  use Jido.AI.Agent, id: "my_app/two_tool_blocks", vsn: 1, name: "two_tool_blocks"
+  use Jido.AI.Agent, name: "two_tool_blocks", id: "my_app/two_tool_blocks", vsn: 1
 
   ai do
     reasoning Jido.AI.Reasoning.ReAct

@@ -183,7 +183,7 @@ When the steps are yours, write the Flow. An inline Flow lives in the Agent:
 
 ```elixir
 defmodule MyApp.FaqAgent do
-  use Jido.AI.Agent, id: "my_app/faq_agent", vsn: 1, name: "faq_agent"
+  use Jido.AI.Agent, name: "faq_agent", id: "my_app/faq_agent", vsn: 1
 
   ai do
     reasoning do

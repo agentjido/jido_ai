@@ -6,10 +6,10 @@ defmodule JidoAI.Examples.JSONSimpleAgent do
   @moduledoc false
 
   use Jido.AI.Agent,
-    id: "jido.ai/agents/simple",
-    vsn: 3,
     name: "jido_ai_simple_agent",
-    description: "Answer one request with guardrails and multiple tools"
+    description: "Answer one request with guardrails and multiple tools",
+    id: "jido.ai/agents/simple",
+    vsn: 3
 
   ai do
     reasoning Jido.AI.Reasoning.ReAct
@@ -25,8 +25,8 @@ defmodule JidoAI.Examples.JSONAgent do
   @moduledoc """
   Stores and loads the graph-first SimpleAgent with `Jido.Authoring`.
 
-  The AI DSL lowers through the AI Agent extension. The normal Agent codec
-  stores the extension data and trusted executable references.
+  The AI DSL lowers through the AI Agent Plugin. The normal Agent codec
+  stores the Plugin data and trusted executable references.
   """
 
   alias Jido.AI.Reasoning.ReAct
@@ -43,7 +43,7 @@ defmodule JidoAI.Examples.JSONAgent do
   def registry do
     Registry.new!(%{
       {"jido.ai/agents/simple", 3} => {:agent, SimpleAgent},
-      {"jido.ai/agent", 1} => {:extension, Jido.AI.Agent.Extension},
+      {"jido.ai/agent", 1} => {:plugin, Jido.AI.Agent.Plugin},
       {"jido.ai/reasoning/react", 1} => {:flow, ReAct},
       {"jido.ai/examples/tools/add", 1} => {:action, JidoAI.Examples.Tools.Add},
       {"jido.ai/examples/tools/multiply", 1} => {:action, JidoAI.Examples.Tools.Multiply},

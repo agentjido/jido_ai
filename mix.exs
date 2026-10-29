@@ -132,6 +132,7 @@ defmodule JidoAi.MixProject do
       {:jido, github: "agentjido/jido", branch: "release/v3", override: true},
       {:jido_action, github: "agentjido/jido_action", branch: "release/v3", override: true},
       {:jido_signal, github: "agentjido/jido_signal", branch: "release/v3", override: true},
+      {:runic, "~> 0.1.0-alpha.12", override: true},
       {:req_llm, "~> 1.29"},
 
       # Runtime
@@ -233,6 +234,7 @@ defmodule JidoAi.MixProject do
         Core: [
           Jido.AI,
           Jido.AI.Agent,
+          Jido.AI.Agent.Plugin,
           Jido.AI.Reasoning
         ],
         "Context and Conversation": [

@@ -28,7 +28,7 @@ Mix.install([{:jido_ai, "~> 3.0.0-beta.1"}, {:plug, "~> 1.0"}])
 
 ```elixir
 defmodule MyApp.TreeAgent do
-  use Jido.AI.Agent, id: "my_app/tree_agent", vsn: 1, name: "tree_agent"
+  use Jido.AI.Agent, name: "tree_agent", id: "my_app/tree_agent", vsn: 1
 
   ai do
     reasoning Jido.AI.Reasoning.TreeOfThoughts
@@ -36,7 +36,7 @@ defmodule MyApp.TreeAgent do
 end
 
 defmodule MyApp.GraphAgent do
-  use Jido.AI.Agent, id: "my_app/graph_agent", vsn: 1, name: "graph_agent"
+  use Jido.AI.Agent, name: "graph_agent", id: "my_app/graph_agent", vsn: 1
 
   ai do
     reasoning Jido.AI.Reasoning.GraphOfThoughts
@@ -44,7 +44,7 @@ defmodule MyApp.GraphAgent do
 end
 
 defmodule MyApp.RevisionAgent do
-  use Jido.AI.Agent, id: "my_app/revision_agent", vsn: 1, name: "revision_agent"
+  use Jido.AI.Agent, name: "revision_agent", id: "my_app/revision_agent", vsn: 1
 
   ai do
     reasoning Jido.AI.Reasoning.TRM

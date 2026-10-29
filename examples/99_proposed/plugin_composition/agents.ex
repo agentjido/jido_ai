@@ -3,7 +3,7 @@ defmodule JidoAI.Examples.PluginComposition.ExplicitAgent do
 
   use Jido.Agent,
     name: "explicit_ai_plugin_example",
-    extensions: [Jido.AI.Plugin]
+    plugins: [Jido.AI.Agent.Plugin]
 
   ai do
     model :fast

@@ -1,7 +1,7 @@
 defmodule Jido.AITest.InlineAgent do
   use Jido.AI.Agent,
-    id: "jido.ai/tests/inline",
-    name: "jido_ai_inline_test_agent"
+    name: "jido_ai_inline_test_agent",
+    id: "jido.ai/tests/inline"
 
   ai do
     reasoning do
@@ -116,14 +116,14 @@ defmodule Jido.AITest do
     assert [
              %{
                id: "jido.ai/agent",
-               provider: Jido.AI.Agent.Extension,
+               provider: Jido.AI.Agent.Plugin,
                data: %{
                  reasoning: ReAct,
                  defaults: %{},
                  tools: [Tools.Add, Tools.Multiply]
                }
              }
-           ] = SimpleAgent.definition().extensions
+           ] = SimpleAgent.definition().plugins
 
     assert %Jido.Flow{
              components: %{
@@ -361,9 +361,9 @@ defmodule Jido.AITest do
     source = """
     defmodule #{inspect(name)} do
       use Jido.AI.Agent,
+        name: "schema_agent",
         id: #{inspect(id)},
-        vsn: 1,
-        name: "schema_agent"
+        vsn: 1
 
       ai do
         reasoning Jido.AITest.SchemaDrivenReasoning do
@@ -393,7 +393,7 @@ defmodule Jido.AITest do
     registry =
       Jido.Authoring.Registry.new!(%{
         {id, 1} => {:agent, name},
-        {"jido.ai/agent", 1} => {:extension, Jido.AI.Agent.Extension},
+        {"jido.ai/agent", 1} => {:plugin, Jido.AI.Agent.Plugin},
         {"jido.ai/tests/schema-driven-reasoning", 1} => {:flow, Jido.AITest.SchemaDrivenReasoning},
         {"jido.ai/tests/schema-agent-state-#{suffix}", 1} => {:schema, name.definition().schema}
       })
@@ -405,12 +405,12 @@ defmodule Jido.AITest do
              )
 
     document = Jason.decode!(json)
-    [extension] = document["definition"]["extensions"]
-    assert extension["provider"] == %{"id" => "jido.ai/agent", "vsn" => 1}
+    [plugin] = document["definition"]["plugins"]
+    assert plugin["provider"] == %{"id" => "jido.ai/agent", "vsn" => 1}
 
     assert {:ok, %{confidence_threshold: 0.85, verification: %{rounds: 2}}} =
              Jido.Flow.decode_defaults(
-               extension["data"]["config"],
+               plugin["data"]["config"],
                Jido.AITest.SchemaDrivenReasoning
              )
 
@@ -602,7 +602,7 @@ defmodule Jido.AITest do
              "type" => "jido.agent.definition",
              "definition" => %{
                "routes" => [],
-               "extensions" => [
+               "plugins" => [
                  %{
                    "provider" => %{"id" => "jido.ai/agent", "vsn" => 1},
                    "data" => %{
@@ -654,9 +654,9 @@ defmodule Jido.AITest do
             %{
               "reasoning" => %{"id" => "jido.ai/reasoning/react", "vsn" => 1},
               "tools" => [%{"id" => "jido.ai/examples/tools/add-flow", "vsn" => 1}]
-            } = encoded} = Jido.AI.Agent.Extension.encode_authoring_data(data, registry)
+            } = encoded} = Jido.AI.Agent.Plugin.encode_authoring_data(data, registry)
 
-    assert Jido.AI.Agent.Extension.decode_authoring_data(encoded, registry) == {:ok, data}
+    assert Jido.AI.Agent.Plugin.decode_authoring_data(encoded, registry) == {:ok, data}
   end
 
   test "configured reasoning defaults round-trip through Jido Authoring" do
@@ -668,7 +668,7 @@ defmodule Jido.AITest do
                codec: Jido.Agent.Codec
              )
 
-    [extension] = Jason.decode!(json)["definition"]["extensions"]
+    [plugin] = Jason.decode!(json)["definition"]["plugins"]
 
     assert {:ok,
             %{
@@ -678,7 +678,7 @@ defmodule Jido.AITest do
               limits: %{model_calls: 6, tool_rounds: 3, tool_calls: 6, retries: 1},
               context: %{max_messages: 32, max_bytes: 100_000},
               prompt_cache: %{enabled: true, ttl: "5m"}
-            }} = Jido.Flow.decode_defaults(extension["data"]["config"], ReAct)
+            }} = Jido.Flow.decode_defaults(plugin["data"]["config"], ReAct)
 
     assert {:ok, definition} =
              Jido.Authoring.decode_json(json,
@@ -698,7 +698,7 @@ defmodule Jido.AITest do
       |> File.read!()
       |> Jason.decode!()
       |> put_in(
-        ["definition", "extensions", Access.at(0), "data", "reasoning", "id"],
+        ["definition", "plugins", Access.at(0), "data", "reasoning", "id"],
         "unknown/reasoning"
       )
       |> Jason.encode!()
@@ -710,7 +710,7 @@ defmodule Jido.AITest do
              )
 
     assert issue.code == :reference
-    assert issue.path == ["definition", "extensions", 0, "data", "reasoning", "id"]
+    assert issue.path == ["definition", "plugins", 0, "data", "reasoning", "id"]
   end
 
   test "AI Agent authoring rejects an untrusted tool Action" do
@@ -722,7 +722,7 @@ defmodule Jido.AITest do
       |> File.read!()
       |> Jason.decode!()
       |> put_in(
-        ["definition", "extensions", Access.at(0), "data", "tools", Access.at(0), "id"],
+        ["definition", "plugins", Access.at(0), "data", "tools", Access.at(0), "id"],
         "unknown/tool"
       )
       |> Jason.encode!()
@@ -734,7 +734,7 @@ defmodule Jido.AITest do
              )
 
     assert issue.code == :reference
-    assert issue.path == ["definition", "extensions", 0, "data", "tools", 0, "id"]
+    assert issue.path == ["definition", "plugins", 0, "data", "tools", 0, "id"]
   end
 
   test "Invoke decisions contain portable intent and allow repair metadata" do
@@ -986,7 +986,7 @@ defmodule Jido.AITest do
   defp simple_agent_registry do
     Jido.Authoring.Registry.new!(%{
       {"jido.ai/agents/simple", 3} => {:agent, SimpleAgent},
-      {"jido.ai/agent", 1} => {:extension, Jido.AI.Agent.Extension},
+      {"jido.ai/agent", 1} => {:plugin, Jido.AI.Agent.Plugin},
       {"jido.ai/reasoning/react", 1} => {:flow, ReAct},
       {"jido.ai/examples/tools/add", 1} => {:action, Tools.Add},
       {"jido.ai/examples/tools/multiply", 1} => {:action, Tools.Multiply},
@@ -997,7 +997,7 @@ defmodule Jido.AITest do
   defp configured_agent_registry do
     Jido.Authoring.Registry.new!(%{
       {"jido.ai/agents/configured", 1} => {:agent, ConfiguredAgent},
-      {"jido.ai/agent", 1} => {:extension, Jido.AI.Agent.Extension},
+      {"jido.ai/agent", 1} => {:plugin, Jido.AI.Agent.Plugin},
       {"jido.ai/reasoning/react", 1} => {:flow, ReAct},
       {"jido.ai/examples/tools/add", 1} => {:action, Tools.Add},
       {"jido.ai/examples/tools/multiply", 1} => {:action, Tools.Multiply},

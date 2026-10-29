@@ -7,7 +7,7 @@ planned Agent composition lesson.
 
 ## What you will learn
 
-- Use `Jido.Agent` with `extensions: [Jido.AI.Plugin]`.
+- Use `Jido.Agent` with `plugins: [Jido.AI.Agent.Plugin]`.
 - Use the same top-level `ai` block as `Jido.AI.Agent`.
 - Treat `Jido.AI.Agent` as a small convenience wrapper, not a second Agent
   type.

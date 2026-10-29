@@ -91,9 +91,9 @@ reply, and your own parse of the result.
 ```elixir
 defmodule MyApp.TriageAgent do
   use Jido.AI.Agent,
+    name: "triage_agent",
     id: "my_app/triage_agent",
-    vsn: 1,
-    name: "triage_agent"
+    vsn: 1
 
   ai do
     reasoning Jido.AI.Reasoning.ReAct do

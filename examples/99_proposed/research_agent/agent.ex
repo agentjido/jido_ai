@@ -214,9 +214,9 @@ defmodule JidoAI.Examples.Proposed.ResearchAgent.Agent do
   }
 
   use Jido.AI.Agent,
-    id: "examples/proposed/research_agent",
     name: "proposed_research_agent",
     description: "Show the current core Jido and Jido AI Agent DSL",
+    id: "examples/proposed/research_agent",
     vsn: 1,
     metadata: %{
       category: "proposed",

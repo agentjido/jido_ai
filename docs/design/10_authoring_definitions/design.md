@@ -33,7 +33,7 @@ V2 provided `use Jido.AI.Agent`, agent options, reasoning-specific convenience a
 | Reasoning selector | Registered method ID and validated options |
 | Tool modules | Tool catalog entries and tool sources |
 | Structured output | Seam 01 Output contract and declared Agent result field |
-| Signal routes | Core Agent routes with an AI extension target |
+| Signal routes | Core Agent routes with an AI Plugin target |
 | Generated `ask` functions | Thin calls to seam 07 request APIs |
 | Serialized agent options | Versioned profile or complete Agent codec with trusted registries |
 
@@ -64,12 +64,12 @@ The canonical authoring value is `Jido.AI.Profile`:
 
 The three primary authoring forms are:
 
-1. **Core Agent DSL with AI extension:** The primary compile-time developer form.
+1. **Core Agent DSL with AI Plugin:** The primary compile-time developer form.
 2. **Direct data:** `Jido.AI.Profile.new/2` plus `Jido.AI.Authoring.lower/2` for programmatic construction.
 3. **Codec document:** Versioned tagged data decoded through trusted registries.
 
 `use Jido.AI.Agent` is the canonical convenience form. It uses `Jido.Agent` with
-the `Jido.AI.DSL` Spark extension. It has no separate schema or runtime.
+the `Jido.AI.Agent.Plugin` Spark-backed Plugin. It has no separate schema or runtime.
 
 Profiles do not contain request transport or retention configuration. Streaming
 is a per-call choice. `controls` owns steering, inactivity limits, and tool
@@ -120,7 +120,7 @@ reject unsupported top-level AI options.
 
 ### DSL and inline authoring
 
-`AUT-REQ-011`: The AI DSL shall extend the core `agent do` block through the public `Jido.Agent.Extension` contract.
+`AUT-REQ-011`: The AI DSL shall extend the core Agent DSL through the public `Jido.Plugin` contract.
 
 `AUT-REQ-012`: An `ai` declaration shall define one Profile and shall make its ID available to core route targets.
 
@@ -174,7 +174,7 @@ Recommended module authoring form:
 defmodule SupportAgent do
   use Jido.Agent,
     name: "support_agent",
-    extensions: [Jido.AI.DSL]
+    plugins: [Jido.AI.Agent.Plugin]
 
   agent do
     schema do

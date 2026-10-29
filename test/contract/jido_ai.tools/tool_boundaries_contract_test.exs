@@ -157,18 +157,13 @@ defmodule Jido.AI.Contract.ToolBoundariesTest do
   end
 
   @tag obligation: ["jido_ai.tools.I1", "jido_ai.tools.I3", "jido_ai.tools.I4"]
-  test "Toolset plugin, policy, definitions, and call resolution share one boundary" do
-    assert {:ok, %{actions: [Tools.Add]}} = Toolset.normalize(%{actions: [Tools.Add]})
-    assert {:ok, %{actions: [Tools.Add]}} = Toolset.normalize(%{"actions" => [Tools.Add]})
-    assert {:error, :invalid_toolset} = Toolset.normalize(%{})
-    assert :ok = Toolset.verify(%{actions: [Tools.Add]}, %{})
-    assert {:ok, [Tools.Add]} = Toolset.prepare(%{}, tools: [Tools.Add])
+  test "Toolset policy, definitions, and call resolution share one boundary" do
     assert {:error, :invalid_toolset} = Toolset.validate(:invalid)
     assert {:error, {:invalid_tool, :invalid}} = Toolset.validate([:invalid])
     assert Toolset.execution_boundary(%{}) == {:error, :tool_must_run_in_agent_graph}
 
     input = %Jido.Plugin.Input{prepared: [Tools.Add], runtime: nil}
-    assert Toolset.from_context(%{plugin_inputs: %{Toolset => input}}) == [Tools.Add]
+    assert Toolset.from_context(%{plugin_inputs: %{Jido.AI.Agent.Plugin => input}}) == [Tools.Add]
     assert Toolset.from_context(%{}) == []
     assert Toolset.names([Tools.Add, Tools.Multiply]) == ["add", "multiply"]
 

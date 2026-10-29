@@ -34,10 +34,10 @@ defmodule Jido.AI.OpenTelemetryTest do
 
   defmodule TracedAgent do
     use Jido.AI.Agent,
-      id: "jido.ai/test/traced-agent",
-      vsn: 7,
       name: "traced_agent",
-      description: "Tests portable GenAI telemetry"
+      description: "Tests portable GenAI telemetry",
+      id: "jido.ai/test/traced-agent",
+      vsn: 7
 
     ai do
       reasoning Jido.AI.Reasoning.ReAct

@@ -53,7 +53,7 @@ defmodule Jido.AI.ChainOfThoughtTest do
     registry =
       Jido.Authoring.Registry.new!(%{
         {"jido.ai/agents/chain-of-thought", 1} => {:agent, ChainOfThoughtAgent},
-        {"jido.ai/agent", 1} => {:extension, Jido.AI.Agent.Extension},
+        {"jido.ai/agent", 1} => {:plugin, Jido.AI.Agent.Plugin},
         {"jido.ai/reasoning/chain-of-thought", 1} => {:flow, ChainOfThought},
         {"jido.ai/schemas/chain-of-thought-agent-state", 1} => {:schema, ChainOfThoughtAgent.definition().schema}
       })
@@ -77,7 +77,7 @@ defmodule Jido.AI.ChainOfThoughtTest do
                  }
                }
              }
-           ] = document["definition"]["extensions"]
+           ] = document["definition"]["plugins"]
 
     assert {:ok, definition} =
              Jido.Authoring.decode_json(json,

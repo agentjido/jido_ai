@@ -18,9 +18,9 @@ Jido AI V3 is under active development. Use it with compatible V3 versions of
 ```elixir
 defmodule MyApp.AnswerAgent do
   use Jido.AI.Agent,
+    name: "answer_agent",
     id: "my_app/answer_agent",
-    vsn: 1,
-    name: "answer_agent"
+    vsn: 1
 
   ai do
     reasoning Jido.AI.Reasoning.ReAct do
@@ -101,9 +101,9 @@ end
 
 defmodule MyApp.ToolAgent do
   use Jido.AI.Agent,
+    name: "tool_agent",
     id: "my_app/tool_agent",
-    vsn: 1,
-    name: "tool_agent"
+    vsn: 1
 
   ai do
     reasoning Jido.AI.Reasoning.ReAct

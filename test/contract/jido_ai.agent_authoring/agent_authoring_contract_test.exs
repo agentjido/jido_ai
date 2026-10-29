@@ -6,8 +6,8 @@ defmodule Jido.AI.Contract.AgentAuthoringTest do
 
   defmodule ContractAgent do
     use Jido.AI.Agent,
-      id: "jido.ai/contracts/authoring",
-      name: "jido_ai_contract_authoring"
+      name: "jido_ai_contract_authoring",
+      id: "jido.ai/contracts/authoring"
 
     ai do
       reasoning Jido.AI.Reasoning.ReAct
@@ -35,7 +35,7 @@ defmodule Jido.AI.Contract.AgentAuthoringTest do
              %{
                data: %{reasoning: ReAct, tools: [Add]}
              }
-           ] = ContractAgent.definition().extensions
+           ] = ContractAgent.definition().plugins
   end
 
   @tag obligation: "jido_ai.agent_authoring.I2"

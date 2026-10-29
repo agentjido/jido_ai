@@ -2,12 +2,12 @@ defmodule Jido.AI.Agent.DSL do
   @moduledoc false
 
   @entity Module.concat([
-            Jido.AI.Agent.Extension,
+            Jido.AI.Agent.Plugin,
             Macro.camelize("__ai__"),
             Macro.camelize("__reasoning__")
           ])
   @tools_section Module.concat([
-                   Jido.AI.Agent.Extension,
+                   Jido.AI.Agent.Plugin,
                    Macro.camelize("__tools__")
                  ])
 

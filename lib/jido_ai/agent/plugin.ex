@@ -1,15 +1,20 @@
-defmodule Jido.AI.Agent.Extension.Reasoning do
+defmodule Jido.AI.Agent.Plugin.Reasoning do
   @moduledoc false
   defstruct [:target, :defaults, :__spark_metadata__]
 end
 
-defmodule Jido.AI.Agent.Extension.Tool do
+defmodule Jido.AI.Agent.Plugin.Tool do
   @moduledoc false
   defstruct [:target, :__spark_metadata__]
 end
 
-defmodule Jido.AI.Agent.Extension do
-  @moduledoc false
+defmodule Jido.AI.Agent.Plugin do
+  @moduledoc """
+  Adds AI authoring data and static tool preparation to a Jido Agent.
+
+  `use Jido.AI.Agent` adds this Plugin automatically. Add it directly to a
+  core Agent only when you need the core `Jido.Agent` authoring surface.
+  """
 
   alias Jido.Agent.{Data, Error}
   alias Jido.Authoring.{Issue, Registry}
@@ -20,7 +25,7 @@ defmodule Jido.AI.Agent.Extension do
 
   @reasoning %Spark.Dsl.Entity{
     name: :__reasoning__,
-    target: Jido.AI.Agent.Extension.Reasoning,
+    target: Jido.AI.Agent.Plugin.Reasoning,
     args: [:target],
     schema: [
       target: [type: :atom, required: true],
@@ -29,7 +34,7 @@ defmodule Jido.AI.Agent.Extension do
   }
   @tool %Spark.Dsl.Entity{
     name: :action,
-    target: Jido.AI.Agent.Extension.Tool,
+    target: Jido.AI.Agent.Plugin.Tool,
     args: [:target],
     schema: [target: [type: :atom, required: true]]
   }
@@ -37,15 +42,14 @@ defmodule Jido.AI.Agent.Extension do
   @tools %Spark.Dsl.Section{name: :__tools__, entities: [@tool, @flow_tool]}
   @ai %Spark.Dsl.Section{name: :__ai__, entities: [@reasoning], sections: [@tools]}
 
-  use Jido.Agent.Extension,
+  use Jido.Plugin,
     id: "jido.ai/agent",
     vsn: 1,
-    sections: [@ai]
+    sections: [@ai],
+    imports: [Jido.AI.Agent.DSL],
+    option_keys: [agent: [:reasoning, :defaults, :tools]]
 
-  @impl Jido.Agent.Extension
-  def authoring_imports, do: [Jido.AI.Agent.DSL]
-
-  @impl Jido.Agent.Extension
+  @impl true
   def lower(dsl, config) do
     reasonings = SparkExtension.get_entities(dsl, [:__ai__])
     tools = SparkExtension.get_entities(dsl, [:__ai__, :__tools__])
@@ -71,7 +75,7 @@ defmodule Jido.AI.Agent.Extension do
     end
   end
 
-  @impl Jido.Agent.Extension
+  @impl true
   def normalize(data) do
     with {:ok, data} <-
            Data.fields(data, [:reasoning, :defaults, :tools], %{defaults: %{}, tools: []}),
@@ -83,7 +87,7 @@ defmodule Jido.AI.Agent.Extension do
     end
   end
 
-  @impl Jido.Agent.Extension
+  @impl true
   def derive_routes(%{reasoning: reasoning, defaults: defaults}) do
     [
       %{
@@ -97,10 +101,13 @@ defmodule Jido.AI.Agent.Extension do
     ]
   end
 
-  @impl Jido.Agent.Extension
-  def runtime_support, do: Jido.AI.Toolset
+  @impl true
+  def prepare(_preparation, options) do
+    tools = Keyword.get(options, :tools, [])
+    with :ok <- Jido.AI.Toolset.validate(tools), do: {:ok, tools}
+  end
 
-  @impl Jido.Agent.Extension
+  @impl true
   def encode_authoring_data(data, registry) do
     with {:ok, data} <- normalize(data),
          {:ok, reasoning} <- Registry.encode_reference(registry, :flow, data.reasoning),
@@ -110,7 +117,7 @@ defmodule Jido.AI.Agent.Extension do
     end
   end
 
-  @impl Jido.Agent.Extension
+  @impl true
   def decode_authoring_data(data, registry) do
     with :ok <- authoring_object(data),
          {:ok, reasoning} <- resolve_reference(data["reasoning"], :flow, registry, ["reasoning"]),
@@ -186,12 +193,12 @@ defmodule Jido.AI.Agent.Extension do
     if Enum.sort(Map.keys(data)) == ~w(config reasoning tools) do
       :ok
     else
-      issue(:invalid_document, [], "AI extension data requires reasoning, config, and tools")
+      issue(:invalid_document, [], "AI Plugin data requires reasoning, config, and tools")
     end
   end
 
   defp authoring_object(_data),
-    do: issue(:invalid_document, [], "AI extension data must be an object")
+    do: issue(:invalid_document, [], "AI Plugin data must be an object")
 
   defp resolve_reference(value, kind, registry, path) do
     case Registry.decode_reference(registry, value, kind) do
@@ -230,7 +237,7 @@ defmodule Jido.AI.Agent.Extension do
   end
 
   defp decode_tools(_values, _registry),
-    do: issue(:invalid_tools, ["tools"], "AI extension tools must be a list")
+    do: issue(:invalid_tools, ["tools"], "AI Plugin tools must be a list")
 
   defp normalize_authoring(reasoning, defaults, tools) do
     case normalize(%{reasoning: reasoning, defaults: defaults, tools: tools}) do

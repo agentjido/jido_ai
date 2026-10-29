@@ -10,9 +10,9 @@ credentials, and what request options can't change. Read
 ```elixir
 defmodule MyApp.SupportAgent do
   use Jido.AI.Agent,
+    name: "support_agent",
     id: "my_app/support_agent",
-    vsn: 1,
-    name: "support_agent"
+    vsn: 1
 
   ai do
     reasoning Jido.AI.Reasoning.ReAct do

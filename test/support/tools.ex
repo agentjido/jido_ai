@@ -103,10 +103,10 @@ end
 
 defmodule Jido.AITest.SimpleAgent do
   use Jido.AI.Agent,
-    id: "jido.ai/agents/simple",
-    vsn: 3,
     name: "jido_ai_simple_agent",
-    description: "Answer one request with guardrails and multiple tools"
+    description: "Answer one request with guardrails and multiple tools",
+    id: "jido.ai/agents/simple",
+    vsn: 3
 
   ai do
     reasoning Jido.AI.Reasoning.ReAct
@@ -120,10 +120,10 @@ end
 
 defmodule Jido.AITest.FlowToolAgent do
   use Jido.AI.Agent,
-    id: "jido.ai/agents/flow-tool",
-    vsn: 1,
     name: "jido_ai_flow_tool_agent",
-    description: "Execute one Flow as a model tool"
+    description: "Execute one Flow as a model tool",
+    id: "jido.ai/agents/flow-tool",
+    vsn: 1
 
   ai do
     reasoning Jido.AI.Reasoning.ReAct
@@ -136,10 +136,10 @@ end
 
 defmodule Jido.AITest.ConfiguredAgent do
   use Jido.AI.Agent,
-    id: "jido.ai/agents/configured",
-    vsn: 1,
     name: "jido_ai_configured_agent",
-    description: "Use compile-time defaults for the canonical ReAct graph"
+    description: "Use compile-time defaults for the canonical ReAct graph",
+    id: "jido.ai/agents/configured",
+    vsn: 1
 
   ai do
     reasoning Jido.AI.Reasoning.ReAct do
@@ -174,10 +174,10 @@ end
 
 defmodule Jido.AITest.ChainOfThoughtAgent do
   use Jido.AI.Agent,
-    id: "jido.ai/agents/chain-of-thought",
-    vsn: 1,
     name: "jido_ai_chain_of_thought_agent",
-    description: "Solve one request with a variable-length numbered reasoning chain"
+    description: "Solve one request with a variable-length numbered reasoning chain",
+    id: "jido.ai/agents/chain-of-thought",
+    vsn: 1
 
   ai do
     reasoning Jido.AI.Reasoning.ChainOfThought
@@ -186,10 +186,10 @@ end
 
 defmodule Jido.AITest.LargeOutputAgent do
   use Jido.AI.Agent,
-    id: "jido.ai/agents/large-output",
-    vsn: 1,
     name: "jido_ai_large_output_agent",
-    description: "Test bounded tool result projection"
+    description: "Test bounded tool result projection",
+    id: "jido.ai/agents/large-output",
+    vsn: 1
 
   ai do
     reasoning Jido.AI.Reasoning.ReAct
@@ -202,10 +202,10 @@ end
 
 defmodule Jido.AITest.ContentPartAgent do
   use Jido.AI.Agent,
-    id: "jido.ai/agents/content-part",
-    vsn: 1,
     name: "jido_ai_content_part_agent",
-    description: "Test model-visible tool content parts"
+    description: "Test model-visible tool content parts",
+    id: "jido.ai/agents/content-part",
+    vsn: 1
 
   ai do
     reasoning Jido.AI.Reasoning.ReAct

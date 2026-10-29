@@ -1,6 +1,6 @@
 defmodule Jido.AI.Agent do
   @moduledoc """
-  Defines a graph-first AI Agent with a Spark-backed Agent extension.
+  Defines a graph-first AI Agent with a Spark-backed Agent Plugin.
 
   An AI Agent selects one root reasoning Flow and an optional ordered set of
   tool Actions and Flows:
@@ -49,20 +49,29 @@ defmodule Jido.AI.Agent do
       end
 
   The `ai`, `reasoning`, and `tools` declarations lower through an internal
-  extension. The extension contributes the normal Agent route and stores its
+  Plugin. The Plugin contributes the normal Agent route and stores its
   authoring data in the normal Agent codec document.
   Registered Flow and Action references are required when the Agent is stored
   as JSON.
   """
 
-  alias Jido.AI.Agent.Extension
+  alias Jido.AI.Agent.Plugin
 
-  @doc "Uses the Jido Agent runtime with the graph-first AI extension."
+  @doc "Uses the Jido Agent runtime with the graph-first AI Plugin."
   defmacro __using__(options) do
-    options = Jido.Agent.options!(options, __CALLER__)
-    providers = Enum.uniq([Extension | Keyword.get(options, :extensions, [])])
-    options = Keyword.put(options, :extensions, providers)
-    signal_source = "/" <> options[:id]
+    {options, _binding} = Code.eval_quoted(options, [], __CALLER__)
+
+    unless Keyword.keyword?(options) do
+      raise ArgumentError, "Jido.AI.Agent requires keyword options"
+    end
+
+    unless is_list(Keyword.get(options, :plugins, [])) do
+      raise ArgumentError, "Jido.AI.Agent plugins must be a list"
+    end
+
+    plugins = Enum.uniq([Plugin | Keyword.get(options, :plugins, [])])
+    options = Keyword.delete(options, :plugins) ++ [plugins: plugins]
+    signal_source = "/" <> Keyword.get(options, :id, Atom.to_string(__CALLER__.module))
 
     quote do
       use Jido.Agent, unquote(Macro.escape(options))

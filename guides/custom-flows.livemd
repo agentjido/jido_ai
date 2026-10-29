@@ -613,9 +613,9 @@ Reference the Flow from the Agent. The block sets defaults for fields of
 ```elixir
 defmodule MyApp.SupportAgent do
   use Jido.AI.Agent,
+    name: "support_agent",
     id: "my_app/support_agent",
-    vsn: 1,
-    name: "support_agent"
+    vsn: 1
 
   ai do
     reasoning MyApp.RefundFlow do
@@ -1011,7 +1011,7 @@ first answer; the ReAct output guard rejects it and repairs within the budget:
 
 ```elixir
 defmodule MyApp.LoopAgent do
-  use Jido.AI.Agent, id: "my_app/loop_agent", vsn: 1, name: "loop_agent"
+  use Jido.AI.Agent, name: "loop_agent", id: "my_app/loop_agent", vsn: 1
 
   ai do
     reasoning MyApp.RefundLoopFlow
@@ -1115,7 +1115,7 @@ same Flow language, and its output has the same `%{state, response}` shape:
 
 ```elixir
 defmodule MyApp.RefundTriageAgent do
-  use Jido.AI.Agent, id: "my_app/refund_triage_agent", vsn: 1, name: "refund_triage_agent"
+  use Jido.AI.Agent, name: "refund_triage_agent", id: "my_app/refund_triage_agent", vsn: 1
 
   ai do
     reasoning do

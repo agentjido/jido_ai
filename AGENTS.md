@@ -18,7 +18,7 @@ into this file.
 
 ## Current architecture
 
-- `Jido.AI.Agent` adds one AI extension to a normal Jido Agent.
+- `Jido.AI.Agent` adds one AI Plugin to a normal Jido Agent.
 - Each AI Agent has exactly one root reasoning Flow and an optional ordered
   set of tool Actions.
 - The generated `jido.ai.request` route targets the reasoning Flow directly.
@@ -36,7 +36,7 @@ into this file.
 
 ## Ownership rules
 
-- Put AI Agent authoring in `Jido.AI.Agent` and its extension.
+- Put AI Agent authoring in `Jido.AI.Agent` and its Plugin.
 - Put reusable AI control behavior in explicit reasoning Flows and Actions.
 - Put durable conversation data in Session and Thread.
 - Put projection policy in `Jido.AI.Thread.Projection`.

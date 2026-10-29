@@ -1,5 +1,5 @@
 defmodule Jido.AI.Contract.NoReasoningAgent do
-  def definition, do: %{routes: [], extensions: []}
+  def definition, do: %{routes: [], plugins: []}
 end
 
 defmodule Jido.AI.Contract.BareReasoningAgent do
@@ -12,7 +12,7 @@ defmodule Jido.AI.Contract.BareReasoningAgent do
           defaults: %{}
         }
       ],
-      extensions: [%{provider: String, data: %{}}]
+      plugins: [%{provider: String, data: %{}}]
     }
   end
 end
