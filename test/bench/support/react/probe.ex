@@ -80,6 +80,42 @@ defmodule JidoAI.Bench.ReAct.Probe do
       {status, error_item_count, error_path} = classify(result)
 
       %{
+        strategy: :single_flow,
+        requested_rounds: requested_rounds,
+        status: status,
+        model_calls: model_summary.calls,
+        executed_tool_rounds: :atomics.get(tool_counter, 1),
+        replies_left: model_summary.replies_left,
+        elapsed_ms: elapsed_ms,
+        error: error_summary(result),
+        result_sizes: term_sizes(result),
+        error_item_count: error_item_count,
+        error_path: error_path,
+        vm_memory: memory
+      }
+    after
+      if Process.alive?(sampler.pid), do: MemorySampler.stop!(sampler)
+      if Process.alive?(model), do: Model.stop(model)
+    end
+  end
+
+  @spec run_fresh_memory(pos_integer()) :: map()
+  def run_fresh_memory(requested_rounds) when requested_rounds in 1..20 do
+    round_counter = :atomics.new(1, signed: false)
+    tool_counter = :atomics.new(1, signed: false)
+    model = Model.start_fresh!(requested_rounds, round_counter)
+    sampler = MemorySampler.start!()
+
+    try do
+      started_at = System.monotonic_time(:millisecond)
+      result = execute_fresh(requested_rounds, tool_counter)
+      elapsed_ms = max(System.monotonic_time(:millisecond) - started_at, 0)
+      memory = MemorySampler.stop!(sampler)
+      model_summary = Model.summary(model)
+      {status, error_item_count, error_path} = classify(result)
+
+      %{
+        strategy: :fresh_flow_per_round,
         requested_rounds: requested_rounds,
         status: status,
         model_calls: model_summary.calls,
@@ -124,6 +160,37 @@ defmodule JidoAI.Bench.ReAct.Probe do
       signal,
       context: %{bench_tool_counter: tool_counter}
     )
+  end
+
+  defp execute_fresh(requested_rounds, tool_counter) do
+    agent = Agent.instantiate!(id: "fresh-flow-state-growth-#{requested_rounds}")
+
+    Enum.reduce_while(1..requested_rounds, {:ok, agent, []}, fn round, {:ok, current, _directives} ->
+      signal =
+        Agent.request_signal!(%{
+          input: "Round #{round}: call echo once, then answer done.",
+          model: "openai:gpt-4o-mini",
+          options: %{
+            api_key: "offline",
+            max_retries: 0,
+            max_tokens: 1_000,
+            req_http_options: [plug: {Req.Test, Model}],
+            temperature: 0.0
+          },
+          limits: %{
+            model_calls: 2,
+            tool_rounds: 1,
+            tool_calls: 1,
+            retries: 0,
+            elapsed_ms: 120_000
+          }
+        })
+
+      case Agent.cmd(current, signal, context: %{bench_tool_counter: tool_counter}) do
+        {:ok, _next, _directives} = success -> {:cont, success}
+        error -> {:halt, error}
+      end
+    end)
   end
 
   defp classify({:ok, _agent, _directives}), do: {:completed, nil, nil}

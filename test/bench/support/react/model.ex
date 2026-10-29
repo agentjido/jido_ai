@@ -4,6 +4,22 @@ defmodule JidoAI.Bench.ReAct.Model do
   def start!(tool_rounds, round_counter) when is_integer(tool_rounds) and tool_rounds > 0 do
     script = List.duplicate({:tool, "echo"}, tool_rounds) ++ [{:text, "done"}]
 
+    start_with_script!(script, tool_rounds, round_counter, fn call_number -> call_number end)
+  end
+
+  def start_fresh!(tool_rounds, round_counter)
+      when is_integer(tool_rounds) and tool_rounds > 0 do
+    script =
+      Enum.flat_map(1..tool_rounds, fn _round ->
+        [{:tool, "echo"}, {:text, "done"}]
+      end)
+
+    start_with_script!(script, tool_rounds, round_counter, fn call_number ->
+      div(call_number + 1, 2)
+    end)
+  end
+
+  defp start_with_script!(script, tool_rounds, round_counter, round_for_call) do
     {:ok, pid} =
       Agent.start_link(fn ->
         %{script: script, calls: 0}
@@ -17,7 +33,7 @@ defmodule JidoAI.Bench.ReAct.Model do
           {{next, call_number}, %{state | script: rest, calls: call_number}}
         end)
 
-      :atomics.put(round_counter, 1, min(call_number, tool_rounds))
+      :atomics.put(round_counter, 1, min(round_for_call.(call_number), tool_rounds))
       Req.Test.json(conn, response(output(reply)))
     end)
 

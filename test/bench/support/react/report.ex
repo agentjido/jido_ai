@@ -51,6 +51,7 @@ defmodule JidoAI.Bench.ReAct.Report do
     memory = report.vm_memory
 
     IO.puts("ReAct VM memory")
+    IO.puts("strategy: #{Map.get(report, :strategy, :single_flow)}")
     IO.puts("requested rounds: #{report.requested_rounds}")
     IO.puts("status: #{report.status}")
     IO.puts("model calls: #{report.model_calls}")

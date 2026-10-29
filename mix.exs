@@ -106,6 +106,7 @@ defmodule JidoAi.MixProject do
         "test.ci": :test,
         "bench.react": :test,
         "bench.react.memory": :test,
+        "bench.react.fresh": :test,
         examples: :test,
         coveralls: :test,
         "coveralls.detail": :test,
@@ -132,7 +133,7 @@ defmodule JidoAi.MixProject do
       {:jido, github: "agentjido/jido", branch: "release/v3", override: true},
       {:jido_action, github: "agentjido/jido_action", branch: "release/v3", override: true},
       {:jido_signal, github: "agentjido/jido_signal", branch: "release/v3", override: true},
-      {:runic, "~> 0.1.0-alpha.12", override: true},
+      {:runic, "~> 0.1.0-alpha.13", override: true},
       {:req_llm, "~> 1.29"},
 
       # Runtime
@@ -170,6 +171,7 @@ defmodule JidoAi.MixProject do
       "test.fast": "cmd env MIX_ENV=test mix test --exclude flaky --only stable_smoke",
       "bench.react": &run_react_benchmark/1,
       "bench.react.memory": &run_react_memory_benchmark/1,
+      "bench.react.fresh": &run_fresh_react_memory_benchmark/1,
       precommit: [
         "format --check-formatted",
         "compile --warnings-as-errors",
@@ -193,6 +195,9 @@ defmodule JidoAi.MixProject do
 
   defp run_react_memory_benchmark(args),
     do: Mix.Task.run("run", ["test/bench/react_memory.exs" | args])
+
+  defp run_fresh_react_memory_benchmark(args),
+    do: Mix.Task.run("run", ["test/bench/react_fresh_memory.exs" | args])
 
   defp package do
     [
