@@ -2,7 +2,7 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
   @moduledoc "Calls one model and returns success or failure as graph data."
 
   alias Jido.AI.Context, as: AIContext
-  alias Jido.AI.{Budget, Telemetry, Toolset, Usage}
+  alias Jido.AI.{Budget, InferenceClient, Telemetry, Toolset, Usage}
 
   use Jido.Action,
     id: "jido.ai/reasoning/actions/call-model",
@@ -33,7 +33,7 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
         if turn.stream do
           stream(request, turn, stream_id, context)
         else
-          generate(request)
+          generate(request, context)
         end
       end
 
@@ -116,8 +116,10 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
 
   defp model_tools(_turn, false), do: {:ok, nil}
 
-  defp generate(request) do
-    ReqLLM.generate_text(request.model, request.context, request.options)
+  defp generate(request, context) do
+    context
+    |> InferenceClient.client!()
+    |> then(& &1.generate_text(request.model, request.context, request.options))
   end
 
   defp tool_choice(turn) do
@@ -177,40 +179,44 @@ defmodule Jido.AI.Reasoning.Actions.CallModel do
     request = correlation(turn, stream_id, 0, System.system_time(:millisecond))
     _result = dispatch_stream_signal(context, "jido.ai.model.stream.started", request)
 
-    case ReqLLM.stream_text(request_data.model, request_data.context, request_data.options) do
-      {:ok, response} ->
-        sequence_counter = :atomics.new(1, [])
+    sequence_counter = :atomics.new(1, [])
 
-        result =
-          ReqLLM.StreamResponse.process_stream(response,
-            on_chunk: fn chunk ->
-              sequence = :atomics.add_get(sequence_counter, 1, 1)
-              publish_chunk(chunk, sequence, turn, stream_id, context)
-            end
-          )
+    on_chunk = fn chunk ->
+      sequence = :atomics.add_get(sequence_counter, 1, 1)
+      publish_chunk(chunk, sequence, turn, stream_id, context)
+    end
 
-        sequence = :atomics.get(sequence_counter, 1) + 1
+    result =
+      with {:ok, response} <-
+             context
+             |> InferenceClient.client!()
+             |> then(
+               & &1.stream_text(
+                 request_data.model,
+                 request_data.context,
+                 request_data.options
+               )
+             ) do
+        ReqLLM.StreamResponse.process_stream(response, on_chunk: on_chunk)
+      end
 
-        case result do
-          {:ok, materialized} = success ->
-            classified = ReqLLM.Response.classify(materialized)
+    sequence = :atomics.get(sequence_counter, 1) + 1
 
-            data =
-              correlation(turn, stream_id, sequence, System.system_time(:millisecond))
-              |> Map.put(:response_id, materialized.id)
-              |> Map.put(:outcome, classified.type)
-              |> Map.put(:finish_reason, classified.finish_reason)
+    case result do
+      {:ok, materialized} = success ->
+        classified = ReqLLM.Response.classify(materialized)
 
-            _result = dispatch_stream_signal(context, "jido.ai.model.stream.completed", data)
-            success
+        data =
+          correlation(turn, stream_id, sequence, System.system_time(:millisecond))
+          |> Map.put(:response_id, materialized.id)
+          |> Map.put(:outcome, classified.type)
+          |> Map.put(:finish_reason, classified.finish_reason)
 
-          {:error, reason} = error ->
-            publish_stream_failure(reason, turn, stream_id, sequence, context)
-            error
-        end
+        _result = dispatch_stream_signal(context, "jido.ai.model.stream.completed", data)
+        success
 
       {:error, reason} = error ->
-        publish_stream_failure(reason, turn, stream_id, 1, context)
+        publish_stream_failure(reason, turn, stream_id, sequence, context)
         error
     end
   end
