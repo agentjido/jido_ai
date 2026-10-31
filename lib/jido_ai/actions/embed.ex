@@ -1,7 +1,7 @@
 defmodule Jido.AI.Actions.Embed do
   @moduledoc "Generates one embedding or a batch of embeddings."
 
-  alias Jido.AI.Usage
+  alias Jido.AI.{InferenceClient, Usage}
 
   use Jido.Action,
     id: "jido.ai/actions/embed",
@@ -17,10 +17,12 @@ defmodule Jido.AI.Actions.Embed do
     output_schema: Zoi.map()
 
   @impl Jido.Action
-  def run(%{model: model, input: input, options: options}, _context) do
+  def run(%{model: model, input: input, options: options}, context) do
     options = options |> Map.to_list() |> Keyword.put(:return_usage, true)
 
-    case ReqLLM.embed(model, input, options) do
+    client = InferenceClient.client!(context)
+
+    case client.embed(model, input, options) do
       {:ok, %{embedding: embedding, usage: usage}} ->
         {:ok, %{embedding: embedding, usage: Usage.normalize(usage)}}
 
