@@ -5,6 +5,11 @@ defmodule Jido.AI.Directive.ToolExec do
   The runtime will execute this asynchronously and send the result back
   as a `ai.tool.result` signal.
 
+  A non-empty directive ID is passed to the Action as `context[:tool_call_id]`,
+  overriding any caller-supplied value for this invocation. It remains stable
+  across retries, and other context fields are preserved. An empty ID leaves
+  the context unchanged; no ID is generated.
+
   ## Execution Modes
 
   1. **Direct module execution** (preferred): When `action_module` is provided,
@@ -108,6 +113,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.AI.Directive.ToolExec do
       arguments: arguments,
       context: context
     } = directive
+
+    context = if call_id != "", do: Map.put(context, :tool_call_id, call_id), else: context
 
     action_module = Map.get(directive, :action_module)
     timeout_ms = Map.get(directive, :timeout_ms)
