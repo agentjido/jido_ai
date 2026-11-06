@@ -22,7 +22,8 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
           value: Zoi.integer()
         })
 
-    def run(%{value: value}, _context) do
+    def run(%{value: value}, context) do
+      if pid = context[:test_pid], do: send(pid, {:retry_identity, context[:tool_call_id]})
       key = {__MODULE__, :attempts}
       attempt = :persistent_term.get(key, 0) + 1
       :persistent_term.put(key, attempt)
@@ -121,8 +122,26 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
        %{
          marker: context[:marker],
          has_call_id: Map.has_key?(context, :call_id),
-         has_tool_call_id: Map.has_key?(context, :tool_call_id)
+         has_tool_call_id: Map.has_key?(context, :tool_call_id),
+         tool_call_id: context[:tool_call_id]
        }}
+    end
+  end
+
+  defmodule ConcurrentIdentityTool do
+    use Jido.Action,
+      name: "concurrent_identity",
+      description: "Waits until sibling executions overlap",
+      schema: Zoi.object(%{})
+
+    def run(_params, context) do
+      send(context.test_pid, {:invocation_ready, self(), context.tool_call_id})
+
+      receive do
+        :release -> {:ok, %{tool_call_id: context.tool_call_id, marker: context.marker}}
+      after
+        5_000 -> {:error, :barrier_timeout}
+      end
     end
   end
 
@@ -2276,7 +2295,12 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
         tool_retry_backoff_ms: 0
       })
 
-    events = ReAct.stream("Run retry tool", config) |> Enum.to_list()
+    events =
+      ReAct.stream("Run retry tool", config, context: %{test_pid: self(), tool_call_id: "stale"}) |> Enum.to_list()
+
+    assert_receive {:retry_identity, "tc_retry"}
+    assert_receive {:retry_identity, "tc_retry"}
+    refute_receive {:retry_identity, _}
 
     tool_completed = Enum.find(events, &(&1.kind == :tool_completed))
     refute is_nil(tool_completed)
@@ -2552,7 +2576,52 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert agent.state.react_order_marker == :fast
   end
 
-  test "keeps telemetry ids out of standalone tool action context" do
+  test "parallel invocations of the same Action receive isolated native identities without telemetry" do
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, messages, _opts ->
+      if Enum.any?(messages, &(&1.role == :tool)) do
+        {:ok, responses_stream_response([ReqLLM.StreamChunk.text("Done")], %{finish_reason: :stop}, model)}
+      else
+        chunks =
+          for id <- ["sibling_a", "sibling_b"], do: ReqLLM.StreamChunk.tool_call("concurrent_identity", %{}, %{id: id})
+
+        {:ok, responses_stream_response(chunks, %{finish_reason: :tool_calls}, model)}
+      end
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{ConcurrentIdentityTool.name() => ConcurrentIdentityTool},
+        tool_max_retries: 0,
+        tool_concurrency: 2,
+        emit_telemetry?: false
+      })
+
+    context = %{test_pid: self(), marker: :kept, tool_call_id: "stale"}
+    task = Task.async(fn -> ReAct.stream("Run siblings", config, context: context) |> Enum.to_list() end)
+
+    assert_receive {:invocation_ready, first, first_id}, 5_000
+    assert_receive {:invocation_ready, second, second_id}, 5_000
+    assert Enum.sort([first_id, second_id]) == ["sibling_a", "sibling_b"]
+    send(first, :release)
+    send(second, :release)
+    events = Task.await(task, 10_000)
+
+    started = Enum.filter(events, &(&1.kind == :tool_started))
+    completed = Enum.filter(events, &(&1.kind == :tool_completed))
+    assert Enum.sort(Enum.map(started, & &1.tool_call_id)) == ["sibling_a", "sibling_b"]
+    assert length(completed) == 2
+
+    for event <- completed do
+      assert event.data.tool_call_id == event.tool_call_id
+      assert {:ok, %{tool_call_id: id, marker: :kept}, _} = event.data.result
+      assert id == event.tool_call_id
+    end
+
+    assert context.tool_call_id == "stale"
+  end
+
+  test "passes native invocation identity to the action and lifecycle events without injecting call_id" do
     test_pid = self()
     handler_id = "react-tool-execute-stop-id-#{System.unique_integer([:positive])}"
 
@@ -2598,13 +2667,19 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       })
 
     events =
-      ReAct.stream("Echo context", config, context: %{marker: :kept})
+      ReAct.stream("Echo context", config, context: %{marker: :kept, tool_call_id: "stale"})
       |> Enum.to_list()
 
     tool_completed = Enum.find(events, &(&1.kind == :tool_completed and &1.data.tool_call_id == "tc_context_echo"))
 
-    assert {:ok, %{marker: :kept, has_call_id: false, has_tool_call_id: false}, _effects} =
+    assert {:ok, %{marker: :kept, has_call_id: false, has_tool_call_id: true, tool_call_id: "tc_context_echo"},
+            _effects} =
              tool_completed.data.result
+
+    for event <- Enum.filter(events, &(&1.kind in [:tool_started, :tool_completed])) do
+      assert event.tool_call_id == "tc_context_echo"
+      assert event.data.tool_call_id == "tc_context_echo"
+    end
 
     assert_receive {:stop_metadata, stop_metadata}
     assert stop_metadata.tool_call_id == "tc_context_echo"
