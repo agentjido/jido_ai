@@ -88,6 +88,33 @@ Deterministic terminal shapes:
 - completed loop: `%{type: :final_answer, text: text, usage: usage, turns: turns, messages: messages, model: model}`
 - max turns reached: `%{type: :tool_calls, reason: :max_turns_reached, turns: max_turns, usage: usage, model: model}`
 
+## Tool Invocation Identity
+
+For native tool calls dispatched by ReAct, `Turn.run_tool_calls/3` (including
+`run_tools/3`), or `Directive.ToolExec`, the Action receives the existing invocation
+ID in `context[:tool_call_id]`:
+
+```elixir
+def run(params, context) do
+  invocation_id = context[:tool_call_id]
+  # Correlate application work with this tool invocation.
+  {:ok, %{invocation_id: invocation_id, input: params}}
+end
+```
+
+A non-empty native ID overrides a caller-supplied `:tool_call_id` for that
+invocation only. It matches the runtime lifecycle identity, remains stable across
+retries, and is isolated between concurrent siblings and nested invocations.
+Other context fields, including `:call_id`, are preserved. Capture the parent's ID
+before dispatching a nested child if your application needs parent correlation.
+
+No ID is generated here: calls without a native ID preserve the existing context.
+Direct `Turn.execute/4` and `execute_module/4` calls use caller-provided context;
+their `:telemetry_metadata` option does not inject execution context fields.
+`ExecuteTool` currently supplies the fixed ID `"direct_tool_exec"`, so that path
+does not provide unique invocation identity. Native IDs are not rewritten or
+guaranteed globally unique; scope correlation by run when combining traces.
+
 ## Direct Tool Execution (`ExecuteTool`)
 
 Use direct execution when your app already chose the tool and args.

@@ -371,6 +371,11 @@ defmodule Jido.AI.Turn do
 
   @doc """
   Executes normalized tool calls and returns normalized tool results.
+
+  Each non-empty native call ID is passed to the Action as `context[:tool_call_id]`,
+  overriding a caller-supplied value for that invocation only. Other context fields
+  are preserved. Calls without an ID leave the context unchanged; no ID is generated.
+  Direct `execute/4` and `execute_module/4` calls do not infer identity from telemetry metadata.
   """
   @spec run_tool_calls([term()], map(), run_opts()) :: {:ok, [tool_result()]}
   def run_tool_calls(tool_calls, context, opts \\ []) when is_list(tool_calls) do
@@ -820,6 +825,8 @@ defmodule Jido.AI.Turn do
 
   defp run_single_tool(tool_call, context, tools, timeout) do
     call_id = normalize_text(extract_tool_call_id(tool_call))
+    context = normalize_context(context)
+    context = if call_id != "", do: Map.put(context, :tool_call_id, call_id), else: context
     tool_name = normalize_text(extract_tool_call_name(tool_call))
     arguments = normalize_tool_arguments(extract_tool_call_arguments(tool_call))
 
