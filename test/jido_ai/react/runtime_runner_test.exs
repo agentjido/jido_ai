@@ -388,12 +388,65 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     query = [ContentPart.text("Describe this"), image]
     config = Config.new(%{model: :capable, tools: %{}})
 
-    events = ReAct.stream(query, config, request_id: "req_multimodal", run_id: "run_multimodal") |> Enum.to_list()
+    events =
+      ReAct.stream(query, config,
+        request_id: "req_multimodal",
+        run_id: "run_multimodal",
+        name: "person_42"
+      )
+      |> Enum.to_list()
 
     assert_receive {:messages, messages}
     assert Enum.any?(events, &(&1.kind == :request_started and &1.data.query =~ "[Image]"))
-    assert [%{role: :user, content: [text, ^image]}] = messages
+    assert [%{role: :user, content: [text, ^image], name: "person_42"}] = messages
     assert text.text == "Describe this"
+  end
+
+  test "projects a named user through the standard ReAct request path" do
+    parent = self()
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, messages, _opts ->
+      send(parent, {:named_messages, messages})
+
+      {:ok,
+       responses_stream_response(
+         [ReqLLM.StreamChunk.text("Hello")],
+         %{finish_reason: :stop},
+         model
+       )}
+    end)
+
+    config = Config.new(%{model: :capable, tools: %{}})
+
+    ReAct.stream("Say hello", config, name: "person_42") |> Enum.to_list()
+
+    assert_receive {:named_messages, [%{role: :user, content: "Say hello", name: "person_42"}]}
+  end
+
+  test "projects a named continuation query through the standard ReAct request path" do
+    parent = self()
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, messages, _opts ->
+      send(parent, {:continued_messages, messages})
+
+      {:ok,
+       responses_stream_response(
+         [ReqLLM.StreamChunk.text("Continued")],
+         %{finish_reason: :stop},
+         model
+       )}
+    end)
+
+    state = Jido.AI.Reasoning.ReAct.State.new("Initial", nil)
+    config = Config.new(%{model: :capable, tools: %{}})
+
+    ReAct.stream_from_state(state, config, query: "Follow up", name: "person_42") |> Enum.to_list()
+
+    assert_receive {:continued_messages,
+                    [
+                      %{role: :user, content: "Initial"},
+                      %{role: :user, content: "Follow up", name: "person_42"}
+                    ]}
   end
 
   test "emits ordered event envelopes for a final-answer run" do
@@ -1418,6 +1471,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
           assert :ok =
                    PendingInputServer.enqueue(pending_input_server, %{
                      content: "Actually answer Q2",
+                     name: "person_42",
                      source: "/test/runtime",
                      refs: %{origin: "suite"}
                    })
@@ -1432,6 +1486,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
         2 ->
           assert user_contents(messages) == ["Q1", "Actually answer Q2"]
           assert assistant_contents(messages) == ["A1"]
+          assert Enum.any?(messages, &(&1[:content] == "Actually answer Q2" and &1[:name] == "person_42"))
 
           {:ok,
            responses_stream_response(
@@ -1456,6 +1511,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
 
     input_injected = Enum.find(events, &(&1.kind == :input_injected))
     assert input_injected.data.content == "Actually answer Q2"
+    assert input_injected.data.name == "person_42"
     assert input_injected.data.source == "/test/runtime"
     assert input_injected.data.refs == %{origin: "suite"}
 

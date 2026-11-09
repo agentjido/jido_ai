@@ -14,6 +14,7 @@ defmodule Jido.AI.PendingInputServer do
   @type input_item :: %{
           optional(:id) => String.t(),
           required(:content) => String.t(),
+          optional(:name) => String.t() | nil,
           optional(:source) => term(),
           optional(:refs) => map() | nil,
           optional(:at_ms) => integer()
@@ -197,6 +198,7 @@ defmodule Jido.AI.PendingInputServer do
        %{
          id: Map.get(item, :id, "inp_#{Jido.Util.generate_id()}"),
          content: trimmed,
+         name: normalize_name(Map.get(item, :name)),
          source: Map.get(item, :source),
          refs: normalize_refs(Map.get(item, :refs)),
          at_ms: Map.get(item, :at_ms, System.system_time(:millisecond))
@@ -205,6 +207,9 @@ defmodule Jido.AI.PendingInputServer do
   end
 
   defp normalize_input_item(_item), do: {:error, :invalid_input}
+
+  defp normalize_name(name) when is_binary(name), do: name
+  defp normalize_name(_name), do: nil
 
   defp normalize_refs(%{} = refs), do: refs
   defp normalize_refs(_), do: nil

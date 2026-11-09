@@ -531,6 +531,7 @@ defmodule Jido.AI.Agent do
 
       ## Options
 
+      - `:name` - Optional participant name for the user message
       - `:tool_context` - Additional context map merged with agent's tool_context
       - `:tools` - Request-scoped tool registry override for this run only
       - `:allowed_tools` - Request-scoped allowlist of tool names

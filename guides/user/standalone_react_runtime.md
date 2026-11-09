@@ -340,7 +340,7 @@ config = %{
   token_secret: "my-32-byte-minimum-secret-here!!"
 }
 
-result = ReAct.run("What is 19 + 23?", config)
+result = ReAct.run("What is 19 + 23?", config, name: "person_42")
 
 # result =>
 # %{
@@ -351,6 +351,11 @@ result = ReAct.run("What is 19 + 23?", config)
 #   trace: [%Jido.AI.Runtime.Event{...}, ...]
 # }
 ```
+
+Use the optional `:name` run option when the provider supports participant
+labels. ReAct stores the name on the user message and includes it in the generic
+message map sent to ReqLLM. The same option is available for a new query passed
+to `stream_from_state/3`, and for `steer/3` or `inject/3` input.
 
 ## Streaming
 

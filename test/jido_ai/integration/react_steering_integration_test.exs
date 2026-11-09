@@ -65,16 +65,18 @@ defmodule Jido.AI.Integration.ReActSteeringIntegrationTest do
     {:ok, pid} = Jido.AgentServer.start_link(agent: SteeringAgent)
     on_exit(fn -> if Process.alive?(pid), do: Process.exit(pid, :kill) end)
 
-    {:ok, request} = SteeringAgent.ask(pid, "Q1")
+    {:ok, request} = SteeringAgent.ask(pid, "Q1", name: "person_1")
 
     assert_receive {:llm_messages, 1, first_messages}, 1_000
     assert user_contents(first_messages) == ["Q1"]
+    assert Enum.find(first_messages, &(message_content(&1) == "Q1")) |> message_name() == "person_1"
     assert assistant_contents(first_messages) == []
 
     assert {:ok, _agent} =
              ReAct.steer(
                pid,
                "Q2",
+               name: "person_42",
                expected_request_id: request.id,
                source: "/integration/test",
                extra_refs: %{origin: "suite"}
@@ -84,6 +86,7 @@ defmodule Jido.AI.Integration.ReActSteeringIntegrationTest do
 
     assert_receive {:llm_messages, 2, second_messages}, 1_000
     assert user_contents(second_messages) == ["Q1", "Q2"]
+    assert Enum.find(second_messages, &(message_content(&1) == "Q2")) |> message_name() == "person_42"
     assert assistant_contents(second_messages) == ["A1"]
   end
 
@@ -119,5 +122,9 @@ defmodule Jido.AI.Integration.ReActSteeringIntegrationTest do
 
   defp message_content(message) when is_map(message) do
     Map.get(message, :content, Map.get(message, "content"))
+  end
+
+  defp message_name(message) when is_map(message) do
+    Map.get(message, :name, Map.get(message, "name"))
   end
 end

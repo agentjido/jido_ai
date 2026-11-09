@@ -421,6 +421,7 @@ defmodule JidoTest.AI.RequestTest do
                  tools: [:tool_override],
                  allowed_tools: ["calculator"],
                  request_transformer: TestRequestTransformer,
+                 name: "person_42",
                  max_iterations: 3,
                  stream_timeout_ms: 4_321,
                  stream_to: {:pid, self()},
@@ -444,6 +445,7 @@ defmodule JidoTest.AI.RequestTest do
       assert signal.data.tools == [:tool_override]
       assert signal.data.allowed_tools == ["calculator"]
       assert signal.data.request_transformer == TestRequestTransformer
+      assert signal.data.name == "person_42"
       assert signal.data.max_iterations == 3
       assert signal.data.stream_timeout_ms == 4_321
       assert signal.data.stream_to == {:pid, self()}
