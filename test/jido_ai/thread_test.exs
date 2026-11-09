@@ -47,6 +47,13 @@ defmodule Jido.AI.ContextTest do
       assert %DateTime{} = entry.timestamp
     end
 
+    test "stores and projects an optional participant name" do
+      thread = AIContext.new() |> AIContext.append_user("Hello!", name: "person_42")
+
+      assert [%Entry{name: "person_42"}] = thread.entries
+      assert [%{role: :user, content: "Hello!", name: "person_42"}] = AIContext.to_messages(thread)
+    end
+
     test "appends multiple user messages" do
       thread =
         AIContext.new()
@@ -98,6 +105,13 @@ defmodule Jido.AI.ContextTest do
       assert entry.role == :assistant
       assert entry.content == ""
       assert entry.tool_calls == tool_calls
+    end
+
+    test "stores and projects an optional assistant name" do
+      thread = AIContext.new() |> AIContext.append_assistant("Hello!", nil, name: "helper")
+
+      assert [%Entry{name: "helper"}] = thread.entries
+      assert [%{role: :assistant, content: "Hello!", name: "helper"}] = AIContext.to_messages(thread)
     end
   end
 
@@ -503,6 +517,26 @@ defmodule Jido.AI.ContextTest do
   end
 
   describe "append_messages/2" do
+    test "preserves participant names from atom and string keyed messages" do
+      messages = [
+        %{role: :user, content: "Question", name: "person_42"},
+        %{"role" => "assistant", "content" => "Answer", "name" => "helper"},
+        %{"role" => "system", "content" => "Policy", "name" => "policy_source"},
+        %{role: :user, content: "Unnamed"}
+      ]
+
+      thread = AIContext.new() |> AIContext.append_messages(messages)
+
+      assert Enum.map(Enum.reverse(thread.entries), & &1.name) == ["person_42", "helper", "policy_source", nil]
+
+      assert AIContext.to_messages(thread) == [
+               %{role: :user, content: "Question", name: "person_42"},
+               %{role: :assistant, content: "Answer", name: "helper"},
+               %{role: :system, content: "Policy", name: "policy_source"},
+               %{role: :user, content: "Unnamed"}
+             ]
+    end
+
     test "imports list of message maps" do
       messages = [
         %{role: :user, content: "Hello"},
@@ -867,7 +901,7 @@ defmodule Jido.AI.ContextTest do
 
   describe "coerce/1" do
     test "accepts raw context maps without struct metadata" do
-      context = AIContext.new(system_prompt: "hello") |> AIContext.append_user("q")
+      context = AIContext.new(system_prompt: "hello") |> AIContext.append_user("q", name: "person_42")
 
       raw = %{
         id: context.id,

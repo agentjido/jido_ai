@@ -189,6 +189,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       schema:
         Zoi.object(%{
           query: Query.schema(),
+          name: Zoi.string() |> Zoi.optional(),
           request_id: Zoi.string() |> Zoi.optional(),
           tool_context: Zoi.map() |> Zoi.optional(),
           tools: Zoi.any() |> Zoi.optional(),
@@ -220,6 +221,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       schema:
         Zoi.object(%{
           content: Zoi.string(),
+          name: Zoi.string() |> Zoi.optional(),
           expected_request_id: Zoi.string() |> Zoi.optional(),
           source: Zoi.any() |> Zoi.optional(),
           extra_refs: Zoi.map() |> Zoi.optional()
@@ -231,6 +233,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       schema:
         Zoi.object(%{
           content: Zoi.string(),
+          name: Zoi.string() |> Zoi.optional(),
           expected_request_id: Zoi.string() |> Zoi.optional(),
           source: Zoi.any() |> Zoi.optional(),
           extra_refs: Zoi.map() |> Zoi.optional()
@@ -676,7 +679,8 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
 
         base_context = strategy_context(state, config)
         extra_refs = Map.get(params, :extra_refs, %{})
-        run_context = AIContext.append_user(base_context, query, refs: normalize_refs(extra_refs))
+        name = Map.get(params, :name)
+        run_context = AIContext.append_user(base_context, query, name: name, refs: normalize_refs(extra_refs))
         runtime_state = runtime_state_from_context(run_context, query, request_id, run_id)
         context_ref = Map.get(state, :active_context_ref, @default_context_ref)
 
@@ -685,7 +689,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
             agent,
             state,
             context_ref,
-            %{role: :user, content: query},
+            %{role: :user, content: query, name: name},
             request_id,
             run_id,
             nil,
@@ -1167,7 +1171,11 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           agent,
           state,
           context_ref,
-          %{role: :user, content: event_field(data, :content, "")},
+          %{
+            role: :user,
+            content: event_field(data, :content, ""),
+            name: event_field(data, :name)
+          },
           request_id,
           run_id,
           signal_id,
@@ -1339,7 +1347,10 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
       :user ->
         case fetch_map_value(payload, :content) do
           content when is_binary(content) ->
-            AIContext.append_user(context, content, refs: normalize_refs(refs))
+            AIContext.append_user(context, content,
+              name: fetch_map_value(payload, :name),
+              refs: normalize_refs(refs)
+            )
 
           _ ->
             context
@@ -1350,6 +1361,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
         tool_calls = fetch_map_value(payload, :tool_calls)
         thinking = fetch_map_value(payload, :thinking)
         opts = if is_binary(thinking) and thinking != "", do: [thinking: thinking], else: []
+        opts = Keyword.put(opts, :name, fetch_map_value(payload, :name))
         opts = Keyword.put(opts, :refs, normalize_refs(refs))
 
         AIContext.append_assistant(
@@ -1703,7 +1715,7 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
           base_state
           |> Map.put(:status, :awaiting_llm)
           |> Map.put(:result, nil)
-          |> append_user_to_run_context(event_field(data, :content, ""), refs)
+          |> append_user_to_run_context(event_field(data, :content, ""), event_field(data, :name), refs)
 
         {updated, []}
 
@@ -2135,12 +2147,16 @@ defmodule Jido.AI.Reasoning.ReAct.Strategy do
     end
   end
 
-  defp append_user_to_run_context(state, content, refs) when is_binary(content) do
+  defp append_user_to_run_context(state, content, name, refs) when is_binary(content) do
     context = Map.get(state, :run_context) || Map.get(state, :context)
 
     case context do
       %AIContext{} = context ->
-        Map.put(state, :run_context, AIContext.append_user(context, content, refs: normalize_refs(refs)))
+        Map.put(
+          state,
+          :run_context,
+          AIContext.append_user(context, content, name: name, refs: normalize_refs(refs))
+        )
 
       _ ->
         state

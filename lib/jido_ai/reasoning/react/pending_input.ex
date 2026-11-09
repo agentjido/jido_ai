@@ -102,6 +102,7 @@ defmodule Jido.AI.Reasoning.ReAct.PendingInput do
   defp queued_item(content, params) do
     %{
       content: content,
+      name: Map.get(params, :name),
       source: Map.get(params, :source),
       refs: normalize_optional_refs(Map.get(params, :extra_refs))
     }

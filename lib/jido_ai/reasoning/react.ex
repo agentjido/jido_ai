@@ -48,7 +48,7 @@ defmodule Jido.AI.Reasoning.ReAct do
   def start(query, config, opts \\ []) when (is_binary(query) or is_list(query)) and is_list(opts) do
     config = build_config(config)
 
-    state = State.new(query, config.system_prompt, Keyword.take(opts, [:request_id, :run_id]))
+    state = State.new(query, config.system_prompt, Keyword.take(opts, [:request_id, :run_id, :name]))
     events = Runner.stream(query, config, Keyword.put(opts, :state, state))
 
     {:ok,
@@ -250,6 +250,7 @@ defmodule Jido.AI.Reasoning.ReAct do
           content: content
         }
         |> maybe_put_control_opt(:expected_request_id, Keyword.get(opts, :expected_request_id))
+        |> maybe_put_control_opt(:name, Keyword.get(opts, :name))
         |> maybe_put_control_opt(:source, Keyword.get(opts, :source, "/ai/react"))
         |> maybe_put_control_opt(:extra_refs, Keyword.get(opts, :extra_refs)),
         source: "/ai/react"

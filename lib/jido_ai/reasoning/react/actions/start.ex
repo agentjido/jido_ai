@@ -14,6 +14,7 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Start do
     schema:
       Zoi.object(%{
         query: Query.schema(description: "User query for ReAct execution"),
+        name: Zoi.string(description: "Optional participant name for the user message") |> Zoi.optional(),
         request_id: Zoi.string() |> Zoi.optional(),
         run_id: Zoi.string() |> Zoi.optional(),
         model: Zoi.any() |> Zoi.optional(),
@@ -60,7 +61,12 @@ defmodule Jido.AI.Reasoning.ReAct.Actions.Start do
         request_id = params[:request_id] || "req_#{Jido.Util.generate_id()}"
         run_id = params[:run_id] || "run_#{Jido.Util.generate_id()}"
 
-        events = ReAct.stream(params[:query], config, Keyword.merge(opts, request_id: request_id, run_id: run_id))
+        events =
+          ReAct.stream(
+            params[:query],
+            config,
+            Keyword.merge(opts, request_id: request_id, run_id: run_id, name: params[:name])
+          )
 
         {:ok,
          %{

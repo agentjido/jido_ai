@@ -21,10 +21,15 @@ alias Jido.AI.Context
 
 context =
   Context.new(system_prompt: "You are concise.")
-  |> Context.append_user("Hello")
+  |> Context.append_user("Hello", name: "person_42")
   |> Context.append_assistant("Hi")
   |> Context.append_user("Summarize this chat")
 ```
+
+The optional `:name` is a participant label. It stays separate from the request
+`user` identifier and from tool names. `Context.to_messages/2` preserves names on
+user, assistant, and imported system messages. Unnamed messages do not get a
+`name` key.
 
 ## Project To Messages
 
@@ -39,8 +44,8 @@ recent_messages = Context.to_messages(context, limit: 2)
 
 ```elixir
 raw = [
-  %{role: "user", content: "Question"},
-  %{role: "assistant", content: "Answer"}
+  %{role: "user", content: "Question", name: "person_42"},
+  %{"role" => "assistant", "content" => "Answer", "name" => "helper"}
 ]
 
 context = Context.new() |> Context.append_messages(raw)

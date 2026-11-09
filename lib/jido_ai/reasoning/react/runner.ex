@@ -34,6 +34,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   @type stream_opt ::
           {:request_id, String.t()}
           | {:run_id, String.t()}
+          | {:name, String.t()}
+          | {:query, String.t() | [ReqLLM.Message.ContentPart.t()]}
           | {:state, State.t()}
           | {:task_supervisor, pid() | atom()}
           | {:context, map()}
@@ -46,7 +48,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     initial_state =
       case Keyword.get(opts, :state) do
         %State{} = state -> state
-        _ -> State.new(query, config.system_prompt, request_id_opts(opts))
+        _ -> State.new(query, config.system_prompt, initial_state_opts(opts))
       end
 
     build_stream(initial_state, config, Keyword.put(opts, :query, query), emit_start?: true)
@@ -61,8 +63,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
     state =
       case query do
-        q when is_binary(q) and q != "" -> append_query(state, q)
-        q when is_list(q) -> append_query(state, q)
+        q when is_binary(q) and q != "" -> append_query(state, q, opts)
+        q when is_list(q) -> append_query(state, q, opts)
         _ -> state
       end
 
@@ -1540,9 +1542,9 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     end
   end
 
-  defp request_id_opts(opts) do
+  defp initial_state_opts(opts) do
     opts
-    |> Keyword.take([:request_id, :run_id])
+    |> Keyword.take([:request_id, :run_id, :name])
   end
 
   defp latest_query(%State{} = state) do
@@ -1553,8 +1555,9 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
     end
   end
 
-  defp append_query(%State{} = state, query) when is_binary(query) or is_list(query) do
-    %{state | context: AIContext.append_user(state.context, query), status: :running, updated_at_ms: now_ms()}
+  defp append_query(%State{} = state, query, opts) when (is_binary(query) or is_list(query)) and is_list(opts) do
+    context = AIContext.append_user(state.context, query, name: Keyword.get(opts, :name))
+    %{state | context: context, status: :running, updated_at_ms: now_ms()}
   end
 
   defp maybe_thinking_opt(nil), do: []
@@ -1847,13 +1850,14 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
         next_state =
           Enum.reduce(items, state, fn item, acc ->
             refs = normalize_optional_refs(item[:refs])
-            next_context = AIContext.append_user(acc.context, item.content, refs: refs)
+            next_context = AIContext.append_user(acc.context, item.content, name: item[:name], refs: refs)
             next_state = %{acc | context: next_context}
 
             {next_state, _} =
               emit_event(next_state, owner, ref, :input_injected, %{
                 input_id: item.id,
                 content: item.content,
+                name: item[:name],
                 source: item.source,
                 refs: refs,
                 at_ms: item.at_ms
