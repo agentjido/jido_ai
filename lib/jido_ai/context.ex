@@ -98,8 +98,9 @@ defmodule Jido.AI.Context do
   """
   @spec append_user(t(), String.t() | [ContentPart.t()], keyword()) :: t()
   def append_user(thread, content, opts \\ []) when is_binary(content) or is_list(content) do
+    name = Keyword.get(opts, :name)
     refs = Keyword.get(opts, :refs)
-    append(thread, %Entry{role: :user, content: content, refs: refs})
+    append(thread, %Entry{role: :user, content: content, name: name, refs: refs})
   end
 
   @doc """
@@ -107,6 +108,7 @@ defmodule Jido.AI.Context do
   """
   @spec append_assistant(t(), String.t() | [ContentPart.t()] | nil, list() | nil, keyword()) :: t()
   def append_assistant(thread, content, tool_calls \\ nil, opts \\ []) do
+    name = Keyword.get(opts, :name)
     thinking = Keyword.get(opts, :thinking)
     reasoning_details = Keyword.get(opts, :reasoning_details)
     refs = Keyword.get(opts, :refs)
@@ -114,6 +116,7 @@ defmodule Jido.AI.Context do
     append(thread, %Entry{
       role: :assistant,
       content: content,
+      name: name,
       tool_calls: tool_calls,
       thinking: thinking,
       reasoning_details: reasoning_details,
@@ -388,20 +391,23 @@ defmodule Jido.AI.Context do
 
   # Private helpers
 
-  defp entry_to_message(%Entry{role: :user, content: content, refs: refs}) do
+  defp entry_to_message(%Entry{role: :user, content: content, name: name, refs: refs}) do
     %{role: :user, content: content}
+    |> maybe_add(:name, name)
     |> maybe_add(:refs, refs)
   end
 
   defp entry_to_message(%Entry{
          role: :assistant,
          content: content,
+         name: name,
          thinking: thinking,
          reasoning_details: reasoning_details,
          tool_calls: nil,
          refs: refs
        }) do
     %{role: :assistant, content: build_assistant_content(content, thinking)}
+    |> maybe_add(:name, name)
     |> maybe_add(:reasoning_details, reasoning_details)
     |> maybe_add(:refs, refs)
   end
@@ -409,12 +415,14 @@ defmodule Jido.AI.Context do
   defp entry_to_message(%Entry{
          role: :assistant,
          content: content,
+         name: name,
          thinking: thinking,
          reasoning_details: reasoning_details,
          tool_calls: tool_calls,
          refs: refs
        }) do
     %{role: :assistant, content: build_assistant_content(content || "", thinking), tool_calls: tool_calls}
+    |> maybe_add(:name, name)
     |> maybe_add(:reasoning_details, reasoning_details)
     |> maybe_add(:refs, refs)
   end
@@ -424,8 +432,9 @@ defmodule Jido.AI.Context do
     |> maybe_add(:refs, refs)
   end
 
-  defp entry_to_message(%Entry{role: :system, content: content, refs: refs}) do
+  defp entry_to_message(%Entry{role: :system, content: content, name: name, refs: refs}) do
     %{role: :system, content: content}
+    |> maybe_add(:name, name)
     |> maybe_add(:refs, refs)
   end
 

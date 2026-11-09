@@ -174,6 +174,7 @@ defmodule Jido.AI.Request do
     file references appended to the user query as ReqLLM content parts when supported by the ReqLLM version
   - `:output` - `:raw` to bypass agent-level structured output for this request,
     or a request-scoped structured output config
+  - `:name` - Optional participant name for the user message
   - `:extra_refs` - Map of additional refs to attach to the user message thread entry
   - `:stream_to` - Optional request-scoped runtime event sink, currently `{:pid, pid}`
   - `:request_id` - Custom request ID (auto-generated if not provided)
@@ -206,6 +207,7 @@ defmodule Jido.AI.Request do
     req_http_options = Keyword.get(opts, :req_http_options, [])
     llm_opts = Keyword.get(opts, :llm_opts, [])
     output = Keyword.get(opts, :output)
+    name = Keyword.get(opts, :name)
     request_id = Keyword.get_lazy(opts, :request_id, &generate_id/0)
     stream_to = Keyword.get(opts, :stream_to)
 
@@ -217,6 +219,7 @@ defmodule Jido.AI.Request do
 
       payload =
         %{query: query, prompt: query, request_id: request_id}
+        |> maybe_add_name(name)
         |> maybe_add_tool_context(tool_context)
         |> maybe_add_tools(tools)
         |> maybe_add_allowed_tools(allowed_tools)
@@ -628,6 +631,10 @@ defmodule Jido.AI.Request do
   end
 
   defp maybe_add_tool_context(payload, _), do: payload
+
+  defp maybe_add_name(payload, nil), do: payload
+  defp maybe_add_name(payload, name) when is_binary(name), do: Map.put(payload, :name, name)
+  defp maybe_add_name(payload, _name), do: payload
 
   defp maybe_add_stream_timeout_ms(payload, stream_timeout_ms)
        when is_integer(stream_timeout_ms) and stream_timeout_ms >= 0 do

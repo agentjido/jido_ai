@@ -38,8 +38,79 @@ defmodule Jido.AI.TurnTest do
        %{
          origin: context[:origin],
          has_call_id: Map.has_key?(context, :call_id),
-         has_tool_call_id: Map.has_key?(context, :tool_call_id)
+         has_tool_call_id: Map.has_key?(context, :tool_call_id),
+         tool_call_id: context[:tool_call_id]
        }}
+    end
+  end
+
+  defmodule InvocationContext do
+    use Jido.Action,
+      name: "invocation_context",
+      description: "Returns invocation context fields",
+      schema: Zoi.object(%{})
+
+    def run(_params, context) do
+      {:ok, Map.take(context, [:tool_call_id, :call_id, :origin, :nested])}
+    end
+  end
+
+  defmodule NestedInvocation do
+    use Jido.Action,
+      name: "nested_invocation",
+      description: "Executes a child tool call",
+      schema: Zoi.object(%{})
+
+    def run(_params, context) do
+      {:ok, [child]} =
+        Jido.AI.Turn.run_tool_calls(
+          [%{id: "child", name: "invocation_context", arguments: %{}}],
+          context,
+          tools: %{"invocation_context" => InvocationContext}
+        )
+
+      {:ok, %{parent_id: context[:tool_call_id], child: child.raw_result}}
+    end
+  end
+
+  describe "invocation context identity" do
+    test "native calls override conflicting identity without leaking between siblings or into the caller" do
+      context = %{tool_call_id: "stale", call_id: "caller", origin: :test, nested: %{tenant: "acme"}}
+      calls = for id <- ["first", "second"], do: %{id: id, name: InvocationContext.name(), arguments: %{}}
+
+      assert {:ok, results} =
+               Turn.run_tool_calls(calls, context, tools: %{InvocationContext.name() => InvocationContext})
+
+      for {result, id} <- Enum.zip(results, ["first", "second"]) do
+        assert result.raw_result == {:ok, %{context | tool_call_id: id}, []}
+      end
+
+      assert context.tool_call_id == "stale"
+    end
+
+    test "missing and empty IDs preserve caller identity or its absence" do
+      tools = %{InvocationContext.name() => InvocationContext}
+
+      for call <- [%{name: InvocationContext.name()}, %{id: "", name: InvocationContext.name()}],
+          context <- [%{}, %{tool_call_id: "inherited"}] do
+        assert {:ok, [%{raw_result: {:ok, ^context, []}}]} = Turn.run_tool_calls([call], context, tools: tools)
+      end
+    end
+
+    test "normalizes non-map context before injecting native identity" do
+      assert {:ok, [%{raw_result: {:ok, %{tool_call_id: "native"}, []}}]} =
+               Turn.run_tool_calls([%{id: "native", name: InvocationContext.name()}], nil,
+                 tools: %{InvocationContext.name() => InvocationContext}
+               )
+    end
+
+    test "nested native execution receives child identity without changing the parent" do
+      assert {:ok, [%{raw_result: {:ok, result, []}}]} =
+               Turn.run_tool_calls([%{id: "parent", name: NestedInvocation.name()}], %{origin: :test},
+                 tools: %{NestedInvocation.name() => NestedInvocation}
+               )
+
+      assert result == %{parent_id: "parent", child: {:ok, %{tool_call_id: "child", origin: :test}, []}}
     end
   end
 
@@ -530,7 +601,7 @@ defmodule Jido.AI.TurnTest do
       assert {:ok, ^turn} = Turn.run_tools(turn, %{})
     end
 
-    test "emits per-tool telemetry id without changing action context" do
+    test "passes native identity to the action and telemetry while preserving other context fields" do
       test_pid = self()
       handler_id = "turn-run-tools-stop-id-#{System.unique_integer([:positive])}"
 
@@ -567,7 +638,9 @@ defmodule Jido.AI.TurnTest do
       assert [
                %{
                  id: "tc_run_tools_1",
-                 raw_result: {:ok, %{origin: :test, has_call_id: false, has_tool_call_id: false}, []}
+                 raw_result:
+                   {:ok, %{origin: :test, has_call_id: false, has_tool_call_id: true, tool_call_id: "tc_run_tools_1"},
+                    []}
                }
              ] = updated_turn.tool_results
 

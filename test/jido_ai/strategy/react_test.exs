@@ -588,6 +588,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
           [
             instruction(ReAct.steer_action(), %{
               content: "Actually answer Q2",
+              name: "person_42",
               expected_request_id: "req_steer",
               source: "/test/steer",
               extra_refs: %{origin: "suite"}
@@ -603,6 +604,7 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
 
       [queued] = PendingInputServer.drain(state.pending_input_server)
       assert queued.content == "Actually answer Q2"
+      assert queued.name == "person_42"
       assert queued.source == "/test/steer"
       assert queued.refs == %{origin: "suite"}
     end
@@ -736,13 +738,20 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       {agent, [_spawn]} =
         ReAct.cmd(
           agent,
-          [instruction(ReAct.start_action(), %{query: "Q1", request_id: "req_input_injected"})],
+          [
+            instruction(ReAct.start_action(), %{
+              query: "Q1",
+              name: "person_1",
+              request_id: "req_input_injected"
+            })
+          ],
           %{}
         )
 
       event =
         runtime_event(:input_injected, "req_input_injected", 2, %{
           content: "Actually answer Q2",
+          name: "person_42",
           source: "/test/runtime",
           refs: %{origin: "suite"}
         })
@@ -761,6 +770,8 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       run_messages = Jido.AI.Context.to_messages(state.run_context)
       run_users = Enum.filter(run_messages, &(&1.role == :user))
       assert Enum.map(run_users, & &1.content) == ["Q1", "Actually answer Q2"]
+      assert Enum.map(run_users, & &1.name) == ["person_1", "person_42"]
+      assert List.last(run_users).name == "person_42"
 
       assert List.last(run_users).refs == %{
                origin: "suite",
@@ -772,9 +783,11 @@ defmodule Jido.AI.Reasoning.ReAct.StrategyTest do
       core_thread = ThreadAgent.get(agent)
       ai_messages = Thread.filter_by_kind(core_thread, :ai_message)
       assert Enum.map(ai_messages, & &1.payload.role) == [:user, :user]
+      assert Enum.map(ai_messages, & &1.payload.name) == ["person_1", "person_42"]
 
       injected_entry = List.last(ai_messages)
       assert injected_entry.payload.content == "Actually answer Q2"
+      assert injected_entry.payload.name == "person_42"
       assert injected_entry.refs.request_id == "req_input_injected"
       assert injected_entry.refs.run_id == "req_input_injected"
       assert injected_entry.refs.signal_id == "evt_2"

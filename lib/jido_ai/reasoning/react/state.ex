@@ -61,7 +61,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
 
     context =
       AIContext.new(system_prompt: system_prompt)
-      |> AIContext.append_user(query)
+      |> AIContext.append_user(query, name: Keyword.get(opts, :name))
 
     attrs = %{
       run_id: run_id,
