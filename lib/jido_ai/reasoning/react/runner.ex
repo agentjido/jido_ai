@@ -180,6 +180,15 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
             fail_run(state, owner, ref, config, reason, error_type)
         end
 
+      is_map(state.pending_native_output) ->
+        completed = complete_pending_native_output(state, owner, ref)
+
+        case maybe_continue_after_final_answer(completed, owner, ref, config, context) do
+          {:continue, state} -> run_loop(state, owner, ref, config, context)
+          {:complete, state} -> state
+          {:error, state, reason, error_type} -> fail_run(state, owner, ref, config, reason, error_type)
+        end
+
       state.iteration > config.max_iterations ->
         seal_pending_input_server(config)
 
@@ -331,16 +340,39 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   defp finish_llm_turn(state, owner, ref, config, turn) do
     case Output.native_tool_call(config.output, turn.tool_calls) do
       {:ok, call} ->
-        state =
-          acknowledge_output_calls(state, owner, ref, [call], {:ok, "Final answer received for schema validation."})
-
-        completed =
-          state
-          |> State.put_status(:completed)
-          |> State.put_result(call.arguments)
+        completed = accept_native_output(state, owner, ref, call)
 
         {completed, _token} = emit_checkpoint(completed, owner, ref, config, :after_llm)
         {:final_answer, completed}
+
+      {:mixed, final_call, action_calls} ->
+        case config.output.end_strategy do
+          :early ->
+            state =
+              acknowledge_output_calls(
+                state,
+                owner,
+                ref,
+                action_calls,
+                {:error, "Skipped because the final answer ended this run."},
+                native_output: false,
+                skipped: true
+              )
+
+            completed = accept_native_output(state, owner, ref, final_call)
+            {completed, _token} = emit_checkpoint(completed, owner, ref, config, :after_llm)
+            {:final_answer, completed}
+
+          :graceful ->
+            {state, _token} = emit_checkpoint(state, owner, ref, config, :after_llm)
+
+            state =
+              state
+              |> State.put_pending_native_output(native_output_call_map(final_call))
+              |> State.put_status(:awaiting_tools)
+
+            {:tool_calls, state, action_calls}
+        end
 
       :none ->
         {state, _token} = emit_checkpoint(state, owner, ref, config, :after_llm)
@@ -359,14 +391,17 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
             owner,
             ref,
             turn.tool_calls,
-            {:error, "Final output must be submitted alone. No actions in this batch were executed."}
+            {:error, "Only one final output can be submitted. No actions in this batch were executed."}
           )
 
         {:error, state, reason, :output_validation}
     end
   end
 
-  defp acknowledge_output_calls(state, owner, ref, calls, result) do
+  defp acknowledge_output_calls(state, owner, ref, calls, result, opts \\ []) do
+    native_output? = Keyword.get(opts, :native_output, true)
+    skipped? = Keyword.get(opts, :skipped, false)
+
     Enum.reduce(calls, state, fn call, state ->
       # The parent agent projects tool responses from runtime events. Retain the
       # same reply in standalone and parent history, including rejected batches.
@@ -382,7 +417,8 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
             result: result,
             attempts: 0,
             duration_ms: 0,
-            native_output: true
+            native_output: native_output?,
+            skipped: skipped?
           },
           tool_call_id: call.id,
           tool_name: call.name
@@ -391,6 +427,23 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
       context = AIContext.append_tool_result(state.context, call.id, call.name, Turn.format_tool_result_content(result))
       %{state | context: context}
     end)
+  end
+
+  defp accept_native_output(state, owner, ref, call) do
+    state
+    |> acknowledge_output_calls(owner, ref, [call], {:ok, "Final answer received for schema validation."})
+    |> State.put_status(:completed)
+    |> State.put_result(call.arguments)
+  end
+
+  defp complete_pending_native_output(%State{pending_native_output: call} = state, owner, ref) do
+    state
+    |> State.clear_pending_native_output()
+    |> accept_native_output(owner, ref, call)
+  end
+
+  defp native_output_call_map(call) do
+    %{id: call.id, name: call.name, arguments: call.arguments}
   end
 
   defp build_turn_request(%State{} = state, %Config{} = config, runtime_context) do

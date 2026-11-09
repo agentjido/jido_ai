@@ -23,6 +23,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
               context: Zoi.any(),
               active_tools: Zoi.map() |> Zoi.default(%{}),
               pending_tool_calls: Zoi.list(PendingToolCall.schema()) |> Zoi.default([]),
+              pending_native_output: Zoi.map() |> Zoi.nullish(),
               usage: Zoi.map() |> Zoi.default(%{}),
               output: Zoi.map() |> Zoi.default(%{}),
               streaming_text: Zoi.string() |> Zoi.default(""),
@@ -72,6 +73,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
       context: context,
       active_tools: %{},
       pending_tool_calls: [],
+      pending_native_output: nil,
       usage: %{},
       output: %{},
       streaming_text: "",
@@ -110,6 +112,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
         context: context,
         active_tools: Map.get(map, :active_tools, Map.get(map, "active_tools", %{})) || %{},
         pending_tool_calls: restore_pending(Map.get(map, :pending_tool_calls, Map.get(map, "pending_tool_calls", []))),
+        pending_native_output: Map.get(map, :pending_native_output, Map.get(map, "pending_native_output")),
         usage: Map.get(map, :usage, Map.get(map, "usage", %{})) || %{},
         output: Map.get(map, :output, Map.get(map, "output", %{})) || %{},
         streaming_text: Map.get(map, :streaming_text, Map.get(map, "streaming_text", "")) || "",
@@ -148,6 +151,7 @@ defmodule Jido.AI.Reasoning.ReAct.State do
       context: state.context,
       active_tools: state.active_tools,
       pending_tool_calls: state.pending_tool_calls,
+      pending_native_output: state.pending_native_output,
       usage: state.usage,
       output: state.output,
       streaming_text: state.streaming_text,
@@ -233,6 +237,22 @@ defmodule Jido.AI.Reasoning.ReAct.State do
   @spec clear_pending_tools(t()) :: t()
   def clear_pending_tools(%__MODULE__{} = state) do
     %{state | pending_tool_calls: [], updated_at_ms: now_ms()}
+  end
+
+  @doc """
+  Stores a native final-output call until its action calls finish.
+  """
+  @spec put_pending_native_output(t(), map()) :: t()
+  def put_pending_native_output(%__MODULE__{} = state, call) when is_map(call) do
+    %{state | pending_native_output: call, updated_at_ms: now_ms()}
+  end
+
+  @doc """
+  Clears the pending native final-output call.
+  """
+  @spec clear_pending_native_output(t()) :: t()
+  def clear_pending_native_output(%__MODULE__{} = state) do
+    %{state | pending_native_output: nil, updated_at_ms: now_ms()}
   end
 
   @doc """

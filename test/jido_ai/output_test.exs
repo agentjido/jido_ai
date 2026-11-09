@@ -111,10 +111,27 @@ defmodule Jido.AI.OutputTest do
 
   test "native mode is opt-in, validated, and part of the output contract fingerprint" do
     assert {:ok, %Output{mode: :prompt} = prompt} = Output.new(schema: @schema)
-    assert {:ok, %Output{mode: :native} = native} = Output.new(schema: @schema, mode: "native")
+
+    assert {:ok, %Output{mode: :native, end_strategy: :graceful} = native} =
+             Output.new(schema: @schema, mode: "native")
+
+    assert {:ok, %Output{end_strategy: :early} = early} =
+             Output.new(schema: @schema, mode: :native, end_strategy: "early")
+
     assert {:error, _reason} = Output.new(schema: @schema, mode: :unsupported)
+    assert {:error, _reason} = Output.new(schema: @schema, end_strategy: :unsupported)
     refute Output.fingerprint(prompt) == Output.fingerprint(native)
+    refute Output.fingerprint(native) == Output.fingerprint(early)
     assert Output.instructions(native) =~ Output.native_tool_name()
+  end
+
+  test "classifies mixed native final-answer and action calls" do
+    {:ok, output} = Output.new(schema: @schema, mode: :native)
+    action = %{id: "action", name: "lookup", arguments: %{}}
+    final = %{id: "final", name: Output.native_tool_name(), arguments: %{}}
+
+    assert {:mixed, ^final, [^action]} = Output.native_tool_call(output, [action, final])
+    assert {:error, %Jido.AI.Error.Validation.Output{}} = Output.native_tool_call(output, [final, final])
   end
 
   test "adds structured output instructions to message lists" do

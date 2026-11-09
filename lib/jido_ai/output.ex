@@ -12,18 +12,21 @@ defmodule Jido.AI.Output do
   @max_retries 3
   @default_retries 1
   @default_on_validation_error :repair
+  @default_end_strategy :graceful
   @raw_preview_bytes 500
   @native_tool_name "jido_ai_final_answer"
 
   @type schema_kind :: :zoi | :json_schema
   @type validation_mode :: :repair | :error
   @type enforcement_mode :: :prompt | :native
+  @type end_strategy :: :graceful | :early
   @type repair_callback :: {module(), atom()}
 
   @type t :: %__MODULE__{
           schema: Zoi.schema() | map(),
           schema_kind: schema_kind(),
           mode: enforcement_mode(),
+          end_strategy: end_strategy(),
           retries: non_neg_integer(),
           on_validation_error: validation_mode(),
           repair_fun: repair_callback() | nil
@@ -34,6 +37,7 @@ defmodule Jido.AI.Output do
     :repair_fun,
     schema_kind: :zoi,
     mode: :prompt,
+    end_strategy: @default_end_strategy,
     retries: @default_retries,
     on_validation_error: @default_on_validation_error
   ]
@@ -53,12 +57,14 @@ defmodule Jido.AI.Output do
     retries = Map.get(attrs, :retries, @default_retries)
     mode = Map.get(attrs, :on_validation_error, @default_on_validation_error)
     enforcement = Map.get(attrs, :mode, :prompt)
+    end_strategy = Map.get(attrs, :end_strategy, @default_end_strategy)
     repair_fun = Map.get(attrs, :repair_fun)
 
     with {:ok, schema_kind} <- schema_kind(schema),
          {:ok, retries} <- normalize_retries(retries),
          {:ok, mode} <- normalize_mode(mode),
          {:ok, enforcement} <- normalize_enforcement(enforcement),
+         {:ok, end_strategy} <- normalize_end_strategy(end_strategy),
          {:ok, repair_fun} <- normalize_repair_fun(repair_fun),
          :ok <- validate_schema_shape(schema, schema_kind) do
       {:ok,
@@ -66,6 +72,7 @@ defmodule Jido.AI.Output do
          schema: schema,
          schema_kind: schema_kind,
          mode: enforcement,
+         end_strategy: end_strategy,
          retries: retries,
          on_validation_error: mode,
          repair_fun: repair_fun
@@ -236,12 +243,14 @@ defmodule Jido.AI.Output do
   def prepare_llm_opts(_output, opts, _action_tools), do: {:ok, opts}
 
   @doc false
-  @spec native_tool_call(t() | nil, [map()]) :: {:ok, map()} | :none | {:error, term()}
+  @spec native_tool_call(t() | nil, [map()]) ::
+          {:ok, map()} | {:mixed, map(), [map()]} | :none | {:error, term()}
   def native_tool_call(%__MODULE__{mode: :native}, calls) when is_list(calls) do
     case Enum.filter(calls, &(&1.name == @native_tool_name)) do
       [] -> :none
       [call] when length(calls) == 1 -> {:ok, call}
-      _calls -> {:error, output_error(:final_answer_must_be_the_only_tool_call, nil)}
+      [call] -> {:mixed, call, Enum.reject(calls, &(&1.name == @native_tool_name))}
+      _calls -> {:error, output_error(:multiple_final_answer_tool_calls, nil)}
     end
   end
 
@@ -271,6 +280,7 @@ defmodule Jido.AI.Output do
       schema: json_schema(output),
       retries: output.retries,
       on_validation_error: output.on_validation_error,
+      end_strategy: output.end_strategy,
       repair_fun: output.repair_fun
     }
 
@@ -494,6 +504,12 @@ defmodule Jido.AI.Output do
   defp normalize_enforcement(value) when value in [:prompt, "prompt"], do: {:ok, :prompt}
   defp normalize_enforcement(value) when value in [:native, "native"], do: {:ok, :native}
   defp normalize_enforcement(_value), do: {:error, "output mode must be :prompt or :native"}
+
+  defp normalize_end_strategy(value) when value in [:graceful, "graceful"], do: {:ok, :graceful}
+  defp normalize_end_strategy(value) when value in [:early, "early"], do: {:ok, :early}
+
+  defp normalize_end_strategy(_value),
+    do: {:error, "output end_strategy must be :graceful or :early"}
 
   defp normalize_mode(value) when value in [:repair, "repair"], do: {:ok, :repair}
   defp normalize_mode(value) when value in [:error, "error"], do: {:ok, :error}
