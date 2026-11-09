@@ -80,6 +80,11 @@ end
 
 ## Run All Requested Tools
 
+Each non-empty native tool-call ID is exposed to the invoked Action as
+`context[:tool_call_id]`, overriding a conflicting caller value for that invocation
+only. See [Tool Invocation Identity](tool_calling_with_actions.md#tool-invocation-identity)
+for retry, nested-call, and direct-execution semantics.
+
 `run_tools/3` executes every tool call in the turn and returns an updated turn with `tool_results` attached.
 
 ```elixir

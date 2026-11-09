@@ -9,6 +9,22 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
   defmodule DummyAction do
   end
 
+  defmodule IdentityAction do
+    use Jido.Action,
+      name: "identity_action",
+      description: "Reports Action invocation identity",
+      schema: Zoi.object(%{})
+
+    def run(_params, context) do
+      send(context.test_pid, {:action_identity, context.tool_call_id})
+
+      case Agent.get_and_update(context.attempts, &{&1, &1 + 1}) do
+        0 -> {:error, :transient_error}
+        _ -> {:ok, Map.take(context, [:tool_call_id, :call_id, :origin])}
+      end
+    end
+  end
+
   setup :set_mimic_from_context
 
   setup do
@@ -442,6 +458,30 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
   end
 
   describe "ToolExec DirectiveExec" do
+    for mode <- [:module, :lookup] do
+      test "passes stable native identity to a real Action across retries through #{mode} dispatch" do
+        supervisor = DirectiveSupport.start_task_supervisor!()
+        on_exit(fn -> DirectiveSupport.stop_task_supervisor(supervisor) end)
+        attempts = start_supervised!({Agent, fn -> 0 end})
+        context = %{test_pid: self(), attempts: attempts, origin: :test, call_id: "caller", tool_call_id: "stale"}
+
+        attrs = %{id: "native", tool_name: IdentityAction.name(), context: context, max_retries: 1, retry_backoff_ms: 0}
+        attrs = if unquote(mode) == :module, do: Map.put(attrs, :action_module, IdentityAction), else: attrs
+        directive = ToolExec.new!(attrs)
+        state = DirectiveSupport.state_with_supervisor(supervisor, %{tools: %{IdentityAction.name() => IdentityAction}})
+
+        assert {:async, nil, ^state} = DirectiveExec.exec(directive, nil, state)
+        started = DirectiveSupport.assert_signal_cast("ai.tool.started")
+        assert_receive {:action_identity, "native"}, 5_000
+        assert_receive {:action_identity, "native"}, 5_000
+        completed = DirectiveSupport.assert_signal_cast("ai.tool.result")
+        assert started.data.call_id == "native"
+        assert completed.data.call_id == "native"
+        assert completed.data.result == {:ok, %{tool_call_id: "native", call_id: "caller", origin: :test}, []}
+        assert directive.context.tool_call_id == "stale"
+      end
+    end
+
     test "emits successful tool_result for direct module execution" do
       supervisor = DirectiveSupport.start_task_supervisor!()
       on_exit(fn -> DirectiveSupport.stop_task_supervisor(supervisor) end)
@@ -449,7 +489,7 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
       Mimic.stub(Jido.AI.Turn, :execute_module, fn module, params, context, opts ->
         assert module == DummyAction
         assert params == %{"value" => 7}
-        assert context == %{origin: :test}
+        assert context == %{origin: :test, tool_call_id: "tool_ok"}
         assert get_in(opts, [:telemetry_metadata, :tool_call_id]) == "tool_ok"
         assert get_in(opts, [:telemetry_metadata, :call_id]) == "tool_ok"
         {:ok, %{value: 8}}
@@ -537,7 +577,8 @@ defmodule Jido.AI.Directive.ExecRuntimeTest do
       :persistent_term.put(key, 0)
       on_exit(fn -> :persistent_term.erase(key) end)
 
-      Mimic.stub(Jido.AI.Turn, :execute, fn _tool_name, _params, _context, _opts ->
+      Mimic.stub(Jido.AI.Turn, :execute, fn _tool_name, _params, context, _opts ->
+        assert context.tool_call_id == "tool_retry"
         attempt = :persistent_term.get(key, 0) + 1
         :persistent_term.put(key, attempt)
 

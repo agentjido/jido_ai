@@ -192,6 +192,11 @@ This means completion timing differences between tools do not reorder the observ
 
 ## Tool Context State Snapshots
 
+Each Action receives its native invocation ID in `context[:tool_call_id]`, matching
+the `:tool_started` and `:tool_completed` events. It overrides conflicting caller
+context, stays stable across retries, and is local to the invocation. See
+[Tool Invocation Identity](tool_calling_with_actions.md#tool-invocation-identity).
+
 Tool actions can read state snapshots from context keys:
 
 - `:state` (canonical, core Jido-compatible)

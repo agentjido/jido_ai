@@ -1108,6 +1108,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   defp execute_tool_with_retries(%PendingToolCall{} = pending_call, %Config{} = config, context) do
     module = pending_call.action_module || Map.get(config.tools, pending_call.name)
+    context = if pending_call.id != "", do: Map.put(context, :tool_call_id, pending_call.id), else: context
 
     case is_atom(module) and function_exported?(module, :name, 0) and function_exported?(module, :run, 2) do
       true ->
