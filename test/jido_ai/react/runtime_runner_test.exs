@@ -943,11 +943,13 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert Enum.any?(events, &(&1.kind == :request_failed))
   end
 
-  test "native output rejects mixed final-answer and action calls without executing actions" do
+  test "native output gracefully executes mixed action calls before accepting the final answer" do
+    arguments = %{"category" => "billing", "confidence" => 0.91, "summary" => "Total is 5"}
+
     Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
       chunks = [
         ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 2, "b" => 3}, %{id: "mixed_calc", index: 0}),
-        ReqLLM.StreamChunk.tool_call(Output.native_tool_name(), %{}, %{id: "mixed_final", index: 1})
+        ReqLLM.StreamChunk.tool_call(Output.native_tool_name(), arguments, %{id: "mixed_final", index: 1})
       ]
 
       {:ok, responses_stream_response(chunks, %{finish_reason: :tool_calls}, model)}
@@ -961,15 +963,45 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       })
 
     events = ReAct.stream("Classify this ticket", config) |> Enum.to_list()
-    assert Enum.any?(events, &(&1.kind == :request_failed))
-    refute Enum.any?(events, &(&1.kind == :tool_started))
+    assert Enum.find(events, &(&1.kind == :request_completed)).data.result.summary == "Total is 5"
+    assert Enum.any?(events, &(&1.kind == :tool_started and &1.tool_call_id == "mixed_calc"))
+    refute Enum.any?(events, &(&1.kind == :request_failed))
     checkpoint = Enum.find(Enum.reverse(events), &(&1.kind == :checkpoint and &1.data.reason == :terminal))
-    assert {:ok, failed_state, _claims} = ReAct.Token.decode_state(checkpoint.data.token, config)
-    messages = AIContext.to_messages(failed_state.context)
+    assert {:ok, completed_state, _claims} = ReAct.Token.decode_state(checkpoint.data.token, config)
+    assert completed_state.pending_native_output == nil
+    messages = AIContext.to_messages(completed_state.context)
 
     for id <- ["mixed_calc", "mixed_final"] do
       assert Enum.any?(messages, &(message_role(&1) == :tool and &1[:tool_call_id] == id))
     end
+  end
+
+  test "native output can accept a mixed final answer early and skip action calls" do
+    arguments = %{"category" => "account", "confidence" => 0.99, "summary" => "Done early"}
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
+      chunks = [
+        ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 2, "b" => 3}, %{id: "early_calc", index: 0}),
+        ReqLLM.StreamChunk.tool_call(Output.native_tool_name(), arguments, %{id: "early_final", index: 1})
+      ]
+
+      {:ok, responses_stream_response(chunks, %{finish_reason: :tool_calls}, model)}
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{CalculatorTool.name() => CalculatorTool},
+        output: [schema: ticket_schema(), mode: :native, end_strategy: :early]
+      })
+
+    events = ReAct.stream("Classify this ticket", config) |> Enum.to_list()
+    assert Enum.find(events, &(&1.kind == :request_completed)).data.result.summary == "Done early"
+    refute Enum.any?(events, &(&1.kind == :tool_started))
+
+    assert Enum.any?(events, fn event ->
+             event.kind == :tool_completed and event.tool_call_id == "early_calc" and event.data.skipped
+           end)
   end
 
   test "repair receives the full conversation and complete answer when native enforcement is ignored" do
@@ -1918,14 +1950,27 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
   test "continuation model survives checkpoints and old checkpoints remain readable" do
     alias Jido.AI.Reasoning.ReAct.State
 
-    state = State.new("Calculate", nil) |> State.put_llm_response_id("resp_1", "openai:gpt-4o-mini")
+    pending_output = %{id: "final_1", name: Output.native_tool_name(), arguments: %{"summary" => "Done"}}
+
+    state =
+      State.new("Calculate", nil)
+      |> State.put_llm_response_id("resp_1", "openai:gpt-4o-mini")
+      |> State.put_pending_native_output(pending_output)
+
     checkpoint = State.minimal_checkpoint_map(state)
     assert {:ok, restored} = State.from_checkpoint_map(checkpoint)
     assert restored.llm_response_model == "openai:gpt-4o-mini"
     assert restored.llm_response_id == "resp_1"
+    assert restored.pending_native_output == pending_output
 
-    assert {:ok, legacy} = checkpoint |> Map.delete(:llm_response_model) |> State.from_checkpoint_map()
+    assert {:ok, legacy} =
+             checkpoint
+             |> Map.delete(:llm_response_model)
+             |> Map.delete(:pending_native_output)
+             |> State.from_checkpoint_map()
+
     assert legacy.llm_response_model == nil
+    assert legacy.pending_native_output == nil
   end
 
   test "passes previous_response_id between streaming tool rounds for OpenAI Responses models" do

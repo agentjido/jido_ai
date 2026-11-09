@@ -578,9 +578,16 @@ config = Jido.AI.Reasoning.ReAct.build_config(%{
 
 Native mode adds the reserved `jido_ai_final_answer` tool and requires a tool call
 on each turn. The model can choose an action tool or submit its final answer. The
-final-answer call must be alone; it is consumed by the runtime and validated with
-the output schema, without executing a Jido action. Its response is recorded in
-the conversation so tool-call history remains complete.
+final-answer call is consumed by the runtime and validated with the output schema,
+without executing a Jido action. Its response is recorded in the conversation so
+tool-call history remains complete.
+
+Some providers can return the final-answer call and action calls in one response.
+The default `end_strategy: :graceful` executes the action calls first and then
+accepts the final answer. It does not make another model request. Use
+`end_strategy: :early` to accept the final answer immediately and record the
+other action calls as skipped. A response with more than one final-answer call
+still fails validation.
 
 Strict enforcement depends on the provider and model. Local schema validation
 always runs. If a model returns prose or an invalid object, the existing
