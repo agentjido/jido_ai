@@ -1,5 +1,10 @@
 # Jido.AI
 
+> [!IMPORTANT]
+> Jido AI is now part of [Jido V3](https://github.com/agentjido/jido/tree/release/v3).
+> This repository and its Hex releases are kept as the history of the standalone package.
+> Use the `jido` package and the main Jido repository for current V3 development and releases.
+
 [![Hex.pm](https://img.shields.io/hexpm/v/jido_ai.svg)](https://hex.pm/packages/jido_ai)
 [![Hex Docs](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/jido_ai/)
 [![CI](https://github.com/agentjido/jido_ai/actions/workflows/ci.yml/badge.svg)](https://github.com/agentjido/jido_ai/actions/workflows/ci.yml)
