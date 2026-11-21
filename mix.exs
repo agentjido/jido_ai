@@ -3,7 +3,7 @@ defmodule JidoAi.MixProject do
 
   @version "2.4.0"
   @source_url "https://github.com/agentjido/jido_ai"
-  @description "AI integration layer for the Jido ecosystem - Actions, Workflows, and LLM orchestration"
+  @description "AI integration layer for the Jido ecosystem - Actions, Workflows, and LLM orchestration. Maintained for one year after Jido 3.0.0 is released. For Jido v3, use the jido package."
   def project do
     [
       app: :jido_ai,
