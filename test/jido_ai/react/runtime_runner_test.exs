@@ -53,6 +53,23 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     end
   end
 
+  defmodule BlockingValidationTool do
+    use Jido.Action,
+      name: "blocking_validation_tool",
+      description: "Waits in parameter validation before the action timeout starts",
+      schema: Zoi.object(%{})
+
+    @impl true
+    def on_before_validate_params(params) do
+      receive do
+        :release -> {:ok, params}
+      end
+    end
+
+    @impl true
+    def run(_params, _context), do: {:ok, %{}}
+  end
+
   defmodule CalculatorTool do
     use Jido.Action,
       name: "calculator",
@@ -2366,7 +2383,7 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     assert request_completed.data.result == "Result is 5"
   end
 
-  test "retries tool execution and reports attempts in tool_completed" do
+  test "allows retry backoff beyond the first attempt timeout and reports both attempts" do
     Mimic.stub(ReqLLM.Generation, :stream_text, fn model, _messages, _opts ->
       count = :persistent_term.get({__MODULE__, :llm_call_count}, 0) + 1
       :persistent_term.put({__MODULE__, :llm_call_count}, count)
@@ -2392,8 +2409,9 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
       Config.new(%{
         model: :capable,
         tools: %{RetryTool.name() => RetryTool},
-        tool_max_retries: 2,
-        tool_retry_backoff_ms: 0
+        tool_timeout_ms: 100,
+        tool_max_retries: 1,
+        tool_retry_backoff_ms: 250
       })
 
     events =
@@ -2407,6 +2425,56 @@ defmodule Jido.AI.Reasoning.ReAct.RuntimeRunnerTest do
     refute is_nil(tool_completed)
     assert tool_completed.data.attempts == 2
     assert match?({:ok, _, _}, tool_completed.data.result)
+  end
+
+  test "reports a tool task timeout and completes the round with the other tool results" do
+    parent = self()
+
+    Mimic.stub(ReqLLM.Generation, :stream_text, fn model, messages, _opts ->
+      if Enum.any?(messages, &(&1.role == :tool)) do
+        send(parent, {:messages_after_tool_timeout, messages})
+
+        {:ok,
+         responses_stream_response(
+           [ReqLLM.StreamChunk.text("Tool round complete")],
+           %{finish_reason: :stop, usage: %{input_tokens: 2, output_tokens: 1}},
+           model
+         )}
+      else
+        {:ok,
+         responses_stream_response(
+           [
+             ReqLLM.StreamChunk.tool_call("blocking_validation_tool", %{}, %{id: "tc_timeout"}),
+             ReqLLM.StreamChunk.tool_call("calculator", %{"a" => 2, "b" => 3}, %{id: "tc_calculator"})
+           ],
+           %{finish_reason: :tool_calls, usage: %{input_tokens: 5, output_tokens: 3}},
+           model
+         )}
+      end
+    end)
+
+    config =
+      Config.new(%{
+        model: :capable,
+        tools: %{BlockingValidationTool.name() => BlockingValidationTool, CalculatorTool.name() => CalculatorTool},
+        tool_timeout_ms: 100,
+        tool_max_retries: 0
+      })
+
+    events = ReAct.stream("Run both tools", config) |> Enum.to_list()
+
+    assert [
+             %{tool_call_id: "tc_timeout", data: %{result: {:error, %{type: :timeout}, []}}},
+             %{tool_call_id: "tc_calculator", data: %{result: {:ok, %{result: 5}, []}}}
+           ] = Enum.filter(events, &(&1.kind == :tool_completed))
+
+    assert_receive {:messages_after_tool_timeout, messages}
+    assert %{content: content} = Enum.find(messages, &(&1[:tool_call_id] == "tc_timeout"))
+    assert {:ok, %{"ok" => false, "error" => %{"type" => "timeout"}}} = Jason.decode(content)
+
+    assert Enum.any?(events, &(&1.kind == :checkpoint and &1.data.reason == :after_tools))
+    assert %{kind: :request_completed, data: %{result: "Tool round complete", usage: usage}} = List.last(events)
+    assert %{input_tokens: 7, output_tokens: 4} = usage
   end
 
   test "marks only the real load_skill action durable in runtime events" do

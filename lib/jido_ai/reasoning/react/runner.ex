@@ -25,6 +25,7 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
   @cleanup_wait_ms 25
   @stream_control_wait_ms 10
+  @tool_attempt_grace_ms 50
   @openai_websocket_session_key {__MODULE__, :openai_websocket_session}
 
   # Injected as a user message when the agent repeats the exact same tool
@@ -861,22 +862,11 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
 
           {results, heartbeat_last_seq} =
             try do
-              mapped =
-                pending
-                |> Task.async_stream(
-                  fn call -> execute_tool_with_retries(call, tool_config, context) end,
-                  ordered: true,
-                  max_concurrency: tool_config.tool_exec.concurrency,
-                  timeout: tool_config.tool_exec.timeout_ms + 50
-                )
-                |> Enum.map(fn
-                  {:ok, result} -> result
-                  {:exit, reason} -> {:error, %{type: :task_exit, reason: inspect(reason)}}
-                end)
+              results = execute_tool_batch(pending, tool_config, context)
 
               # Synchronously stop the heartbeat and learn the highest seq it
               # allocated, so the runner can resume above that range.
-              {mapped, stop_tool_heartbeat(heartbeat)}
+              {results, stop_tool_heartbeat(heartbeat)}
             after
               # Crash-safety net: guarantee the heartbeat process is gone even if
               # the tool block raised before the synchronous stop ran.
@@ -927,10 +917,6 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
                   {:error, reason} ->
                     {:halt, {:error, acc, reason}}
                 end
-
-              {:error, reason}, {:ok, acc, context_acc, result_acc} ->
-                Logger.error("tool task failure", reason: inspect(reason))
-                {:cont, {:ok, acc, context_acc, result_acc}}
             end)
 
           case transformed_results do
@@ -1158,6 +1144,45 @@ defmodule Jido.AI.Reasoning.ReAct.Runner do
   end
 
   defp delete_in_path(map, _path), do: map
+
+  defp execute_tool_batch(pending, %Config{tool_exec: tool_exec} = config, context) do
+    timeout_ms = normalize_timeout(tool_exec[:timeout_ms])
+    max_retries = normalize_retry_count(tool_exec[:max_retries])
+    backoff_ms = normalize_backoff(tool_exec[:retry_backoff_ms])
+    task_timeout_ms = (timeout_ms + @tool_attempt_grace_ms) * (max_retries + 1) + backoff_ms * max_retries
+
+    pending
+    |> Task.async_stream(
+      fn call -> execute_tool_with_retries(call, config, context) end,
+      ordered: true,
+      max_concurrency: tool_exec.concurrency,
+      timeout: task_timeout_ms,
+      on_timeout: :kill_task,
+      zip_input_on_exit: true
+    )
+    |> Enum.map(fn
+      {:ok, result} ->
+        result
+
+      {:exit, {call, :timeout}} ->
+        error =
+          Error.error_envelope(
+            :timeout,
+            "Tool execution timed out",
+            %{tool_name: call.name, timeout_ms: task_timeout_ms},
+            true
+          )
+
+        # The worker did not report an attempt count. Record one attempt.
+        {call, {:error, error, []}, 1, task_timeout_ms}
+
+      {:exit, {call, reason}} ->
+        reason = inspect(reason)
+        Logger.error("tool task failure", reason: reason)
+        error = Error.error_envelope(:task_exit, "Tool task exited", %{tool_name: call.name, reason: reason})
+        {call, {:error, error, []}, 1, 0}
+    end)
+  end
 
   defp execute_tool_with_retries(%PendingToolCall{} = pending_call, %Config{} = config, context) do
     module = pending_call.action_module || Map.get(config.tools, pending_call.name)
