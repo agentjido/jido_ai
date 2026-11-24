@@ -24,7 +24,10 @@ Package defaults are built into `Jido.AI`; `model_aliases` is merged on top for 
   - `max_iterations`: `10`
   - `max_tokens`: `4096`
   - `request_policy`: `:reject`
-  - `tool_timeout_ms`: `15_000`
+  - `tool_timeout_ms`: `15_000` per action attempt. The runner gives each tool
+    task time for its configured retries and backoff. If the tool task reaches
+    its time limit, the runner records a timeout for that call and continues
+    the tool round.
   - `tool_max_retries`: `1`
   - `tool_retry_backoff_ms`: `200`
   - `stream_timeout_ms`: `0` (0 = auto-derive the runner's inter-event idle
